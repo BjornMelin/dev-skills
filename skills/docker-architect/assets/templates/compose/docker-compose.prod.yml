@@ -1,0 +1,18 @@
+services:
+  app:
+    environment:
+      - PORT={{CONTAINER_PORT}}
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Healthchecks are app-specific. Prefer a lightweight HTTP/CLI check.
+    # Note: minimal/distroless images often lack a shell/curl; use an in-app CLI or add a tiny probe binary.
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -fsS http://localhost:{{CONTAINER_PORT}}/healthz || exit 1"]
+    #   interval: 10s
+    #   timeout: 2s
+    #   retries: 10

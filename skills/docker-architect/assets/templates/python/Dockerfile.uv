@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+
+ARG PYTHON_VERSION=3.12
+ARG DEBIAN_RELEASE=bookworm
+
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE} AS base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# ---- builder ----
+FROM base AS builder
+WORKDIR /app
+
+# Install uv by copying binaries from the official distroless uv image.
+# Best practice: pin to a specific uv version tag (and optionally digest).
+ARG UV_VERSION=0.9.22
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /bin/
+
+# Ensure certificates exist for TLS package downloads (PyPI, Git, etc.)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Copy only dependency files first for caching
+COPY pyproject.toml ./
+COPY uv.lock* ./
+
+# Create venv and sync deps (requires uv.lock for fully deterministic builds)
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv venv /opt/venv \
+  && . /opt/venv/bin/activate \
+  && uv sync --frozen --no-dev --no-install-project
+
+# Copy the rest of the app
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv \
+  . /opt/venv/bin/activate \
+  && uv sync --frozen --no-dev
+
+# ---- runtime ----
+FROM base AS runtime
+WORKDIR /app
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PORT=8000
+
+# Create non-root user
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+USER 10001
+EXPOSE 8000
+
+# Set a repo-specific CMD (examples):
+# - FastAPI: ["uvicorn", "myapp.api:app", "--host=0.0.0.0", "--port=8000"]
+# - CLI: ["python", "-m", "myapp"]
+CMD ["python", "-m", "app"]

@@ -1,0 +1,63 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+ehthumbs.db
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Editor/project settings
+.idea/
+.vscode/
+
+# Logs / temp
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node / JS
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Generic build outputs (root-level only)
+/build/
+/dist/
+
+# Skill bundles (build artifacts)
+skills/dist/
+*.skill
+skills/*.zip

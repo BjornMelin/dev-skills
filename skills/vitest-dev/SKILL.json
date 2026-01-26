@@ -1,0 +1,16 @@
+{
+  "name": "vitest-dev",
+  "version": "0.1.0",
+  "entry": "skill.md",
+  "description": "World-class Vitest QA/test engineer for TypeScript + Next.js (local + CI performance focused)",
+  "files": [
+    "skill.md",
+    "README.md",
+    "LICENSE",
+    "checklists/",
+    "references/",
+    "templates/",
+    "scripts/",
+    "examples/"
+  ]
+}

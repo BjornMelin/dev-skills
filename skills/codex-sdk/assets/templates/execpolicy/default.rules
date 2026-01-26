@@ -1,0 +1,49 @@
+# Example execpolicy rules (prefix_rule language; Starlark syntax).
+#
+# Use as a starting point. Apply the principle of least privilege:
+# - allow safe, read-only inspection commands
+# - prompt for potentially destructive operations
+# - forbid privilege escalation and obvious footguns
+
+prefix_rule(
+    pattern = ["git", "status"],
+    decision = "allow",
+    justification = "Safe repository status check.",
+    match = [["git", "status"], "git status"],
+)
+
+prefix_rule(
+    pattern = ["git", "diff"],
+    decision = "allow",
+    justification = "Safe diff inspection.",
+    match = [["git", "diff"], "git diff --name-only"],
+)
+
+prefix_rule(
+    pattern = [["rg", "ripgrep"]],
+    decision = "allow",
+    justification = "Fast repository search.",
+    match = ["rg \"TODO\" ."],
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "prompt",
+    justification = "Remote writes are sensitive; require explicit approval.",
+    match = [["git", "push"], "git push origin main"],
+)
+
+prefix_rule(
+    pattern = ["sudo"],
+    decision = "forbidden",
+    justification = "Never escalate privileges in agentic workflows.",
+    match = [["sudo", "true"], "sudo -n true"],
+)
+
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Destructive recursive delete is too risky; use targeted deletions with review.",
+    match = [["rm", "-rf", "/tmp/something"]],
+)
+

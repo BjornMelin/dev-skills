@@ -1,0 +1,39 @@
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim AS base
+
+WORKDIR /app
+
+ENV PNPM_HOME="/pnpm" \
+    PATH="/pnpm:$PATH"
+
+RUN corepack enable
+
+# ---- deps (cacheable) ----
+FROM base AS deps
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+  pnpm fetch
+
+# ---- build ----
+FROM base AS build
+COPY --from=deps /pnpm/store /pnpm/store
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+  pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm run build \
+  && pnpm prune --prod
+
+# ---- runtime ----
+FROM base AS runtime
+ENV NODE_ENV=production \
+    PORT=3000
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
+COPY --from=build /app /app
+
+USER 10001
+EXPOSE 3000
+CMD ["pnpm", "start"]

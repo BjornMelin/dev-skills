@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: {{IMAGE_NAME}}
+    ports:
+      - "{{HOST_PORT}}:{{CONTAINER_PORT}}"
+    environment:
+      - PORT={{CONTAINER_PORT}}
+

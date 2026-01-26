@@ -1,0 +1,11 @@
+services:
+  app:
+    environment:
+      - PORT={{CONTAINER_PORT}}
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: {{DEV_COMMAND}}
+    # DEV_COMMAND can be a string or a YAML list. Prefer list form for correctness:
+    #   ["python","-m","uvicorn","myapp.api:app","--host","0.0.0.0","--port","{{CONTAINER_PORT}}","--reload"]
+    #   ["npm","run","dev"]

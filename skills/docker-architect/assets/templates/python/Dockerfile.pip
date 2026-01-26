@@ -1,0 +1,44 @@
+# syntax=docker/dockerfile:1
+
+ARG PYTHON_VERSION=3.12
+ARG DEBIAN_RELEASE=bookworm
+
+FROM python:${PYTHON_VERSION}-slim-${DEBIAN_RELEASE} AS base
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+# ---- builder ----
+FROM base AS builder
+WORKDIR /app
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends build-essential ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY requirements*.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+  python -m venv /opt/venv \
+  && . /opt/venv/bin/activate \
+  && pip install -r requirements.txt
+
+COPY . .
+
+# ---- runtime ----
+FROM base AS runtime
+WORKDIR /app
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PORT=8000
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+USER 10001
+EXPOSE 8000
+
+# Set a repo-specific CMD
+CMD ["python", "-m", "app"]

@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24
+FROM node:${NODE_VERSION}-slim AS base
+
+# ---- deps ----
+FROM base AS deps
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN --mount=type=cache,target=/root/.npm \
+  npm ci
+
+# ---- build ----
+FROM deps AS build
+COPY . .
+RUN npm run build \
+  && npm prune --omit=dev
+
+# ---- runtime ----
+FROM base AS runtime
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
+
+COPY --from=build /app ./
+
+USER 10001
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]
