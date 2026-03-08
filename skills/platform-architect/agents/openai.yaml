@@ -1,0 +1,14 @@
+interface:
+  display_name: "Platform Architect"
+  short_description: "Architect modern Next, Expo, Convex, and monorepo stacks"
+  default_prompt: "Use $platform-architect to detect the active platform lanes, choose the correct architecture path, and route into the right repo-native skill or verification workflow."
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Library and framework documentation"
+    - type: "mcp"
+      value: "exa"
+      description: "Latest platform research when official docs are not enough"

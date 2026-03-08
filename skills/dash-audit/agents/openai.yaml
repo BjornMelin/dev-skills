@@ -1,0 +1,6 @@
+interface:
+  display_name: "Dash Audit"
+  short_description: "Audit Dash callbacks, UI state, and regression risks"
+  default_prompt: "Use $dash-audit to map Dash callbacks, review the relevant UI surfaces, and return grouped findings with the highest-risk fixes first."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,15 @@
+interface:
+  display_name: "Convex Feature Spec"
+  short_description: "Write Convex-first feature specs with rollout and verification"
+  default_prompt: "Use $convex-feature-spec to generate a complete Convex-first feature plan with schema, API, rollout, and verification details."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current API and library docs"
+    - type: "mcp"
+      value: "exa"
+      description: "Supplemental current research for edge cases"
+
