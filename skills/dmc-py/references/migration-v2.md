@@ -278,6 +278,115 @@ def update_popover():
 - [ ] Test RichTextEditor customizations (if using)
 - [ ] Verify CodeHighlight language availability
 
+## New Features in v2.3 - v2.5
+
+### v2.5.x Updates
+
+**TableOfContents (v2.5.0):**
+```python
+dmc.TableOfContents(
+    links=[
+        {"label": "Section 1", "link": "#section-1", "order": 1},
+        {"label": "Subsection", "link": "#subsection", "order": 2},
+        {"label": "Section 2", "link": "#section-2", "order": 1},
+    ],
+    variant="filled"  # or "light", "subtle"
+)
+```
+
+**Combobox Improvements (v2.5.0):**
+```python
+dmc.Select(
+    data=["Option 1", "Option 2"],
+    selectFirstOptionOnDropdownOpen=True,  # NEW: auto-select first option
+    openOnFocus=True,  # NEW: open dropdown on focus
+)
+```
+
+**AppShell Static Mode (v2.5.0):**
+```python
+dmc.AppShell(
+    mode="static",  # For nested app shells
+    # ...
+)
+```
+
+**Window Globals (v2.5.0):**
+- `window.MantineCore` - Access Mantine core components
+- `window.MantineHooks` - Access Mantine hooks
+- Useful for building custom Dash components that need Mantine integration
+
+### v2.4.x Updates
+
+**CopyButton (v2.4.0):**
+```python
+dmc.CopyButton(
+    value="Text to copy",
+    timeout=2000,  # Reset after 2 seconds
+)
+```
+
+**RichTextEditor Enhancements (v2.4.0):**
+```python
+# Access editor instance in clientside callback
+from dash import clientside_callback
+
+clientside_callback(
+    """
+    function(n_clicks) {
+        const editor = dmc.getEditor("editor-id");
+        if (editor) {
+            editor.commands.setContent("<p>New content</p>");
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("dummy", "children"),
+    Input("update-btn", "n_clicks"),
+)
+```
+
+### v2.3.x Updates
+
+**MiniCalendar (v2.3.0):**
+```python
+dmc.MiniCalendar(
+    value="2025-01-15",
+    type="default",  # or "multiple", "range"
+)
+```
+
+**ScrollAreaAutoheight (v2.3.0):**
+```python
+dmc.ScrollAreaAutoheight(
+    minHeight=100,
+    maxHeight=400,
+    children=[...]
+)
+```
+
+**DirectionProvider (v2.3.0):**
+```python
+dmc.DirectionProvider(
+    dir="rtl",  # Right-to-left support
+    children=[...]
+)
+```
+
+### NotificationProvider → NotificationContainer
+
+The `NotificationProvider` component has been deprecated. Use `NotificationContainer` instead:
+
+**Old (deprecated):**
+```python
+dmc.NotificationProvider(position="top-right")
+```
+
+**New:**
+```python
+dmc.NotificationContainer(position="top-right")
+```
+
 ## Testing After Migration
 
 1. **Visual regression:**

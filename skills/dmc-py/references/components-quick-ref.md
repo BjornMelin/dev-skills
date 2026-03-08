@@ -1,6 +1,6 @@
 # DMC Components Quick Reference
 
-> Dash Mantine Components v2.4.0 (Mantine 8.3.6)
+> Dash Mantine Components v2.x (Mantine 8.x)
 
 ## Component Categories
 
@@ -10,6 +10,7 @@
 | Button | `variant`, `color`, `size`, `radius`, `leftSection`, `rightSection`, `loading`, `fullWidth` | `n_clicks` | Standard button with variants (filled, light, outline, subtle, transparent, white, gradient) |
 | ActionIcon | `variant`, `color`, `size`, `radius`, `loading` | `n_clicks` | Icon button with same variants as Button |
 | CopyButton | `value`, `timeout` | - | Button that copies text to clipboard |
+| CustomCopyButton | `value`, `timeout`, `children` | `copied` | Customizable copy button (use with render function) |
 
 **Button Variants**: `filled`, `light`, `outline`, `subtle`, `transparent`, `white`, `gradient`
 
@@ -34,6 +35,10 @@
 | MultiSelect | `data`, `value`, `searchable`, `clearable`, `limit`, `maxDropdownHeight` | `value` | Multiple selection dropdown |
 | Autocomplete | `data`, `value`, `limit`, `maxDropdownHeight` | `value` | Input with autocomplete |
 | TagsInput | `value`, `maxTags`, `splitChars`, `clearable` | `value` | Multi-value text input |
+
+**New Combobox Props (v2.5+):**
+- `selectFirstOptionOnDropdownOpen` - Automatically select first option when dropdown opens
+- `openOnFocus` - Open dropdown when input receives focus
 
 ### Data Display
 | Component | Key Props | Events | Description |
@@ -123,6 +128,8 @@
 | AppShellAside | `width`, `breakpoint`, `collapsed` | Aside section |
 | AppShellFooter | `height` | Footer section |
 | AppShellMain | - | Main content section |
+| ScrollArea | `h`, `w`, `offsetScrollbars`, `type` | Scrollable container |
+| ScrollAreaAutoheight | `minHeight`, `maxHeight`, `offsetScrollbars` | Auto-height scrollable container (v2.3+) |
 
 ### Miscellaneous
 | Component | Key Props | Description |
@@ -133,6 +140,7 @@
 | Collapse | `in`, `transitionDuration`, `transitionTimingFunction` | Collapsible content |
 | ScrollArea | `type`, `offsetScrollbars`, `scrollbarSize`, `scrollHideDelay` | Custom scrollbar area |
 | VisuallyHidden | - | Screen reader only content |
+| DirectionProvider | `dir` | RTL/LTR text direction wrapper (v2.3+) |
 
 ### Navigation
 | Component | Key Props | Events | Description |
@@ -149,6 +157,7 @@
 | Stepper.Step | `label`, `description`, `icon`, `completedIcon`, `progressIcon`, `color`, `loading` | - | Individual step |
 | Pagination | `total`, `value`, `siblings`, `boundaries`, `withEdges`, `withControls` | `value` | Page navigation |
 | Tree | `data`, `selectOnClick`, `clearSelectionOnOutsideClick` | - | Tree structure |
+| TableOfContents | `links`, `variant`, `active` | `active` | Auto-generated table of contents (v2.5+) |
 
 **NavLink Variants**: `filled`, `light`, `subtle`
 

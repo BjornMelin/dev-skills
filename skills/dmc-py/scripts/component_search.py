@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""DMC Component Search - Search Dash Mantine Components documentation
+"""DMC Component Search - Search local skill references and official documentation
+
+Searches the local skill reference files and optionally the cached official
+llms.txt documentation for Dash Mantine Components information.
 
 Usage:
     component_search.py <query> [options]
@@ -8,27 +11,39 @@ Options:
     --category CATEGORY    Filter by component category
     --props               Search prop definitions only
     --limit N             Max results (default: 10)
+    --online              Also search cached llms.txt (via fetch_docs.py)
+    --docs-dir PATH       Custom documentation directory path
+
+Examples:
+    python component_search.py "Button"
+    python component_search.py "Select" --props --limit 20
+    python component_search.py "TableOfContents" --online
 """
+
+from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 
 def find_docs_directory() -> Path | None:
-    """Find DMC documentation directory.
+    """Find DMC skill references directory.
 
-    Searches in common locations for DMC docs.
+    Searches in known locations for the skill references.
 
     Returns:
-        Path to docs directory if found, None otherwise
+        Path to references directory if found, None otherwise
     """
     possible_paths = [
-        Path.home() / ".agent" / "dash-mantine-components",
-        Path.home() / ".claude" / "skills" / "dmc-py" / "docs",
-        Path.cwd() / "docs" / "dash-mantine-components",
-        Path.cwd() / ".agent" / "dash-mantine-components",
+        # Primary locations for the skill
+        Path.home() / ".codex" / "skills" / "dmc-py" / "references",
+        Path.home() / ".claude" / "skills" / "dmc-py" / "references",
+        # Fallback to current directory structure
+        Path(__file__).parent.parent / "references",
+        Path.cwd() / "references",
     ]
 
     for path in possible_paths:
@@ -60,15 +75,13 @@ def search_files(
     results = []
     pattern = re.compile(re.escape(query), re.IGNORECASE)
 
-    # Determine file pattern
-    if category:
-        file_pattern = f"**/{category}/*.md"
-    else:
-        file_pattern = "**/*.md"
-
-    # Search files
-    for file_path in docs_dir.glob(file_pattern):
+    # Search markdown files
+    for file_path in docs_dir.glob("**/*.md"):
         if not file_path.is_file():
+            continue
+
+        # Category filter - match filename
+        if category and category.lower() not in file_path.stem.lower():
             continue
 
         try:
@@ -125,7 +138,7 @@ def format_result(
     try:
         rel_path = file_path.relative_to(docs_dir)
     except ValueError:
-        rel_path = file_path
+        rel_path = file_path.name
 
     # Highlight query in content (simple approach)
     highlighted = re.sub(
@@ -138,28 +151,72 @@ def format_result(
     return f"{rel_path}:{line_num}\n  {highlighted}"
 
 
+def search_online(query: str, limit: int = 5) -> None:
+    """Search cached llms.txt via fetch_docs.py.
+
+    Args:
+        query: Search query
+        limit: Maximum results
+    """
+    fetch_docs = Path(__file__).parent / "fetch_docs.py"
+
+    if not fetch_docs.exists():
+        print(
+            "\nOnline search unavailable: fetch_docs.py not found",
+            file=sys.stderr,
+        )
+        return
+
+    print(f"\n{'=' * 40}")
+    print("Online docs (via fetch_docs.py):")
+    print("=" * 40)
+
+    try:
+        subprocess.run(
+            [sys.executable, str(fetch_docs), query, "--limit", str(limit)],
+            check=False,
+        )
+    except Exception as e:
+        print(f"Error running fetch_docs.py: {e}", file=sys.stderr)
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="DMC Component Search - Search Dash Mantine Components documentation",
+        description="DMC Component Search - Search skill references and online docs",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s "Button"                   Search for Button
+  %(prog)s "Select" --props           Search only prop definitions
+  %(prog)s "TableOfContents" --online Include online docs search
+""",
     )
 
     parser.add_argument("query", help="Search query string")
     parser.add_argument(
         "--category",
-        help="Filter by component category",
+        "-c",
+        help="Filter by category (matches filename)",
     )
     parser.add_argument(
         "--props",
+        "-p",
         action="store_true",
         help="Search prop definitions only",
     )
     parser.add_argument(
         "--limit",
+        "-n",
         type=int,
         default=10,
         help="Maximum results (default: 10)",
+    )
+    parser.add_argument(
+        "--online",
+        "-o",
+        action="store_true",
+        help="Also search cached llms.txt via fetch_docs.py",
     )
     parser.add_argument(
         "--docs-dir",
@@ -174,18 +231,19 @@ def main() -> None:
 
     if not docs_dir:
         print(
-            "Error: Could not find DMC documentation directory.\n"
+            "Warning: Could not find skill references directory.\n"
             "Searched in:\n"
-            "  - ~/.agent/dash-mantine-components\n"
-            "  - ~/.claude/skills/dmc-py/docs\n"
-            "  - ./docs/dash-mantine-components\n"
-            "  - ./.agent/dash-mantine-components\n\n"
-            "Use --docs-dir to specify a custom path.",
+            "  - ~/.codex/skills/dmc-py/references\n"
+            "  - ~/.claude/skills/dmc-py/references\n\n"
+            "Use --docs-dir to specify a custom path, or --online for web docs.",
             file=sys.stderr,
         )
+        if args.online:
+            search_online(args.query, args.limit)
+            return
         sys.exit(1)
 
-    # Perform search
+    # Perform local search
     results = search_files(
         args.query,
         docs_dir,
@@ -194,16 +252,20 @@ def main() -> None:
         args.limit,
     )
 
-    # Display results
+    # Display local results
     if not results:
-        print(f"No results found for '{args.query}'")
-        return
+        print(f"No local results found for '{args.query}' in {docs_dir}")
+    else:
+        print(f"Found {len(results)} local result(s) for '{args.query}':\n")
+        for file_path, line_num, line_content in results:
+            print(
+                format_result(file_path, line_num, line_content, docs_dir, args.query)
+            )
+            print()
 
-    print(f"Found {len(results)} result(s) for '{args.query}':\n")
-
-    for file_path, line_num, line_content in results:
-        print(format_result(file_path, line_num, line_content, docs_dir, args.query))
-        print()  # Blank line between results
+    # Optionally search online docs
+    if args.online:
+        search_online(args.query, args.limit)
 
 
 if __name__ == "__main__":
