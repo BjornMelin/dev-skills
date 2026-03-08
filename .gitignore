@@ -64,3 +64,4 @@ skills/*.zip
 
 # Local skill tooling caches
 skills/bun-dev/.bun-platform/
+skills/bun-dev/references/release-sync-report.json

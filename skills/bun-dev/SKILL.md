@@ -145,7 +145,7 @@ Platform state:
 
 - `.bun-platform/cache.sqlite`: shared scan cache
 - `.bun-platform/rollbacks/`: safe-fix rollback artifacts
-- `references/release-sync-report.json`: release intelligence summary
+- `references/release-sync-report.json`: local generated release intelligence summary (ignored; not committed)
 
 Config file:
 
