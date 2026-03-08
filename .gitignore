@@ -61,3 +61,6 @@ pnpm-debug.log*
 skills/dist/
 *.skill
 skills/*.zip
+
+# Local skill tooling caches
+skills/bun-dev/.bun-platform/
