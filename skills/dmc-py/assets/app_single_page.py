@@ -1,5 +1,7 @@
 """Single-Page Dash Mantine Components Application Template
 
+Compatible with: DMC 2.x (dash-mantine-components>=2.5.0)
+
 Complete template for a single-page DMC app with:
 - MantineProvider wrapper with theme persistence
 - Theme toggle functionality (clientside callback)
@@ -31,7 +33,7 @@ app.layout = dmc.MantineProvider(
         # Theme persistence store
         dcc.Store(id="theme-store", storage_type="local", data={"theme": "light"}),
         # Notification container
-        dmc.NotificationProvider(position="top-right"),
+        dmc.NotificationContainer(position="top-right"),
         html.Div(id="notifications-container"),
         # Main content
         dmc.Container(

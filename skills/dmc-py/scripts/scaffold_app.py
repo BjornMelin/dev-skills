@@ -35,7 +35,6 @@ def create_single_page_app(
     shell_layout = """
     app.layout = dmc.MantineProvider(
         id="mantine-provider",
-        theme={"colorScheme": "auto"},
         children=[
             dmc.AppShell(
                 children=[
@@ -43,7 +42,7 @@ def create_single_page_app(
                         dmc.Group([
                             dmc.Text(f"{app_name}", size="xl", fw=700),
                             dmc.ActionIcon(
-                                dmc.Icon(icon="tabler:sun"),
+                                DashIconify(icon="tabler:sun", width=20),
                                 id="theme-toggle",
                                 variant="default",
                                 size="lg",
@@ -53,8 +52,8 @@ def create_single_page_app(
                     ),
                     dmc.AppShellNavbar(
                         dmc.Stack([
-                            dmc.NavLink(label="Home", leftSection=dmc.Icon(icon="tabler:home")),
-                            dmc.NavLink(label="About", leftSection=dmc.Icon(icon="tabler:info-circle")),
+                            dmc.NavLink(label="Home", leftSection=DashIconify(icon="tabler:home", width=18)),
+                            dmc.NavLink(label="About", leftSection=DashIconify(icon="tabler:info-circle", width=18)),
                         ], p="md"),
                         w=250,
                     ),
@@ -74,13 +73,12 @@ def create_single_page_app(
     simple_layout = """
     app.layout = dmc.MantineProvider(
         id="mantine-provider",
-        theme={"colorScheme": "auto"},
         children=[
             dmc.Container([
                 dmc.Group([
                     dmc.Title(f"{app_name}", order=1),
                     dmc.ActionIcon(
-                        dmc.Icon(icon="tabler:sun"),
+                        DashIconify(icon="tabler:sun", width=20),
                         id="theme-toggle",
                         variant="default",
                         size="lg",
@@ -101,6 +99,7 @@ def create_single_page_app(
 from dash import Dash, Input, Output, clientside_callback
 
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 # Initialize app
 app = Dash(__name__, title="{app_name}")
@@ -147,6 +146,7 @@ def create_multi_page_app(
 from dash import Dash, Input, Output, clientside_callback, page_container
 
 import dash_mantine_components as dmc
+from dash_iconify import DashIconify
 
 # Initialize app with pages
 app = Dash(__name__, use_pages=True, title="{app_name}")
@@ -154,7 +154,6 @@ app = Dash(__name__, use_pages=True, title="{app_name}")
 # Layout with navigation
 app.layout = dmc.MantineProvider(
     id="mantine-provider",
-    theme={{"colorScheme": "{theme}"}},
     children=[
         dmc.AppShell(
             children=[
@@ -162,7 +161,7 @@ app.layout = dmc.MantineProvider(
                     dmc.Group([
                         dmc.Text("{app_name}", size="xl", fw=700),
                         dmc.ActionIcon(
-                            dmc.Icon(icon="tabler:sun"),
+                            DashIconify(icon="tabler:sun", width=20),
                             id="theme-toggle",
                             variant="default",
                             size="lg",
@@ -174,12 +173,12 @@ app.layout = dmc.MantineProvider(
                     dmc.Stack([
                         dmc.NavLink(
                             label="Home",
-                            leftSection=dmc.Icon(icon="tabler:home"),
+                            leftSection=DashIconify(icon="tabler:home", width=18),
                             href="/",
                         ),
                         dmc.NavLink(
                             label="About",
-                            leftSection=dmc.Icon(icon="tabler:info-circle"),
+                            leftSection=DashIconify(icon="tabler:info-circle", width=18),
                             href="/about",
                         ),
                     ], p="md"),
@@ -289,7 +288,7 @@ def scaffold_app(
         (pages_dir / "about.py").write_text(create_page("about", "/about", "About"))
 
     # Create requirements.txt
-    requirements = "dash>=2.14.0\ndash-mantine-components>=0.12.0\n"
+    requirements = "dash>=2.14.0\ndash-mantine-components>=2.5.0\ndash-iconify>=0.1.2\n"
     (app_dir / "requirements.txt").write_text(requirements)
 
     # Create .gitignore

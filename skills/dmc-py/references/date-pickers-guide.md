@@ -21,6 +21,53 @@ Complete reference for date picker components in Dash Mantine Components.
 - Calendar as optional helper
 - Best for power users
 
+**MiniCalendar** - Compact inline calendar (v2.3+)
+- Minimal footprint for sidebar widgets
+- Same selection API as DatePicker
+- Ideal for dashboard widgets and compact UIs
+
+## MiniCalendar (v2.3+)
+
+Compact calendar component with minimal footprint:
+
+```python
+import dash_mantine_components as dmc
+from dash import Input, Output, callback
+
+# Basic usage
+dmc.MiniCalendar(id="mini-calendar")
+
+# With default value
+dmc.MiniCalendar(
+    id="mini-calendar",
+    value="2025-01-15"
+)
+
+# Multiple selection
+dmc.MiniCalendar(
+    type="multiple",
+    value=["2025-01-15", "2025-01-20"]
+)
+
+# Range selection
+dmc.MiniCalendar(
+    type="range",
+    value=["2025-01-15", "2025-01-20"]
+)
+
+@callback(
+    Output("output", "children"),
+    Input("mini-calendar", "value")
+)
+def update(date):
+    return f"Selected: {date}"
+```
+
+**When to use MiniCalendar instead of DatePicker:**
+- Sidebar widgets with limited space
+- Dashboard date selectors
+- When you want a more compact visual appearance
+
 ## DatePicker
 
 ### Basic Usage
