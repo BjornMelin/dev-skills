@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bun Dev"
+  short_description: "Bun operating model + shared audit/remediation platform"
+  default_prompt: "Use bun-dev for Bun-first operating-model guidance, release sync, and shared repo auditing. Prefer the shared CLI in scripts/bun-platform.ts for audit, plan-fixes, apply-safe-fixes, validate, benchmark, and release-sync. Route focused scan/remediation work to bun-audit when appropriate, but keep bun-dev as the source of truth for rules and references."

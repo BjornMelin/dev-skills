@@ -1,0 +1,11 @@
+{
+  "name": "validate-success-fixture",
+  "private": true,
+  "packageManager": "bun@1.3.10",
+  "scripts": {
+    "lint": "bun -e \"console.log('lint ok')\"",
+    "typecheck": "bun -e \"console.log('typecheck ok')\"",
+    "test": "bun -e \"console.log('test ok')\"",
+    "build": "bun -e \"console.log('build ok')\""
+  }
+}

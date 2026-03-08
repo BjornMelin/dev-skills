@@ -1,0 +1,5 @@
+{
+  "name": "docker-fixture",
+  "private": true,
+  "packageManager": "bun@1.3.10"
+}

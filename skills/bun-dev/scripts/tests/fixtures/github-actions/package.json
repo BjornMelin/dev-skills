@@ -1,0 +1,8 @@
+{
+  "name": "github-actions-fixture",
+  "private": true,
+  "packageManager": "bun@1.3.10",
+  "scripts": {
+    "lint": "bun run lint:repo"
+  }
+}

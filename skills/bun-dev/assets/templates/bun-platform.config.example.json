@@ -1,0 +1,19 @@
+{
+  "disabledRules": [],
+  "severityOverrides": {
+    "pm-package-manager-field": "warn"
+  },
+  "adapters": [
+    "auto"
+  ],
+  "includePaths": [],
+  "excludeDirs": [
+    "vendor",
+    ".bun-platform"
+  ],
+  "baseline": "./bun-platform-baseline.json",
+  "maxFiles": 5000,
+  "maxBytes": 50000000,
+  "validationCommands": [],
+  "manageGitignore": true
+}
