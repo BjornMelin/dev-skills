@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bun Audit"
+  short_description: "Shared Bun audit and safe remediation router"
+  default_prompt: "Use bun-audit to run the shared bun-dev Bun platform CLI for audit, explain, list-rules, plan-fixes, apply-safe-fixes, validate, and benchmark. Keep bun-dev as the rule source of truth and avoid duplicating engine logic here."

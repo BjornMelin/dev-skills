@@ -1,0 +1,14 @@
+interface:
+  display_name: "GH PR Review Fix"
+  short_description: "Resolve GitHub PR review threads end-to-end"
+  default_prompt: "Use $gh-pr-review-fix to infer the target PR, fetch unresolved review threads, implement minimal verified fixes, and re-check until the PR is clean or blocked."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current docs when review fixes touch changing APIs"
+    - type: "mcp"
+      value: "exa"
+      description: "Supplemental latest research for non-trivial migrations"
