@@ -1,0 +1,14 @@
+interface:
+  display_name: "Dependency Intel"
+  short_description: "Plan dependency upgrades with release and refactor context"
+  default_prompt: "Use $gh-deps-intel to inventory upgrades, research release notes, map refactors, and either plan or execute the upgrade workflow with a stable Markdown and JSON contract."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current library documentation"
+    - type: "mcp"
+      value: "exa"
+      description: "Current migration and release-note research"
