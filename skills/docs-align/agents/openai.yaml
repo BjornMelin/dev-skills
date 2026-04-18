@@ -1,0 +1,7 @@
+interface:
+  display_name: "Docs Align"
+  short_description: "Detect and fix implementation-vs-docs drift"
+  default_prompt: "Use $docs-align to detect likely docs drift from current code changes and update the right documentation surfaces."
+policy:
+  allow_implicit_invocation: false
+
