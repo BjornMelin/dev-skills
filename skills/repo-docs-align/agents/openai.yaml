@@ -1,0 +1,11 @@
+interface:
+  display_name: "Repo Docs Align"
+  short_description: "Align AGENTS, docs, ADRs, specs, and comments with repo reality"
+  default_prompt: "Use $repo-docs-align to map docs drift, choose canonical authority docs, create or update a durable exec artifact when needed, and execute verified repo-doc alignment end to end."
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Official or primary documentation research when repo evidence is not enough"
