@@ -182,9 +182,11 @@ def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
     for pattern in existing:
         normalized = pattern.lstrip("/")
         for target in targets:
-            if fnmatch.fnmatch(target, normalized) or fnmatch.fnmatch(target.rstrip("/"), normalized.rstrip("/")):
+            tnorm = target.rstrip("/")
+            rnorm = normalized.rstrip("/")
+            if fnmatch.fnmatch(target, normalized) or fnmatch.fnmatch(tnorm, rnorm):
                 return "already_ignored"
-            if fnmatch.fnmatch(normalized, target) or fnmatch.fnmatch(normalized.rstrip("/"), target.rstrip("/")):
+            if fnmatch.fnmatch(normalized, target) or fnmatch.fnmatch(rnorm, tnorm):
                 return "already_ignored"
 
     rule = ".agents/\n"
