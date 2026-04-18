@@ -4,7 +4,8 @@
 
 import argparse
 import datetime as dt
-import fnmatch
+import re
+import subprocess
 from pathlib import Path
 
 
@@ -133,24 +134,25 @@ def render_template(template: str, iso_date: str, repo_name: str, repo_root: Pat
     )
 
 
-def ignore_targets(skill_name: str) -> tuple[str, ...]:
-    """Return the .gitignore patterns that should cover the hidden artifact tree.
+def has_agents_rule(existing: list[str]) -> bool:
+    """Return whether the current .gitignore already mentions the hidden tree."""
+    pattern = re.compile(r"(?:^|/)\.agents(?:$|/)")
+    return any(pattern.search(line.lstrip("!/")) for line in existing)
 
-    Args:
-        skill_name: Installed skill directory name used in the hidden path.
 
-    Returns:
-        A tuple of path patterns that should be treated as ignore matches.
-
-    Raises:
-        None: This helper only builds static path patterns.
-    """
-    return (
-        ".agents",
-        ".agents/",
-        f".agents/{skill_name}",
-        f".agents/{skill_name}/",
-    )
+def git_ignores_path(repo_root: Path, relative_path: str) -> bool:
+    """Return whether Git currently ignores the given relative path."""
+    try:
+        result = subprocess.run(
+            ["git", "check-ignore", "-q", relative_path],
+            cwd=repo_root,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0
 
 
 def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
@@ -178,16 +180,9 @@ def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
         for line in current.splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
-    targets = ignore_targets(skill_name)
-    for pattern in existing:
-        normalized = pattern.lstrip("/")
-        for target in targets:
-            tnorm = target.rstrip("/")
-            rnorm = normalized.rstrip("/")
-            if fnmatch.fnmatch(target, normalized) or fnmatch.fnmatch(tnorm, rnorm):
-                return "already_ignored"
-            if fnmatch.fnmatch(normalized, target) or fnmatch.fnmatch(rnorm, tnorm):
-                return "already_ignored"
+    probe_path = f".agents/{skill_name}"
+    if git_ignores_path(repo_root, probe_path) or has_agents_rule(existing):
+        return "already_ignored"
 
     rule = ".agents/\n"
     if current and not current.endswith("\n"):
