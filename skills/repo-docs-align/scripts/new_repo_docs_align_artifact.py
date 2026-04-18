@@ -44,8 +44,15 @@ def next_run_bucket(day_root: Path) -> str:
 
 
 def read_template(skill_root: Path, artifact_key: str) -> str:
-    template_path = skill_root / "templates" / ARTIFACTS[artifact_key]
-    return template_path.read_text(encoding="utf-8")
+    template_path = (skill_root / "templates" / ARTIFACTS[artifact_key]).resolve()
+    try:
+        return template_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise SystemExit(
+            "Failed to load template "
+            f"(artifact_key={artifact_key}, skill_root={skill_root}, template_path={template_path}): "
+            f"{exc}"
+        ) from exc
 
 
 def render_template(template: str, iso_date: str, repo_name: str, repo_root: Path) -> str:
