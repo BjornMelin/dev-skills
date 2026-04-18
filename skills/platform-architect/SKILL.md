@@ -23,7 +23,7 @@ Use this skill to route broad platform work into the correct web, native, backen
    - React/Next performance or render-quality review -> repo-local `$vercel-react-best-practices` when installed
    - Dash callback or Dash UI review -> `$dash-audit`
    - Design/build work -> `$frontend-design`
-   - Docs sync -> `$docs-align`
+   - Docs sync -> `$repo-docs-align`
    - Dependency work -> `$gh-deps-intel`
 
 ## Use When
