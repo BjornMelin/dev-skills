@@ -206,7 +206,7 @@ python3 scripts/new_repo_docs_align_artifact.py \
   --artifacts drift-map,reviewed-surfaces,exec-plan,retrospective
 ```
 
-Run that command from the installed skill directory, or `cd` into the folder containing this `SKILL.md` first, so the script can resolve its bundled templates correctly.
+Run that exact command from the installed skill directory if you want to use the shorter `python3 scripts/...` path. From repo root, use the full script path instead, for example `python3 skills/repo-docs-align/scripts/new_repo_docs_align_artifact.py --dir <repo-root> --artifacts drift-map,reviewed-surfaces,exec-plan,retrospective`. The script resolves bundled templates relative to itself, so either invocation works.
 
 Use `--artifacts` to request only the files needed for the run. Use `--force` only when intentionally refreshing an existing artifact file.
 

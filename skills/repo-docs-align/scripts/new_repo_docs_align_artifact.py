@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+"""Create portable repo-docs-align working artifacts under the hidden .agents tree."""
+
 import argparse
 import datetime as dt
 import fnmatch
@@ -15,6 +17,21 @@ ARTIFACTS = {
 
 
 def today_parts(date_override: str | None) -> tuple[str, str, str]:
+    """Return the month, day, and ISO date used for artifact paths.
+
+    Args:
+        date_override: Optional date string in ``YYYY-MM-DD`` format. If
+            omitted, the current local date is used.
+
+    Returns:
+        A ``(month_dir, day_dir, iso_date)`` tuple of strings, where
+        ``month_dir`` is ``YYYY-MM``, ``day_dir`` is ``MM-DD``, and
+        ``iso_date`` is ``YYYY-MM-DD``.
+
+    Raises:
+        ValueError: If ``date_override`` is provided but is not valid
+            ``YYYY-MM-DD`` input.
+    """
     if date_override:
         day = dt.datetime.strptime(date_override, "%Y-%m-%d").date()
     else:
@@ -23,6 +40,19 @@ def today_parts(date_override: str | None) -> tuple[str, str, str]:
 
 
 def normalize_run_bucket(raw: str) -> str:
+    """Normalize a run bucket string to a zero-padded two-digit value.
+
+    Args:
+        raw: Raw bucket input from the CLI. The value must be numeric and at
+            least 1.
+
+    Returns:
+        A zero-padded two-digit run bucket string such as ``"01"`` or
+        ``"12"``.
+
+    Raises:
+        SystemExit: If ``raw`` is empty, non-numeric, or less than 1.
+    """
     raw = raw.strip()
     if not raw:
         raise SystemExit("Run bucket cannot be empty.")
@@ -35,6 +65,18 @@ def normalize_run_bucket(raw: str) -> str:
 
 
 def next_run_bucket(day_root: Path) -> str:
+    """Compute the next available run bucket for a day directory.
+
+    Args:
+        day_root: Root directory for a given day, typically
+            ``.agents/<skill>/<YYYY-MM>/<MM-DD>``.
+
+    Returns:
+        The next available zero-padded run bucket string.
+
+    Raises:
+        OSError: If directory iteration fails while scanning ``day_root``.
+    """
     max_seen = 0
     if day_root.exists():
         for child in day_root.iterdir():
@@ -44,6 +86,19 @@ def next_run_bucket(day_root: Path) -> str:
 
 
 def read_template(skill_root: Path, artifact_key: str) -> str:
+    """Read the template text for a named artifact.
+
+    Args:
+        skill_root: Root directory of the installed skill package.
+        artifact_key: Artifact key from ``ARTIFACTS``.
+
+    Returns:
+        The template file contents as a string.
+
+    Raises:
+        KeyError: If ``artifact_key`` is not a known artifact name.
+        OSError: If the template file cannot be read.
+    """
     template_path = (skill_root / "templates" / ARTIFACTS[artifact_key]).resolve()
     try:
         return template_path.read_text(encoding="utf-8")
@@ -56,6 +111,21 @@ def read_template(skill_root: Path, artifact_key: str) -> str:
 
 
 def render_template(template: str, iso_date: str, repo_name: str, repo_root: Path) -> str:
+    """Substitute repository and date placeholders into a template.
+
+    Args:
+        template: Raw template text containing ``{{DATE}}``, ``{{REPO_NAME}}``,
+            and ``{{REPO_ROOT}}`` placeholders.
+        iso_date: Date string in ``YYYY-MM-DD`` format.
+        repo_name: Repository name used for the rendered artifact.
+        repo_root: Absolute repository root path inserted into the template.
+
+    Returns:
+        The rendered template text.
+
+    Raises:
+        None: This function performs only string substitution.
+    """
     return (
         template.replace("{{DATE}}", iso_date)
         .replace("{{REPO_NAME}}", repo_name)
@@ -64,6 +134,17 @@ def render_template(template: str, iso_date: str, repo_name: str, repo_root: Pat
 
 
 def ignore_targets(skill_name: str) -> tuple[str, ...]:
+    """Return the .gitignore patterns that should cover the hidden artifact tree.
+
+    Args:
+        skill_name: Installed skill directory name used in the hidden path.
+
+    Returns:
+        A tuple of path patterns that should be treated as ignore matches.
+
+    Raises:
+        None: This helper only builds static path patterns.
+    """
     return (
         ".agents",
         ".agents/",
@@ -73,6 +154,19 @@ def ignore_targets(skill_name: str) -> tuple[str, ...]:
 
 
 def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
+    """Ensure the repository ignores the hidden .agents artifact directory.
+
+    Args:
+        repo_root: Absolute repository root path containing ``.gitignore``.
+        skill_name: Installed skill directory name used in the hidden path.
+
+    Returns:
+        ``"already_ignored"`` if an existing rule already covers the target, or
+        ``"added_agents_rule"`` if ``.agents/`` was appended.
+
+    Raises:
+        OSError: If reading or writing ``.gitignore`` fails.
+    """
     gitignore_path = repo_root / ".gitignore"
     if gitignore_path.exists():
         current = gitignore_path.read_text(encoding="utf-8")
@@ -101,6 +195,17 @@ def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
 
 
 def parse_artifacts(raw: str) -> list[str]:
+    """Parse the requested artifact list from CLI input.
+
+    Args:
+        raw: Comma-separated artifact keys or the literal ``all``.
+
+    Returns:
+        A list of validated artifact keys in request order.
+
+    Raises:
+        SystemExit: If an unknown key is provided or no artifacts are requested.
+    """
     if raw == "all":
         return list(ARTIFACTS.keys())
     requested = []
@@ -118,6 +223,19 @@ def parse_artifacts(raw: str) -> list[str]:
 
 
 def main() -> int:
+    """Run the CLI to scaffold repo-docs-align working artifacts.
+
+    Args:
+        None: Command-line arguments are parsed from ``sys.argv``.
+
+    Returns:
+        Zero on success.
+
+    Raises:
+        SystemExit: For argument parsing failures, invalid repository paths, or
+            other user-facing validation errors.
+        OSError: If filesystem operations fail while creating artifacts.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Create typed working artifacts under "
