@@ -1,9 +1,8 @@
 ---
 name: caveman-compress
 description: >
-  Compress docs and natural language files in repos into caveman format to save input
-  tokens. Preserve technical substance, code, URLs, and structure. Use when asked to
-  compress a memory file, repo note, or dense markdown prose.
+  Caveman-compress repo docs + prose for fewer tokens. Keep substance, code, URLs, structure.
+  Triggers: docs, memory file, repo note, dense markdown.
 ---
 
 # Caveman Compress
@@ -14,15 +13,15 @@ Compress docs and natural language files such as `AGENTS.md`, todos, preferences
 
 ## Trigger
 
-`/caveman:compress <filepath>` or when the user asks to compress a memory file.
+`/caveman:compress <filepath>` or user asks to compress memory file.
 
 ## Discovery
 
-- Inspect current repo first when the user does not name files.
-- Use `git status --porcelain` and `git diff --name-only` to find changed files.
-- Use `rg` and `find` for nearby docs, plus bounded semantic matching for likely prose neighbors.
-- Prefer repo-owned docs and notes by default. Allow explicit outside-repo paths when named.
-- Use `request_user_input` for ambiguous or lower-confidence candidates and include scored recommendations.
+- No files named → inspect current repo first.
+- `git status --porcelain`, `git diff --name-only` for changes.
+- `rg`, `find` for nearby docs; bounded semantic match for prose neighbors.
+- Prefer repo-owned docs + notes; outside-repo paths when user names them.
+- Ambiguous / low-confidence → `request_user_input` + scored recs.
 
 ## Process
 
@@ -50,7 +49,7 @@ Compress docs and natural language files such as `AGENTS.md`, todos, preferences
 
 - Code blocks (fenced ``` and indented)
 - Inline code (`backtick content`)
-- URLs and links (full URLs, markdown links)
+- URLs + links (full URLs, markdown links)
 - File paths (`/src/components/...`, `./config.yaml`)
 - Commands (`npm install`, `git commit`, `docker build`)
 - Technical terms (library names, API names, protocols, algorithms)
@@ -89,7 +88,7 @@ Do not modify anything inside backticks.
 
 If file contains code blocks:
 
-- Treat code blocks as read-only regions
+- Code blocks = read-only regions
 - Only compress text outside them
 - Do not merge sections around code
 
