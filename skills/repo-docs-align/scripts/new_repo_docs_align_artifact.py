@@ -13,24 +13,6 @@ ARTIFACTS = {
     "retrospective": "retrospective.md",
 }
 
-IGNORE_PATTERNS = {
-    ".agents",
-    ".agents/",
-    "/.agents",
-    "/.agents/",
-    ".agents/repo-docs-align",
-    ".agents/repo-docs-align/",
-    "/.agents/repo-docs-align",
-    "/.agents/repo-docs-align/",
-}
-
-IGNORE_TARGETS = (
-    ".agents",
-    ".agents/",
-    ".agents/repo-docs-align",
-    ".agents/repo-docs-align/",
-)
-
 
 def today_parts(date_override: str | None) -> tuple[str, str, str]:
     if date_override:
@@ -74,7 +56,16 @@ def render_template(template: str, iso_date: str, repo_name: str, repo_root: Pat
     )
 
 
-def ensure_gitignore(repo_root: Path) -> str:
+def ignore_targets(skill_name: str) -> tuple[str, ...]:
+    return (
+        ".agents",
+        ".agents/",
+        f".agents/{skill_name}",
+        f".agents/{skill_name}/",
+    )
+
+
+def ensure_gitignore(repo_root: Path, skill_name: str) -> str:
     gitignore_path = repo_root / ".gitignore"
     if gitignore_path.exists():
         current = gitignore_path.read_text(encoding="utf-8")
@@ -86,11 +77,10 @@ def ensure_gitignore(repo_root: Path) -> str:
         for line in current.splitlines()
         if line.strip() and not line.lstrip().startswith("#")
     ]
-    if any(pattern in IGNORE_PATTERNS for pattern in existing):
-        return "already_ignored"
+    targets = ignore_targets(skill_name)
     for pattern in existing:
         normalized = pattern.lstrip("/")
-        for target in IGNORE_TARGETS:
+        for target in targets:
             if fnmatch.fnmatch(target, normalized) or fnmatch.fnmatch(target.rstrip("/"), normalized.rstrip("/")):
                 return "already_ignored"
             if fnmatch.fnmatch(normalized, target) or fnmatch.fnmatch(normalized.rstrip("/"), target.rstrip("/")):
@@ -123,8 +113,8 @@ def parse_artifacts(raw: str) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Create typed repo-docs-align working artifacts under "
-            ".agents/repo-docs-align/YYYY-MM/MM-DD/NN/ and ensure ignore hygiene."
+            "Create typed working artifacts under "
+            ".agents/<skill-name>/YYYY-MM/MM-DD/NN/ and ensure ignore hygiene."
         )
     )
     parser.add_argument(
@@ -163,13 +153,14 @@ def main() -> int:
 
     requested = parse_artifacts(args.artifacts)
     month_dir, day_dir, iso_date = today_parts(args.date)
+    skill_name = Path(__file__).resolve().parent.parent.name
 
-    day_root = repo_root / ".agents" / "repo-docs-align" / month_dir / day_dir
+    day_root = repo_root / ".agents" / skill_name / month_dir / day_dir
     run_bucket = normalize_run_bucket(args.run) if args.run else next_run_bucket(day_root)
     artifact_dir = day_root / run_bucket
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    ignore_status = ensure_gitignore(repo_root)
+    ignore_status = ensure_gitignore(repo_root, skill_name)
     skill_root = Path(__file__).resolve().parent.parent
     repo_name = repo_root.name
 
