@@ -15,11 +15,11 @@ Read these references before making authority or compression decisions:
 - [references/subagent-orchestration.md](references/subagent-orchestration.md)
 
 Bundled resources:
-- `scripts/new_repo_docs_align_artifact.py` - scaffold hidden working artifacts under `.agents/<skill-name>/YYYY-MM/MM-DD/NN/` where `<skill-name>` is the installed skill directory name
-- `templates/drift-map.md`
-- `templates/reviewed-surfaces.md`
-- `templates/exec-plan.md`
-- `templates/retrospective.md`
+- `./scripts/new_repo_docs_align_artifact.py` - scaffold hidden working artifacts under `.agents/<skill-name>/YYYY-MM/MM-DD/NN/` where `<skill-name>` is the installed skill directory name
+- `./templates/drift-map.md`
+- `./templates/reviewed-surfaces.md`
+- `./templates/exec-plan.md`
+- `./templates/retrospective.md`
 
 ## Core contract
 
@@ -201,12 +201,12 @@ Rules:
 When you want deterministic scaffolding for this hidden work area, use:
 
 ```bash
-python3 scripts/new_repo_docs_align_artifact.py \
+python3 ./scripts/new_repo_docs_align_artifact.py \
   --dir <repo-root> \
   --artifacts drift-map,reviewed-surfaces,exec-plan,retrospective
 ```
 
-Run that exact command from the installed skill directory if you want to use the shorter `python3 scripts/...` path. From repo root, use the full script path instead, for example `python3 skills/repo-docs-align/scripts/new_repo_docs_align_artifact.py --dir <repo-root> --artifacts drift-map,reviewed-surfaces,exec-plan,retrospective`. The script resolves bundled templates relative to itself, so either invocation works.
+Run that exact command from the installed skill directory. The script resolves bundled templates relative to itself, so the relative path stays unambiguous wherever the skill is installed.
 
 Use `--artifacts` to request only the files needed for the run. Use `--force` only when intentionally refreshing an existing artifact file.
 
