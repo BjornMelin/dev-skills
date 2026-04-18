@@ -196,6 +196,7 @@ def parse_artifacts(raw: str) -> list[str]:
 
     Args:
         raw: Comma-separated artifact keys or the literal ``all``.
+            Surrounding whitespace is ignored.
 
     Returns:
         A list of validated artifact keys in request order.
@@ -203,6 +204,7 @@ def parse_artifacts(raw: str) -> list[str]:
     Raises:
         SystemExit: If an unknown key is provided or no artifacts are requested.
     """
+    raw = raw.strip().lower()
     if raw == "all":
         return list(ARTIFACTS.keys())
     requested = []
