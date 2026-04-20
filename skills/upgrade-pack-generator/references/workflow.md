@@ -38,6 +38,16 @@ Steps:
    and repo-local overlay evidence in `qualification-snapshot.json`.
 8. Render the pack into `.agents/plans/upgrade/<topic>/`.
 
+The rendered pack should follow this final contract:
+
+- the playbook is the human source of truth
+- the playbook is the only file updated during a real implementation run
+- operator-mode is a delta card with links back to playbook sections
+- trigger-prompt is a thin launcher that tells a fresh Codex session to load
+  the playbook first
+- `upgrade-pack.yaml` and `qualification-snapshot.json` remain the canonical
+  machine-readable sources
+
 ## Guardrails
 
 - Generation is docs/research only.
@@ -45,6 +55,7 @@ Steps:
 - The generated `upgrade-pack.yaml` is the canonical source.
 - `qualification-snapshot.json` is the canonical machine-readable qualification
   evidence file for the rendered pack.
-- `operator-mode.md` is a rendered derivative, not a hand-maintained document.
+- `operator-mode.md` and `trigger-prompt.md` are rendered derivatives, not
+  hand-maintained documents.
 - Use one package-manager command family per target repo run.
 - In monorepos, prefer workspace-owned family packs over root-centric guesses.

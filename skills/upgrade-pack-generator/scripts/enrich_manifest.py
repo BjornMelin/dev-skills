@@ -167,12 +167,6 @@ def apply_qualification_plan(
     qualification_plan["source_specs"] = unique_list(source_specs)
     qualification_plan["cli_checks"] = cli_checks
     manifest["repo_local_skill_overlays"] = overlays
-    if overlays:
-        manifest.setdefault("repo_probes", {})
-        manifest["repo_probes"]["Repo-local skill overlays"] = [
-            f"`{overlay['skill_name']}` at `{overlay['skill_path']}` -- {overlay['reason']}"
-            for overlay in overlays
-        ]
 
 
 def build_target_surface(

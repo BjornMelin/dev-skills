@@ -85,8 +85,20 @@ Every generated repo-local pack must contain exactly:
 
 The manifest is the canonical source. The markdown files are rendered outputs.
 `qualification-snapshot.json` is the canonical machine-readable evidence file for
-the separate qualify stage. Do not hand-maintain `operator-mode.md`; regenerate
-it from the manifest.
+the separate qualify stage.
+
+Rendered file roles:
+
+- `<basename>-playbook.md`
+  - authoritative human handoff doc and the only writable pack file during an
+    implementation run
+- `<basename>-operator-mode.md`
+  - execution delta card that points back to the playbook
+- `<basename>-trigger-prompt.md`
+  - thin launcher for a fresh Codex session with a compact repo summary
+
+Do not hand-maintain `operator-mode.md` or `trigger-prompt.md`; regenerate them
+from the manifest.
 
 ## Family Overrides
 

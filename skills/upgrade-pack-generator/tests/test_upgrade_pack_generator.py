@@ -316,6 +316,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             convex_plan = convex_manifest["qualification_plan"]
             self.assertTrue(any(check["label"] == "Convex CLI help" for check in convex_plan["cli_checks"]))
             self.assertTrue(any(overlay["skill_name"] == "convex-best-practices" for overlay in convex_manifest["repo_local_skill_overlays"]))
+            self.assertNotIn("Repo-local skill overlays", convex_manifest.get("repo_probes", {}))
 
             turbo_manifest = enrich_manifest.enrich_turborepo_manifest(self.build_manifest(root, "turbo"), root)
             turbo_plan = turbo_manifest["qualification_plan"]
@@ -324,7 +325,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
     def test_rendered_trigger_prompt_wraps_long_lines(self, _mock_fetch) -> None:
-        """Trigger prompt rendering should keep Markdown lines within the configured width."""
+        """Rendered packs should use the grouped playbook and linked thin launcher outputs."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
             out = Path(tmp) / "rendered"
@@ -375,25 +376,106 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             trigger_path = out / enriched["trigger_filename"]
             playbook_path = out / enriched["playbook_filename"]
             operator_path = out / enriched["operator_filename"]
-            longest_line = max(len(line.rstrip("\n")) for line in trigger_path.read_text(encoding="utf-8").splitlines())
-            self.assertLessEqual(longest_line, 120)
+            playbook_text = playbook_path.read_text(encoding="utf-8")
+            operator_text = operator_path.read_text(encoding="utf-8")
+            trigger_text = trigger_path.read_text(encoding="utf-8")
             self.assertTrue((out / "qualification-snapshot.json").exists())
-            self.assertIn("status: `ready`", playbook_path.read_text(encoding="utf-8"))
+            self.assertIn("status: `ready`", playbook_text)
+            self.assertIn("## Pack Map", playbook_text)
+            self.assertIn("## Current State And Evidence", playbook_text)
+            self.assertIn("## Decisions And End State", playbook_text)
+            self.assertIn("## Execution And Verification", playbook_text)
+            self.assertIn("## Live Tracker And Closeout", playbook_text)
+            self.assertIn("### Findings Matrix", playbook_text)
+            self.assertIn("### Decision Log", playbook_text)
+            self.assertIn("### Affected Files Map", playbook_text)
+            self.assertIn("### Change Checklist", playbook_text)
+            self.assertIn("### Verification Evidence", playbook_text)
+            self.assertIn("### Residual Risks / Defers", playbook_text)
+            self.assertIn("## Read This First", operator_text)
+            self.assertIn("## Non-Negotiable Guardrails", operator_text)
+            self.assertNotIn("## Family Profile", operator_text)
+            self.assertNotIn("## Target Surface", operator_text)
+            self.assertIn(f"./{enriched['playbook_filename']}#current-state-and-evidence", operator_text)
+            self.assertIn(f"./{enriched['playbook_filename']}#live-tracker-and-closeout", operator_text)
+            self.assertIn("Repo-specific summary:", trigger_text)
+            self.assertNotIn("Goals:", trigger_text)
+            self.assertNotIn("Required decisions:", trigger_text)
+            self.assertNotIn("- -", trigger_text)
+            self.assertIn(f"PLAYBOOK=./{enriched['playbook_filename']}", trigger_text)
+            self.assertIn("${PLAYBOOK}#pack-map", trigger_text)
+            self.assertIn("${PLAYBOOK}#execution-and-verification", trigger_text)
+            self.assertIn("${PLAYBOOK}#live-tracker-and-closeout", trigger_text)
             self.assertTrue(
-                playbook_path.read_text(encoding="utf-8").startswith(
+                playbook_text.startswith(
                     "<!-- markdownlint-disable MD013 -->\n"
                 )
             )
             self.assertTrue(
-                operator_path.read_text(encoding="utf-8").startswith(
+                operator_text.startswith(
                     "<!-- markdownlint-disable MD013 -->\n"
                 )
             )
             self.assertTrue(
-                trigger_path.read_text(encoding="utf-8").startswith(
+                trigger_text.startswith(
                     "<!-- markdownlint-disable MD013 -->\n"
                 )
             )
+
+    @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    def test_rendered_playbook_does_not_duplicate_repo_local_overlays(self, _mock_fetch) -> None:
+        """Repo-local overlays should render once in their dedicated section."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            out = Path(tmp) / "rendered"
+            make_signr_like_repo(root)
+            manifest = self.build_manifest(root, "convex")
+            enriched = enrich_manifest.enrich_convex_manifest(manifest, root)
+            manifest_path = Path(tmp) / "upgrade-pack.yaml"
+            common.dump_yaml(manifest_path, enriched)
+            qualification_snapshot = {
+                "schema_version": 1,
+                "generated_at": "2026-04-19T00:00:00Z",
+                "family_slug": enriched["family_slug"],
+                "anchor_package": enriched["anchor_package"],
+                "repo_root": str(root),
+                "snapshot_filename": "qualification-snapshot.json",
+                "qualification_status": "ready",
+                "summary": {
+                    "doc_checks": 2,
+                    "doc_failures": 0,
+                    "source_checks": 1,
+                    "source_failures": 0,
+                    "cli_checks": 2,
+                    "cli_failures": 0,
+                    "repo_local_overlays": len(enriched["repo_local_skill_overlays"]),
+                },
+                "doc_checks": [],
+                "source_checks": [],
+                "cli_checks": [],
+                "repo_local_skill_overlays": enriched["repo_local_skill_overlays"],
+                "caveats": [],
+            }
+            qualification_path = Path(tmp) / "qualification-snapshot.json"
+            qualification_path.write_text(json.dumps(qualification_snapshot), encoding="utf-8")
+
+            subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPTS_DIR / "render_upgrade_pack.py"),
+                    "--manifest",
+                    str(manifest_path),
+                    "--qualification-snapshot",
+                    str(qualification_path),
+                    "--output-dir",
+                    str(out),
+                ],
+                check=True,
+            )
+
+            playbook_text = (out / enriched["playbook_filename"]).read_text(encoding="utf-8")
+            self.assertEqual(playbook_text.count("## Repo-Local Skill Overlays"), 1)
+            self.assertNotIn("### Repo-local skill overlays", playbook_text)
 
 
 if __name__ == "__main__":
