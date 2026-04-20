@@ -47,7 +47,7 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
         {
             "label": f"{display} manifest declarations",
             "cwd": ".",
-            "command": f"rg -n '\"{anchor_package}\"' package.json pnpm-workspace.yaml bunfig.toml .",
+            "command": f"rg -n '\"{anchor_package}\"' . --glob 'package.json' --glob 'pnpm-workspace.yaml' --glob 'bunfig.toml'",
         },
         {
             "label": f"{display} repo usage",
@@ -88,6 +88,8 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
         "research_plan": {
             "strategy": "separate-read-only-research",
             "snapshot_filename": "research-snapshot.json",
+            "bundle_filename": "research-bundle.json",
+            "web_findings_filename": "web-research-findings.json",
             "required_categories": [
                 "official_docs",
                 "api_reference",
@@ -104,6 +106,12 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
                 "upstream source inspection fourth",
                 "examples and cookbooks fifth",
                 "repo-local usage mapping always required",
+            ],
+            "identity_confidence_threshold": 0.75,
+            "source_map_policy": "bundled-seed-then-verify",
+            "required_web_confirmation_categories": [
+                "official_docs",
+                "api_reference",
             ],
             "target_version_policy": "latest-compatible-stable",
             "target_version": "latest supportable stable release to be confirmed during enrichment and research",

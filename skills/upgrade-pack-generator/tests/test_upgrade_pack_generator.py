@@ -24,6 +24,7 @@ import common  # type: ignore  # noqa: E402
 import enrich_manifest  # type: ignore  # noqa: E402
 import qualify_upgrade_pack  # type: ignore  # noqa: E402
 import research_upgrade_pack  # type: ignore  # noqa: E402
+import solve_constraints  # type: ignore  # noqa: E402
 
 
 def write_text(path: Path, content: str) -> None:
@@ -220,6 +221,39 @@ def make_single_next_repo(root: Path) -> None:
     write_text(root / "app/page.tsx", "export default function Page() { return null; }")
 
 
+def make_generic_repo(root: Path) -> None:
+    """Create a minimal single-package repo for generic package-lane tests."""
+    write_text(
+        root / "package.json",
+        """
+        {
+          "name": "generic-upgrade-repo",
+          "private": true,
+          "packageManager": "pnpm@10.28.0",
+          "scripts": {
+            "lint": "biome check .",
+            "typecheck": "tsc --noEmit",
+            "test": "vitest run",
+            "build": "tsc --noEmit"
+          },
+          "dependencies": {
+            "zod": "^3.25.76"
+          }
+        }
+        """,
+    )
+    write_text(
+        root / "src/schemas.ts",
+        """
+        import { z } from "zod";
+
+        export const UserSchema = z.object({
+          email: z.string().email()
+        });
+        """,
+    )
+
+
 class UpgradePackGeneratorTests(unittest.TestCase):
     """Regression coverage for owner selection and rendering."""
 
@@ -367,8 +401,9 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             self.assertIn("radix-ui/primitives", shadcn_manifest["research_plan"]["source_specs"])
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    @patch.object(research_upgrade_pack, "probe_url", side_effect=lambda url: {"url": url, "status": "ok", "final_url": url, "title": "Doc", "last_updated": "April 1, 2026"})
     @patch.object(research_upgrade_pack, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
-    def test_research_snapshot_complete_for_next_family(self, _research_fetch, _enrich_fetch) -> None:
+    def test_research_snapshot_complete_for_next_family(self, _research_fetch, _probe_fetch, _enrich_fetch) -> None:
         """Research stage should produce a complete snapshot for built-in family packs."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
@@ -382,28 +417,188 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             def fake_run_shell(command: str, _cwd: Path) -> dict[str, Any]:
                 if command.startswith("opensrc path "):
                     return {
+                        "command": command,
+                        "cwd": str(root),
                         "exit_code": 0,
                         "status": "ok",
+                        "stdout": f"{opensrc_root}\n",
                         "stdout_excerpt": [str(opensrc_root)],
+                        "stderr": "",
                         "stderr_excerpt": [],
                         "summary": [str(opensrc_root)],
                     }
+                if command.startswith("npm view next@16.2.4 "):
+                    text = json.dumps(
+                        {
+                            "peerDependencies": {"react": "^18.2.0 || ^19.0.0", "react-dom": "^18.2.0 || ^19.0.0"},
+                            "engines": {"node": ">=20.9.0"},
+                            "repository": {"type": "git", "url": "git+https://github.com/vercel/next.js.git"},
+                            "homepage": "https://nextjs.org",
+                            "bugs": {"url": "https://github.com/vercel/next.js/issues"},
+                        }
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stdout_excerpt": [text],
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("npm view next "):
+                    text = json.dumps(
+                        {
+                            "repository": {"type": "git", "url": "git+https://github.com/vercel/next.js.git"},
+                            "homepage": "https://nextjs.org",
+                            "bugs": {"url": "https://github.com/vercel/next.js/issues"},
+                            "dist-tags": {"latest": "16.2.4"},
+                            "versions": ["16.2.2", "16.2.3", "16.2.4"],
+                            "peerDependencies": {"react": "^18.2.0 || ^19.0.0", "react-dom": "^18.2.0 || ^19.0.0"},
+                            "engines": {"node": ">=20.9.0"},
+                            "name": "next",
+                        }
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stdout_excerpt": [text],
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command == "gh api repos/vercel/next.js":
+                    text = json.dumps(
+                        {
+                            "full_name": "vercel/next.js",
+                            "default_branch": "canary",
+                            "html_url": "https://github.com/vercel/next.js",
+                        }
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stdout_excerpt": [text],
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command == "gh api 'repos/vercel/next.js/releases?per_page=5'":
+                    text = json.dumps([{"tag_name": "v16.2.4"}, {"tag_name": "v16.2.3"}])
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stdout_excerpt": [text],
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("ctx7 library next "):
+                    stdout = "\n".join(
+                        [
+                            "1. Title: Next.js",
+                            "   Context7-compatible library ID: /vercel/next.js",
+                            "   Description: Next.js app router framework.",
+                        ]
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("ctx7 docs /vercel/next.js "):
+                    stdout = "\n".join(
+                        [
+                            "### Next.js docs",
+                            "Source: https://nextjs.org/docs",
+                            "Use App Router, upgrade guides, and API references.",
+                        ]
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("rg -n "):
+                    stdout = "apps/web/package.json:1:\"next\": \"16.2.4\"\napps/web/next.config.ts:1:export default { typedRoutes: true }\n"
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr": "",
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
                 return {
+                    "command": command,
+                    "cwd": str(root),
                     "exit_code": 0,
                     "status": "ok",
+                    "stdout": "ok\n",
                     "stdout_excerpt": ["ok"],
+                    "stderr": "",
                     "stderr_excerpt": [],
                     "summary": ["ok"],
                 }
 
+            web_findings = {
+                "entries": [
+                    {
+                        "category": "official_docs",
+                        "url": manifest["research_plan"]["official_docs"]["docs home"],
+                        "confirmed": True,
+                        "confirmed_at": "2026-04-20T00:00:00Z",
+                        "facts": ["Upgrade guide reviewed."],
+                    },
+                    {
+                        "category": "api_reference",
+                        "url": next(iter(manifest["research_plan"]["api_reference"].values())),
+                        "confirmed": True,
+                        "confirmed_at": "2026-04-20T00:00:00Z",
+                        "facts": ["API reference reviewed."],
+                    },
+                ]
+            }
+
             with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
-                snapshot = research_upgrade_pack.generate_snapshot(manifest, root)
+                snapshot, bundle = research_upgrade_pack.generate_snapshot(manifest, root, web_findings)
 
             self.assertEqual(snapshot["research_status"], "complete")
             self.assertEqual(snapshot["category_status"]["release_history"], "ok")
             self.assertEqual(snapshot["category_status"]["repo_usage_mapping"], "ok")
             self.assertEqual(snapshot["summary"]["missing_categories"], 0)
+            self.assertEqual(snapshot["summary"]["required_web_queue"], 2)
+            self.assertEqual(snapshot["summary"]["confirmed_web_queue"], 2)
             self.assertTrue(snapshot["source_evidence"][0]["release_note_files"])
+            self.assertEqual(snapshot["summary"]["identity_status"], "high-confidence")
+            self.assertEqual(bundle["bundle_filename"], "research-bundle.json")
+            self.assertEqual(bundle["source_map_seed"]["match_status"], "fresh")
 
     def test_repo_usage_rg_no_matches_is_not_a_failure(self) -> None:
         """Read-only grep probes should treat exit code 1 as valid no-match evidence."""
@@ -429,6 +624,32 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             self.assertEqual(entries[0]["summary"], ["no matches"])
             self.assertEqual(entries[0]["exit_code"], 1)
 
+    def test_repo_usage_rg_missing_optional_files_is_not_a_failure(self) -> None:
+        """Optional missing manifest paths should not downgrade a grep-backed usage probe."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def fake_run_shell(_command: str, _cwd: Path) -> dict[str, Any]:
+                return {
+                    "exit_code": 2,
+                    "status": "failed",
+                    "stdout": "package.json:1:\"zod\": \"^4.3.6\"\n",
+                    "stderr": "rg: pnpm-workspace.yaml: No such file or directory (os error 2)\n",
+                    "stdout_excerpt": ['package.json:1:"zod": "^4.3.6"'],
+                    "stderr_excerpt": ["rg: pnpm-workspace.yaml: No such file or directory (os error 2)"],
+                    "summary": ['package.json:1:"zod": "^4.3.6"', "rg: pnpm-workspace.yaml: No such file or directory (os error 2)"],
+                }
+
+            with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
+                entries = research_upgrade_pack.repo_usage_entries(
+                    root,
+                    [{"label": "Manifest usage", "cwd": ".", "command": "rg -n '\"zod\"' . --glob 'package.json' --glob 'pnpm-workspace.yaml'"}],
+                )
+
+            self.assertEqual(entries[0]["status"], "ok")
+            self.assertEqual(entries[0]["summary"], ['package.json:1:"zod": "^4.3.6"'])
+            self.assertEqual(entries[0]["exit_code"], 2)
+
     def test_qualification_status_requires_complete_research(self) -> None:
         """Qualification should not mark a pack ready when research is incomplete."""
         summary = {
@@ -449,11 +670,253 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         self.assertTrue(any("research stage" in caveat for caveat in caveats))
 
         ready_status, ready_caveats = qualify_upgrade_pack.qualification_status(
-            summary | {"research_status": "complete"},
-            {"research_status": "complete"},
+            summary | {"research_status": "complete", "identity_status": "high-confidence", "identity_confidence": 0.92},
+            {"research_status": "complete", "identity": {"status": "high-confidence", "confidence": 0.92}},
         )
         self.assertEqual(ready_status, "ready")
         self.assertEqual(ready_caveats, [])
+
+        identity_caveat_status, identity_caveats = qualify_upgrade_pack.qualification_status(
+            summary | {"research_status": "complete", "identity_status": "medium-confidence", "identity_confidence": 0.62},
+            {"research_status": "complete", "identity": {"status": "medium-confidence", "confidence": 0.62}},
+        )
+        self.assertEqual(identity_caveat_status, "ready-with-caveats")
+        self.assertTrue(any("package identity" in caveat for caveat in identity_caveats))
+
+    @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    @patch.object(research_upgrade_pack, "probe_url", side_effect=lambda url: {"url": url, "status": "ok", "final_url": url, "title": "Doc", "last_updated": "April 1, 2026"})
+    @patch.object(research_upgrade_pack, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    def test_generic_research_auto_discovers_identity_and_bundle(self, _research_fetch, _probe_fetch, _enrich_fetch) -> None:
+        """Generic packs should auto-discover upstream evidence and write a raw bundle."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            make_generic_repo(root)
+            manifest = enrich_manifest.enrich_generic_manifest(self.build_manifest(root, "zod"), root)
+
+            def fake_run_shell(command: str, _cwd: Path) -> dict[str, Any]:
+                if command.startswith("opensrc path "):
+                    opensrc_root = root / "opensrc-cache" / "zod"
+                    write_text(opensrc_root / "CHANGELOG.md", "# Changelog")
+                    write_text(opensrc_root / "MIGRATION.md", "# Migration")
+                    write_text(opensrc_root / "examples" / "basic.ts", "export {}")
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": f"{opensrc_root}\n",
+                        "stderr": "",
+                        "stdout_excerpt": [str(opensrc_root)],
+                        "stderr_excerpt": [],
+                        "summary": [str(opensrc_root)],
+                    }
+                if command.startswith("npm view zod@4.3.6 "):
+                    payload = {
+                        "peerDependencies": {},
+                        "engines": {"node": ">=18"},
+                        "repository": {"type": "git", "url": "git+https://github.com/colinhacks/zod.git"},
+                        "homepage": "https://zod.dev",
+                        "bugs": {"url": "https://github.com/colinhacks/zod/issues"},
+                    }
+                    text = json.dumps(payload)
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stderr": "",
+                        "stdout_excerpt": [text],
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("npm view zod "):
+                    payload = {
+                        "repository": {"type": "git", "url": "git+https://github.com/colinhacks/zod.git"},
+                        "homepage": "https://zod.dev",
+                        "bugs": {"url": "https://github.com/colinhacks/zod/issues"},
+                        "dist-tags": {"latest": "4.3.6", "canary": "4.4.0-canary.20260125T215152"},
+                        "versions": ["3.25.76", "4.3.4", "4.3.5", "4.3.6"],
+                        "peerDependencies": {},
+                        "engines": {"node": ">=18"},
+                        "name": "zod",
+                    }
+                    text = json.dumps(payload)
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stderr": "",
+                        "stdout_excerpt": [text],
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command == "gh api repos/colinhacks/zod":
+                    payload = {
+                        "full_name": "colinhacks/zod",
+                        "default_branch": "main",
+                        "html_url": "https://github.com/colinhacks/zod",
+                    }
+                    text = json.dumps(payload)
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stderr": "",
+                        "stdout_excerpt": [text],
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command == "gh api 'repos/colinhacks/zod/releases?per_page=5'":
+                    payload = [{"tag_name": "v4.3.6"}, {"tag_name": "v4.3.5"}]
+                    text = json.dumps(payload)
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": text,
+                        "stderr": "",
+                        "stdout_excerpt": [text],
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("ctx7 library zod "):
+                    stdout = "\n".join(
+                        [
+                            "1. Title: Zod",
+                            "   Context7-compatible library ID: /colinhacks/zod",
+                            "   Description: Zod is a TypeScript-first schema validation library.",
+                        ]
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stderr": "",
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("ctx7 docs /colinhacks/zod "):
+                    stdout = "\n".join(
+                        [
+                            "### Zod API docs",
+                            "Source: https://zod.dev",
+                            "Use `.parse`, `.safeParse`, and schema composition helpers.",
+                        ]
+                    )
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stderr": "",
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr_excerpt": [],
+                        "summary": ["ok"],
+                    }
+                if command.startswith("rg -n "):
+                    stdout = "src/schemas.ts:1:import { z } from \"zod\";\npackage.json:11:\"zod\": \"^3.25.76\"\n"
+                    return {
+                        "command": command,
+                        "cwd": str(root),
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout": stdout,
+                        "stderr": "",
+                        "stdout_excerpt": stdout.splitlines(),
+                        "stderr_excerpt": [],
+                        "summary": ["usage found"],
+                    }
+                return {
+                    "command": command,
+                    "cwd": str(root),
+                    "exit_code": 1,
+                    "status": "failed",
+                    "stdout": "",
+                    "stderr": "",
+                    "stdout_excerpt": [],
+                    "stderr_excerpt": [],
+                    "summary": [],
+                }
+
+            web_findings = {
+                "entries": [
+                    {
+                        "category": "official_docs",
+                        "url": "https://zod.dev/",
+                        "confirmed": True,
+                        "confirmed_at": "2026-04-20T00:00:00Z",
+                        "facts": ["Zod docs reviewed."],
+                    },
+                    {
+                        "category": "api_reference",
+                        "url": "https://zod.dev/api",
+                        "confirmed": True,
+                        "confirmed_at": "2026-04-20T00:00:00Z",
+                        "facts": ["Zod API reviewed."],
+                    },
+                ]
+            }
+
+            with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
+                snapshot, bundle = research_upgrade_pack.generate_snapshot(manifest, root, web_findings)
+
+            self.assertEqual(snapshot["research_status"], "complete")
+            self.assertEqual(snapshot["summary"]["identity_status"], "high-confidence")
+            self.assertEqual(snapshot["identity"]["repository_slug"], "colinhacks/zod")
+            self.assertEqual(snapshot["target_version"], "4.3.6")
+            self.assertEqual(snapshot["target_resolution"]["selected_status"], "compatible")
+            self.assertEqual(snapshot["category_status"]["official_docs"], "ok")
+            self.assertEqual(snapshot["category_status"]["api_reference"], "ok")
+            self.assertEqual(snapshot["category_status"]["migration_guides"], "ok")
+            self.assertEqual(snapshot["category_status"]["release_history"], "ok")
+            self.assertEqual(snapshot["category_status"]["examples_cookbooks"], "ok")
+            self.assertEqual(snapshot["bundle_filename"], "research-bundle.json")
+            self.assertIn("ctx7", bundle)
+            self.assertIn("github", bundle)
+            self.assertEqual(bundle["identity"]["status"], "high-confidence")
+            self.assertEqual(bundle["source_map_seed"]["entry"]["packageName"], "zod")
+            self.assertTrue(bundle["web_research_queue"])
+            self.assertIn("category_provenance", bundle)
+
+    def test_research_status_requires_web_confirmation(self) -> None:
+        """Research cannot be complete until required official pages are web-confirmed."""
+        status, caveats = research_upgrade_pack.research_status(
+            ["official_docs", "api_reference"],
+            {"official_docs": "ok", "api_reference": "ok"},
+            {"status": "high-confidence", "confidence": 0.9},
+            {"selected_status": "compatible"},
+            [
+                {
+                    "category": "official_docs",
+                    "seed_url": "https://example.com/docs",
+                    "required_for_complete": True,
+                },
+                {
+                    "category": "api_reference",
+                    "seed_url": "https://example.com/api",
+                    "required_for_complete": True,
+                },
+            ],
+            {"entries": []},
+        )
+        self.assertEqual(status, "partial")
+        self.assertTrue(any("web.run confirmation" in caveat for caveat in caveats))
+
+    def test_semver_solver_handles_union_and_minor_ranges(self) -> None:
+        """The bundled solver should handle common peer/engine range shapes."""
+        self.assertTrue(solve_constraints.satisfies("19.2.0", "^18.2.0 || ^19.0.0"))
+        self.assertTrue(solve_constraints.satisfies("55.0.15", "~55.0.0"))
+        self.assertFalse(solve_constraints.satisfies("17.0.2", "^18.2.0 || ^19.0.0"))
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
     def test_rendered_trigger_prompt_wraps_long_lines(self, _mock_fetch) -> None:
@@ -473,6 +936,8 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                 "anchor_package": enriched["anchor_package"],
                 "repo_root": str(root),
                 "snapshot_filename": "research-snapshot.json",
+                "bundle_filename": "research-bundle.json",
+                "web_findings_filename": "web-research-findings.json",
                 "research_status": "complete",
                 "current_version": enriched["current_version"],
                 "target_version": enriched["validated_upstream_version"],
@@ -494,7 +959,21 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     "examples_cookbooks": len(enriched["research_plan"]["examples_cookbooks"]),
                     "source_evidence": len(enriched["research_plan"]["source_specs"]),
                     "repo_usage_mapping": len(enriched["research_plan"]["repo_usage_queries"]),
+                    "identity_status": "high-confidence",
+                    "identity_confidence": 0.93,
+                    "required_web_queue": 2,
+                    "confirmed_web_queue": 2,
                 },
+                "identity": {
+                    "status": "high-confidence",
+                    "confidence": 0.93,
+                    "repository_slug": "expo/expo",
+                },
+                "target_resolution": {
+                    "selected_status": "compatible",
+                    "recommended_related_packages": ["expo-router"],
+                },
+                "recommended_related_packages": ["expo-router"],
                 "official_docs": [],
                 "api_reference": [],
                 "migration_guides": [],
@@ -502,10 +981,44 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                 "examples_cookbooks": [],
                 "source_evidence": [],
                 "repo_usage_mapping": [],
+                "web_research_queue": [],
+                "web_research_findings": {"entries": []},
                 "caveats": [],
             }
             research_path = Path(tmp) / "research-snapshot.json"
             research_path.write_text(json.dumps(research_snapshot), encoding="utf-8")
+            research_bundle = {
+                "schema_version": 1,
+                "generated_at": "2026-04-19T00:00:00Z",
+                "family_slug": enriched["family_slug"],
+                "anchor_package": enriched["anchor_package"],
+                "repo_root": str(root),
+                "snapshot_filename": "research-snapshot.json",
+                "bundle_filename": "research-bundle.json",
+                "web_findings_filename": "web-research-findings.json",
+                "identity": research_snapshot["identity"],
+                "source_map_seed": {"match_status": "fresh"},
+                "target_resolution": research_snapshot["target_resolution"],
+                "ctx7": {},
+                "github": {},
+                "registry": {},
+                "repo_runtime": {},
+                "collectors": {},
+                "discovered_sources": {},
+                "source_evidence": [],
+                "repo_usage_mapping": [],
+                "category_entries": {},
+                "category_status": research_snapshot["category_status"],
+                "category_provenance": {},
+                "web_research_queue": [],
+                "web_research_findings": {"entries": []},
+                "caveats": [],
+            }
+            research_bundle_path = Path(tmp) / "research-bundle.json"
+            research_bundle_path.write_text(json.dumps(research_bundle), encoding="utf-8")
+            web_findings = {"entries": []}
+            web_findings_path = Path(tmp) / "web-research-findings.json"
+            web_findings_path.write_text(json.dumps(web_findings), encoding="utf-8")
             qualification_snapshot = {
                 "schema_version": 1,
                 "generated_at": "2026-04-19T00:00:00Z",
@@ -540,6 +1053,10 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     str(manifest_path),
                     "--research-snapshot",
                     str(research_path),
+                    "--research-bundle",
+                    str(research_bundle_path),
+                    "--web-findings",
+                    str(web_findings_path),
                     "--qualification-snapshot",
                     str(qualification_path),
                     "--output-dir",
@@ -554,8 +1071,13 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             operator_text = operator_path.read_text(encoding="utf-8")
             trigger_text = trigger_path.read_text(encoding="utf-8")
             self.assertTrue((out / "research-snapshot.json").exists())
+            self.assertTrue((out / "research-bundle.json").exists())
+            self.assertTrue((out / "web-research-findings.json").exists())
             self.assertTrue((out / "qualification-snapshot.json").exists())
             self.assertIn("### Research Coverage", playbook_text)
+            self.assertIn("raw bundle file: `research-bundle.json`", playbook_text)
+            self.assertIn("web findings file: `web-research-findings.json`", playbook_text)
+            self.assertIn("package identity: `high-confidence`", playbook_text)
             self.assertIn("status: `complete`", playbook_text)
             self.assertIn("status: `ready`", playbook_text)
             self.assertIn("## Pack Map", playbook_text)
@@ -618,6 +1140,8 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                 "anchor_package": enriched["anchor_package"],
                 "repo_root": str(root),
                 "snapshot_filename": "research-snapshot.json",
+                "bundle_filename": "research-bundle.json",
+                "web_findings_filename": "web-research-findings.json",
                 "research_status": "complete",
                 "current_version": enriched["current_version"],
                 "target_version": enriched["validated_upstream_version"],
@@ -639,7 +1163,21 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     "examples_cookbooks": len(enriched["research_plan"]["examples_cookbooks"]),
                     "source_evidence": len(enriched["research_plan"]["source_specs"]),
                     "repo_usage_mapping": len(enriched["research_plan"]["repo_usage_queries"]),
+                    "identity_status": "high-confidence",
+                    "identity_confidence": 0.91,
+                    "required_web_queue": 2,
+                    "confirmed_web_queue": 2,
                 },
+                "identity": {
+                    "status": "high-confidence",
+                    "confidence": 0.91,
+                    "repository_slug": "get-convex/convex-backend",
+                },
+                "target_resolution": {
+                    "selected_status": "compatible",
+                    "recommended_related_packages": ["convex-helpers"],
+                },
+                "recommended_related_packages": ["convex-helpers"],
                 "official_docs": [],
                 "api_reference": [],
                 "migration_guides": [],
@@ -647,10 +1185,44 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                 "examples_cookbooks": [],
                 "source_evidence": [],
                 "repo_usage_mapping": [],
+                "web_research_queue": [],
+                "web_research_findings": {"entries": []},
                 "caveats": [],
             }
             research_path = Path(tmp) / "research-snapshot.json"
             research_path.write_text(json.dumps(research_snapshot), encoding="utf-8")
+            research_bundle = {
+                "schema_version": 1,
+                "generated_at": "2026-04-19T00:00:00Z",
+                "family_slug": enriched["family_slug"],
+                "anchor_package": enriched["anchor_package"],
+                "repo_root": str(root),
+                "snapshot_filename": "research-snapshot.json",
+                "bundle_filename": "research-bundle.json",
+                "web_findings_filename": "web-research-findings.json",
+                "identity": research_snapshot["identity"],
+                "source_map_seed": {"match_status": "fresh"},
+                "target_resolution": research_snapshot["target_resolution"],
+                "ctx7": {},
+                "github": {},
+                "registry": {},
+                "repo_runtime": {},
+                "collectors": {},
+                "discovered_sources": {},
+                "source_evidence": [],
+                "repo_usage_mapping": [],
+                "category_entries": {},
+                "category_status": research_snapshot["category_status"],
+                "category_provenance": {},
+                "web_research_queue": [],
+                "web_research_findings": {"entries": []},
+                "caveats": [],
+            }
+            research_bundle_path = Path(tmp) / "research-bundle.json"
+            research_bundle_path.write_text(json.dumps(research_bundle), encoding="utf-8")
+            web_findings = {"entries": []}
+            web_findings_path = Path(tmp) / "web-research-findings.json"
+            web_findings_path.write_text(json.dumps(web_findings), encoding="utf-8")
             qualification_snapshot = {
                 "schema_version": 1,
                 "generated_at": "2026-04-19T00:00:00Z",
@@ -685,6 +1257,10 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     str(manifest_path),
                     "--research-snapshot",
                     str(research_path),
+                    "--research-bundle",
+                    str(research_bundle_path),
+                    "--web-findings",
+                    str(web_findings_path),
                     "--qualification-snapshot",
                     str(qualification_path),
                     "--output-dir",

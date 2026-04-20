@@ -21,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", required=True, help="Path to upgrade-pack.yaml")
     parser.add_argument("--out", help="Optional alternate output path for qualification-snapshot.json")
     parser.add_argument("--research-snapshot", help="Optional path to research-snapshot.json")
+    parser.add_argument("--web-findings", help="Optional path to web-research-findings.json")
     return parser
 
 
@@ -136,15 +137,23 @@ def qualification_status(summary: dict[str, int], research_snapshot: dict[str, A
     """Return a normalized overall qualification result and caveats."""
     caveats: list[str] = []
     research_status = (research_snapshot or {}).get("research_status", "pending")
+    identity = (research_snapshot or {}).get("identity") or {}
+    identity_status = identity.get("status", "unknown")
+    identity_confidence = identity.get("confidence", "unknown")
     if (
         summary["cli_failures"] == 0
         and summary["source_failures"] == 0
         and summary["doc_failures"] == 0
         and research_status == "complete"
+        and identity_status == "high-confidence"
     ):
         return "ready", caveats
     if research_status != "complete":
         caveats.append(f"research stage is `{research_status}`")
+    if identity_status != "high-confidence":
+        caveats.append(
+            f"package identity is `{identity_status}` at confidence `{identity_confidence}`"
+        )
     if summary["cli_checks"] == summary["cli_failures"]:
         caveats.append("all CLI qualification checks failed")
     if summary["source_checks"] and summary["source_checks"] == summary["source_failures"]:
@@ -181,6 +190,17 @@ def research_snapshot_path(manifest_path: Path, manifest: dict[str, Any], explic
     return manifest_path.parent / filename
 
 
+def web_findings_path(manifest_path: Path, manifest: dict[str, Any], explicit_path: str | None) -> Path | None:
+    """Return the expected web findings path when present."""
+    if explicit_path:
+        return Path(explicit_path).expanduser().resolve()
+    research_plan = manifest.get("research_plan") or {}
+    filename = str(research_plan.get("web_findings_filename") or "").strip()
+    if not filename:
+        return None
+    return manifest_path.parent / filename
+
+
 def main() -> None:
     args = build_parser().parse_args()
     manifest_path = Path(args.manifest).expanduser().resolve()
@@ -198,6 +218,10 @@ def main() -> None:
     research_snapshot = None
     if research_path and research_path.exists():
         research_snapshot = json.loads(research_path.read_text(encoding="utf-8"))
+    web_findings_file = web_findings_path(manifest_path, manifest, args.web_findings)
+    web_findings = None
+    if web_findings_file and web_findings_file.exists():
+        web_findings = json.loads(web_findings_file.read_text(encoding="utf-8"))
 
     doc_checks, doc_failures = qualify_docs(qualification_plan.get("doc_urls") or {})
     source_checks, source_failures = qualify_source(root, qualification_plan.get("source_specs") or [])
@@ -213,6 +237,9 @@ def main() -> None:
         "cli_failures": cli_failures,
         "repo_local_overlays": len(overlays),
         "research_status": (research_snapshot or {}).get("research_status", "pending"),
+        "identity_status": ((research_snapshot or {}).get("identity") or {}).get("status", "unknown"),
+        "identity_confidence": ((research_snapshot or {}).get("identity") or {}).get("confidence", "unknown"),
+        "web_findings_entries": len((web_findings or {}).get("entries") or []),
     }
     status, caveats = qualification_status(summary, research_snapshot)
     snapshot = {
@@ -230,6 +257,10 @@ def main() -> None:
         "research_snapshot": {
             "path": str(research_path) if research_path else None,
             "status": (research_snapshot or {}).get("research_status", "pending"),
+        },
+        "web_research_findings": {
+            "path": str(web_findings_file) if web_findings_file else None,
+            "entries": len((web_findings or {}).get("entries") or []),
         },
         "repo_local_skill_overlays": overlays,
         "caveats": caveats,

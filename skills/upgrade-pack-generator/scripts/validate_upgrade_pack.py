@@ -187,6 +187,9 @@ def validate_manifest(path: str | Path) -> tuple[bool, list[str]]:
         for key in (
             "strategy",
             "snapshot_filename",
+            "bundle_filename",
+            "web_findings_filename",
+            "source_map_policy",
             "target_version_policy",
             "target_version",
             "compatibility_rationale",
@@ -195,8 +198,19 @@ def validate_manifest(path: str | Path) -> tuple[bool, list[str]]:
             value = research_plan.get(key)
             if not isinstance(value, str) or not value.strip():
                 errors.append(f"research_plan.{key} must be a non-empty string")
+        confidence_threshold = research_plan.get("identity_confidence_threshold")
+        if not isinstance(confidence_threshold, (int, float)):
+            errors.append("research_plan.identity_confidence_threshold must be a number")
+        elif not 0 <= float(confidence_threshold) <= 1:
+            errors.append("research_plan.identity_confidence_threshold must be between 0 and 1")
         errors.extend(_validate_string_list("research_plan.required_categories", research_plan.get("required_categories")))
         errors.extend(_validate_string_list("research_plan.source_priority", research_plan.get("source_priority")))
+        errors.extend(
+            _validate_string_list(
+                "research_plan.required_web_confirmation_categories",
+                research_plan.get("required_web_confirmation_categories"),
+            )
+        )
         for key in (
             "official_docs",
             "api_reference",

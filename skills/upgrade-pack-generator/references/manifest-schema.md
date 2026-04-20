@@ -74,7 +74,9 @@ The canonical rendered source is `upgrade-pack.yaml`.
   declare the snapshot filename, current doc URLs, pinned source specs, and
   family-native read-only CLI checks.
 - `research_plan` drives the separate research stage. It should declare the
-  snapshot filename, required evidence categories, target-version policy,
+  snapshot filename, raw bundle filename, web-findings filename,
+  source-map policy, identity-confidence threshold, required evidence
+  categories, required web-confirmation categories, target-version policy,
   release-range reasoning, source priorities, upstream URL buckets, pinned
   source specs, and repo-usage mapping commands.
 - `family_type` should distinguish broad families such as `package` vs
@@ -95,6 +97,18 @@ The canonical rendered source is `upgrade-pack.yaml`.
   - `<plan_basename>-operator-mode.md`
 - `research_plan.snapshot_filename` controls the machine-readable research file
   name, usually `research-snapshot.json`.
+- `research_plan.bundle_filename` controls the raw machine-readable research
+  bundle file name, usually `research-bundle.json`.
+- `research_plan.web_findings_filename` controls the machine-readable `web.run`
+  confirmation file name, usually `web-research-findings.json`.
+- `research_plan.source_map_policy` describes how the bundled source map should
+  be used, usually `bundled-seed-then-verify`.
+- `research_plan.identity_confidence_threshold` controls the minimum confidence
+  required for the generic package-identity resolver to count the pack as
+  fully researched.
+- `research_plan.required_web_confirmation_categories` declares which
+  categories must have explicit `web.run` confirmations before the research
+  stage can be `complete`.
 - `qualification_plan.snapshot_filename` controls the machine-readable
   qualification file name, usually `qualification-snapshot.json`.
 
@@ -141,6 +155,8 @@ qualification_plan:
 research_plan:
   strategy: separate-read-only-research
   snapshot_filename: research-snapshot.json
+  bundle_filename: research-bundle.json
+  web_findings_filename: web-research-findings.json
   required_categories:
     - official_docs
     - api_reference
@@ -156,9 +172,16 @@ research_plan:
     - upstream source inspection fourth
     - examples and cookbooks fifth
     - repo-local usage mapping always required
+  identity_confidence_threshold: 0.75
+  source_map_policy: bundled-seed-then-verify
+  required_web_confirmation_categories:
+    - official_docs
+    - api_reference
   target_version_policy: latest-compatible-stable
   target_version: Next.js 16
-  compatibility_rationale: Stay on the latest compatible stable Next.js 16 surface that fits the repo's runtime and deployment constraints.
+  compatibility_rationale: >-
+    Stay on the latest compatible stable Next.js 16 surface that fits the
+    repo's runtime and deployment constraints.
   release_range: 16.2.4 -> Next.js 16
   official_docs:
     docs home: https://nextjs.org/docs

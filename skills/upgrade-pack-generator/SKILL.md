@@ -65,13 +65,24 @@ generating the pack.
    python3 scripts/research_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
    ```
 
-9. Run read-only qualification:
+9. Run the mandatory `web.run` confirmation pass for required official docs and
+   API-reference pages from `research-bundle.json` and record the results in
+   `web-research-findings.json`.
+
+10. Re-run read-only research so the snapshot reflects the confirmed official
+    pages:
+
+   ```bash
+   python3 scripts/research_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
+   ```
+
+11. Run read-only qualification:
 
    ```bash
    python3 scripts/qualify_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
    ```
 
-10. Render the pack:
+12. Render the pack:
 
    ```bash
    python3 scripts/render_upgrade_pack.py \
@@ -85,6 +96,8 @@ Every generated repo-local pack must contain exactly:
 
 - `upgrade-pack.yaml`
 - `research-snapshot.json`
+- `research-bundle.json`
+- `web-research-findings.json`
 - `qualification-snapshot.json`
 - `<basename>-playbook.md`
 - `<basename>-trigger-prompt.md`
@@ -93,6 +106,10 @@ Every generated repo-local pack must contain exactly:
 The manifest is the canonical source. The markdown files are rendered outputs.
 `research-snapshot.json` and `qualification-snapshot.json` are the canonical
 machine-readable evidence files for the separate research and qualify stages.
+`research-bundle.json` is the raw evidence ledger that backs the research
+snapshot.
+`web-research-findings.json` is the machine-readable record of `web.run`
+confirmation for the required official pages.
 
 Rendered file roles:
 
@@ -173,7 +190,12 @@ Conditional routing:
   - validates the manifest contract before rendering
 - `scripts/research_upgrade_pack.py`
   - gathers upstream docs, API refs, release notes, examples, source evidence,
-    and repo-usage mapping into `research-snapshot.json`
+    repo-usage mapping, package identity, target-version reasoning, source-map
+    drift checks, provenance scores, and the `web.run` queue into
+    `research-snapshot.json` plus `research-bundle.json`
+- `scripts/sync_source_map.py`
+  - validates or refreshes the bundled package source-map under
+    `references/source-maps/`
 - `scripts/qualify_upgrade_pack.py`
   - runs family-native read-only qualification and writes
   `qualification-snapshot.json`

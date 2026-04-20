@@ -150,6 +150,8 @@ def ensure_manifest_research_defaults(manifest: dict[str, Any]) -> None:
         research_plan = {}
     research_plan.setdefault("strategy", "separate-read-only-research")
     research_plan.setdefault("snapshot_filename", "research-snapshot.json")
+    research_plan.setdefault("bundle_filename", "research-bundle.json")
+    research_plan.setdefault("web_findings_filename", "web-research-findings.json")
     research_plan.setdefault(
         "required_categories",
         [
@@ -171,6 +173,15 @@ def ensure_manifest_research_defaults(manifest: dict[str, Any]) -> None:
             "upstream source inspection fourth",
             "examples and cookbooks fifth",
             "repo-local usage mapping always required",
+        ],
+    )
+    research_plan.setdefault("identity_confidence_threshold", 0.75)
+    research_plan.setdefault("source_map_policy", "bundled-seed-then-verify")
+    research_plan.setdefault(
+        "required_web_confirmation_categories",
+        [
+            "official_docs",
+            "api_reference",
         ],
     )
     research_plan.setdefault("target_version_policy", "latest-compatible-stable")

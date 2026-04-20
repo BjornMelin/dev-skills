@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import shutil
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,44 @@ MANAGER_TOKEN_PATTERNS = {
 
 PACKAGE_JSON_SECTIONS = ("dependencies", "devDependencies", "peerDependencies")
 SOURCE_TEXT_SUFFIXES = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".yml", ".yaml"}
+SOURCE_MAP_FILENAME = "package_source_map.json"
+
+
+def skill_root_from_script(script_path: str | Path) -> Path:
+    """Return the upgrade-pack-generator skill root for a script path."""
+    return Path(script_path).expanduser().resolve().parents[1]
+
+
+def bundled_source_map_path(script_path: str | Path) -> Path:
+    """Return the bundled package source-map path."""
+    return skill_root_from_script(script_path) / "references" / "source-maps" / SOURCE_MAP_FILENAME
+
+
+def load_bundled_source_map(script_path: str | Path) -> list[dict[str, Any]]:
+    """Load the bundled source map."""
+    path = bundled_source_map_path(script_path)
+    if not path.exists():
+        return []
+    payload = load_json(path)
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def source_map_entry(script_path: str | Path, package_name: str) -> dict[str, Any] | None:
+    """Return the first matching bundled source-map entry for a package."""
+    normalized = package_name.strip()
+    if not normalized:
+        return None
+    for entry in load_bundled_source_map(script_path):
+        if str(entry.get("packageName") or "").strip() == normalized:
+            return entry
+    return None
+
+
+def tool_available(name: str) -> bool:
+    """Return whether a binary is present on PATH."""
+    return shutil.which(name) is not None
 
 
 def safe_read_text(path: str | Path) -> str:

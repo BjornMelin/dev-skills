@@ -24,6 +24,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-dir", required=True, help="Directory to write the rendered pack into")
     parser.add_argument("--qualification-snapshot", help="Optional path to qualification-snapshot.json")
     parser.add_argument("--research-snapshot", help="Optional path to research-snapshot.json")
+    parser.add_argument("--research-bundle", help="Optional path to research-bundle.json")
+    parser.add_argument("--web-findings", help="Optional path to web-research-findings.json")
     return parser
 
 
@@ -164,19 +166,28 @@ def research_summary_block(snapshot: dict[str, Any] | None, manifest: dict[str, 
         items = [
             "status: `pending`",
             f"snapshot file: `{plan.get('snapshot_filename', 'research-snapshot.json')}`",
+            f"raw bundle file: `{plan.get('bundle_filename', 'research-bundle.json')}`",
+            f"web findings file: `{plan.get('web_findings_filename', 'web-research-findings.json')}`",
             "research stage has not been run yet for this rendered pack",
         ]
         return bullets(items)
 
     summary = snapshot.get("summary") or {}
     category_status = snapshot.get("category_status") or {}
+    identity = snapshot.get("identity") or {}
+    target_resolution = snapshot.get("target_resolution") or {}
     items = [
         f"status: `{snapshot.get('research_status', 'unknown')}`",
         f"snapshot file: `{snapshot.get('snapshot_filename', plan.get('snapshot_filename', 'research-snapshot.json'))}`",
+        f"raw bundle file: `{snapshot.get('bundle_filename', plan.get('bundle_filename', 'research-bundle.json'))}`",
+        f"web findings file: `{snapshot.get('web_findings_filename', plan.get('web_findings_filename', 'web-research-findings.json'))}`",
         f"target version policy: `{snapshot.get('target_version_policy', 'unknown')}`",
         f"target version: `{snapshot.get('target_version', 'unknown')}`",
         f"release range reviewed: `{snapshot.get('release_range', 'unknown')}`",
         f"compatibility rationale: {snapshot.get('compatibility_rationale', 'unknown')}",
+        f"package identity: `{identity.get('status', 'unknown')}` at confidence `{identity.get('confidence', 'unknown')}`",
+        f"resolved upstream repo: `{identity.get('repository_slug', identity.get('repository_url', 'unknown'))}`",
+        f"selected target posture: `{target_resolution.get('selected_status', 'unknown')}`",
         (
             "category status: "
             + ", ".join(f"{key}=`{value}`" for key, value in category_status.items())
@@ -188,10 +199,18 @@ def research_summary_block(snapshot: dict[str, Any] | None, manifest: dict[str, 
             f"failed=`{summary.get('failed_categories', 0)}`, "
             f"missing=`{summary.get('missing_categories', 0)}`"
         ),
+        (
+            "web confirmation: "
+            f"required=`{summary.get('required_web_queue', 0)}`, "
+            f"confirmed=`{summary.get('confirmed_web_queue', 0)}`"
+        ),
     ]
     caveats = snapshot.get("caveats") or []
     if caveats:
         items.append(f"caveats: `{'; '.join(str(item) for item in caveats[:3])}`")
+    related = snapshot.get("recommended_related_packages") or []
+    if related:
+        items.append(f"recommended related packages: `{', '.join(str(item) for item in related)}`")
     return bullets(items)
 
 
@@ -207,14 +226,21 @@ def repo_local_overlay_block(snapshot: dict[str, Any] | None) -> str:
     )
 
 
-def family_profile_block(manifest: dict[str, Any]) -> str:
+def family_profile_block(manifest: dict[str, Any], research_snapshot: dict[str, Any] | None) -> str:
+    effective_validated_version = manifest["validated_upstream_version"]
+    if (
+        research_snapshot
+        and effective_validated_version in {"unverified", "unknown"}
+        and research_snapshot.get("target_version")
+    ):
+        effective_validated_version = str(research_snapshot["target_version"])
     items = [
         f"display name: `{manifest['family_display_name']}`",
         f"family type: `{manifest['family_type']}`",
         f"mode: `{manifest['mode']}`",
         f"anchor package: `{manifest['anchor_package']}`",
         f"current repo version: `{manifest['current_version']}`",
-        f"validated upstream version: `{manifest['validated_upstream_version']}`",
+        f"validated upstream version: `{effective_validated_version}`",
         f"validated doc date: `{manifest['validated_doc_date']}`",
     ]
     return bullets(items)
@@ -260,6 +286,12 @@ def pack_map_block(manifest: dict[str, Any]) -> str:
     research_snapshot_filename = (
         manifest.get("research_plan", {}).get("snapshot_filename") or "research-snapshot.json"
     )
+    research_bundle_filename = (
+        manifest.get("research_plan", {}).get("bundle_filename") or "research-bundle.json"
+    )
+    web_findings_filename = (
+        manifest.get("research_plan", {}).get("web_findings_filename") or "web-research-findings.json"
+    )
     snapshot_filename = (
         manifest.get("qualification_plan", {}).get("snapshot_filename") or "qualification-snapshot.json"
     )
@@ -270,6 +302,8 @@ def pack_map_block(manifest: dict[str, Any]) -> str:
             f"`{manifest['trigger_filename']}` -- copy/paste launcher for a fresh Codex session.",
             "`upgrade-pack.yaml` -- canonical structured source for the rendered pack.",
             f"`{research_snapshot_filename}` -- machine-readable research evidence from the read-only research stage.",
+            f"`{research_bundle_filename}` -- raw machine-readable research bundle with identity resolution, registry, source, docs, and repo-usage evidence.",
+            f"`{web_findings_filename}` -- machine-readable `web.run` confirmations for required official docs and API-reference pages.",
             f"`{snapshot_filename}` -- machine-readable qualification evidence from the read-only qualify stage.",
         ]
     )
@@ -279,7 +313,7 @@ def pack_map_block(manifest: dict[str, Any]) -> str:
             f"Read {playbook_anchor_link(manifest, 'pack-map', 'Pack Map')} and {playbook_anchor_link(manifest, 'current-state-and-evidence', 'Current State And Evidence')} in `./{manifest['playbook_filename']}`.",
             f"Use {playbook_anchor_link(manifest, 'decisions-and-end-state', 'Decisions And End State')} before editing and {playbook_anchor_link(manifest, 'execution-and-verification', 'Execution And Verification')} while implementing.",
             f"Use `./{manifest['operator_filename']}` only as a quick execution aid after the playbook is loaded.",
-            f"Consult `upgrade-pack.yaml`, `{research_snapshot_filename}`, and `{snapshot_filename}` when raw structured evidence or exact research or qualification details are needed.",
+            f"Consult `upgrade-pack.yaml`, `{research_snapshot_filename}`, `{research_bundle_filename}`, `{web_findings_filename}`, and `{snapshot_filename}` when raw structured evidence or exact research or qualification details are needed.",
         ]
     )
     writable_file = raw_bullets(
@@ -404,6 +438,12 @@ def main() -> None:
         if args.research_snapshot
         else None
     )
+    research_bundle_path = (
+        Path(args.research_bundle).expanduser().resolve()
+        if args.research_bundle
+        else None
+    )
+    web_findings_path = Path(args.web_findings).expanduser().resolve() if args.web_findings else None
 
     valid, errors = validate_manifest(manifest_path)
     if not valid:
@@ -421,6 +461,18 @@ def main() -> None:
             candidate = manifest_path.parent / default_research_snapshot
             if candidate.exists():
                 research_path = candidate
+    if research_bundle_path is None:
+        default_research_bundle = research_plan.get("bundle_filename")
+        if isinstance(default_research_bundle, str) and default_research_bundle.strip():
+            candidate = manifest_path.parent / default_research_bundle
+            if candidate.exists():
+                research_bundle_path = candidate
+    if web_findings_path is None:
+        default_web_findings = research_plan.get("web_findings_filename")
+        if isinstance(default_web_findings, str) and default_web_findings.strip():
+            candidate = manifest_path.parent / default_web_findings
+            if candidate.exists():
+                web_findings_path = candidate
     if qualification_path is None:
         default_snapshot = qualification_plan.get("snapshot_filename")
         if isinstance(default_snapshot, str) and default_snapshot.strip():
@@ -428,6 +480,8 @@ def main() -> None:
             if candidate.exists():
                 qualification_path = candidate
     research_snapshot = load_json(research_path) if research_path and research_path.exists() else None
+    research_bundle = load_json(research_bundle_path) if research_bundle_path and research_bundle_path.exists() else None
+    web_findings = load_json(web_findings_path) if web_findings_path and web_findings_path.exists() else None
     qualification_snapshot = load_json(qualification_path) if qualification_path and qualification_path.exists() else None
     manifest["_research_snapshot"] = research_snapshot
     skill_root = Path(__file__).resolve().parents[1]
@@ -442,6 +496,12 @@ def main() -> None:
     research_snapshot_filename = research_plan.get("snapshot_filename")
     if isinstance(research_snapshot_filename, str) and research_snapshot_filename.strip():
         companion_files.append(research_snapshot_filename)
+    research_bundle_filename = research_plan.get("bundle_filename")
+    if isinstance(research_bundle_filename, str) and research_bundle_filename.strip():
+        companion_files.append(research_bundle_filename)
+    web_findings_filename = research_plan.get("web_findings_filename")
+    if isinstance(web_findings_filename, str) and web_findings_filename.strip():
+        companion_files.append(web_findings_filename)
     snapshot_filename = qualification_plan.get("snapshot_filename")
     if isinstance(snapshot_filename, str) and snapshot_filename.strip():
         companion_files.append(snapshot_filename)
@@ -450,7 +510,7 @@ def main() -> None:
         "playbook_title": manifest["playbook_title"],
         "purpose": paragraph(manifest["purpose"]),
         "pack_map_block": pack_map_block(manifest),
-        "family_profile_block": family_profile_block(manifest),
+        "family_profile_block": family_profile_block(manifest, research_snapshot),
         "target_surface_block": target_surface_block(manifest),
         "companion_files_block": bullets(companion_files),
         "research_summary_block": research_summary_block(research_snapshot, manifest),
@@ -539,6 +599,16 @@ def main() -> None:
         write_file(
             output_dir / research_snapshot_filename,
             json.dumps(research_snapshot, indent=2, sort_keys=False),
+        )
+    if research_bundle and isinstance(research_bundle_filename, str) and research_bundle_filename.strip():
+        write_file(
+            output_dir / research_bundle_filename,
+            json.dumps(research_bundle, indent=2, sort_keys=False),
+        )
+    if web_findings and isinstance(web_findings_filename, str) and web_findings_filename.strip():
+        write_file(
+            output_dir / web_findings_filename,
+            json.dumps(web_findings, indent=2, sort_keys=False),
         )
     if qualification_snapshot and isinstance(snapshot_filename, str) and snapshot_filename.strip():
         write_file(
