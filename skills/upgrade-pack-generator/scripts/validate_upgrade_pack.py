@@ -91,6 +91,33 @@ def _validate_string_list(name: str, value: Any, *, allow_empty: bool = False) -
     return errors
 
 
+def _validate_url_map(name: str, value: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(value, dict):
+        return [f"{name} must be a dictionary"]
+    for key, entry in value.items():
+        if not isinstance(key, str) or not key.strip():
+            errors.append(f"{name} keys must be non-empty strings")
+        if not isinstance(entry, str) or not entry.strip():
+            errors.append(f"{name}.{key} must be a non-empty string")
+    return errors
+
+
+def _validate_shell_checks(name: str, value: Any) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(value, list):
+        return [f"{name} must be a list"]
+    for index, check in enumerate(value):
+        if not isinstance(check, dict):
+            errors.append(f"{name}[{index}] must be a dictionary")
+            continue
+        for key in ("label", "cwd", "command"):
+            entry = check.get(key)
+            if not isinstance(entry, str) or not entry.strip():
+                errors.append(f"{name}[{index}].{key} must be a non-empty string")
+    return errors
+
+
 def validate_manifest(path: str | Path) -> tuple[bool, list[str]]:
     """Validate a manifest path."""
     manifest = load_yaml(path)
@@ -100,8 +127,8 @@ def validate_manifest(path: str | Path) -> tuple[bool, list[str]]:
     errors: list[str] = []
 
     schema_version = manifest.get("schema_version")
-    if schema_version not in {1, 2}:
-        errors.append("schema_version must equal 1 or 2")
+    if schema_version not in {1, 2, 3}:
+        errors.append("schema_version must equal 1, 2, or 3")
 
     for key in REQUIRED_STRING_KEYS:
         value = manifest.get(key)
@@ -139,37 +166,51 @@ def validate_manifest(path: str | Path) -> tuple[bool, list[str]]:
     errors.extend(_validate_string_list("target_surface.related_workspaces", target_surface.get("related_workspaces")))
 
     qualification_plan = manifest.get("qualification_plan") or {}
-    if schema_version == 2:
+    if schema_version in {2, 3}:
         for key in ("strategy", "snapshot_filename"):
             value = qualification_plan.get(key)
             if not isinstance(value, str) or not value.strip():
                 errors.append(f"qualification_plan.{key} must be a non-empty string")
-        doc_urls = qualification_plan.get("doc_urls")
-        if not isinstance(doc_urls, dict):
-            errors.append("qualification_plan.doc_urls must be a dictionary")
-        else:
-            for name, url in doc_urls.items():
-                if not isinstance(name, str) or not name.strip():
-                    errors.append("qualification_plan.doc_urls keys must be non-empty strings")
-                if not isinstance(url, str) or not url.strip():
-                    errors.append(f"qualification_plan.doc_urls.{name} must be a non-empty string")
+        errors.extend(_validate_url_map("qualification_plan.doc_urls", qualification_plan.get("doc_urls")))
         source_specs = qualification_plan.get("source_specs")
         if not isinstance(source_specs, list):
             errors.append("qualification_plan.source_specs must be a list")
         elif not all(isinstance(item, str) and item.strip() for item in source_specs):
             errors.append("qualification_plan.source_specs must contain only non-empty strings")
-        cli_checks = qualification_plan.get("cli_checks")
-        if not isinstance(cli_checks, list):
-            errors.append("qualification_plan.cli_checks must be a list")
-        else:
-            for index, check in enumerate(cli_checks):
-                if not isinstance(check, dict):
-                    errors.append(f"qualification_plan.cli_checks[{index}] must be a dictionary")
-                    continue
-                for key in ("label", "cwd", "command"):
-                    value = check.get(key)
-                    if not isinstance(value, str) or not value.strip():
-                        errors.append(f"qualification_plan.cli_checks[{index}].{key} must be a non-empty string")
+        errors.extend(_validate_shell_checks("qualification_plan.cli_checks", qualification_plan.get("cli_checks")))
+
+    if schema_version == 3:
+        research_plan = manifest.get("research_plan") or {}
+        if not isinstance(research_plan, dict) or not research_plan:
+            errors.append("research_plan must be a non-empty dictionary")
+            research_plan = {}
+        for key in (
+            "strategy",
+            "snapshot_filename",
+            "target_version_policy",
+            "target_version",
+            "compatibility_rationale",
+            "release_range",
+        ):
+            value = research_plan.get(key)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"research_plan.{key} must be a non-empty string")
+        errors.extend(_validate_string_list("research_plan.required_categories", research_plan.get("required_categories")))
+        errors.extend(_validate_string_list("research_plan.source_priority", research_plan.get("source_priority")))
+        for key in (
+            "official_docs",
+            "api_reference",
+            "migration_guides",
+            "release_history",
+            "examples_cookbooks",
+        ):
+            errors.extend(_validate_url_map(f"research_plan.{key}", research_plan.get(key)))
+        source_specs = research_plan.get("source_specs")
+        if not isinstance(source_specs, list):
+            errors.append("research_plan.source_specs must be a list")
+        elif not all(isinstance(item, str) and item.strip() for item in source_specs):
+            errors.append("research_plan.source_specs must contain only non-empty strings")
+        errors.extend(_validate_shell_checks("research_plan.repo_usage_queries", research_plan.get("repo_usage_queries")))
 
     for key in ("repo_probes", "upstream_validation", "required_research", "execution_plan"):
         section = manifest.get(key) or {}

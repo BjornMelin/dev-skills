@@ -59,13 +59,19 @@ generating the pack.
    python3 scripts/validate_upgrade_pack.py /tmp/upgrade-pack.yaml
    ```
 
-8. Run read-only qualification:
+8. Run read-only research:
+
+   ```bash
+   python3 scripts/research_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
+   ```
+
+9. Run read-only qualification:
 
    ```bash
    python3 scripts/qualify_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
    ```
 
-9. Render the pack:
+10. Render the pack:
 
    ```bash
    python3 scripts/render_upgrade_pack.py \
@@ -78,14 +84,15 @@ generating the pack.
 Every generated repo-local pack must contain exactly:
 
 - `upgrade-pack.yaml`
+- `research-snapshot.json`
 - `qualification-snapshot.json`
 - `<basename>-playbook.md`
 - `<basename>-trigger-prompt.md`
 - `<basename>-operator-mode.md`
 
 The manifest is the canonical source. The markdown files are rendered outputs.
-`qualification-snapshot.json` is the canonical machine-readable evidence file for
-the separate qualify stage.
+`research-snapshot.json` and `qualification-snapshot.json` are the canonical
+machine-readable evidence files for the separate research and qualify stages.
 
 Rendered file roles:
 
@@ -164,9 +171,12 @@ Conditional routing:
     package versions, and live official-doc snapshots
 - `scripts/validate_upgrade_pack.py`
   - validates the manifest contract before rendering
+- `scripts/research_upgrade_pack.py`
+  - gathers upstream docs, API refs, release notes, examples, source evidence,
+    and repo-usage mapping into `research-snapshot.json`
 - `scripts/qualify_upgrade_pack.py`
   - runs family-native read-only qualification and writes
-    `qualification-snapshot.json`
+  `qualification-snapshot.json`
 - `scripts/render_upgrade_pack.py`
   - renders the repo-local pack from the canonical manifest and qualification
     snapshot
@@ -191,6 +201,8 @@ python3 scripts/bootstrap_manifest.py \
   --out /tmp/commander-upgrade-pack.yaml
 python3 scripts/enrich_manifest.py \
   --manifest /tmp/commander-upgrade-pack.yaml
+python3 scripts/research_upgrade_pack.py \
+  --manifest /tmp/commander-upgrade-pack.yaml
 python3 scripts/qualify_upgrade_pack.py \
   --manifest /tmp/commander-upgrade-pack.yaml
 python3 scripts/render_upgrade_pack.py \
@@ -205,6 +217,8 @@ python3 scripts/enrich_manifest.py \
   --manifest /path/to/repo/.agents/plans/upgrade/lucide-react/upgrade-pack.yaml
 python3 scripts/validate_upgrade_pack.py \
   /path/to/repo/.agents/plans/upgrade/lucide-react/upgrade-pack.yaml
+python3 scripts/research_upgrade_pack.py \
+  --manifest /path/to/repo/.agents/plans/upgrade/lucide-react/upgrade-pack.yaml
 python3 scripts/qualify_upgrade_pack.py \
   --manifest /path/to/repo/.agents/plans/upgrade/lucide-react/upgrade-pack.yaml
 python3 scripts/render_upgrade_pack.py \

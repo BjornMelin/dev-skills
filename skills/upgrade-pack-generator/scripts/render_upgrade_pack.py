@@ -23,6 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--manifest", required=True, help="Path to upgrade-pack.yaml")
     parser.add_argument("--output-dir", required=True, help="Directory to write the rendered pack into")
     parser.add_argument("--qualification-snapshot", help="Optional path to qualification-snapshot.json")
+    parser.add_argument("--research-snapshot", help="Optional path to research-snapshot.json")
     return parser
 
 
@@ -156,6 +157,44 @@ def qualification_summary_block(snapshot: dict[str, Any] | None, manifest: dict[
     return bullets(items)
 
 
+def research_summary_block(snapshot: dict[str, Any] | None, manifest: dict[str, Any]) -> str:
+    """Render a compact human digest of research coverage."""
+    plan = manifest.get("research_plan") or {}
+    if not snapshot:
+        items = [
+            "status: `pending`",
+            f"snapshot file: `{plan.get('snapshot_filename', 'research-snapshot.json')}`",
+            "research stage has not been run yet for this rendered pack",
+        ]
+        return bullets(items)
+
+    summary = snapshot.get("summary") or {}
+    category_status = snapshot.get("category_status") or {}
+    items = [
+        f"status: `{snapshot.get('research_status', 'unknown')}`",
+        f"snapshot file: `{snapshot.get('snapshot_filename', plan.get('snapshot_filename', 'research-snapshot.json'))}`",
+        f"target version policy: `{snapshot.get('target_version_policy', 'unknown')}`",
+        f"target version: `{snapshot.get('target_version', 'unknown')}`",
+        f"release range reviewed: `{snapshot.get('release_range', 'unknown')}`",
+        f"compatibility rationale: {snapshot.get('compatibility_rationale', 'unknown')}",
+        (
+            "category status: "
+            + ", ".join(f"{key}=`{value}`" for key, value in category_status.items())
+        ),
+        (
+            "summary counts: "
+            f"ok=`{summary.get('ok_categories', 0)}`, "
+            f"partial=`{summary.get('partial_categories', 0)}`, "
+            f"failed=`{summary.get('failed_categories', 0)}`, "
+            f"missing=`{summary.get('missing_categories', 0)}`"
+        ),
+    ]
+    caveats = snapshot.get("caveats") or []
+    if caveats:
+        items.append(f"caveats: `{'; '.join(str(item) for item in caveats[:3])}`")
+    return bullets(items)
+
+
 def repo_local_overlay_block(snapshot: dict[str, Any] | None) -> str:
     overlays = (snapshot or {}).get("repo_local_skill_overlays") or []
     if not overlays:
@@ -185,6 +224,7 @@ def trigger_summary_block(manifest: dict[str, Any], snapshot: dict[str, Any] | N
     """Render the compact identity + surface summary kept in the trigger prompt."""
     target_surface = manifest["target_surface"]
     qualification_status = (snapshot or {}).get("qualification_status", "pending")
+    research_status = (manifest.get("_research_snapshot") or {}).get("research_status", "pending")
     return labeled_bullets(
         [
             ("family", f"`{manifest['family_display_name']}`"),
@@ -193,6 +233,7 @@ def trigger_summary_block(manifest: dict[str, Any], snapshot: dict[str, Any] | N
             ("validated upstream version", f"`{manifest['validated_upstream_version']}`"),
             ("owner surface", f"`{target_surface['workspace_path']}` (`{target_surface['surface_type']}`)"),
             ("verification strategy", f"`{target_surface['verification_strategy']}`"),
+            ("research status", f"`{research_status}`"),
             ("qualification status", f"`{qualification_status}`"),
         ]
     )
@@ -216,6 +257,9 @@ def target_surface_block(manifest: dict[str, Any]) -> str:
 
 def pack_map_block(manifest: dict[str, Any]) -> str:
     """Render file roles, reading order, and writable-file rules for the pack."""
+    research_snapshot_filename = (
+        manifest.get("research_plan", {}).get("snapshot_filename") or "research-snapshot.json"
+    )
     snapshot_filename = (
         manifest.get("qualification_plan", {}).get("snapshot_filename") or "qualification-snapshot.json"
     )
@@ -225,6 +269,7 @@ def pack_map_block(manifest: dict[str, Any]) -> str:
             f"`{manifest['operator_filename']}` -- execution delta card for fast runs; if it conflicts with the playbook, the playbook wins.",
             f"`{manifest['trigger_filename']}` -- copy/paste launcher for a fresh Codex session.",
             "`upgrade-pack.yaml` -- canonical structured source for the rendered pack.",
+            f"`{research_snapshot_filename}` -- machine-readable research evidence from the read-only research stage.",
             f"`{snapshot_filename}` -- machine-readable qualification evidence from the read-only qualify stage.",
         ]
     )
@@ -234,14 +279,14 @@ def pack_map_block(manifest: dict[str, Any]) -> str:
             f"Read {playbook_anchor_link(manifest, 'pack-map', 'Pack Map')} and {playbook_anchor_link(manifest, 'current-state-and-evidence', 'Current State And Evidence')} in `./{manifest['playbook_filename']}`.",
             f"Use {playbook_anchor_link(manifest, 'decisions-and-end-state', 'Decisions And End State')} before editing and {playbook_anchor_link(manifest, 'execution-and-verification', 'Execution And Verification')} while implementing.",
             f"Use `./{manifest['operator_filename']}` only as a quick execution aid after the playbook is loaded.",
-            f"Consult `upgrade-pack.yaml` and `{snapshot_filename}` when raw structured evidence or exact qualification details are needed.",
+            f"Consult `upgrade-pack.yaml`, `{research_snapshot_filename}`, and `{snapshot_filename}` when raw structured evidence or exact research or qualification details are needed.",
         ]
     )
     writable_file = raw_bullets(
         [
             f"Writable during implementation: `{manifest['playbook_filename']}` only.",
             f"Update {playbook_anchor_link(manifest, 'live-tracker-and-closeout', 'Live Tracker And Closeout')} in place as work progresses.",
-            "Do not hand-edit the operator, trigger, manifest, or qualification snapshot during implementation unless you are intentionally regenerating the pack.",
+            "Do not hand-edit the operator, trigger, manifest, research snapshot, or qualification snapshot during implementation unless you are intentionally regenerating the pack.",
         ]
     )
     return "\n".join(
@@ -354,6 +399,11 @@ def main() -> None:
         if args.qualification_snapshot
         else None
     )
+    research_path = (
+        Path(args.research_snapshot).expanduser().resolve()
+        if args.research_snapshot
+        else None
+    )
 
     valid, errors = validate_manifest(manifest_path)
     if not valid:
@@ -363,14 +413,23 @@ def main() -> None:
         raise SystemExit(1)
 
     manifest = load_yaml(manifest_path)
+    research_plan = manifest.get("research_plan") or {}
     qualification_plan = manifest.get("qualification_plan") or {}
+    if research_path is None:
+        default_research_snapshot = research_plan.get("snapshot_filename")
+        if isinstance(default_research_snapshot, str) and default_research_snapshot.strip():
+            candidate = manifest_path.parent / default_research_snapshot
+            if candidate.exists():
+                research_path = candidate
     if qualification_path is None:
         default_snapshot = qualification_plan.get("snapshot_filename")
         if isinstance(default_snapshot, str) and default_snapshot.strip():
             candidate = manifest_path.parent / default_snapshot
             if candidate.exists():
                 qualification_path = candidate
+    research_snapshot = load_json(research_path) if research_path and research_path.exists() else None
     qualification_snapshot = load_json(qualification_path) if qualification_path and qualification_path.exists() else None
+    manifest["_research_snapshot"] = research_snapshot
     skill_root = Path(__file__).resolve().parents[1]
     templates = skill_root / "assets" / "templates"
 
@@ -380,6 +439,9 @@ def main() -> None:
         manifest["operator_filename"],
         "upgrade-pack.yaml",
     ]
+    research_snapshot_filename = research_plan.get("snapshot_filename")
+    if isinstance(research_snapshot_filename, str) and research_snapshot_filename.strip():
+        companion_files.append(research_snapshot_filename)
     snapshot_filename = qualification_plan.get("snapshot_filename")
     if isinstance(snapshot_filename, str) and snapshot_filename.strip():
         companion_files.append(snapshot_filename)
@@ -391,6 +453,7 @@ def main() -> None:
         "family_profile_block": family_profile_block(manifest),
         "target_surface_block": target_surface_block(manifest),
         "companion_files_block": bullets(companion_files),
+        "research_summary_block": research_summary_block(research_snapshot, manifest),
         "qualification_summary_block": qualification_summary_block(qualification_snapshot, manifest),
         "repo_local_overlay_block": repo_local_overlay_block(qualification_snapshot),
         "use_when_block": bullets(manifest["use_when"]),
@@ -426,6 +489,7 @@ def main() -> None:
             f"Load {markdown_link(f'./{playbook_file}', playbook_file)} first and treat it as the source of truth.",
             f"Use {playbook_anchor_link(manifest, 'current-state-and-evidence', 'Current State And Evidence')} for repo-specific evidence and {playbook_anchor_link(manifest, 'decisions-and-end-state', 'Decisions And End State')} for the intended final posture.",
             f"Update only {playbook_anchor_link(manifest, 'live-tracker-and-closeout', 'Live Tracker And Closeout')} while implementing.",
+            f"Research status for this pack: `{(research_snapshot or {}).get('research_status', 'pending')}`.",
             f"Qualification status for this pack: `{(qualification_snapshot or {}).get('qualification_status', 'pending')}`.",
         ]
     )
@@ -471,6 +535,11 @@ def main() -> None:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     write_file(output_dir / "upgrade-pack.yaml", manifest_path.read_text(encoding="utf-8"))
+    if research_snapshot and isinstance(research_snapshot_filename, str) and research_snapshot_filename.strip():
+        write_file(
+            output_dir / research_snapshot_filename,
+            json.dumps(research_snapshot, indent=2, sort_keys=False),
+        )
     if qualification_snapshot and isinstance(snapshot_filename, str) and snapshot_filename.strip():
         write_file(
             output_dir / snapshot_filename,

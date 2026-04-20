@@ -34,9 +34,12 @@ Steps:
    - repo root plus related workspaces
 5. Refine the manifest further with live repo research and upstream package research.
 6. Validate the manifest.
-7. Run `scripts/qualify_upgrade_pack.py` to capture read-only docs, source, CLI,
+7. Run `scripts/research_upgrade_pack.py` to capture upstream docs, API refs,
+   release notes, cookbooks, source evidence, and repo-usage mapping in
+   `research-snapshot.json`.
+8. Run `scripts/qualify_upgrade_pack.py` to capture read-only docs, source, CLI,
    and repo-local overlay evidence in `qualification-snapshot.json`.
-8. Render the pack into `.agents/plans/upgrade/<topic>/`.
+9. Render the pack into `.agents/plans/upgrade/<topic>/`.
 
 The rendered pack should follow this final contract:
 
@@ -45,14 +48,16 @@ The rendered pack should follow this final contract:
 - operator-mode is a delta card with links back to playbook sections
 - trigger-prompt is a thin launcher that tells a fresh Codex session to load
   the playbook first
-- `upgrade-pack.yaml` and `qualification-snapshot.json` remain the canonical
-  machine-readable sources
+- `upgrade-pack.yaml`, `research-snapshot.json`, and
+  `qualification-snapshot.json` remain the canonical machine-readable sources
 
 ## Guardrails
 
 - Generation is docs/research only.
 - Do not implement package upgrades while building the pack.
 - The generated `upgrade-pack.yaml` is the canonical source.
+- `research-snapshot.json` is the canonical machine-readable research evidence
+  file for the rendered pack.
 - `qualification-snapshot.json` is the canonical machine-readable qualification
   evidence file for the rendered pack.
 - `operator-mode.md` and `trigger-prompt.md` are rendered derivatives, not

@@ -130,7 +130,7 @@ def set_plan_identity(
 
 def ensure_manifest_qualification_defaults(manifest: dict[str, Any]) -> None:
     """Upgrade older manifests to the qualification-aware schema shape."""
-    manifest["schema_version"] = 2
+    manifest["schema_version"] = 3
     qualification_plan = manifest.get("qualification_plan")
     if not isinstance(qualification_plan, dict):
         qualification_plan = {}
@@ -142,8 +142,74 @@ def ensure_manifest_qualification_defaults(manifest: dict[str, Any]) -> None:
     manifest["qualification_plan"] = qualification_plan
 
 
+def ensure_manifest_research_defaults(manifest: dict[str, Any]) -> None:
+    """Upgrade older manifests to the research-aware schema shape."""
+    manifest["schema_version"] = 3
+    research_plan = manifest.get("research_plan")
+    if not isinstance(research_plan, dict):
+        research_plan = {}
+    research_plan.setdefault("strategy", "separate-read-only-research")
+    research_plan.setdefault("snapshot_filename", "research-snapshot.json")
+    research_plan.setdefault(
+        "required_categories",
+        [
+            "official_docs",
+            "api_reference",
+            "migration_guides",
+            "release_history",
+            "examples_cookbooks",
+            "source_evidence",
+            "repo_usage_mapping",
+        ],
+    )
+    research_plan.setdefault(
+        "source_priority",
+        [
+            "official docs and API references first",
+            "official migration guides and upgrade walkthroughs second",
+            "official blog, release notes, and changelog sources third",
+            "upstream source inspection fourth",
+            "examples and cookbooks fifth",
+            "repo-local usage mapping always required",
+        ],
+    )
+    research_plan.setdefault("target_version_policy", "latest-compatible-stable")
+    research_plan.setdefault(
+        "target_version",
+        "latest supportable stable release to be confirmed during enrichment and research",
+    )
+    research_plan.setdefault(
+        "compatibility_rationale",
+        "Use the latest supportable stable release whose documented constraints fit the repo's framework, runtime, and policy boundaries.",
+    )
+    research_plan.setdefault(
+        "release_range",
+        "current repo version -> latest supportable stable release under verified repo constraints",
+    )
+    for key in (
+        "official_docs",
+        "api_reference",
+        "migration_guides",
+        "release_history",
+        "examples_cookbooks",
+    ):
+        research_plan.setdefault(key, {})
+    research_plan.setdefault("source_specs", [])
+    research_plan.setdefault("repo_usage_queries", [])
+    manifest["research_plan"] = research_plan
+
+
 def qualification_cli_check(label: str, cwd: str, command: str) -> dict[str, str]:
     """Return a normalized CLI qualification check payload."""
+    return {
+        "label": label,
+        "cwd": cwd,
+        "command": command,
+    }
+
+
+def research_repo_usage_query(label: str, cwd: str, command: str) -> dict[str, str]:
+    """Return a normalized repo-usage research query payload."""
     return {
         "label": label,
         "cwd": cwd,
@@ -167,6 +233,37 @@ def apply_qualification_plan(
     qualification_plan["source_specs"] = unique_list(source_specs)
     qualification_plan["cli_checks"] = cli_checks
     manifest["repo_local_skill_overlays"] = overlays
+
+
+def apply_research_plan(
+    manifest: dict[str, Any],
+    *,
+    official_docs: dict[str, str],
+    api_reference: dict[str, str],
+    migration_guides: dict[str, str],
+    release_history: dict[str, str],
+    examples_cookbooks: dict[str, str],
+    source_specs: list[str],
+    repo_usage_queries: list[dict[str, str]],
+    target_version: str,
+    compatibility_rationale: str,
+    release_range: str,
+    target_version_policy: str = "latest-compatible-stable",
+) -> None:
+    """Write research metadata into a manifest."""
+    ensure_manifest_research_defaults(manifest)
+    research_plan = manifest["research_plan"]
+    research_plan["official_docs"] = official_docs
+    research_plan["api_reference"] = api_reference
+    research_plan["migration_guides"] = migration_guides
+    research_plan["release_history"] = release_history
+    research_plan["examples_cookbooks"] = examples_cookbooks
+    research_plan["source_specs"] = unique_list(source_specs)
+    research_plan["repo_usage_queries"] = repo_usage_queries
+    research_plan["target_version_policy"] = target_version_policy
+    research_plan["target_version"] = target_version
+    research_plan["compatibility_rationale"] = compatibility_rationale
+    research_plan["release_range"] = release_range
 
 
 def build_target_surface(
@@ -295,6 +392,45 @@ def next_doc_urls(version: str) -> dict[str, str]:
         "proxy": "https://nextjs.org/docs/app/getting-started/proxy",
         "release post": f"https://nextjs.org/blog/next-{major}",
     }
+
+
+def next_research_sources(version: str) -> dict[str, dict[str, str]]:
+    """Return categorized research sources for Next.js."""
+    major = next_major(version)
+    return {
+        "official_docs": {
+            "docs home": "https://nextjs.org/docs",
+            "app router overview": "https://nextjs.org/docs/app",
+        },
+        "api_reference": {
+            "cacheComponents": "https://nextjs.org/docs/app/api-reference/config/next-config-js/useCache",
+            "typedRoutes": "https://nextjs.org/docs/app/api-reference/config/next-config-js/typedRoutes",
+            "cookies": "https://nextjs.org/docs/app/api-reference/functions/cookies",
+            "proxy": "https://nextjs.org/docs/app/getting-started/proxy",
+        },
+        "migration_guides": {
+            "upgrade guide": f"https://nextjs.org/docs/app/guides/upgrading/version-{major}",
+            "codemods": "https://nextjs.org/docs/app/guides/upgrading/codemods",
+        },
+        "release_history": {
+            "release post": f"https://nextjs.org/blog/next-{major}",
+            "github releases": "https://github.com/vercel/next.js/releases",
+        },
+        "examples_cookbooks": {
+            "static exports": "https://nextjs.org/docs/app/guides/static-exports",
+            "ai coding agents": "https://nextjs.org/docs/app/guides/ai-coding-agents",
+        },
+    }
+
+
+def next_repo_usage_queries(owner: dict[str, Any]) -> list[dict[str, str]]:
+    """Return repo-usage mapping commands for Next.js."""
+    owner_cwd = workspace_display_path(owner)
+    return [
+        research_repo_usage_query("Next manifest declarations", ".", "rg -n '\"next\"|\"react\"|\"react-dom\"|\"@next/codemod\"' ."),
+        research_repo_usage_query("Next config and route surfaces", ".", f"rg --files {shlex.quote(owner_cwd)} | rg '(next\\.config\\.|(^|/)proxy\\.|(^|/)middleware\\.|(^|/)app/|(^|/)src/app/)'"),
+        research_repo_usage_query("Next API usage", ".", f"rg -n \"from ['\\\"]next/(font|image|link|navigation|server|cache)|\\bcookies\\(|\\bheaders\\(|\\bdraftMode\\(|\\bconnection\\(|\\brevalidateTag\\(|\\bupdateTag\\(|\\bcacheLife\\(|\\bcacheTag\\(\" {shlex.quote(owner_cwd)}"),
+    ]
 
 
 def detect_next_owner(root: Path) -> dict[str, Any]:
@@ -529,6 +665,23 @@ def enrich_next_manifest(manifest: dict[str, Any], root: Path) -> dict[str, Any]
             ),
         ],
     )
+    research_sources = next_research_sources(current_version)
+    apply_research_plan(
+        manifest,
+        official_docs=research_sources["official_docs"],
+        api_reference=research_sources["api_reference"],
+        migration_guides=research_sources["migration_guides"],
+        release_history=research_sources["release_history"],
+        examples_cookbooks=research_sources["examples_cookbooks"],
+        source_specs=[f"next@{normalize_package_version_for_source(current_version)}"] if current_version != "unknown" else [],
+        repo_usage_queries=next_repo_usage_queries(owner),
+        target_version=f"Next.js {current_major}",
+        compatibility_rationale=(
+            "Stay on the latest compatible stable Next.js 16 surface that fits the repo's runtime, "
+            "static-export, and deployment constraints while adopting current official APIs."
+        ),
+        release_range=f"{current_version} -> Next.js {current_major}",
+    )
     return manifest
 
 
@@ -546,6 +699,45 @@ def expo_doc_urls() -> dict[str, str]:
         "EAS overview": "https://docs.expo.dev/eas",
         "new architecture": "https://docs.expo.dev/guides/new-architecture/",
     }
+
+
+def expo_research_sources(version: str) -> dict[str, dict[str, str]]:
+    """Return categorized research sources for Expo and EAS."""
+    sdk_major = expo_sdk_major(version)
+    return {
+        "official_docs": {
+            "expo docs home": "https://docs.expo.dev/",
+            "eas overview": "https://docs.expo.dev/eas",
+        },
+        "api_reference": {
+            "expo sdk reference": "https://docs.expo.dev/versions/latest/",
+            "expo router reference": "https://docs.expo.dev/versions/latest/sdk/router/",
+            "eas build config": "https://docs.expo.dev/build/eas-json/",
+        },
+        "migration_guides": {
+            "upgrade guide": "https://docs.expo.dev/workflow/upgrading-expo-sdk-walkthrough/",
+            "monorepos": "https://docs.expo.dev/guides/monorepos/",
+            "new architecture": "https://docs.expo.dev/guides/new-architecture/",
+        },
+        "release_history": {
+            f"sdk {sdk_major} changelog": f"https://expo.dev/changelog/sdk-{sdk_major}",
+            "expo changelog": "https://expo.dev/changelog",
+        },
+        "examples_cookbooks": {
+            "eas workflows": "https://docs.expo.dev/eas/workflows/introduction/",
+            "eas json": "https://docs.expo.dev/build/eas-json/",
+        },
+    }
+
+
+def expo_repo_usage_queries(owner: dict[str, Any]) -> list[dict[str, str]]:
+    """Return repo-usage mapping commands for Expo and EAS."""
+    owner_cwd = workspace_display_path(owner)
+    return [
+        research_repo_usage_query("Expo manifest declarations", ".", "rg -n '\"expo\"|\"expo-router\"|\"react-native\"|\"expo-updates\"|\"expo-dev-client\"' ."),
+        research_repo_usage_query("Expo config surfaces", ".", f"rg --files {shlex.quote(owner_cwd)} | rg '(app\\.json|app\\.config\\.|eas\\.json|expo-env\\.d\\.ts|metro\\.config|babel\\.config)'"),
+        research_repo_usage_query("Expo and EAS script usage", ".", f"rg -n 'expo start|expo-doctor|expo install|eas ' {shlex.quote(owner_cwd)} {shlex.quote(owner['package_json_path'])}"),
+    ]
 
 
 def detect_expo_owner(root: Path) -> dict[str, Any]:
@@ -771,6 +963,23 @@ def enrich_expo_manifest(manifest: dict[str, Any], root: Path) -> dict[str, Any]
             ),
         ],
     )
+    research_sources = expo_research_sources(current_version)
+    apply_research_plan(
+        manifest,
+        official_docs=research_sources["official_docs"],
+        api_reference=research_sources["api_reference"],
+        migration_guides=research_sources["migration_guides"],
+        release_history=research_sources["release_history"],
+        examples_cookbooks=research_sources["examples_cookbooks"],
+        source_specs=source_specs,
+        repo_usage_queries=expo_repo_usage_queries(owner),
+        target_version=f"Expo SDK {sdk_major}",
+        compatibility_rationale=(
+            "Stay on the latest Expo SDK and EAS guidance compatible with the owner workspace's React Native, "
+            "Expo Router, and CI or release posture."
+        ),
+        release_range=f"{current_version} -> Expo SDK {sdk_major}",
+    )
     return manifest
 
 
@@ -783,6 +992,42 @@ def convex_doc_urls() -> dict[str, str]:
         "deploy keys": "https://docs.convex.dev/cli/deploy-key-types",
         "agent mode": "https://docs.convex.dev/cli/agent-mode",
     }
+
+
+def convex_research_sources() -> dict[str, dict[str, str]]:
+    """Return categorized research sources for Convex."""
+    return {
+        "official_docs": {
+            "docs home": "https://docs.convex.dev/home",
+            "cli": "https://docs.convex.dev/cli",
+        },
+        "api_reference": {
+            "generated api": "https://docs.convex.dev/generated-api/",
+            "indexes": "https://docs.convex.dev/database/reading-data/indexes/",
+            "react client": "https://docs.convex.dev/client/react",
+        },
+        "migration_guides": {
+            "agent mode": "https://docs.convex.dev/cli/agent-mode",
+            "deploy keys": "https://docs.convex.dev/cli/deploy-key-types",
+        },
+        "release_history": {
+            "github releases": "https://github.com/get-convex/convex-backend/releases",
+        },
+        "examples_cookbooks": {
+            "tutorial": "https://docs.convex.dev/tutorial/",
+            "react quickstart": "https://docs.convex.dev/quickstart/react",
+        },
+    }
+
+
+def convex_repo_usage_queries(owner: dict[str, Any]) -> list[dict[str, str]]:
+    """Return repo-usage mapping commands for Convex."""
+    owner_cwd = workspace_display_path(owner)
+    return [
+        research_repo_usage_query("Convex manifest declarations", ".", "rg -n '\"convex\"|\"convex-helpers\"|\"@convex-dev/' ."),
+        research_repo_usage_query("Convex source surfaces", ".", f"rg --files {shlex.quote(owner_cwd)} | rg '(^|/)convex/|function_spec_|convex\\.json'"),
+        research_repo_usage_query("Convex API usage", ".", f"rg -n 'defineTable|withIndex|convex/_generated|CONVEX_DEPLOY_KEY|CONVEX_AGENT_MODE' {shlex.quote(owner_cwd)}"),
+    ]
 
 
 def detect_convex_owner(root: Path) -> dict[str, Any]:
@@ -1004,6 +1249,23 @@ def enrich_convex_manifest(manifest: dict[str, Any], root: Path) -> dict[str, An
             ),
         ],
     )
+    research_sources = convex_research_sources()
+    apply_research_plan(
+        manifest,
+        official_docs=research_sources["official_docs"],
+        api_reference=research_sources["api_reference"],
+        migration_guides=research_sources["migration_guides"],
+        release_history=research_sources["release_history"],
+        examples_cookbooks=research_sources["examples_cookbooks"],
+        source_specs=source_specs,
+        repo_usage_queries=convex_repo_usage_queries(owner),
+        target_version=f"Convex {current_major}.x",
+        compatibility_rationale=(
+            "Stay on the latest compatible stable Convex family surface that preserves generated-code, "
+            "schema, and deploy-key contracts used by the owner backend workspace."
+        ),
+        release_range=f"{current_version} -> Convex {current_major}.x",
+    )
     return manifest
 
 
@@ -1015,6 +1277,58 @@ def turborepo_doc_urls() -> dict[str, str]:
         "repository understanding": "https://turborepo.com/docs/crafting-your-repository/understanding-your-repository",
         "skipping tasks": "https://turborepo.com/repo/docs/core-concepts/monorepos/skipping-tasks",
     }
+
+
+def turborepo_research_sources() -> dict[str, dict[str, str]]:
+    """Return categorized research sources for Turborepo."""
+    return {
+        "official_docs": {
+            "docs home": "https://turborepo.dev/docs",
+            "run reference": "https://turborepo.dev/docs/reference/run",
+        },
+        "api_reference": {
+            "package configurations": "https://turborepo.dev/docs/reference/package-configurations",
+            "ls reference": "https://turborepo.dev/docs/reference/ls",
+            "query reference": "https://turborepo.dev/docs/reference/query",
+        },
+        "migration_guides": {
+            "repository understanding": "https://turborepo.dev/docs/crafting-your-repository/understanding-your-repository",
+            "skipping tasks": "https://turborepo.dev/docs/crafting-your-repository/configuring-tasks",
+        },
+        "release_history": {
+            "github releases": "https://github.com/vercel/turborepo/releases",
+        },
+        "examples_cookbooks": {
+            "examples": "https://github.com/vercel/turborepo/tree/main/examples",
+            "run reference": "https://turborepo.dev/docs/reference/run",
+        },
+    }
+
+
+def turborepo_repo_usage_queries() -> list[dict[str, str]]:
+    """Return repo-usage mapping commands for Turborepo."""
+    return [
+        research_repo_usage_query("Turbo manifest and config declarations", ".", "rg -n '\"turbo\"|turbo run|--affected|\"extends\"|\"$TURBO_EXTENDS$\"' ."),
+        research_repo_usage_query("Turbo config files", ".", "rg --files . | rg '(^|/)turbo\\.json$'"),
+        research_repo_usage_query("Turbo package graph usage", ".", "rg -n 'turbo query|turbo ls|turbo run' ."),
+    ]
+
+
+def generic_repo_usage_queries(anchor_package: str, owner: dict[str, Any]) -> list[dict[str, str]]:
+    """Return generic repo-usage mapping commands for a package family."""
+    owner_cwd = workspace_display_path(owner)
+    return [
+        research_repo_usage_query(
+            f"{anchor_package} manifest declarations",
+            ".",
+            f"rg -n '\"{anchor_package}\"' .",
+        ),
+        research_repo_usage_query(
+            f"{anchor_package} repo usage",
+            ".",
+            f"rg -n '{anchor_package}' {shlex.quote(owner_cwd) if owner_cwd != '.' else '.'}",
+        ),
+    ]
 
 
 def detect_turborepo_owner(root: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1196,6 +1510,23 @@ def enrich_turborepo_manifest(manifest: dict[str, Any], root: Path) -> dict[str,
             ),
         ],
     )
+    research_sources = turborepo_research_sources()
+    apply_research_plan(
+        manifest,
+        official_docs=research_sources["official_docs"],
+        api_reference=research_sources["api_reference"],
+        migration_guides=research_sources["migration_guides"],
+        release_history=research_sources["release_history"],
+        examples_cookbooks=research_sources["examples_cookbooks"],
+        source_specs=source_specs,
+        repo_usage_queries=turborepo_repo_usage_queries(),
+        target_version=f"Turborepo {current_major}.x",
+        compatibility_rationale=(
+            "Stay on the latest compatible stable Turborepo surface that preserves the repo's root task graph, "
+            "workspace package configurations, and affected-graph validation posture."
+        ),
+        release_range=f"{current_version} -> Turborepo {current_major}.x",
+    )
     return manifest
 
 
@@ -1242,6 +1573,8 @@ def enrich_generic_manifest(manifest: dict[str, Any], root: Path) -> dict[str, A
     root_record = root_manifest_record(root)
     owner = detect_generic_owner(root, manifest["anchor_package"])
     versions = package_versions_from_records([owner, root_record], manifest["related_packages"])
+    existing_qualification = manifest.get("qualification_plan") or {}
+    existing_research = manifest.get("research_plan") or {}
     owner_reason = (
         f"`{workspace_display_path(owner)}` is the primary owner because it declares `{manifest['anchor_package']}` in its package manifest."
     )
@@ -1259,19 +1592,38 @@ def enrich_generic_manifest(manifest: dict[str, Any], root: Path) -> dict[str, A
     manifest["related_packages"] = unique_list(manifest["related_packages"])
     manifest["current_version"] = versions.get(manifest["anchor_package"], "unknown")
     manifest["verification_commands"] = generic_verification_commands(root, owner, root_record, manifest)
-    source_specs = (
+    version_source_specs = (
         [
             f"{manifest['anchor_package']}@{normalize_package_version_for_source(manifest['current_version'])}"
         ]
         if manifest["current_version"] != "unknown"
         else []
     )
+    qualification_source_specs = unique_list(version_source_specs + list(existing_qualification.get("source_specs") or []))
+    research_source_specs = unique_list(version_source_specs + list(existing_research.get("source_specs") or []))
     apply_qualification_plan(
         manifest,
         root,
-        doc_urls={},
-        source_specs=source_specs,
-        cli_checks=[],
+        doc_urls=existing_qualification.get("doc_urls") or {},
+        source_specs=qualification_source_specs,
+        cli_checks=existing_qualification.get("cli_checks") or [],
+    )
+    apply_research_plan(
+        manifest,
+        official_docs=existing_research.get("official_docs") or {},
+        api_reference=existing_research.get("api_reference") or {},
+        migration_guides=existing_research.get("migration_guides") or {},
+        release_history=existing_research.get("release_history") or {},
+        examples_cookbooks=existing_research.get("examples_cookbooks") or {},
+        source_specs=research_source_specs,
+        repo_usage_queries=existing_research.get("repo_usage_queries") or generic_repo_usage_queries(manifest["anchor_package"], owner),
+        target_version=str(existing_research.get("target_version") or "latest supportable stable release to be confirmed during research"),
+        compatibility_rationale=str(
+            existing_research.get("compatibility_rationale")
+            or "Use the latest supportable stable release whose official docs, release notes, and repo usage mapping show a compatible migration path for this repository."
+        ),
+        release_range=str(existing_research.get("release_range") or f"{manifest['current_version']} -> latest supportable stable release"),
+        target_version_policy=str(existing_research.get("target_version_policy") or "latest-compatible-stable"),
     )
     return manifest
 
@@ -1281,6 +1633,7 @@ def main() -> None:
     manifest_path = Path(args.manifest).expanduser().resolve()
     manifest = load_manifest(manifest_path)
     ensure_manifest_qualification_defaults(manifest)
+    ensure_manifest_research_defaults(manifest)
     root = repo_path(manifest["repo_context"]["repo_root"])
 
     family_slug = str(manifest.get("family_slug") or "")

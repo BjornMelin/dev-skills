@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, help="Path to upgrade-pack.yaml")
     parser.add_argument("--out", help="Optional alternate output path for qualification-snapshot.json")
+    parser.add_argument("--research-snapshot", help="Optional path to research-snapshot.json")
     return parser
 
 
@@ -131,20 +132,32 @@ def qualify_cli(root: Path, checks: list[dict[str, str]]) -> tuple[list[dict[str
     return results, failures
 
 
-def qualification_status(summary: dict[str, int]) -> tuple[str, list[str]]:
+def qualification_status(summary: dict[str, int], research_snapshot: dict[str, Any] | None) -> tuple[str, list[str]]:
     """Return a normalized overall qualification result and caveats."""
     caveats: list[str] = []
-    if summary["cli_failures"] == 0 and summary["source_failures"] == 0 and summary["doc_failures"] == 0:
+    research_status = (research_snapshot or {}).get("research_status", "pending")
+    if (
+        summary["cli_failures"] == 0
+        and summary["source_failures"] == 0
+        and summary["doc_failures"] == 0
+        and research_status == "complete"
+    ):
         return "ready", caveats
+    if research_status != "complete":
+        caveats.append(f"research stage is `{research_status}`")
     if summary["cli_checks"] == summary["cli_failures"]:
         caveats.append("all CLI qualification checks failed")
     if summary["source_checks"] and summary["source_checks"] == summary["source_failures"]:
         caveats.append("all source qualification checks failed")
     if summary["doc_checks"] and summary["doc_checks"] == summary["doc_failures"]:
         caveats.append("all doc qualification checks failed")
-    if caveats:
+    if research_status == "insufficient-evidence":
         return "insufficient-evidence", caveats
-    caveats.append("one or more qualification checks failed; inspect the snapshot before treating the pack as fully qualified")
+    if caveats and any(item.startswith("all ") for item in caveats):
+        return "insufficient-evidence", caveats
+    caveats.append(
+        "one or more research or qualification checks are incomplete; inspect the snapshots before treating the pack as fully qualified"
+    )
     return "ready-with-caveats", caveats
 
 
@@ -154,6 +167,17 @@ def snapshot_path(manifest_path: Path, manifest: dict[str, Any], explicit_out: s
         return Path(explicit_out).expanduser().resolve()
     qualification_plan = manifest.get("qualification_plan") or {}
     filename = str(qualification_plan.get("snapshot_filename") or "qualification-snapshot.json")
+    return manifest_path.parent / filename
+
+
+def research_snapshot_path(manifest_path: Path, manifest: dict[str, Any], explicit_path: str | None) -> Path | None:
+    """Return the expected research snapshot path when present."""
+    if explicit_path:
+        return Path(explicit_path).expanduser().resolve()
+    research_plan = manifest.get("research_plan") or {}
+    filename = str(research_plan.get("snapshot_filename") or "").strip()
+    if not filename:
+        return None
     return manifest_path.parent / filename
 
 
@@ -170,6 +194,10 @@ def main() -> None:
     manifest = load_manifest(manifest_path)
     root = repo_path(manifest["repo_context"]["repo_root"])
     qualification_plan = manifest.get("qualification_plan") or {}
+    research_path = research_snapshot_path(manifest_path, manifest, args.research_snapshot)
+    research_snapshot = None
+    if research_path and research_path.exists():
+        research_snapshot = json.loads(research_path.read_text(encoding="utf-8"))
 
     doc_checks, doc_failures = qualify_docs(qualification_plan.get("doc_urls") or {})
     source_checks, source_failures = qualify_source(root, qualification_plan.get("source_specs") or [])
@@ -184,8 +212,9 @@ def main() -> None:
         "cli_checks": len(cli_checks),
         "cli_failures": cli_failures,
         "repo_local_overlays": len(overlays),
+        "research_status": (research_snapshot or {}).get("research_status", "pending"),
     }
-    status, caveats = qualification_status(summary)
+    status, caveats = qualification_status(summary, research_snapshot)
     snapshot = {
         "schema_version": 1,
         "generated_at": iso_now(),
@@ -198,6 +227,10 @@ def main() -> None:
         "doc_checks": doc_checks,
         "source_checks": source_checks,
         "cli_checks": cli_checks,
+        "research_snapshot": {
+            "path": str(research_path) if research_path else None,
+            "status": (research_snapshot or {}).get("research_status", "pending"),
+        },
         "repo_local_skill_overlays": overlays,
         "caveats": caveats,
     }

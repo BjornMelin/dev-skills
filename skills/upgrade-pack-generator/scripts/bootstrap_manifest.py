@@ -43,8 +43,20 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
     """Build a generic manifest when no family override exists."""
     display = titleize_package(anchor_package)
     plan_basename = f"{family_slug}-upgrade"
+    repo_usage_queries = [
+        {
+            "label": f"{display} manifest declarations",
+            "cwd": ".",
+            "command": f"rg -n '\"{anchor_package}\"' package.json pnpm-workspace.yaml bunfig.toml .",
+        },
+        {
+            "label": f"{display} repo usage",
+            "cwd": ".",
+            "command": f"rg -n '{anchor_package}' .",
+        },
+    ]
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "family_slug": family_slug,
         "family_display_name": display,
         "family_type": "package",
@@ -72,6 +84,41 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
             "doc_urls": {},
             "source_specs": [],
             "cli_checks": [],
+        },
+        "research_plan": {
+            "strategy": "separate-read-only-research",
+            "snapshot_filename": "research-snapshot.json",
+            "required_categories": [
+                "official_docs",
+                "api_reference",
+                "migration_guides",
+                "release_history",
+                "examples_cookbooks",
+                "source_evidence",
+                "repo_usage_mapping",
+            ],
+            "source_priority": [
+                "official docs and API references first",
+                "official migration guides and upgrade walkthroughs second",
+                "official blog, release notes, and changelog sources third",
+                "upstream source inspection fourth",
+                "examples and cookbooks fifth",
+                "repo-local usage mapping always required",
+            ],
+            "target_version_policy": "latest-compatible-stable",
+            "target_version": "latest supportable stable release to be confirmed during enrichment and research",
+            "compatibility_rationale": (
+                "Use the latest supportable stable release whose documented constraints fit the repo's "
+                "framework, runtime, and policy boundaries."
+            ),
+            "release_range": "current repo version -> latest supportable stable release under verified repo constraints",
+            "official_docs": {},
+            "api_reference": {},
+            "migration_guides": {},
+            "release_history": {},
+            "examples_cookbooks": {},
+            "source_specs": [],
+            "repo_usage_queries": repo_usage_queries,
         },
         "current_version": "unknown",
         "validated_upstream_version": "unverified",
@@ -318,6 +365,7 @@ def finalize_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     manifest["trigger_filename"] = f"{basename}-trigger-prompt.md"
     manifest["operator_filename"] = f"{basename}-operator-mode.md"
     manifest["related_packages"] = unique_list(manifest["related_packages"])
+    manifest.setdefault("research_plan", {})
     return manifest
 
 

@@ -10,6 +10,7 @@ import textwrap
 import unittest
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 
@@ -21,6 +22,8 @@ if str(SCRIPTS_DIR) not in sys.path:
 import bootstrap_manifest  # type: ignore  # noqa: E402
 import common  # type: ignore  # noqa: E402
 import enrich_manifest  # type: ignore  # noqa: E402
+import qualify_upgrade_pack  # type: ignore  # noqa: E402
+import research_upgrade_pack  # type: ignore  # noqa: E402
 
 
 def write_text(path: Path, content: str) -> None:
@@ -307,10 +310,16 @@ class UpgradePackGeneratorTests(unittest.TestCase):
 
             next_manifest = enrich_manifest.enrich_next_manifest(self.build_manifest(root, "next"), root)
             next_plan = next_manifest["qualification_plan"]
+            next_research = next_manifest["research_plan"]
             self.assertEqual(next_plan["snapshot_filename"], "qualification-snapshot.json")
             self.assertTrue(any(check["label"] == "Next.js codemod help" for check in next_plan["cli_checks"]))
             self.assertIn("next@16.2.4", next_plan["source_specs"])
             self.assertTrue(next_manifest["repo_local_skill_overlays"])
+            self.assertEqual(next_research["snapshot_filename"], "research-snapshot.json")
+            self.assertIn("release_history", next_research["required_categories"])
+            self.assertIn("docs home", next_research["official_docs"])
+            self.assertIn("github releases", next_research["release_history"])
+            self.assertTrue(next_research["repo_usage_queries"])
 
             convex_manifest = enrich_manifest.enrich_convex_manifest(self.build_manifest(root, "convex"), root)
             convex_plan = convex_manifest["qualification_plan"]
@@ -324,6 +333,129 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             self.assertTrue(any(overlay["skill_name"] == "monorepo-management" for overlay in turbo_manifest["repo_local_skill_overlays"]))
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    def test_generic_override_family_keeps_override_source_specs(self, _mock_fetch) -> None:
+        """Generic override families should merge repo-version and override source specs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_text(
+                root / "package.json",
+                """
+                {
+                  "name": "ui-upgrades",
+                  "private": true,
+                  "packageManager": "pnpm@10.28.0",
+                  "dependencies": {
+                    "lucide-react": "1.8.0",
+                    "radix-ui": "1.4.2"
+                  }
+                }
+                """,
+            )
+
+            lucide_manifest = enrich_manifest.enrich_generic_manifest(self.build_manifest(root, "lucide-react"), root)
+            self.assertIn("lucide-react@1.8.0", lucide_manifest["qualification_plan"]["source_specs"])
+            self.assertIn("lucide-icons/lucide", lucide_manifest["qualification_plan"]["source_specs"])
+            self.assertIn("lucide-react@1.8.0", lucide_manifest["research_plan"]["source_specs"])
+            self.assertIn("lucide-icons/lucide", lucide_manifest["research_plan"]["source_specs"])
+
+            shadcn_manifest = enrich_manifest.enrich_generic_manifest(self.build_manifest(root, "radix-ui"), root)
+            self.assertIn("radix-ui@1.4.2", shadcn_manifest["qualification_plan"]["source_specs"])
+            self.assertIn("shadcn-ui/ui", shadcn_manifest["qualification_plan"]["source_specs"])
+            self.assertIn("radix-ui/primitives", shadcn_manifest["qualification_plan"]["source_specs"])
+            self.assertIn("radix-ui@1.4.2", shadcn_manifest["research_plan"]["source_specs"])
+            self.assertIn("shadcn-ui/ui", shadcn_manifest["research_plan"]["source_specs"])
+            self.assertIn("radix-ui/primitives", shadcn_manifest["research_plan"]["source_specs"])
+
+    @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    @patch.object(research_upgrade_pack, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
+    def test_research_snapshot_complete_for_next_family(self, _research_fetch, _enrich_fetch) -> None:
+        """Research stage should produce a complete snapshot for built-in family packs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            make_signr_like_repo(root)
+            manifest = enrich_manifest.enrich_next_manifest(self.build_manifest(root, "next"), root)
+            opensrc_root = root / "opensrc-cache" / "next"
+            write_text(opensrc_root / "CHANGELOG.md", "# Changelog")
+            write_text(opensrc_root / "MIGRATION.md", "# Migration")
+            write_text(opensrc_root / "examples" / "app" / "README.md", "# Example")
+
+            def fake_run_shell(command: str, _cwd: Path) -> dict[str, Any]:
+                if command.startswith("opensrc path "):
+                    return {
+                        "exit_code": 0,
+                        "status": "ok",
+                        "stdout_excerpt": [str(opensrc_root)],
+                        "stderr_excerpt": [],
+                        "summary": [str(opensrc_root)],
+                    }
+                return {
+                    "exit_code": 0,
+                    "status": "ok",
+                    "stdout_excerpt": ["ok"],
+                    "stderr_excerpt": [],
+                    "summary": ["ok"],
+                }
+
+            with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
+                snapshot = research_upgrade_pack.generate_snapshot(manifest, root)
+
+            self.assertEqual(snapshot["research_status"], "complete")
+            self.assertEqual(snapshot["category_status"]["release_history"], "ok")
+            self.assertEqual(snapshot["category_status"]["repo_usage_mapping"], "ok")
+            self.assertEqual(snapshot["summary"]["missing_categories"], 0)
+            self.assertTrue(snapshot["source_evidence"][0]["release_note_files"])
+
+    def test_repo_usage_rg_no_matches_is_not_a_failure(self) -> None:
+        """Read-only grep probes should treat exit code 1 as valid no-match evidence."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+
+            def fake_run_shell(_command: str, _cwd: Path) -> dict[str, Any]:
+                return {
+                    "exit_code": 1,
+                    "status": "failed",
+                    "stdout_excerpt": [],
+                    "stderr_excerpt": [],
+                    "summary": [],
+                }
+
+            with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
+                entries = research_upgrade_pack.repo_usage_entries(
+                    root,
+                    [{"label": "No matches", "cwd": ".", "command": "rg -n 'missing-pattern' ."}],
+                )
+
+            self.assertEqual(entries[0]["status"], "ok")
+            self.assertEqual(entries[0]["summary"], ["no matches"])
+            self.assertEqual(entries[0]["exit_code"], 1)
+
+    def test_qualification_status_requires_complete_research(self) -> None:
+        """Qualification should not mark a pack ready when research is incomplete."""
+        summary = {
+            "doc_checks": 2,
+            "doc_failures": 0,
+            "source_checks": 1,
+            "source_failures": 0,
+            "cli_checks": 2,
+            "cli_failures": 0,
+            "repo_local_overlays": 0,
+            "research_status": "partial",
+        }
+        status, caveats = qualify_upgrade_pack.qualification_status(
+            summary,
+            {"research_status": "partial"},
+        )
+        self.assertEqual(status, "ready-with-caveats")
+        self.assertTrue(any("research stage" in caveat for caveat in caveats))
+
+        ready_status, ready_caveats = qualify_upgrade_pack.qualification_status(
+            summary | {"research_status": "complete"},
+            {"research_status": "complete"},
+        )
+        self.assertEqual(ready_status, "ready")
+        self.assertEqual(ready_caveats, [])
+
+    @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
     def test_rendered_trigger_prompt_wraps_long_lines(self, _mock_fetch) -> None:
         """Rendered packs should use the grouped playbook and linked thin launcher outputs."""
         with tempfile.TemporaryDirectory() as tmp:
@@ -334,6 +466,46 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             enriched = enrich_manifest.enrich_expo_manifest(manifest, root)
             manifest_path = Path(tmp) / "upgrade-pack.yaml"
             common.dump_yaml(manifest_path, enriched)
+            research_snapshot = {
+                "schema_version": 1,
+                "generated_at": "2026-04-19T00:00:00Z",
+                "family_slug": enriched["family_slug"],
+                "anchor_package": enriched["anchor_package"],
+                "repo_root": str(root),
+                "snapshot_filename": "research-snapshot.json",
+                "research_status": "complete",
+                "current_version": enriched["current_version"],
+                "target_version": enriched["validated_upstream_version"],
+                "target_version_policy": "latest-compatible-stable",
+                "compatibility_rationale": "Use the latest compatible stable release.",
+                "release_range": f"{enriched['current_version']} -> {enriched['validated_upstream_version']}",
+                "required_categories": enriched["research_plan"]["required_categories"],
+                "category_status": {category: "ok" for category in enriched["research_plan"]["required_categories"]},
+                "summary": {
+                    "required_categories": len(enriched["research_plan"]["required_categories"]),
+                    "ok_categories": len(enriched["research_plan"]["required_categories"]),
+                    "partial_categories": 0,
+                    "failed_categories": 0,
+                    "missing_categories": 0,
+                    "official_docs": len(enriched["research_plan"]["official_docs"]),
+                    "api_reference": len(enriched["research_plan"]["api_reference"]),
+                    "migration_guides": len(enriched["research_plan"]["migration_guides"]),
+                    "release_history": len(enriched["research_plan"]["release_history"]),
+                    "examples_cookbooks": len(enriched["research_plan"]["examples_cookbooks"]),
+                    "source_evidence": len(enriched["research_plan"]["source_specs"]),
+                    "repo_usage_mapping": len(enriched["research_plan"]["repo_usage_queries"]),
+                },
+                "official_docs": [],
+                "api_reference": [],
+                "migration_guides": [],
+                "release_history": [],
+                "examples_cookbooks": [],
+                "source_evidence": [],
+                "repo_usage_mapping": [],
+                "caveats": [],
+            }
+            research_path = Path(tmp) / "research-snapshot.json"
+            research_path.write_text(json.dumps(research_snapshot), encoding="utf-8")
             qualification_snapshot = {
                 "schema_version": 1,
                 "generated_at": "2026-04-19T00:00:00Z",
@@ -366,6 +538,8 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     str(SCRIPTS_DIR / "render_upgrade_pack.py"),
                     "--manifest",
                     str(manifest_path),
+                    "--research-snapshot",
+                    str(research_path),
                     "--qualification-snapshot",
                     str(qualification_path),
                     "--output-dir",
@@ -379,7 +553,10 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             playbook_text = playbook_path.read_text(encoding="utf-8")
             operator_text = operator_path.read_text(encoding="utf-8")
             trigger_text = trigger_path.read_text(encoding="utf-8")
+            self.assertTrue((out / "research-snapshot.json").exists())
             self.assertTrue((out / "qualification-snapshot.json").exists())
+            self.assertIn("### Research Coverage", playbook_text)
+            self.assertIn("status: `complete`", playbook_text)
             self.assertIn("status: `ready`", playbook_text)
             self.assertIn("## Pack Map", playbook_text)
             self.assertIn("## Current State And Evidence", playbook_text)
@@ -396,6 +573,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             self.assertIn("## Non-Negotiable Guardrails", operator_text)
             self.assertNotIn("## Family Profile", operator_text)
             self.assertNotIn("## Target Surface", operator_text)
+            self.assertIn("Research status for this pack: `complete`.", operator_text)
             self.assertIn(f"./{enriched['playbook_filename']}#current-state-and-evidence", operator_text)
             self.assertIn(f"./{enriched['playbook_filename']}#live-tracker-and-closeout", operator_text)
             self.assertIn("Repo-specific summary:", trigger_text)
@@ -433,6 +611,46 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             enriched = enrich_manifest.enrich_convex_manifest(manifest, root)
             manifest_path = Path(tmp) / "upgrade-pack.yaml"
             common.dump_yaml(manifest_path, enriched)
+            research_snapshot = {
+                "schema_version": 1,
+                "generated_at": "2026-04-19T00:00:00Z",
+                "family_slug": enriched["family_slug"],
+                "anchor_package": enriched["anchor_package"],
+                "repo_root": str(root),
+                "snapshot_filename": "research-snapshot.json",
+                "research_status": "complete",
+                "current_version": enriched["current_version"],
+                "target_version": enriched["validated_upstream_version"],
+                "target_version_policy": "latest-compatible-stable",
+                "compatibility_rationale": "Use the latest compatible stable release.",
+                "release_range": f"{enriched['current_version']} -> {enriched['validated_upstream_version']}",
+                "required_categories": enriched["research_plan"]["required_categories"],
+                "category_status": {category: "ok" for category in enriched["research_plan"]["required_categories"]},
+                "summary": {
+                    "required_categories": len(enriched["research_plan"]["required_categories"]),
+                    "ok_categories": len(enriched["research_plan"]["required_categories"]),
+                    "partial_categories": 0,
+                    "failed_categories": 0,
+                    "missing_categories": 0,
+                    "official_docs": len(enriched["research_plan"]["official_docs"]),
+                    "api_reference": len(enriched["research_plan"]["api_reference"]),
+                    "migration_guides": len(enriched["research_plan"]["migration_guides"]),
+                    "release_history": len(enriched["research_plan"]["release_history"]),
+                    "examples_cookbooks": len(enriched["research_plan"]["examples_cookbooks"]),
+                    "source_evidence": len(enriched["research_plan"]["source_specs"]),
+                    "repo_usage_mapping": len(enriched["research_plan"]["repo_usage_queries"]),
+                },
+                "official_docs": [],
+                "api_reference": [],
+                "migration_guides": [],
+                "release_history": [],
+                "examples_cookbooks": [],
+                "source_evidence": [],
+                "repo_usage_mapping": [],
+                "caveats": [],
+            }
+            research_path = Path(tmp) / "research-snapshot.json"
+            research_path.write_text(json.dumps(research_snapshot), encoding="utf-8")
             qualification_snapshot = {
                 "schema_version": 1,
                 "generated_at": "2026-04-19T00:00:00Z",
@@ -465,6 +683,8 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                     str(SCRIPTS_DIR / "render_upgrade_pack.py"),
                     "--manifest",
                     str(manifest_path),
+                    "--research-snapshot",
+                    str(research_path),
                     "--qualification-snapshot",
                     str(qualification_path),
                     "--output-dir",

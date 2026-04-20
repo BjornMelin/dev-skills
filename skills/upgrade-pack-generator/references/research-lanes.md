@@ -8,6 +8,14 @@ Default lanes:
 - `$technical-writing`
 - `$hard-cut`
 
+Required evidence posture:
+
+- official docs and API references
+- official migration guides and upgrade walkthroughs
+- official changelogs, release notes, or release posts
+- pinned upstream source when docs are insufficient
+- repo-local usage mapping before implementation
+
 Conditional lanes:
 
 - `$bun-dev`

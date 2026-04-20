@@ -18,6 +18,7 @@ The canonical rendered source is `upgrade-pack.yaml`.
 - `repo_context`
 - `target_surface`
 - `qualification_plan`
+- `research_plan`
 - `current_version`
 - `validated_upstream_version`
 - `validated_doc_date`
@@ -72,6 +73,10 @@ The canonical rendered source is `upgrade-pack.yaml`.
 - `qualification_plan` drives the separate qualification stage. It should
   declare the snapshot filename, current doc URLs, pinned source specs, and
   family-native read-only CLI checks.
+- `research_plan` drives the separate research stage. It should declare the
+  snapshot filename, required evidence categories, target-version policy,
+  release-range reasoning, source priorities, upstream URL buckets, pinned
+  source specs, and repo-usage mapping commands.
 - `family_type` should distinguish broad families such as `package` vs
   `framework`.
 - `mode` should express the mission shape such as `upgrade`, `optimize`, or
@@ -88,13 +93,15 @@ The canonical rendered source is `upgrade-pack.yaml`.
   - `<plan_basename>-playbook.md`
   - `<plan_basename>-trigger-prompt.md`
   - `<plan_basename>-operator-mode.md`
+- `research_plan.snapshot_filename` controls the machine-readable research file
+  name, usually `research-snapshot.json`.
 - `qualification_plan.snapshot_filename` controls the machine-readable
   qualification file name, usually `qualification-snapshot.json`.
 
 ## Minimal Example
 
 ```yaml
-schema_version: 2
+schema_version: 3
 family_display_name: Lucide React
 family_type: package
 mode: upgrade
@@ -131,6 +138,44 @@ qualification_plan:
     - label: Next.js codemod help
       cwd: apps/web
       command: pnpm dlx @next/codemod@canary --help
+research_plan:
+  strategy: separate-read-only-research
+  snapshot_filename: research-snapshot.json
+  required_categories:
+    - official_docs
+    - api_reference
+    - migration_guides
+    - release_history
+    - examples_cookbooks
+    - source_evidence
+    - repo_usage_mapping
+  source_priority:
+    - official docs and API references first
+    - official migration guides and upgrade walkthroughs second
+    - official blog, release notes, and changelog sources third
+    - upstream source inspection fourth
+    - examples and cookbooks fifth
+    - repo-local usage mapping always required
+  target_version_policy: latest-compatible-stable
+  target_version: Next.js 16
+  compatibility_rationale: Stay on the latest compatible stable Next.js 16 surface that fits the repo's runtime and deployment constraints.
+  release_range: 16.2.4 -> Next.js 16
+  official_docs:
+    docs home: https://nextjs.org/docs
+  api_reference:
+    typedRoutes: https://nextjs.org/docs/app/api-reference/config/next-config-js/typedRoutes
+  migration_guides:
+    upgrade guide: https://nextjs.org/docs/app/guides/upgrading/version-16
+  release_history:
+    github releases: https://github.com/vercel/next.js/releases
+  examples_cookbooks:
+    static exports: https://nextjs.org/docs/app/guides/static-exports
+  source_specs:
+    - next@16.2.4
+  repo_usage_queries:
+    - label: Next config and route surfaces
+      cwd: .
+      command: rg --files apps/web | rg '(next\\.config\\.|(^|/)proxy\\.|(^|/)app/)'
 current_version: 0.577.0
 validated_upstream_version: v1
 validated_doc_date: 2026-03-31

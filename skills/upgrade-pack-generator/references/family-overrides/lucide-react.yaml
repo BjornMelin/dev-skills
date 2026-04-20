@@ -7,6 +7,38 @@ operator_title: Lucide React v1 Upgrade Operator Mode
 trigger_title: Lucide React v1 Upgrade Trigger Prompt
 related_packages:
   - lucide-react
+qualification_plan:
+  doc_urls:
+    lucide home: https://lucide.dev/
+    lucide icons: https://lucide.dev/icons/
+    github releases: https://github.com/lucide-icons/lucide/releases
+  source_specs:
+    - lucide-icons/lucide
+research_plan:
+  target_version: Lucide React v1
+  compatibility_rationale: Keep the repo on the latest compatible Lucide React v1 surface and adopt current named-import and type usage guidance.
+  release_range: current repo version -> Lucide React v1
+  official_docs:
+    lucide home: https://lucide.dev/
+  api_reference:
+    icons gallery: https://lucide.dev/icons/
+    package source: https://github.com/lucide-icons/lucide/tree/main/packages/lucide-react
+  migration_guides:
+    v1 docs: https://lucide.dev/
+  release_history:
+    github releases: https://github.com/lucide-icons/lucide/releases
+  examples_cookbooks:
+    icons gallery: https://lucide.dev/icons/
+    brand logo statement: https://lucide.dev/brand-logo-statement
+  source_specs:
+    - lucide-icons/lucide
+  repo_usage_queries:
+    - label: Lucide manifest declarations
+      cwd: .
+      command: rg -n '"lucide-react"|@radix-ui/react-icons|react-icons' .
+    - label: Lucide import usage
+      cwd: .
+      command: rg -n 'lucide-react|dist/esm/icons|DynamicIcon|LucideProvider|LucideIcon' .
 purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a `lucide-react` v1 upgrade in this repository.
 use_when:
   - the repository already uses `lucide-react` and needs a v1-era cleanup or migration

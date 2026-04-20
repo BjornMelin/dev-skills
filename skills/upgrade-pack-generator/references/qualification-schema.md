@@ -13,6 +13,7 @@
 - `snapshot_filename`
 - `qualification_status`
 - `summary`
+- `research_snapshot`
 - `doc_checks`
 - `source_checks`
 - `cli_checks`
@@ -36,9 +37,14 @@
 - `cli_checks`
 - `cli_failures`
 - `repo_local_overlays`
+- `research_status`
 
 ## Notes
 
+- Qualification is downstream of the research stage. A pack cannot be `ready`
+  unless `research-snapshot.json` reports `research_status = complete`.
+- `research_snapshot` records the linked research snapshot path plus the
+  observed research status at qualification time.
 - `doc_checks` records live official-doc metadata for the URLs declared in
   `qualification_plan.doc_urls`.
 - `source_checks` records pinned `opensrc path` evidence for the specs declared

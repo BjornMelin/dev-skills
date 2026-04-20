@@ -13,6 +13,53 @@ anchor_package: radix-ui
 related_packages:
   - radix-ui
   - "@radix-ui/react-icons"
+qualification_plan:
+  doc_urls:
+    shadcn cli docs: https://ui.shadcn.com/docs/cli
+    shadcn radix migration changelog: https://ui.shadcn.com/docs/changelog/2026-02-radix-ui
+    radix introduction: https://www.radix-ui.com/primitives/docs/overview/introduction
+    radix releases: https://www.radix-ui.com/primitives/docs/overview/releases
+  source_specs:
+    - shadcn-ui/ui
+    - radix-ui/primitives
+research_plan:
+  target_version: shadcn Radix unified package lane
+  compatibility_rationale: Keep shadcn new-york repos on the current unified radix-ui package path, verify current CLI migration behavior, and adopt the latest compatible Radix guidance without mixing Base UI scope into the same wave.
+  release_range: current repo primitive package set -> current unified radix-ui package lane
+  official_docs:
+    shadcn cli docs: https://ui.shadcn.com/docs/cli
+    shadcn installation: https://ui.shadcn.com/docs/installation
+    radix introduction: https://www.radix-ui.com/primitives/docs/overview/introduction
+  api_reference:
+    shadcn dialog docs: https://ui.shadcn.com/docs/components/dialog
+    radix getting started: https://www.radix-ui.com/primitives/docs/overview/getting-started
+    radix accessibility: https://www.radix-ui.com/primitives/docs/overview/accessibility
+  migration_guides:
+    shadcn radix migration changelog: https://ui.shadcn.com/docs/changelog/2026-02-radix-ui
+    shadcn radix migration launch: https://ui.shadcn.com/docs/changelog/2025-06-radix-ui
+    shadcn migrate command docs: https://ui.shadcn.com/docs/cli
+  release_history:
+    shadcn radix migration changelog: https://ui.shadcn.com/docs/changelog/2026-02-radix-ui
+    radix releases overview: https://www.radix-ui.com/primitives/docs/overview/releases
+  examples_cookbooks:
+    shadcn dialog examples: https://ui.shadcn.com/docs/components/dialog
+    shadcn sidebar examples: https://ui.shadcn.com/docs/components/radix/sidebar
+  source_specs:
+    - shadcn-ui/ui
+    - radix-ui/primitives
+  repo_usage_queries:
+    - label: shadcn config and manifests
+      cwd: .
+      command: rg -n '"radix-ui"|@radix-ui/react-|@radix-ui/react-icons|components\\.json|shadcn' .
+    - label: shadcn primitive imports double quotes
+      cwd: .
+      command: "rg -n \"from \\\"@radix-ui/react-|from \\\"radix-ui\\\"\" ."
+    - label: shadcn primitive imports single quotes
+      cwd: .
+      command: "rg -n \"from '@radix-ui/react-|from 'radix-ui'\" ."
+    - label: shadcn owned component surface
+      cwd: .
+      command: rg -n 'components/ui|ui/' .
 purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a migration from many individual `@radix-ui/react-*` packages to the unified `radix-ui` package in a shadcn `new-york` Next.js codebase.
 use_when:
   - the repository uses shadcn `new-york`
