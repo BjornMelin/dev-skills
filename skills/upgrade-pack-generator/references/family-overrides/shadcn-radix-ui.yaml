@@ -1,0 +1,227 @@
+match_packages:
+  - shadcn-ui
+  - shadcn
+  - radix-ui
+  - "@radix-ui/react-dialog"
+  - "@radix-ui/react-slot"
+family_slug: shadcn
+plan_basename: shadcn-radix-ui-unification
+playbook_title: shadcn Radix UI Unification Playbook
+operator_title: shadcn Radix UI Unification Operator Mode
+trigger_title: shadcn Radix UI Unification Trigger Prompt
+anchor_package: radix-ui
+related_packages:
+  - radix-ui
+  - "@radix-ui/react-icons"
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a migration from many individual `@radix-ui/react-*` packages to the unified `radix-ui` package in a shadcn `new-york` Next.js codebase.
+use_when:
+  - the repository uses shadcn `new-york`
+  - the repo owns local shadcn component source in-repo
+  - the repo still imports primitives from multiple `@radix-ui/react-*` packages
+  - the repo wants one canonical primitive import model
+  - the repo needs a reusable migration report for current and future repos
+primary_goal:
+  - "`radix-ui` as the unified primitive dependency"
+  - one import convention for local shadcn-owned primitives
+  - no mixed primitive package ownership in component source
+  - current docs, policies, and verification evidence
+non_goals:
+  - converting the repo to Base UI
+  - redesigning the visual system
+  - changing shadcn style family without explicit approval
+  - "treating `@radix-ui/react-icons` as automatically covered by the primitive migration"
+  - folding Lucide or unrelated dependency waves into the same change by default
+source_hierarchy:
+  - official shadcn docs and CLI help
+  - official Radix docs
+  - upstream shadcn source and migration implementation
+  - local repo code and tests
+  - package manager metadata, audits, and lockfiles
+default_final_decisions:
+  - "canonical primitive import style: `import { Dialog as DialogPrimitive } from \"radix-ui\"`"
+  - use `shadcn migrate radix` as the initial rewrite path
+  - remove obsolete `@radix-ui/react-*` packages only after grep proves they are unused
+  - use one hard-cut wave, not staged coexistence
+  - stay on shadcn `new-york` plus Radix; do not silently expand into Base UI
+intake_checklist:
+  - confirm the repo actually uses shadcn
+  - confirm `components.json` exists and record `style`, `base`, `rsc`, aliases, and `iconLibrary`
+  - run `shadcn info --json` and record framework, version, base, resolved paths, and installed components
+  - search for `@radix-ui/react-*` usage
+  - search for existing `radix-ui` usage
+  - search for `@radix-ui/react-icons` usage
+  - identify all locally owned shadcn components and all direct primitive import sites
+  - search repo docs and AGENTS for primitive import guidance
+  - build a touched-files map before editing
+required_research:
+  Upstream shadcn:
+    - "verify current CLI help: `shadcn --help`, `shadcn migrate --list`, `shadcn migrate radix --help`"
+    - verify current migration/changelog guidance for `radix-ui`
+    - verify whether the target style/base is eligible for unified `radix-ui`
+  Upstream Radix:
+    - verify current installation guidance for `radix-ui`
+    - verify tree-shaking or bundling guidance where documented
+    - verify compatibility expectations for importing multiple primitives from the unified package
+  Upstream source inspection:
+    - inspect the shadcn migrator implementation when docs are incomplete
+    - confirm what the migrator does and does not do for import rewrites, dependency addition, old package cleanup, `Slot`, and `@radix-ui/react-icons`
+questions_to_resolve:
+  - is the repo on `new-york` plus Radix and therefore a good candidate for this migration
+  - does the repo own its shadcn component source, or is it generated from elsewhere
+  - are there any direct primitive imports outside the standard UI component directory
+  - is `@radix-ui/react-icons` still in use, and should it remain explicitly outside this wave
+  - is a Base UI migration being considered separately, and if so, should it stay deferred
+canonical_end_state:
+  - local shadcn-owned primitives import from `radix-ui`
+  - local component source no longer imports individual `@radix-ui/react-*` packages for migrated primitives
+  - "`package.json` carries `radix-ui` and no obsolete individual primitive packages"
+  - the repo does not misrepresent `@radix-ui/react-icons` as covered by the migration unless it was explicitly handled too
+  - docs and repo policy describe the final primitive import shape
+  - lint, typecheck, tests, build, and audit remain green
+what_to_adopt:
+  - "`shadcn migrate radix` as the first migration step"
+  - named imports from `radix-ui`
+  - manual post-migration grep and manifest cleanup
+  - focused verification on dialog, sheet, dropdown, select, popover, toast, navigation menu, toggle, and toggle group behavior
+what_to_avoid:
+  - partial coexistence between `radix-ui` and individual primitive imports in local component source
+  - assuming the CLI removes old packages automatically
+  - assuming the CLI migrates `@radix-ui/react-icons`
+  - silently expanding the scope into Base UI migration
+  - widening the change into unrelated design-system refactors
+execution_plan:
+  "Phase 1: Discovery":
+    - capture `shadcn info --json`
+    - inventory all primitive imports
+    - inventory all local shadcn-owned components
+    - inventory all docs/policy references to primitive import conventions
+    - record `@radix-ui/react-icons` usage and ownership separately
+  "Phase 2: Decisions":
+    - lock the canonical primitive import style
+    - lock whether the official CLI migration applies cleanly
+    - lock cleanup policy for old primitive packages
+    - lock whether `@radix-ui/react-icons` is explicitly deferred
+    - lock that Base UI is out of scope unless explicitly approved
+  "Phase 3: Code Changes":
+    - run `${PM_DLX} shadcn@latest migrate radix`
+    - review the diff file-by-file
+    - fix any local edge cases the migration did not cover cleanly
+    - add `radix-ui` if it is still missing
+    - remove obsolete individual `@radix-ui/react-*` packages after zero references are proven
+  "Phase 4: Policy And Docs":
+    - update AGENTS or repo guidance if it still describes the old import shape
+    - update architecture or frontend docs if they mention stale primitive policy
+    - write or update the migration report with current guidance, actual CLI behavior, final decisions, verification evidence, and residual risks
+  "Phase 5: Verification":
+    - lint
+    - typecheck
+    - tests
+    - build
+    - audit
+    - grep-based proof that old primitive imports and removed packages are gone
+verification_commands:
+  - "# inventory"
+  - "rg -n '@radix-ui/react-|radix-ui|@radix-ui/react-icons' ."
+  - ""
+  - "# inspect project config"
+  - "${PM_DLX} shadcn@latest info --json"
+  - "${PM_DLX} shadcn@latest migrate --list"
+  - "${PM_DLX} shadcn@latest migrate radix --help"
+  - ""
+  - "# verification"
+  - "${PM_RUN} lint"
+  - "${PM_RUN} type-check"
+  - "${PM_TEST}"
+  - "${PM_RUN} build"
+  - "${PM_AUDIT}"
+  - ""
+  - "# proof of hard cut"
+  - "rg -n 'from \"@radix-ui/react-' ."
+report_heading: Migration Report Requirements
+report_requirements:
+  - current starting state
+  - final decisions
+  - actual CLI behavior observed in this repo
+  - migration-specific caveats and skipped surfaces
+  - final verification evidence
+  - repo-specific findings and residual risks
+skill_routing_playbook:
+  - "Always start in the upgrade and cleanup lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
+  - "Primary shadcn execution lane: `$vercel:shadcn` or a repo-local shadcn skill, plus the `shadcn` CLI."
+  - "Use official-doc lanes first for unstable claims: current shadcn docs, Radix docs, changelogs, and upstream source when needed."
+  - "Use `$vitest` or `$vitest-dev` when UI tests, coverage, or Vitest config need to change."
+  - "Use `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` when migrated primitives need browser-visible verification."
+  - "Use `$build-web-apps:frontend-skill` only if the migration also includes an explicit visual redesign or composition pass."
+  - "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane."
+  - "Do not use `$imagegen` for shadcn or Radix vector/UI-system migration unless raster asset generation is explicitly part of the surface."
+operator_defaults:
+  - "Final primitive import style: `import { Dialog as DialogPrimitive } from \"radix-ui\"`."
+  - "use `${PM_DLX} shadcn@latest migrate radix` first"
+  - remove old `@radix-ui/react-*` packages only after grep proves zero usage
+  - keep `@radix-ui/react-icons` as a separate explicit decision
+  - keep Base UI out of scope unless explicitly requested
+operator_fast_intake:
+  - confirm shadcn is present
+  - read `components.json`
+  - run `shadcn info --json`
+  - "grep for: `@radix-ui/react-`, `radix-ui`, `@radix-ui/react-icons`"
+  - map all direct primitive import sites
+  - find any AGENTS/docs that describe primitive import policy
+operator_research:
+  - verify shadcn CLI help and migration docs
+  - verify Radix unified package guidance
+  - inspect shadcn migrator source if the docs are not specific enough
+operator_execute:
+  - run `${PM_DLX} shadcn@latest migrate radix`
+  - review the diff file-by-file
+  - fix any local edge cases, especially around `Slot` and shared overlays
+  - add `radix-ui` if still missing
+  - remove obsolete individual primitive packages once zero references are proven
+  - update docs/policy to match the final primitive import shape
+operator_exit_criteria:
+  - local shadcn-owned primitives use `radix-ui`
+  - obsolete individual primitive packages are gone
+  - docs/policy match the final state
+  - verification is green
+  - "`@radix-ui/react-icons` status is explicit, not accidental"
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
+  - "Primary execution lane: `$vercel:shadcn` or a repo-local shadcn skill, plus the `shadcn` CLI."
+  - "Proof lane: current shadcn/Radix docs and upstream source when CLI behavior needs confirmation."
+  - "Test and browser lanes: `$vitest` or `$vitest-dev` for test changes; `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` for visible regression checks."
+  - "Conditional lanes: `$bun-dev` for Bun repos, framework/plugin lanes only when actually relevant."
+  - "Do not route this migration through `$imagegen`."
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first shadcn Radix unification migration in this repository.
+trigger_goals:
+  - "reach one canonical primitive end state: local shadcn-owned components import from `radix-ui`"
+  - use the official shadcn migration where it helps, but do not over-credit it
+  - delete stale import conventions, obsolete primitive packages, and stale docs
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect `components.json`, manifests, lockfiles, AGENTS/docs, and all direct primitive imports first
+  - run `shadcn info --json` and record framework, style, base, resolved paths, and installed components
+  - verify current shadcn CLI/changelog guidance and Radix installation guidance before editing
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm the repo is a real `new-york` plus Radix migration candidate
+  - decide whether `shadcn migrate radix` covers the owned component surface
+  - decide whether `@radix-ui/react-icons` is explicitly in or out of scope
+  - keep Base UI migration out of scope unless explicitly requested
+trigger_required_outcomes:
+  - standardize local shadcn-owned primitive imports on `radix-ui`
+  - use `shadcn migrate radix` as the starting rewrite step where applicable
+  - remove obsolete `@radix-ui/react-*` packages only after grep proves they are unused
+  - update repo policy/docs to match the final primitive import convention
+  - treat `@radix-ui/react-icons` as a separate explicit decision because the official migration skips it
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - migration report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, build, and audit
+  - prove old primitive import paths are gone with grep
+  - verify shared overlay/focus components still behave correctly after rewrite

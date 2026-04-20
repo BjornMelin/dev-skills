@@ -1,0 +1,213 @@
+match_packages:
+  - lucide-react
+family_slug: lucide-react
+plan_basename: lucide-react-v1-upgrade
+playbook_title: Lucide React v1 Upgrade Playbook
+operator_title: Lucide React v1 Upgrade Operator Mode
+trigger_title: Lucide React v1 Upgrade Trigger Prompt
+related_packages:
+  - lucide-react
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a `lucide-react` v1 upgrade in this repository.
+use_when:
+  - the repository already uses `lucide-react` and needs a v1-era cleanup or migration
+  - the repo still imports icons from `lucide-react/dist/esm/icons/*`
+  - the repo has local typing shims for deep Lucide imports
+  - the repo has extra icon dependencies that may now be removable
+primary_goal:
+  - standardize on named imports from `lucide-react`
+  - remove deep Lucide import paths and any Lucide deep-path typing shim
+  - remove unnecessary secondary icon dependencies for a tiny brand-icon footprint
+  - leave current docs, policies, and verification evidence
+non_goals:
+  - broad design-system modernization beyond the icon surface
+  - introducing `DynamicIcon` unless runtime data actually requires it
+  - adopting `LucideProvider` unless it clearly deletes meaningful code
+  - folding unrelated shadcn or Radix migrations into the same wave
+source_hierarchy:
+  - official Lucide docs
+  - official Next.js docs
+  - upstream Lucide source code
+  - local repo code and tests
+  - package manager metadata, audits, and lockfiles
+default_final_decisions:
+  - "canonical import style: `import { IconName } from \"lucide-react\"`"
+  - rely on Next.js built-in import optimization when the repo version supports it
+  - prefer local SVG ownership over a separate icon package for a tiny brand-icon footprint
+  - use one hard-cut migration wave, not staged coexistence
+  - keep scope focused on the Lucide/icon surface
+intake_checklist:
+  - confirm framework and version, especially Next.js version
+  - record current `lucide-react` version
+  - record package manager and lockfile shape
+  - search for deep Lucide imports
+  - search for local typing shims related to Lucide deep imports
+  - search for dynamic icon usage
+  - search for custom icon wrappers or indirection layers
+  - search for other icon dependencies such as brand/icon helper packages
+  - search repo docs, AGENTS, contributing guides, and lint rules for icon import policy
+  - build a touched-files map before editing
+required_research:
+  Upstream Lucide:
+    - verify current React usage guidance
+    - verify migration guidance to v1
+    - verify current exported types such as `LucideProps`, `LucideIcon`, and `IconNode`
+    - verify current guidance for `DynamicIcon`, `LucideProvider`, accessibility defaults, and brand icon support or removal
+  Upstream Next.js:
+    - verify whether `lucide-react` is optimized by default in the repo's Next.js version
+    - verify whether explicit `optimizePackageImports` config is needed or redundant
+  Upstream source inspection:
+    - inspect Lucide source when public docs or typings do not answer export shape, per-icon typing behavior, dynamic helpers, or provider/context behavior
+questions_to_resolve:
+  - is barrel import from `lucide-react` safe and preferred in this repo's framework version
+  - does the repo have any runtime icon-name boundary that actually justifies `DynamicIcon`
+  - is any local icon wrapper still earning its keep
+  - are brand icons currently covered by Lucide, another package, or local SVGs
+  - is there any repo policy that must be updated together with code changes
+canonical_end_state:
+  - all Lucide imports come from `lucide-react`
+  - no file imports `lucide-react/dist/esm/icons/*`
+  - any Lucide deep-path typing shim is deleted
+  - icon component or data typing uses official Lucide types where needed
+  - tiny one-off brand icon dependencies are removed when local SVG ownership is enough
+  - docs and repo policy describe the final import shape
+  - lint, typecheck, tests, build, and audit remain green
+what_to_adopt:
+  - named imports from `lucide-react`
+  - "`LucideIcon` for icon component fields and props"
+  - local SVGs for non-Lucid brand marks
+  - existing local styling patterns unless a simpler package-native pattern is clearly better
+what_to_avoid:
+  - "`lucide-react/dist/esm/icons/*`"
+  - mixed deep-import and barrel-import conventions
+  - local typing shims kept only to support a stale import policy
+  - "`DynamicIcon` for static UI"
+  - "`LucideProvider` unless it deletes enough local styling glue to justify itself"
+  - keeping a second icon package only for a handful of brand marks
+execution_plan:
+  "Phase 1: Discovery":
+    - inventory all Lucide imports
+    - inventory all non-Lucid icon dependencies
+    - inventory all docs and policy references to icon import conventions
+    - record brand-icon usage and ownership
+    - record any dynamic icon usage or wrappers
+  "Phase 2: Decisions":
+    - lock the canonical import style
+    - lock the brand-icon strategy
+    - lock the rollout style
+    - lock whether any adjacent icon work is deferred
+  "Phase 3: Code Changes":
+    - convert deep Lucide imports to named imports from `lucide-react`
+    - tighten icon typing to official Lucide types where useful
+    - delete the Lucide deep-path typing shim
+    - replace secondary brand-icon dependency usage with local SVG ownership when justified
+    - remove obsolete icon dependencies from manifests and lockfiles
+  "Phase 4: Policy And Docs":
+    - update AGENTS or repo guidance if it still describes the old import shape
+    - update architecture or frontend docs if they mention stale icon policy
+    - write or update the upgrade report with current guidance, final decisions, verification evidence, and residual risks
+  "Phase 5: Verification":
+    - lint
+    - typecheck
+    - tests
+    - build
+    - audit
+    - grep-based proof that old import paths and removed icon dependencies are gone
+verification_commands:
+  - "# inventory"
+  - "rg -n 'lucide-react|dist/esm/icons|react-icons|@radix-ui/react-icons' ."
+  - ""
+  - "# verification"
+  - "${PM_RUN} lint"
+  - "${PM_RUN} type-check"
+  - "${PM_TEST}"
+  - "${PM_RUN} build"
+  - "${PM_AUDIT}"
+  - ""
+  - "# proof of hard cut"
+  - "rg -n 'lucide-react/dist/esm/icons/' ."
+  - "rg -n '@radix-ui/react-icons' ."
+report_requirements:
+  - current starting state
+  - final decisions
+  - features and capabilities available in current Lucide React
+  - old patterns removed or discouraged
+  - deprecations and practical replacements
+  - repo-specific findings, verification evidence, and residual risks
+skill_routing_playbook:
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
+  - "Use official-doc lanes first for unstable claims: current Lucide docs, Next.js docs, changelogs, and upstream source when needed."
+  - "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane."
+  - "Use `$vitest` or `$vitest-dev` when tests, coverage, or Vitest config need to move."
+  - "Use `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` only when user-visible browser verification matters."
+  - "Use Vercel and Build Web Apps plugin lanes only when the target repo actually needs them."
+  - "Do not use `$imagegen` for Lucide or vector-icon migration unless raster asset generation is explicitly part of the surface."
+operator_defaults:
+  - "Final import style: `import { IconName } from \"lucide-react\"`."
+  - no deep imports
+  - no Lucide deep-path typing shim
+  - no extra icon package for a tiny brand-logo footprint unless clearly needed
+  - no `DynamicIcon` unless runtime data forces it
+operator_fast_intake:
+  - record Next.js version
+  - record `lucide-react` version
+  - record package manager
+  - "grep for: `lucide-react/dist/esm/icons`, `lucide-react`, `@radix-ui/react-icons`, `react-icons`"
+  - find any local Lucide typing shim
+  - find any AGENTS/docs that describe icon import policy
+operator_research:
+  - verify the Lucide React guide and migration guide
+  - verify Next.js package import optimization guidance
+  - inspect Lucide source only if docs and types are insufficient
+operator_execute:
+  - convert all deep Lucide imports to named imports from `lucide-react`
+  - replace loose icon typing with `LucideIcon` where useful
+  - delete the deep-path shim
+  - localize brand icons if a second dependency is only covering a few marks
+  - remove obsolete icon dependencies from manifest and lockfile
+  - update docs/policy to match the final import shape
+operator_exit_criteria:
+  - every Lucide import uses `from "lucide-react"`
+  - no deep import path remains
+  - any Lucide shim is deleted
+  - removed icon dependencies are actually gone
+  - docs/policy match the final state
+  - verification is green
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
+  - "Proof lane: current official docs, changelogs, and upstream source when needed."
+  - "Test lane: `$vitest` or `$vitest-dev` when tests or coverage config move."
+  - "Browser lane: `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` only for visible UI verification."
+  - "Conditional lanes: `$bun-dev` for Bun repos, framework/plugin lanes only when actually relevant."
+  - "Do not route this migration through `$imagegen`."
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first Lucide React v1 migration in this repository.
+trigger_goals:
+  - "reach one canonical Lucide end state: named imports from `lucide-react`"
+  - delete deep import paths, local shims, stale docs, and unnecessary icon deps
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect package manifests, lockfiles, Next config, AGENTS/docs, and all icon usage first
+  - verify current Lucide and Next.js guidance before editing
+  - use official docs, upstream source, and repo-native commands
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm whether named imports from `lucide-react` are the canonical final shape in this repo
+  - decide whether any runtime icon-name use really justifies `DynamicIcon`
+  - decide how brand icons should be owned
+  - keep the migration Lucide-focused unless explicit evidence justifies more
+trigger_required_outcomes:
+  - standardize on `import { IconName } from "lucide-react"`
+  - remove deep imports from `lucide-react/dist/esm/icons/*`
+  - remove any Lucide deep-path typing shim if no longer needed
+  - replace tiny one-off brand icon dependencies with local SVG ownership when justified
+  - update repo policy/docs to match the final import convention
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - upgrade report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, build, and audit
+  - prove removed import paths and dependencies are gone with grep

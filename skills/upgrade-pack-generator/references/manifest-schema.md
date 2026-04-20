@@ -1,0 +1,160 @@
+# Manifest Schema
+
+The canonical rendered source is `upgrade-pack.yaml`.
+
+## Required Keys
+
+- `schema_version`
+- `family_display_name`
+- `family_type`
+- `mode`
+- `family_slug`
+- `plan_basename`
+- `playbook_title`
+- `operator_title`
+- `trigger_title`
+- `anchor_package`
+- `related_packages`
+- `repo_context`
+- `target_surface`
+- `qualification_plan`
+- `current_version`
+- `validated_upstream_version`
+- `validated_doc_date`
+- `repo_probes`
+- `upstream_validation`
+- `purpose`
+- `use_when`
+- `primary_goal`
+- `non_goals`
+- `primary_persona`
+- `secondary_audience`
+- `operating_goals`
+- `source_hierarchy`
+- `default_final_decisions`
+- `intake_checklist`
+- `required_research`
+- `questions_to_resolve`
+- `canonical_end_state`
+- `what_to_adopt`
+- `what_to_avoid`
+- `framework_constraints`
+- `supported_features`
+- `unsupported_features`
+- `codemod_recommendations`
+- `execution_plan`
+- `verification_commands`
+- `report_heading`
+- `report_requirements`
+- `deliverables`
+- `skill_routing_playbook`
+- `operator_defaults`
+- `operator_fast_intake`
+- `operator_research`
+- `operator_execute`
+- `operator_exit_criteria`
+- `skill_routing_operator`
+- `trigger_mission`
+- `trigger_goals`
+- `trigger_required_research`
+- `trigger_required_decisions`
+- `trigger_required_outcomes`
+- `trigger_required_deliverables`
+- `trigger_verification_expectation`
+
+## Notes
+
+- `repo_context` is generated from live repo inspection.
+- `target_surface` is the family-specific owner surface chosen during
+  enrichment. It should explicitly identify whether the pack is root-owned,
+  workspace-owned, or root-plus-workspaces, plus the verification strategy used
+  for that shape.
+- `qualification_plan` drives the separate qualification stage. It should
+  declare the snapshot filename, current doc URLs, pinned source specs, and
+  family-native read-only CLI checks.
+- `family_type` should distinguish broad families such as `package` vs
+  `framework`.
+- `mode` should express the mission shape such as `upgrade`, `optimize`, or
+  `upgrade+optimize`.
+- `current_version`, `validated_upstream_version`, and `validated_doc_date`
+  should be recorded after enrichment.
+- `repo_probes` and `upstream_validation` are dictionaries whose values are
+  ordered string lists.
+- `required_research` and `execution_plan` are dictionaries whose values are
+  ordered string lists.
+- `verification_commands` is an ordered list of shell lines rendered into one
+  fenced block.
+- `plan_basename` controls file names:
+  - `<plan_basename>-playbook.md`
+  - `<plan_basename>-trigger-prompt.md`
+  - `<plan_basename>-operator-mode.md`
+- `qualification_plan.snapshot_filename` controls the machine-readable
+  qualification file name, usually `qualification-snapshot.json`.
+
+## Minimal Example
+
+```yaml
+schema_version: 2
+family_display_name: Lucide React
+family_type: package
+mode: upgrade
+family_slug: lucide-react
+plan_basename: lucide-react-v1-upgrade
+playbook_title: Lucide React v1 Upgrade Playbook
+operator_title: Lucide React v1 Upgrade Operator Mode
+trigger_title: Lucide React v1 Upgrade Trigger Prompt
+anchor_package: lucide-react
+related_packages:
+  - lucide-react
+repo_context:
+  repo_root: /path/to/repo
+  package_manager: pnpm
+  detected_by: packageManager
+target_surface:
+  surface_type: workspace
+  workspace_path: apps/web
+  workspace_name: '@repo/web'
+  workspace_package_json: apps/web/package.json
+  workspace_slug: apps-web
+  owner_reason: apps/web declares the framework package and owns its config.
+  related_workspaces:
+    - apps/web
+  verification_strategy: layered-root-and-workspace
+qualification_plan:
+  strategy: separate-read-only-qualification
+  snapshot_filename: qualification-snapshot.json
+  doc_urls:
+    upgrade guide: https://nextjs.org/docs/app/guides/upgrading/version-16
+  source_specs:
+    - next@16.2.4
+  cli_checks:
+    - label: Next.js codemod help
+      cwd: apps/web
+      command: pnpm dlx @next/codemod@canary --help
+current_version: 0.577.0
+validated_upstream_version: v1
+validated_doc_date: 2026-03-31
+repo_probes:
+  Repo posture:
+    - record family-specific probe results here
+upstream_validation:
+  Official guidance:
+    - record the live official guidance snapshot here
+purpose: >-
+  Use this playbook to fully explore, research, plan, implement, verify, and
+  document a `lucide-react` upgrade in this repository.
+use_when:
+  - the repo already uses `lucide-react`
+primary_goal:
+  - standardize on named imports from `lucide-react`
+non_goals:
+  - unrelated design-system rewrites
+framework_constraints:
+  - record any family-specific constraints here
+supported_features:
+  - record supported features here
+unsupported_features:
+  - record unsupported or intentionally out-of-scope features here
+codemod_recommendations:
+  - record codemods or automated migration helpers here
+```

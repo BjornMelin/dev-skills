@@ -1,0 +1,192 @@
+match_packages:
+  - next
+  - nextjs
+family_slug: nextjs
+family_display_name: Next.js
+family_type: framework
+mode: upgrade+optimize
+plan_basename: nextjs-v16-upgrade-and-optimization
+playbook_title: Next.js v16 Upgrade And Optimization Playbook
+operator_title: Next.js v16 Upgrade And Optimization Operator Mode
+trigger_title: Next.js v16 Upgrade And Optimization Trigger Prompt
+related_packages:
+  - next
+  - react
+  - react-dom
+  - "@types/react"
+  - "@types/react-dom"
+  - "@next/codemod"
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a Next.js upgrade or current-major optimization wave in this repository.
+use_when:
+  - the repository already uses `next`
+  - the repo needs a version upgrade, a current-major optimization audit, or both
+  - the repo needs one canonical artifact covering routing, rendering, config, deployment boundaries, and framework-native adoption work
+primary_goal:
+  - reach one verified canonical Next.js end state for the target repo
+  - support both version-upgrade and current-major optimization work
+  - adopt current framework-native APIs, config, and repo posture where they materially simplify the app
+  - leave docs, verification evidence, and a reviewable execution path
+non_goals:
+  - unrelated application redesign beyond the Next.js boundary
+  - introducing server-runtime-only features into a repo that intentionally stays static-export-only
+  - folding unrelated package waves into scope without direct framework evidence
+source_hierarchy:
+  - official Next.js docs and version-specific upgrade guides
+  - official Vercel Next.js guidance when it clarifies platform behavior
+  - upstream Next.js source code when docs and types are insufficient
+  - local repo code, tests, configs, and docs
+  - package manager metadata, lockfiles, audits, and release notes
+default_final_decisions:
+  - treat Next.js as a framework boundary, not a plain npm package
+  - default to one canonical framework posture per repo
+  - support both upgrade and optimize outcomes inside the same pack
+  - keep scope centered on the Next.js family and directly related runtime or tooling surfaces
+intake_checklist:
+  - record current `next`, `react`, and `react-dom` versions
+  - record package manager and lockfile shape
+  - inspect `next.config.*`
+  - identify App Router vs Pages Router posture
+  - identify static-export vs server-runtime posture
+  - inventory `next/*` imports and route surfaces
+  - inventory docs and local policy that describe the framework boundary
+  - build a touched-files map before editing
+required_research:
+  Upstream Next.js:
+    - verify the current version-specific upgrade guide
+    - verify current breaking changes, stable APIs, and codemods for the repo's major version
+    - verify current routing, caching, request API, and config guidance
+  Upstream Vercel and deployment posture:
+    - verify platform guidance that materially affects Next.js runtime, static export, or cache behavior
+    - verify whether the repo's deployment posture rules out certain framework features
+  Upstream source inspection:
+    - inspect Next.js source only when public docs, types, or codemods do not answer behavior or migration risk questions
+questions_to_resolve:
+  - is this run primarily a version jump, a same-major optimization audit, or both
+  - what is the canonical final Next.js posture in this repo
+  - which runtime or config features are intentionally forbidden by repo posture
+  - which adjacent packages are truly part of this framework wave
+  - which docs or policy files must move with the code change
+canonical_end_state:
+  - all live Next.js usage follows current verified framework guidance
+  - the repo's Next.js posture is explicit, consistent, and compatible with deployment constraints
+  - obsolete wrappers, stale APIs, and redundant framework workarounds are removed when no real boundary requires them
+  - docs and repo policy describe the final Next.js convention
+  - lint, typecheck, tests, build, and audit remain green
+what_to_adopt:
+  - current version-appropriate Next.js APIs and config
+  - framework-native routing, metadata, image, navigation, cache, and typegen patterns where they fit the repo posture
+  - current codemods when they reduce migration risk and review cost
+what_to_avoid:
+  - stale Next.js APIs, deprecated config names, and transitional compatibility code
+  - mixed framework conventions left in parallel
+  - server-runtime-only features in repos that intentionally remain static exports
+execution_plan:
+  "Phase 1: Discovery":
+    - inventory Next.js config, routes, imports, and current framework posture
+    - inventory related packages and framework-adjacent tooling
+    - inventory docs and policy references that describe Next.js constraints or conventions
+  "Phase 2: Decisions":
+    - lock the canonical final Next.js posture
+    - lock the upgrade vs optimize scope
+    - lock the related-package boundary and explicit defers
+  "Phase 3: Code Changes":
+    - apply the final version-appropriate Next.js usage shape
+    - remove stale config, wrappers, and framework workarounds that no longer earn their keep
+    - update docs and repo policy to match the final state
+  "Phase 4: Verification":
+    - run repo-native validation
+    - prove removed patterns are gone
+    - write the final upgrade and optimization report with residual risks
+verification_commands:
+  - "# inventory"
+  - "node -p \"require('./package.json').dependencies?.next || require('./package.json').devDependencies?.next || ''\""
+  - "rg --files -g 'next.config.*' -g 'middleware.*' -g 'proxy.*' -g 'app/**' -g 'src/app/**' ."
+  - "rg -n \"from ['\\\"]next/(font|image|link|navigation|server|cache)\" src app next.config.* package.json docs"
+  - "rg -n \"\\bcookies\\(|\\bheaders\\(|\\bdraftMode\\(\" src app next.config.* package.json docs"
+  - "rg -n \"\\brevalidateTag\\(|\\bupdateTag\\(\" src app next.config.* package.json docs"
+  - "rg -n \"\\bcacheLife\\(|\\bcacheTag\\(|\\bunstable_cache(Life|Tag)\\(\" src app next.config.* package.json docs"
+  - "rg -n \"\\buseSearchParams\\(|generateMetadata|generateStaticParams\" src app next.config.* package.json docs"
+  - "rg -n \"dynamicParams|proxy\\(|middleware\\(\" src app next.config.* package.json docs"
+  - ""
+  - "# verification"
+  - "${PM_RUN} lint"
+  - "${PM_RUN} type-check"
+  - "${PM_TEST}"
+  - "${PM_RUN} build"
+  - "${PM_AUDIT}"
+report_requirements:
+  - current starting state
+  - final decisions
+  - current Next.js features and capabilities relevant to the repo
+  - stale or deprecated patterns removed or intentionally retained
+  - codemods considered or used
+  - repo-specific findings, verification evidence, and residual risks
+skill_routing_playbook:
+  - "Always start in the framework upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$vercel`, and `$vercel:nextjs`."
+  - "Use official Next.js docs first for unstable claims, then Vercel guidance when platform behavior matters."
+  - "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane."
+  - "Use test lanes such as `$vitest` or `$vitest-dev` when tests or coverage config move."
+  - "Use browser lanes only when the framework wave affects visible behavior."
+  - "Do not use `$imagegen` for Next.js framework migration work."
+operator_defaults:
+  - Final Next.js posture follows current verified official guidance.
+  - One canonical framework posture per repo.
+  - No stale compatibility shims unless a real external boundary requires them.
+  - Static export constraints remain binding when the repo enforces them.
+operator_fast_intake:
+  - record current `next`, `react`, and `react-dom` versions
+  - record package manager
+  - inspect `next.config.*`
+  - identify App Router vs Pages Router posture
+  - identify static-export vs server-runtime posture
+  - grep `next/*` imports and request-time API usage
+operator_research:
+  - verify the current version-specific Next.js guide and codemods
+  - verify Vercel Next.js guidance when deployment or cache posture matters
+  - inspect source only when docs, types, or codemods are insufficient
+operator_execute:
+  - migrate the repo to the canonical final Next.js posture
+  - remove stale config, deprecated APIs, and redundant framework workarounds
+  - update docs and policy to match the final state
+operator_exit_criteria:
+  - live Next.js usage follows the final verified posture
+  - deprecated config or framework patterns are gone or explicitly deferred
+  - docs and policy match the final state
+  - verification is green
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$vercel`, `$vercel:nextjs`."
+  - "Proof lane: official Next.js docs first, Vercel docs when platform behavior matters, upstream source only when necessary."
+  - "Test lane: `$vitest` or `$vitest-dev` when tests or coverage config move."
+  - "Conditional lanes: `$bun-dev` for Bun repos, browser verification only when the framework wave changes visible behavior."
+  - "Do not route this migration through `$imagegen`."
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first Next.js upgrade and optimization wave in this repository.
+trigger_goals:
+  - reach one canonical final Next.js end state for this repo
+  - support both version-upgrade and same-major optimization work
+  - remove stale config, docs, and unnecessary framework workarounds where justified
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect manifests, lockfiles, Next config, route surfaces, AGENTS/docs, and all `next/*` usage first
+  - verify current official Next.js guidance before editing
+  - use official docs, upstream source, and repo-native commands
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm whether this run is upgrade-only, optimize-only, or both
+  - decide the canonical final Next.js posture for this repo
+  - decide which related packages are in or out of scope
+  - decide which stale wrappers or config can be deleted
+trigger_required_outcomes:
+  - standardize on the verified final Next.js usage and config shape
+  - remove stale framework patterns and unnecessary related dependencies
+  - update repo policy and docs to match the final convention
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - upgrade and optimization report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, build, and audit
+  - prove removed patterns are gone with grep or equivalent checks

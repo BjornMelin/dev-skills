@@ -1,0 +1,168 @@
+match_packages:
+  - convex
+  - convex-helpers
+  - convex-test
+  - "@convex-dev/aggregate"
+  - "@convex-dev/migrations"
+  - "@convex-dev/r2"
+  - "@convex-dev/rate-limiter"
+  - "@convex-dev/resend"
+  - "@convex-dev/workflow"
+  - "@convex-dev/workpool"
+family_slug: convex
+family_display_name: Convex
+family_type: framework
+mode: upgrade+optimize
+plan_basename: convex-upgrade-and-optimization
+playbook_title: Convex Upgrade And Optimization Playbook
+operator_title: Convex Upgrade And Optimization Operator Mode
+trigger_title: Convex Upgrade And Optimization Trigger Prompt
+related_packages:
+  - convex
+  - convex-helpers
+  - convex-test
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a Convex upgrade or current-major backend optimization wave in this repository.
+use_when:
+  - the repository already uses Convex
+  - the repo needs a Convex version upgrade, backend best-practices audit, or both
+  - the repo needs one canonical artifact covering schema, generated code, CLI posture, and deployment-script boundaries
+primary_goal:
+  - reach one verified canonical Convex backend end state for the owner workspace
+  - align schema, generated code, CLI scripts, and backend package usage with current official guidance
+  - remove stale backend workarounds or duplicate ownership that the current Convex surface makes unnecessary
+non_goals:
+  - unrelated application redesign outside the Convex boundary
+  - treating client-only `convex` consumers as the owner surface when a dedicated backend workspace exists
+  - changing deploy-key or environment posture without proof from repo policy and current Convex docs
+source_hierarchy:
+  - official Convex docs and CLI guidance
+  - official generated-code, schema, query, and index docs
+  - upstream Convex source when docs and types are insufficient
+  - local repo code, generated artifacts, scripts, and docs
+  - package manager metadata, lockfiles, audits, and release notes
+default_final_decisions:
+  - treat the backend workspace as the owner Convex surface when it owns `convex/` and Convex scripts
+  - generated Convex artifacts move with schema and function changes
+  - support both version-upgrade and same-major optimization outcomes inside one pack
+intake_checklist:
+  - record current `convex` and related `@convex-dev/*` versions
+  - record package manager and lockfile shape
+  - identify the owner backend workspace
+  - inspect the `convex/` directory and generated artifacts
+  - inventory deploy, codegen, and non-interactive validation scripts before editing
+required_research:
+  Upstream Convex:
+    - verify current CLI guidance and generated-code expectations
+    - verify current schema, query, and index best practices
+    - verify current deploy-key and agent-mode guidance if the repo uses those flows
+  Upstream source inspection:
+    - inspect source only when public docs do not answer CLI or generated-code behavior questions
+questions_to_resolve:
+  - which workspace truly owns the backend Convex surface in this repo
+  - is this run a version bump, a current-major cleanup, or both
+  - which deploy and codegen scripts are contractually required by repo policy
+  - which client-facing `convex` consumers are in or out of scope
+canonical_end_state:
+  - the owner backend workspace follows current verified Convex guidance
+  - schema, generated code, and verification scripts are in sync
+  - backend package usage and docs reflect one canonical Convex posture
+  - lint, typecheck, tests, build, and audit remain green
+what_to_adopt:
+  - current Convex CLI and generated-code flows
+  - current schema and index-backed query guidance
+  - existing non-interactive deploy-key posture when the repo already relies on it
+what_to_avoid:
+  - stale generated artifacts or drift between schema and generated code
+  - outdated Convex helper patterns kept in parallel after the upgrade
+  - client-only ownership assumptions in monorepos with a dedicated backend workspace
+execution_plan:
+  "Phase 1: Discovery":
+    - inventory the owner backend workspace, `convex/` sources, generated files, and scripts
+    - inventory root validation or release scripts that constrain Convex changes
+    - inventory current package versions and current backend best-practice signals
+  "Phase 2: Decisions":
+    - lock the owner workspace and the final version or optimize-only scope
+    - lock deploy-key, codegen, and agent-mode boundaries
+    - lock explicit defers before broad edits
+  "Phase 3: Code Changes":
+    - align package versions, schema usage, generated artifacts, and scripts to the final verified shape
+    - remove stale helpers or duplicate ownership that no longer earn their keep
+    - update docs and policy to match the final state
+  "Phase 4: Verification":
+    - run repo-native validation
+    - run Convex-specific codegen and release-surface checks
+    - write the final upgrade and optimization report with residual risks
+report_heading: Upgrade And Optimization Report Requirements
+report_requirements:
+  - current owner workspace and Convex starting state
+  - final decisions
+  - current Convex features and backend best-practice signals relevant to the repo
+  - stale or deprecated patterns removed or intentionally retained
+  - codegen, release-surface, and verification evidence
+  - repo-specific findings and residual risks
+skill_routing_playbook:
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
+  - "Use official Convex docs first for unstable claims."
+  - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
+  - "Use `$platform-architect` when the Convex wave crosses web, mobile, and backend boundaries."
+  - "Do not use `$imagegen` for Convex upgrade work."
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
+  - "Proof lane: official Convex docs first, source only when public guidance is insufficient."
+  - "Conditional lanes: `$bun-dev` for Bun repos, `$platform-architect` for full-stack monorepo coordination."
+  - "Do not route this migration through `$imagegen`."
+operator_defaults:
+  - Final Convex posture follows current verified official guidance.
+  - One owner backend workspace per pack.
+  - Generated API and data-model artifacts move with schema and function changes.
+  - No stale backend helper or deploy-key drift unless a real boundary requires it.
+operator_fast_intake:
+  - record current `convex` and `@convex-dev/*` versions
+  - record package manager
+  - inspect the owner `convex/` directory and generated artifacts
+  - inventory codegen, deploy, and release scripts
+  - inventory root validation commands that constrain backend changes
+operator_research:
+  - verify current Convex CLI, generated-code, and index guidance
+  - verify deploy-key and agent-mode guidance when the repo uses those flows
+  - inspect source only when docs or CLI help are insufficient
+operator_execute:
+  - align Convex package versions, schema usage, generated artifacts, and scripts to the final verified posture
+  - remove stale backend helpers or duplicate ownership that no longer earn their keep
+  - update docs and policy to match the final state
+operator_exit_criteria:
+  - the owner backend workspace follows the final verified Convex posture
+  - generated artifacts and verification scripts are in sync
+  - stale backend helper drift is gone or explicitly deferred
+  - verification is green
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first Convex upgrade and backend optimization wave in this repository.
+trigger_goals:
+  - reach one canonical final Convex end state for the owner backend workspace
+  - support both version-upgrade and same-major optimization work
+  - remove stale helpers, generated-code drift, and unnecessary backend duplication where justified
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect manifests, lockfiles, Convex source, generated artifacts, scripts, and AGENTS/docs first
+  - verify current official Convex guidance before editing
+  - use official docs, upstream source, and repo-native commands
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm which workspace owns the backend Convex surface
+  - decide whether this run is upgrade-only, optimize-only, or both
+  - decide which deploy-key, codegen, and agent-mode flows are in or out of scope
+  - decide which stale helper or wrapper code can be deleted
+trigger_required_outcomes:
+  - standardize on the verified final Convex usage, schema, and script shape
+  - remove stale backend patterns and unnecessary related dependencies
+  - update repo policy and docs to match the final convention
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - upgrade and optimization report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, audit, and the repo's codegen or release-surface checks
+  - prove removed patterns are gone with grep or equivalent checks

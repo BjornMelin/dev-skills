@@ -1,0 +1,173 @@
+match_packages:
+  - expo
+  - expo-router
+  - expo-updates
+  - expo-dev-client
+  - eas-cli
+family_slug: expo-eas
+family_display_name: Expo And EAS
+family_type: framework
+mode: upgrade+optimize
+plan_basename: expo-eas-upgrade-and-optimization
+playbook_title: Expo And EAS Upgrade And Optimization Playbook
+operator_title: Expo And EAS Upgrade And Optimization Operator Mode
+trigger_title: Expo And EAS Upgrade And Optimization Trigger Prompt
+related_packages:
+  - expo
+  - expo-router
+  - expo-updates
+  - expo-dev-client
+  - react-native
+  - react-native-web
+  - react
+  - react-dom
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document an Expo SDK plus EAS upgrade or current-major optimization wave in this repository.
+use_when:
+  - the repository already uses Expo or Expo Router
+  - the repo needs an Expo SDK upgrade, Expo package alignment audit, or EAS workflow cleanup
+  - the repo needs one canonical artifact covering mobile app ownership, app config, build profiles, and validation posture
+primary_goal:
+  - reach one verified canonical Expo SDK and EAS end state for the target app workspace
+  - keep Expo, Expo Router, React Native, and EAS configuration aligned to current official guidance
+  - adopt current Expo-native tooling and remove stale mobile build workarounds where justified
+non_goals:
+  - unrelated mobile product redesign
+  - splitting the Expo SDK wave from EAS configuration when the repo treats them as one delivery surface
+  - introducing bare-workflow-only steps into a CNG-first workspace without proof
+source_hierarchy:
+  - official Expo docs and SDK upgrade guides
+  - official EAS docs and build-profile guidance
+  - official React Native and Expo Router docs when they materially affect the upgrade
+  - local repo code, configs, workflows, and docs
+  - package manager metadata, lockfiles, audits, and release notes
+default_final_decisions:
+  - treat Expo SDK alignment as a framework-family concern, not a single-package bump
+  - support both version-upgrade and same-major optimization outcomes inside one pack
+  - keep scope centered on the owner mobile workspace plus root validation and workflow boundaries
+intake_checklist:
+  - record current `expo`, `expo-router`, `react-native`, and `expo-updates` versions
+  - record package manager and lockfile shape
+  - inspect `app.json` or `app.config.*`
+  - inspect `eas.json`
+  - identify whether the workspace is CNG-first or keeps native `ios/` and `android/` directories
+  - inventory Expo, EAS, and native workflow scripts before editing
+required_research:
+  Upstream Expo:
+    - verify the current Expo SDK upgrade walkthrough
+    - verify current Expo monorepo guidance and package alignment rules
+    - verify `expo-doctor`, `expo install --fix`, and New Architecture guidance
+  Upstream EAS:
+    - verify current `eas.json` build-profile guidance
+    - verify EAS environment and workflow guidance that materially affects CI or release flows
+  Upstream source inspection:
+    - inspect source or CLI behavior only when public docs do not answer config or package-alignment questions
+questions_to_resolve:
+  - is this run primarily an SDK jump, a same-major cleanup, or both
+  - which mobile workspace owns the Expo app surface in this repo
+  - what root validation or CI commands must remain coupled to the mobile app upgrade
+  - which native directories or EAS workflows are intentionally in or out of scope
+canonical_end_state:
+  - the owner app workspace follows current Expo SDK and EAS guidance
+  - Expo family packages are aligned with the supported SDK surface
+  - app config, EAS config, and validation scripts match the final mobile posture
+  - docs and repo policy describe the final Expo and EAS convention
+what_to_adopt:
+  - current Expo SDK upgrade flows
+  - "`expo-doctor` and Expo package-alignment checks"
+  - current Expo Router and EAS build-profile conventions where they fit the repo posture
+what_to_avoid:
+  - drifting Expo family versions outside the official support matrix
+  - stale mobile workflow workarounds left in parallel after the upgrade
+  - CNG and bare-workflow instructions mixed together without a clear owner posture
+execution_plan:
+  "Phase 1: Discovery":
+    - inventory the owner Expo workspace, app config, and EAS build profiles
+    - inventory root validation and workflow scripts that constrain the mobile app
+    - inventory current Expo family package versions and local overrides
+  "Phase 2: Decisions":
+    - lock the owner workspace and the final SDK target or optimize-only scope
+    - lock the EAS workflow boundary and explicit native-directory policy
+    - lock any package or config defers before broad edits
+  "Phase 3: Code Changes":
+    - align Expo family packages, app config, and workflow scripts to the final verified shape
+    - remove stale mobile build workarounds or exclusions that no longer earn their keep
+    - update docs and policy to match the final state
+  "Phase 4: Verification":
+    - run repo-native validation
+    - run Expo-specific doctor and workflow checks
+    - write the final upgrade and optimization report with residual risks
+report_heading: Upgrade And Optimization Report Requirements
+report_requirements:
+  - current owner workspace, SDK, and EAS starting state
+  - final decisions
+  - current Expo and EAS features relevant to the repo
+  - stale or deprecated patterns removed or intentionally retained
+  - workflow and validation evidence
+  - repo-specific findings and residual risks
+skill_routing_playbook:
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, and `$expo:upgrading-expo`."
+  - "Use official Expo and EAS docs first for unstable claims."
+  - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
+  - "Use Turborepo or platform-architecture lanes only when the repo is a monorepo and those boundaries materially affect the mobile app."
+  - "Do not use `$imagegen` for Expo or EAS upgrade work."
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, `$expo:upgrading-expo`."
+  - "Proof lane: official Expo and EAS docs first, source only when public guidance is insufficient."
+  - "Conditional lanes: `$bun-dev` for Bun repos, `$turborepo` for monorepo task-graph work, `$platform-architect` when the app upgrade crosses web/native/backend boundaries."
+  - "Do not route this migration through `$imagegen`."
+operator_defaults:
+  - Final Expo SDK and EAS posture follows current verified official guidance.
+  - One owner mobile workspace per pack.
+  - No stale mobile workflow workarounds unless a real external boundary requires them.
+  - SDK alignment, app config, and EAS config move together.
+operator_fast_intake:
+  - record current `expo`, `expo-router`, and `react-native` versions
+  - record package manager
+  - inspect `app.json` or `app.config.*`
+  - inspect `eas.json`
+  - identify whether native `ios/` or `android/` directories exist
+  - inventory Expo, doctor, and EAS workflow scripts
+operator_research:
+  - verify the current Expo SDK upgrade walkthrough
+  - verify current monorepo and EAS build-profile guidance
+  - inspect source only when docs or CLI help are insufficient
+operator_execute:
+  - align Expo family package versions, app config, and EAS config to the final verified posture
+  - remove stale exclusions, mobile workflow workarounds, and redundant package drift
+  - update docs and policy to match the final state
+operator_exit_criteria:
+  - the owner mobile workspace follows the final verified Expo SDK posture
+  - EAS config and validation scripts match the final convention
+  - stale mobile workflow workarounds are gone or explicitly deferred
+  - verification is green
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first Expo SDK and EAS upgrade plus optimization wave in this repository.
+trigger_goals:
+  - reach one canonical final Expo SDK and EAS end state for the owner workspace
+  - support both SDK-upgrade and same-major optimization work
+  - remove stale mobile workflow workarounds, config drift, and unnecessary package churn where justified
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect manifests, lockfiles, Expo app config, EAS config, AGENTS/docs, and mobile scripts first
+  - verify current official Expo and EAS guidance before editing
+  - use official docs, upstream source, and repo-native commands
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm whether this run is SDK-upgrade-only, optimize-only, or both
+  - decide the canonical final Expo and EAS posture for the owner workspace
+  - decide which related packages and workflows are in or out of scope
+  - decide which stale exclusions or config can be deleted
+trigger_required_outcomes:
+  - standardize on the verified final Expo SDK and EAS config shape
+  - remove stale workflow patterns and unnecessary related dependencies
+  - update repo policy and docs to match the final convention
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - upgrade and optimization report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, audit, and the mobile doctor or workflow checks the repo actually uses
+  - prove removed patterns are gone with grep or equivalent checks
