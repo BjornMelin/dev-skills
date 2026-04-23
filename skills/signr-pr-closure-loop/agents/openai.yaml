@@ -1,0 +1,4 @@
+interface:
+  display_name: "Signr PR Closure Loop"
+  short_description: "Autonomous Signr PR remediation loop"
+  default_prompt: "Use $signr-pr-closure-loop to remediate a Signr PR end-to-end, fix blocking CI and review feedback, and stop only when it is ready to merge."

@@ -1,0 +1,158 @@
+match_packages:
+  - turbo
+  - turborepo
+family_slug: turborepo
+family_display_name: Turborepo
+family_type: tooling
+mode: upgrade+optimize
+plan_basename: turborepo-monorepo-upgrade-and-optimization
+playbook_title: Turborepo Monorepo Upgrade And Optimization Playbook
+operator_title: Turborepo Monorepo Upgrade And Optimization Operator Mode
+trigger_title: Turborepo Monorepo Upgrade And Optimization Trigger Prompt
+related_packages:
+  - turbo
+purpose: Use this playbook to fully explore, research, plan, implement, verify, and document a Turborepo upgrade or monorepo task-graph optimization wave in this repository.
+use_when:
+  - the repository already uses Turborepo
+  - the repo needs a Turborepo version upgrade, package-config audit, or task-graph cleanup
+  - the repo needs one canonical artifact covering root task orchestration, package configs, and validation posture
+primary_goal:
+  - reach one verified canonical Turborepo task-graph and package-config end state for the monorepo
+  - align root delegation, package tasks, and package configurations with current official guidance
+  - remove stale root-task logic or duplicated orchestration that Turborepo should own instead
+non_goals:
+  - unrelated app or package redesign outside the monorepo orchestration boundary
+  - moving package task logic into bespoke root shell scripts
+  - treating workspace package configurations as optional docs when they actively change task behavior
+source_hierarchy:
+  - official Turborepo docs and reference pages
+  - official package-configuration and affected-run guidance
+  - local repo task graph, scripts, and package configs
+  - package manager metadata, lockfiles, and release notes
+default_final_decisions:
+  - treat Turborepo as a monorepo-root concern with related workspace package configs
+  - prefer package tasks plus root delegation via `turbo run`
+  - support both version-upgrade and same-major optimization outcomes inside one pack
+intake_checklist:
+  - record current `turbo` version
+  - record package manager and lockfile shape
+  - inspect root `turbo.json`
+  - inspect any workspace `turbo.json` package configurations
+  - inventory root scripts that delegate to or bypass Turborepo
+  - build a touched-files map before editing
+required_research:
+  Upstream Turborepo:
+    - verify current run-reference guidance
+    - verify current package-configuration inheritance rules
+    - verify current affected-run and graph-inspection guidance
+  Upstream source inspection:
+    - inspect source only when docs do not answer task-graph or package-config behavior questions
+questions_to_resolve:
+  - is this run primarily a version bump, a task-graph cleanup, or both
+  - which root scripts are canonical delegation surfaces and which are stale
+  - which workspace package configs materially affect the final task graph
+  - which CI or local validation commands must remain coupled to the Turborepo surface
+canonical_end_state:
+  - the monorepo uses current verified Turborepo guidance
+  - root scripts delegate cleanly and package tasks own the real task logic
+  - package configurations and docs match the final task graph
+  - lint, typecheck, tests, build, and audit remain green
+what_to_adopt:
+  - current `turbo run` delegation and graph-inspection workflows
+  - package configuration inheritance and affected-run validation
+  - existing repo-native package-task patterns when they already fit current guidance
+what_to_avoid:
+  - stale root task logic that bypasses Turborepo
+  - package configs left unaudited when they override root behavior
+  - mixed shorthand and canonical `turbo run` conventions in code and CI
+execution_plan:
+  "Phase 1: Discovery":
+    - inventory root and workspace `turbo.json` files, root scripts, and package task ownership
+    - inventory CI or local validation commands that depend on the task graph
+    - inventory current version and monorepo feature usage
+  "Phase 2: Decisions":
+    - lock the final version or optimize-only scope
+    - lock the root-vs-package task ownership model
+    - lock package-config cleanup and explicit defers
+  "Phase 3: Code Changes":
+    - align root delegation, package configs, and task-graph tooling to the final verified shape
+    - remove stale orchestration that Turborepo should no longer share with custom root logic
+    - update docs and policy to match the final state
+  "Phase 4: Verification":
+    - run repo-native validation
+    - run Turborepo graph and affected-run checks
+    - write the final upgrade and optimization report with residual risks
+report_heading: Upgrade And Optimization Report Requirements
+report_requirements:
+  - current root and package-config starting state
+  - final decisions
+  - current Turborepo features and task-graph signals relevant to the repo
+  - stale or deprecated patterns removed or intentionally retained
+  - graph, affected-run, and validation evidence
+  - repo-specific findings and residual risks
+skill_routing_playbook:
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
+  - "Use official Turborepo docs first for unstable claims."
+  - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
+  - "Use `$platform-architect` when task-graph changes materially affect web/native/backend coordination."
+  - "Do not use `$imagegen` for Turborepo upgrade work."
+skill_routing_operator:
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
+  - "Proof lane: official Turborepo docs first, source only when public guidance is insufficient."
+  - "Conditional lanes: `$bun-dev` for Bun repos, `$platform-architect` for cross-stack monorepo coordination."
+  - "Do not route this migration through `$imagegen`."
+operator_defaults:
+  - Final Turborepo posture follows current verified official guidance.
+  - Root scripts delegate; package tasks own real task logic.
+  - Package configurations are treated as live task-graph surfaces, not optional docs.
+  - No stale root orchestration remains unless a real external boundary requires it.
+operator_fast_intake:
+  - record current `turbo` version
+  - record package manager
+  - inspect root `turbo.json`
+  - inspect any workspace package-config `turbo.json` files
+  - inventory root scripts that delegate to or bypass Turborepo
+operator_research:
+  - verify the current run reference and package-configuration docs
+  - verify current `--affected` and graph-inspection guidance
+  - inspect source only when docs are insufficient
+operator_execute:
+  - align root delegation, package configs, and task-graph tooling to the final verified posture
+  - remove stale orchestration that Turborepo should no longer share with custom root logic
+  - update docs and policy to match the final state
+operator_exit_criteria:
+  - the monorepo follows the final verified Turborepo posture
+  - package tasks and package configs match the final task graph
+  - stale root orchestration is gone or explicitly deferred
+  - verification is green
+trigger_mission: Act as an architect-level modernization engineer performing a verification-first Turborepo upgrade and monorepo task-graph optimization wave in this repository.
+trigger_goals:
+  - reach one canonical final Turborepo end state for the monorepo
+  - support both version-upgrade and same-major optimization work
+  - remove stale root orchestration, package-config drift, and unnecessary task-graph duplication where justified
+  - keep the diff reviewable and the final state simpler than the initial state
+trigger_required_research:
+  - inspect manifests, lockfiles, root and workspace `turbo.json`, scripts, and AGENTS/docs first
+  - verify current official Turborepo guidance before editing
+  - use official docs, upstream source, and repo-native commands
+  - build a touched-files map before broad edits
+trigger_required_decisions:
+  - confirm whether this run is upgrade-only, optimize-only, or both
+  - decide the canonical final root-vs-package task ownership model
+  - decide which package configs and CI boundaries are in or out of scope
+  - decide which stale orchestration or shorthand conventions can be deleted
+trigger_required_outcomes:
+  - standardize on the verified final Turborepo task-graph and delegation shape
+  - remove stale root orchestration and unnecessary related dependencies
+  - update repo policy and docs to match the final convention
+trigger_required_deliverables:
+  - findings matrix
+  - decision log
+  - affected-files map
+  - migration checklist
+  - exact verification commands
+  - upgrade and optimization report
+  - residual risks or explicit defer reasons
+trigger_verification_expectation:
+  - run lint, typecheck, tests, audit, and graph or affected-run checks
+  - prove removed patterns are gone with grep or equivalent checks

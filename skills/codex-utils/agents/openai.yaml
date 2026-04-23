@@ -1,0 +1,6 @@
+interface:
+  display_name: "Codex Utils"
+  short_description: "Built-in planning, web, and utility tools"
+  default_prompt: "Use $codex-utils to decide when to use built-in planning, web, image, and utility tools for this task."
+policy:
+  allow_implicit_invocation: true
