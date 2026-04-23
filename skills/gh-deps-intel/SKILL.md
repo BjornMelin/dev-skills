@@ -1,6 +1,6 @@
 ---
 name: gh-deps-intel
-description: 'Runtime-aware dependency upgrade intelligence for JavaScript/TypeScript and Python repositories (including monorepos/turborepos), using package-manager outdated checks plus GitHub API release/changelog mining to produce definitive Markdown+JSON upgrade/refactor reports. Use when auditing dependency upgrades, planning compatible version bumps, mapping deprecations/breaking changes, standardizing GitHub API/CLI dependency workflows, or when asked to fully upgrade a specific dependency/package (for example: "use $gh-deps-intel to fully upgrade workflow").'
+description: JS/TS + Python dep upgrade intel (monorepos). Outdated package-manager checks + GitHub release/changelog → Markdown+JSON. Audits, compatible bumps, deprecations, breaking changes, full upgrades.
 ---
 
 # Gh Deps Intel
@@ -26,33 +26,36 @@ Use this as the canonical dependency-upgrade workflow skill. The shared `deps-wo
 
 ## Workflow Modes
 
-- `plan`: produce the Markdown + JSON upgrade report and execution order without mutating dependencies.
-- `execute`: follow the planned batches, apply the requested upgrades, run repo-native verification, and then refresh the report.
+- `plan`: Markdown + JSON report + order; no dep mutations.
+- `execute`: run batches, apply upgrades, repo-native verification, refresh report.
 
 ## Quick Start
 
 1. Prerequisites:
-- `gh` authenticated (`gh auth status`)
-- `python3` available
+
+- `gh` logged in (`gh auth status`)
+- `python3`
 - Optional: `bun`/`pnpm`/`npm`/`yarn`, `uv`
 
-2. Run full analysis from target repository root:
+1. From repo root:
+
 - `python /home/bjorn/.agents/skills/gh-deps-intel/scripts/gh_deps_intel.py full --repo . --out reports --mode safe`
 
-3. Read outputs:
+1. Outputs:
+
 - `reports/dependency-upgrade-report.md`
 - `reports/dependency-upgrade-report.json`
 
 ## Execution Modes
 
 - `safe` (default): serial GitHub API pacing + backoff/retries.
-- `fast`: bounded parallel enrichment with automatic safe-mode fallback on rate-limit/error signals.
+- `fast`: bounded parallel enrich; auto fallback to safe on rate limit/errors.
 
 ## Primary Commands
 
-- Full pipeline (recommended):
+- Full pipeline (default):
   - `python scripts/gh_deps_intel.py full --repo . --out reports --mode safe`
-- Single dependency comprehensive spec:
+- Single dependency full spec:
   - `python scripts/gh_deps_intel.py package --repo . --out reports --mode safe --dependency workflow`
   - `python scripts/upgrade_one_dep.py workflow --repo . --out reports --mode safe`
 - Stage outputs:
@@ -65,34 +68,36 @@ Use this as the canonical dependency-upgrade workflow skill. The shared `deps-wo
 ## Resource Map
 
 | Path | Type | Purpose | Use When |
-|---|---|---|---|
-| `scripts/gh_deps_intel.py` | orchestrator | End-to-end scan/enrich/analyze/report pipeline | Default for all dependency intelligence requests |
-| `scripts/upgrade_one_dep.py` | utility | Convenience wrapper for single dependency `package` workflow | You need a comprehensive refactor spec for one package |
-| `scripts/detect_repo.py` | script | Detect runtime, package managers, workspace topology | You need repo/runtime context only |
-| `scripts/collect_deps.py` | script | Parse dependencies from `package.json` and `pyproject.toml` | You need manifest-level dependency inventory |
-| `scripts/outdated_probe.py` | script | Run outdated commands mapped to detected managers | You need current/wanted/latest signals |
-| `scripts/repo_resolver.py` | script | Resolve registry metadata and GitHub source repos | You need package->repo mapping |
-| `scripts/gh_release_fetch.py` | script | GitHub releases/tags/changelog retrieval with cache/retries | You need release notes/changelog context |
-| `scripts/runtime_policy.py` | script | Runtime compatibility targeting (Node/Python) | You need latest compatible target selection |
-| `scripts/impact_analyzer.py` | script | Extract breaking/deprecations/features and refactor actions | You need actionable migration deltas |
-| `scripts/render_report.py` | script | Markdown + JSON report generation | You need final upgrade intelligence outputs |
-| `scripts/gh_release_diff.py` | utility | Release-window notes for arbitrary `owner/repo` | Ad-hoc release research |
-| `scripts/gh_compare_notes.py` | utility | Compare-summary between refs/tags | Changelog unavailable; need commit summary |
-| `scripts/gh_rate_limit_diag.py` | utility | Current GitHub rate-limit status | Verify API budget before large runs |
-| `references/workflow.md` | reference | Canonical run order and decision tree | You need process guidance |
-| `references/command-mapping.md` | reference | Package manager command equivalents | You need bun/pnpm/npm/yarn/uv/pip mapping |
-| `references/github-api-endpoints.md` | reference | Endpoint and backoff rules | You need API behavior details |
-| `references/compatibility-policy.md` | reference | Runtime-pinned target rules | You need version policy rationale |
-| `references/report-spec.md` | reference | Output schema and report sections | You need machine/human contract details |
-| `references/troubleshooting.md` | reference | Common failures and mitigations | You hit auth/rate-limit/parse issues |
+| --- | --- | --- | --- |
+| `scripts/gh_deps_intel.py` | orchestrator | Scan/enrich/analyze/report end-to-end | Any dep intel request |
+| `scripts/upgrade_one_dep.py` | utility | Single-dep `package` wrapper | One-package refactor spec |
+| `scripts/detect_repo.py` | script | Runtime, package managers, workspace | Repo/runtime context only |
+| `scripts/collect_deps.py` | script | Deps from `package.json` + `pyproject.toml` | Manifest inventory |
+| `scripts/outdated_probe.py` | script | Outdated cmds per manager | current/wanted/latest |
+| `scripts/repo_resolver.py` | script | Registry meta → GitHub repos | package → repo map |
+| `scripts/gh_release_fetch.py` | script | Releases/tags/changelog, cache+retries | Release/changelog text |
+| `scripts/runtime_policy.py` | script | Node/Python compatibility targets | Pick compatible version |
+| `scripts/impact_analyzer.py` | script | Breaking/deprecations/features, actions | Migration deltas |
+| `scripts/render_report.py` | script | Markdown + JSON reports | Final outputs |
+| `scripts/gh_release_diff.py` | utility | Release window for `owner/repo` | Ad-hoc release research |
+| `scripts/gh_compare_notes.py` | utility | Compare two refs/tags | No changelog; need commits |
+| `scripts/gh_rate_limit_diag.py` | utility | Current rate limit | Check API budget first |
+| `references/workflow.md` | reference | Run order + decision tree | Process |
+| `references/command-mapping.md` | reference | PM command equivalents | bun/pnpm/npm/yarn/uv/pip map |
+| `references/github-api-endpoints.md` | reference | Endpoints + backoff | API details |
+| `references/compatibility-policy.md` | reference | Runtime-pinned rules | Version policy |
+| `references/report-spec.md` | reference | Schema + sections | Machine+human contract |
+| `references/troubleshooting.md` | reference | Failures + mitigations | Auth/rate/parse issues |
 
 ## Reporting Contract
 
 Always produce both files in the same stable contract:
+
 - Markdown: concise upgrade/refactor plan by dependency.
 - JSON: full structured data for downstream automation.
 
 For `package` mode, include:
+
 - targeted dependency selectors
 - repository impact map (usage hits + affected files)
 - explicit refactor checklist for that package only
@@ -108,6 +113,6 @@ For `package` mode, include:
 
 ## Shared Support Alignment
 
-- Preflight inventory and classification live in `/home/bjorn/.codex/skill-support/bin/deps-workbench`.
-- Long-form GitHub release intelligence stays here.
-- When both are used, treat the Markdown and JSON output files from this skill as the final contract.
+- Preflight + classify: `/home/bjorn/.codex/skill-support/bin/deps-workbench`.
+- Long GitHub release intel: here.
+- Both used: Markdown + JSON from this skill = final contract.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ship Branch"
+  short_description: "Commit, push, and open reviewer-ready PRs"
+  default_prompt: "Use $ship-branch to stage task-scoped changes, make semantic Conventional Commits, push to remote, and open a reviewer-ready PR into `main` with a Conventional Commits title and complete description."
+policy:
+  allow_implicit_invocation: false
