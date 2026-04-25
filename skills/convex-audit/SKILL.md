@@ -1,6 +1,6 @@
 ---
 name: convex-audit
-description: Audit a Convex-backed codebase for schema quality, security, runtime boundaries, migrations, and function-surface risks. Use when the user asks for a Convex review, backend audit, contract analysis, or remediation plan. Do not use for green-field feature-spec generation; use convex-feature-spec for that.
+description: Audit Convex—schema, security, runtime edges, migrations, function risk. Triggers—review, contract, remediate. Not greenfield spec (convex-feature-spec).
 ---
 
 # Convex Audit

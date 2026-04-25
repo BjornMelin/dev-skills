@@ -1,0 +1,14 @@
+interface:
+  display_name: "Review Remediation"
+  short_description: "Fix Codex, Zen, and local review findings"
+  default_prompt: "Use $review-remediation to normalize local review artifacts, prioritize valid findings, implement fixes, and verify them with repo-native checks."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current docs when a review fix touches changing APIs"
+    - type: "mcp"
+      value: "exa"
+      description: "Supplemental latest research for non-trivial migrations"
