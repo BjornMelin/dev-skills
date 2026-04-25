@@ -8,6 +8,7 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `skills/<skill-name>/references/`: optional long-form docs to load on demand.
 - `skills/<skill-name>/scripts/`: optional helper scripts (prefer deterministic tooling here).
 - `skills/<skill-name>/assets/` / `templates/`: optional reusable artifacts.
+- `skills/<skill-name>/agents/`: optional agent-runtime metadata (for example OpenAI YAML).
 - `skills/dist/`: prebuilt `.skill` bundles (ZIP archives) for selected skills.
 
 Example skill path: `skills/docker-architect/SKILL.md`.
@@ -39,6 +40,7 @@ This repo may not have established git history conventions yet. Use clear, scope
 
 - What changed + why
 - Validation commands run (at minimum `python3 tools/skill/quick_validate.py skills/<skill-name>`)
+- If you add or rename a skill, update the catalog table in `README.md` (keep rows sorted by skill name)
 - If you built/published bundles, say where (release assets/registry)
 
 ## Security & Configuration Tips
