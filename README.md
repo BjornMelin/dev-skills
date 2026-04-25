@@ -43,6 +43,7 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `streamdown` | Vercel Streamdown: streaming markdown rendering for AI apps, Shiki/KaTeX/Mermaid, remend, and output hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit architecture + testing + deployment: state/reruns, caching/fragments, AppTest, components v2, security, Playwright MCP. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |
 | `supabase-ts` | Supabase + Next.js/React/TS: SSR auth, RLS, storage, realtime, edge functions, pgvector, CLI/typegen, deployment patterns. | [skills/supabase-ts/SKILL.md](skills/supabase-ts/SKILL.md) |
+| `taste-metaskill` | Route frontend UI work to focused visual taste references for premium, distinct, anti-generic design output. | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
 | `vitest-dev` | Vitest test-engineering for TypeScript + Next.js: low-flake suites, fast local DX, CI throughput, sharding, reporting. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
 | `zod-v4` | Zod v4 patterns: schema design, migration from v3, error handling, JSON schema/OpenAPI, and framework integrations. | [skills/zod-v4/SKILL.md](skills/zod-v4/SKILL.md) |
 
