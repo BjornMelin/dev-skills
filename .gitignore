@@ -66,3 +66,4 @@ skills/*.zip
 skills/bun-dev/.bun-platform/
 skills/bun-dev/references/release-sync-report.json
 .agents/
+skills-lock.json

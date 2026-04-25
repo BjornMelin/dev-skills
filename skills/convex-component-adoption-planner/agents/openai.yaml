@@ -1,0 +1,7 @@
+interface:
+  display_name: "Convex Component Adoption Planner"
+  short_description: "Plans Signr adoption or rejection of Convex components"
+  default_prompt: "Use $convex-component-adoption-planner to research a Convex component for Signr and generate a `PLAN.md` plus `CODEX_FULL_PROMPT.md` package."
+
+policy:
+  allow_implicit_invocation: false
