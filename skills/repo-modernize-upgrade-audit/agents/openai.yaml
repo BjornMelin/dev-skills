@@ -1,0 +1,6 @@
+interface:
+  display_name: "Repo Modernize Audit"
+  short_description: "Plan dependency and modernization waves"
+  default_prompt: "Use $repo-modernize-upgrade-audit to audit modernization opportunities and plan upgrade waves."
+policy:
+  allow_implicit_invocation: false
