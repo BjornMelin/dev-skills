@@ -1,6 +1,6 @@
 ---
 name: repo-docs-align
-description: Sync all repo docs (AGENTS.md, README, ADRs, specs, runbooks, doc comments, etc.) to match current code/workflow. Use after big changes, drift reviews, docs-align/AGENTS/canonical docs prompts, plan, or governance needs. Works across stacks with repo-native tools — no stack lock-in.
+description: Sync repo docs (AGENTS, README, ADRs, specs, runbooks, doc comments) ↔ code/workflow. Triggers—big change, drift, docs-align/AGENTS prompts, plan, governance. Repo-native tools, any stack.
 metadata:
   successor_to: docs-align
 ---
