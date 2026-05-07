@@ -423,6 +423,9 @@ Default suite:
 crates/codex-research/evals/research/core.json
 ```
 
+The default suite is embedded into the binary at build time from that repo
+path. Only `--suite <path>` reads a suite file at runtime.
+
 Task kinds:
 
 - `route-classification`: validates source routing for direct, browser, and

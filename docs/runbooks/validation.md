@@ -34,9 +34,9 @@ codex-research --json eval --live
 ```
 
 Use `cargo run -q -p codex-research -- ...` for these commands before the new
-binary is installed locally. The default eval suite lives at
-`crates/codex-research/evals/research/core.json` and covers routing, privacy,
-budgets, cited claims, and report shape.
+binary is installed locally. The embedded default eval suite is sourced from
+`crates/codex-research/evals/research/core.json` at build time and covers
+routing, privacy, budgets, cited claims, and report shape.
 
 ## Skills
 

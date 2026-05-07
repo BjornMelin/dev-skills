@@ -2090,7 +2090,7 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
         }
         Ok(())
     } else {
-        println!("offline passed: {passed}");
+        println!("offline: {passed}/{} tasks passed", passed + failed_count);
         if failed {
             println!(
                 "{}",
@@ -2205,7 +2205,22 @@ fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Resu
 
 fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let config = ResearchConfig::default();
-    if let Some(url) = optional_str(&task.input, "url") {
+    let url = optional_str(&task.input, "url");
+    let metadata_input = optional_str(&task.input, "metadata_text");
+    if url.is_none() && metadata_input.is_none() {
+        bail!("privacy-redaction requires `url` or `metadata_text` input");
+    }
+    if url.is_none()
+        && (optional_str(&task.expected, "privacy").is_some()
+            || optional_str(&task.expected, "redacted_url").is_some())
+    {
+        bail!("privacy-redaction expectations `privacy` and `redacted_url` require `url` input");
+    }
+    if metadata_input.is_none() && optional_str(&task.expected, "metadata_text").is_some() {
+        bail!("privacy-redaction expectation `metadata_text` requires `metadata_text` input");
+    }
+
+    if let Some(url) = url {
         let privacy = classify_privacy(url);
         let redacted = redact_url_query_secrets(url);
         assertions
@@ -2232,7 +2247,7 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
             assert_text_eq(assertions, "redacted_url", expected_redacted, &actual);
         }
     }
-    if let Some(text) = optional_str(&task.input, "metadata_text") {
+    if let Some(text) = metadata_input {
         let redacted = metadata_text(text, &config);
         assertions
             .details
@@ -2400,8 +2415,7 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
 fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let report = required_str(&task.input, "report")?;
     for section in optional_str_array(&task.expected, "required_sections").unwrap_or_default() {
-        let heading = format!("## {section}");
-        if !report.contains(&heading) && !report.contains(section) {
+        if !report_has_heading(report, section) {
             assertions
                 .failures
                 .push(format!("report missing required section `{section}`"));
@@ -2427,6 +2441,16 @@ fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertion
         .details
         .insert("chars".to_string(), json!(report.chars().count()));
     Ok(())
+}
+
+fn report_has_heading(report: &str, section: &str) -> bool {
+    report.lines().any(|line| {
+        let trimmed = line.trim();
+        let Some(title) = trimmed.strip_prefix("## ") else {
+            return false;
+        };
+        title.trim() == section
+    })
 }
 
 fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
@@ -4198,6 +4222,43 @@ mod tests {
 
         assert!(result.is_err());
         Ok(())
+    }
+
+    #[test]
+    fn privacy_eval_rejects_empty_tasks() {
+        let task = EvalTask {
+            id: "empty-privacy".to_string(),
+            kind: "privacy-redaction".to_string(),
+            description: "empty".to_string(),
+            input: json!({}),
+            expected: json!({}),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(outcome.failures[0].contains("requires `url` or `metadata_text`"));
+    }
+
+    #[test]
+    fn report_contract_requires_explicit_headings() {
+        let task = EvalTask {
+            id: "missing-heading".to_string(),
+            kind: "report-contract".to_string(),
+            description: "heading check".to_string(),
+            input: json!({
+                "report": "- Provider limits are mentioned in prose only."
+            }),
+            expected: json!({
+                "required_sections": ["Provider limits"]
+            }),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("missing required section"))
+        );
     }
 
     #[test]

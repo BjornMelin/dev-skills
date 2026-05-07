@@ -227,8 +227,9 @@ Tagged enum:
 
 Async provider commands run under `tokio`.
 
-`run_eval` loads `crates/codex-research/evals/research/core.json` by default,
-or a caller-supplied suite through `--suite`. The eval harness is deliberately
+`run_eval` uses a default suite embedded at build time from
+`crates/codex-research/evals/research/core.json`; only `--suite` reads a
+caller-supplied suite file at runtime. The eval harness is deliberately
 offline-first so it can run in PR validation without provider credentials. It
 supports task filtering, listing, strict warning handling, and JSON output.
 
