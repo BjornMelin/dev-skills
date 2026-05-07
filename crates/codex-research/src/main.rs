@@ -1886,6 +1886,12 @@ fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> R
             topic,
             out,
         } => {
+            if out.exists() {
+                bail!(
+                    "run file already exists at {}; move it aside or choose a different --out path",
+                    out.display()
+                );
+            }
             let state = ResearchRunState {
                 query: query.clone(),
                 profile,
@@ -3412,6 +3418,9 @@ fn private_or_local_ip(ip: IpAddr) -> bool {
             ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified()
         }
         IpAddr::V6(ip) => {
+            if let Some(mapped) = ip.to_ipv4_mapped() {
+                return private_or_local_ip(IpAddr::V4(mapped));
+            }
             let first = ip.segments()[0];
             ip.is_loopback()
                 || ip.is_unspecified()
@@ -3807,6 +3816,30 @@ mod tests {
     }
 
     #[test]
+    fn run_init_refuses_to_overwrite_existing_state() -> Result<()> {
+        let dir = temp_path("run-init-existing");
+        fs::create_dir_all(&dir)?;
+        let run = dir.join("run.json");
+        fs::write(&run, b"{\"existing\":true}")?;
+
+        let result = handle_run(
+            RunCommand::Init {
+                query: "smoke".to_string(),
+                profile: ResearchProfile::Quick,
+                topic: TopicKind::General,
+                out: run.clone(),
+            },
+            &ResearchConfig::default(),
+            false,
+        );
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_to_string(&run)?, "{\"existing\":true}");
+        fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
     fn close_run_state_preserves_existing_run_history() -> Result<()> {
         let dir = temp_path("run-close");
         fs::create_dir_all(&dir)?;
@@ -3905,6 +3938,10 @@ mod tests {
         );
         assert_eq!(
             classify_privacy("https://[fd00::1]/internal"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
+        assert_eq!(
+            classify_privacy("https://[::ffff:127.0.0.1]/internal"),
             PrivacyClass::PrivateOrAuthenticated
         );
         assert!(
