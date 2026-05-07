@@ -125,7 +125,7 @@ codex-research fetch probe "https://example.com/docs"
 codex-research context7 search --library "Next.js" --query "middleware auth"
 codex-research github search-code 'repo:owner/repo symbol in:file'
 codex-research ledger init
-codex-research ledger add-source --run .codex/research/run.json --from-cache <source-id>
+codex-research ledger add-source --from-cache <source-id>
 codex-research report --ledger .codex/research/ledger.jsonl
 codex-research eval
 ```

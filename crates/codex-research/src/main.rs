@@ -1373,7 +1373,7 @@ async fn handle_github(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Github, 1, Some("github compare"))?;
-            let per_page = per_page.unwrap_or(per_page_max).min(per_page_max);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let basehead = format!("{base}...{head}");
             let url = format!(
                 "https://api.github.com/repos/{repo}/compare/{}",
@@ -1606,7 +1606,7 @@ fn handle_ledger(command: LedgerCommand, json_out: bool) -> Result<()> {
                     cached.id,
                     cached.provider,
                     cached.url,
-                    cached.title.or(args.title),
+                    args.title.or(cached.title),
                     cached.route,
                 )
             } else {
