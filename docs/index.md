@@ -9,8 +9,8 @@ added to this repository:
 - `subagent-creator`: skill and Python helper for authoring, installing,
   validating, diffing, syncing, backing up, and smoke-testing Codex custom
   agents.
-- `subspawn`: hardened subagent delegation policy with strict wait and
-  evidence-first synthesis.
+- `subspawn`: hardened subagent delegation policy with planner-generated
+  prompts, strict wait, and evidence-first synthesis.
 
 The docs are handwritten and tracked. Generated Rust docs and build output stay
 out of version control.

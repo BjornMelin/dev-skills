@@ -57,6 +57,19 @@ Before spawning:
 4. Default to read-only exploration unless scoped edits materially advance the
    task.
 
+For nontrivial batches, generate a plan before spawning:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset research \
+  --task "Research current Codex subagent docs" \
+  --scope "official OpenAI docs and GitHub only"
+```
+
+Use `--role` for explicit custom role selection, `--mode edit` only with
+disjoint write surfaces, and `--json` when another tool needs to consume the
+plan. Run `validate-roles` after changing subagent templates.
+
 ## Fan-Out Rules
 
 - Prefer 1-3 focused subagents.
@@ -271,6 +284,16 @@ Good probe:
 - disjoint bounded questions
 - strict wait-for-all synthesis
 - each spawn includes full mandatory spawn contract
+
+Planning-only smoke:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset review \
+  --task "Review this PR for correctness and test gaps" \
+  --scope "current PR diff only"
+```
 
 ## Failure Modes
 
