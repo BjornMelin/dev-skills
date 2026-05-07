@@ -56,6 +56,7 @@ pnpm-debug.log*
 # Generic build outputs (root-level only)
 /build/
 /dist/
+/target/
 
 # Skill bundles (build artifacts)
 skills/dist/
