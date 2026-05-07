@@ -1,11 +1,31 @@
 # dev-skills
 
-[![AgentSkills](https://img.shields.io/badge/AgentSkills-specification-24292f?style=flat-square)](https://agentskills.io/specification) [![skills.sh](https://img.shields.io/badge/registry-skills.sh-24292f?style=flat-square)](https://skills.sh/) [![Python](https://img.shields.io/badge/tooling-Python%203-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-specification-24292f?style=flat-square)](https://agentskills.io/specification) [![skills.sh](https://img.shields.io/badge/registry-skills.sh-24292f?style=flat-square)](https://skills.sh/) [![Python](https://img.shields.io/badge/tooling-Python%203-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![Rust](https://img.shields.io/badge/tooling-Rust-000000?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 A versioned collection of reusable **Agent Skills** (per the AgentSkills specification) that I use to make coding agents more reliable, consistent, and fast.
 
 - Spec: <https://agentskills.io/specification>
 - Skill registry: <https://skills.sh/>
+
+## What Is In This Repo
+
+This repo now contains both skill packages and supporting tooling:
+
+- reusable skills under `skills/`;
+- a Rust research CLI, `codex-research`, under `crates/`;
+- tracked documentation under `docs/`;
+- skill validation and packaging helpers under `tools/skill/`.
+
+Start with [docs/index.md](docs/index.md) for the full guide set.
+
+Key docs:
+
+- [Onboarding](docs/guides/onboarding.md)
+- [System overview](docs/architecture/overview.md)
+- [Research architecture](docs/architecture/research-system.md)
+- [codex-research CLI reference](docs/reference/codex-research-cli.md)
+- [codex-research crate reference](docs/reference/codex-research-crate.md)
+- [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
 
 Each skill lives in `skills/<skill-name>/` and is designed to be:
 
@@ -24,6 +44,44 @@ skills/
     assets/               # optional (templates/snippets)
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
+crates/
+  codex-research/         # Rust CLI for evidence-first research helpers
+docs/
+  index.md                # documentation portal
+  architecture/           # system design
+  guides/                 # onboarding and setup
+  reference/              # CLI, crate, skill, and template references
+  cookbooks/              # operator-grade workflows
+  prompts/                # copy-paste Codex prompts
+  runbooks/               # validation, troubleshooting, maintenance
+```
+
+## Research and Subagent Stack
+
+The main new system is a research/subagent stack:
+
+- `deep-researcher`: skill for deep cited research with a Focused Six subagent
+  pack.
+- `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
+  GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
+  doctor, and evals.
+- `subagent-creator`: helper skill and CLI for custom Codex agent templates.
+- `subspawn`: strict subagent delegation policy with mandatory wait-before-next
+  work synthesis.
+
+Build and install the CLI:
+
+```bash
+cargo build -p codex-research
+cargo install --path crates/codex-research --force
+codex-research doctor
+```
+
+Install the deep research agents:
+
+```bash
+python3 skills/deep-researcher/scripts/install_agents.py --target global --dry-run
+python3 skills/deep-researcher/scripts/install_agents.py --target global
 ```
 
 ## Skill catalog
@@ -49,6 +107,7 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `convex-component-adoption-planner` | Research Convex components vs a live graph; scored Q&A; adoption or rejection packs (`PLAN.md`, prompts). | [skills/convex-component-adoption-planner/SKILL.md](skills/convex-component-adoption-planner/SKILL.md) |
 | `convex-feature-spec` | Convex-first feature specs: model, API, rollout, verification (not implementation audits). | [skills/convex-feature-spec/SKILL.md](skills/convex-feature-spec/SKILL.md) |
 | `dash-audit` | Audit Dash apps: callbacks, state, layout, accessibility, Dash-specific UX. | [skills/dash-audit/SKILL.md](skills/dash-audit/SKILL.md) |
+| `deep-researcher` | Deep cited research across Codex web, Context7 API, GitHub, source, rendered pages, Firecrawl, and evidence ledgers. | [skills/deep-researcher/SKILL.md](skills/deep-researcher/SKILL.md) |
 | `dmc-best-practices` | DMC + Dash best practices: architecture, callbacks, styling, performance, theming. | [skills/dmc-best-practices/SKILL.md](skills/dmc-best-practices/SKILL.md) |
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
@@ -67,7 +126,8 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `signr-pr-closure-loop` | Signr-style PR closure: review threads, CI, Expo/EAS, Vercel/Turborepo, docs, babysit to merge-ready. | [skills/signr-pr-closure-loop/SKILL.md](skills/signr-pr-closure-loop/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit: reruns/state, caching/fragments, AppTest, components v2, security, Playwright E2E. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |
-| `subspawn` | Bounded Codex subagent delegation and synthesis (`spawn_agent`, scopes, evidence-first merge). | [skills/subspawn/SKILL.md](skills/subspawn/SKILL.md) |
+| `subagent-creator` | Create, validate, install, diff, sync, and smoke-test Codex custom subagent TOML role packs. | [skills/subagent-creator/SKILL.md](skills/subagent-creator/SKILL.md) |
+| `subspawn` | Bounded Codex subagent delegation with strict wait and evidence-first synthesis. | [skills/subspawn/SKILL.md](skills/subspawn/SKILL.md) |
 | `supabase-ts` | Supabase with Next/React/TS: SSR auth, RLS, storage, realtime, Edge Functions, pgvector, deploy. | [skills/supabase-ts/SKILL.md](skills/supabase-ts/SKILL.md) |
 | `taste-metaskill` | Route frontend UI work to focused visual-taste references (premium, distinct, anti-generic). | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
@@ -97,6 +157,28 @@ Package a skill to `skills/dist/<skill-name>.skill`:
 
 ```bash
 python3 tools/skill/package_skill.py skills/<skill-name> skills/dist
+```
+
+Build the research CLI:
+
+```bash
+cargo build -p codex-research
+```
+
+Full local validation for the research/subagent stack:
+
+```bash
+cargo fmt --all --check
+cargo clippy -p codex-research --all-targets -- -D warnings
+cargo check -p codex-research
+cargo test -p codex-research
+codex-research --json doctor
+codex-research --json eval
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
+python3 tools/docs/check_links.py docs README.md AGENTS.md
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
+for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
+git diff --check
 ```
 
 Notes:

@@ -1,0 +1,119 @@
+# Validation Runbook
+
+Use this after editing docs, skills, templates, Python helpers, or Rust code.
+
+## Rust CLI
+
+Run after any change under `crates/codex-research/` or root Cargo files:
+
+```bash
+cargo fmt --all --check
+cargo clippy -p codex-research --all-targets -- -D warnings
+cargo check -p codex-research
+cargo test -p codex-research
+```
+
+CLI smoke:
+
+```bash
+codex-research --json doctor
+codex-research --json eval
+codex-research --json plan "validation smoke" --profile quick
+```
+
+Optional live readiness:
+
+```bash
+codex-research --json eval --live
+```
+
+## Skills
+
+Validate one skill:
+
+```bash
+python3 tools/skill/quick_validate.py skills/<skill-name>
+```
+
+Validate all skills:
+
+```bash
+for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
+```
+
+Package changed skills:
+
+```bash
+python3 tools/skill/package_skill.py skills/deep-researcher skills/dist
+python3 tools/skill/package_skill.py skills/subagent-creator skills/dist
+python3 tools/skill/package_skill.py skills/subspawn skills/dist
+```
+
+## Python Helpers
+
+```bash
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
+```
+
+## Subagent Templates
+
+Validate bundled templates:
+
+```bash
+python3 skills/subagent-creator/scripts/subagent_creator.py validate \
+  skills/deep-researcher/templates/agents \
+  skills/subagent-creator/templates/agents
+```
+
+Validate global installed templates:
+
+```bash
+python3 skills/subagent-creator/scripts/subagent_creator.py validate ~/.codex/agents
+```
+
+Install dry-run:
+
+```bash
+python3 skills/deep-researcher/scripts/install_agents.py --target project --project-dir /tmp/deep-researcher-smoke --dry-run
+python3 skills/subagent-creator/scripts/subagent_creator.py smoke --pack docs
+```
+
+## Docs
+
+Docs currently use a command checklist instead of a separate docs linter.
+
+Required checks:
+
+```bash
+! rg -n "TO[D]O|FIX[M]E" docs README.md AGENTS.md
+python3 tools/docs/check_links.py docs README.md AGENTS.md
+git diff --check
+```
+
+Manual checks:
+
+- intentional `UNVERIFIED` mentions are policy examples, not unresolved docs
+  markers;
+- generated-output references such as `target/` and `skills/dist/` are policy
+  notes, not tracked artifacts;
+- docs/index.md links every new major doc section;
+- README links docs/index.md and the main guides;
+- AGENTS.md lists the validation commands affected by the change;
+- command examples match current CLI help;
+- docs do not include secrets, local tokens, or committed run ledgers.
+
+## Full Local Gate
+
+```bash
+cargo fmt --all --check
+cargo clippy -p codex-research --all-targets -- -D warnings
+cargo check -p codex-research
+cargo test -p codex-research
+codex-research --json doctor
+codex-research --json eval
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
+python3 tools/docs/check_links.py docs README.md AGENTS.md
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
+for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
+git diff --check
+```
