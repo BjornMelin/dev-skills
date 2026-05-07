@@ -48,6 +48,7 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents`
 - Rust CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
+- Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
 - Docs links: `python3 tools/docs/check_links.py docs README.md AGENTS.md`
 - Final whitespace check: `git diff --check`
 

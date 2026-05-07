@@ -27,6 +27,8 @@ out of version control.
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
   data model, provider behavior, and extension points.
+- [Validation](runbooks/validation.md): local gates including the manifest-backed
+  research eval suite.
 - [codex-research v0.2 Spec](specs/codex-research-v0.2.md): implemented
   follow-up plan covering config, budgets, GitHub hydration, source cache,
   privacy, evals, and research-agent contracts.

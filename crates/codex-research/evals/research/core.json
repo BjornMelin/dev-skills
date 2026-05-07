@@ -1,0 +1,134 @@
+{
+  "suite": "research-core",
+  "description": "Deterministic offline checks for source routing, privacy redaction, provider budgets, and research evidence contracts.",
+  "tasks": [
+    {
+      "id": "route-static-docs-direct",
+      "kind": "route-classification",
+      "description": "Static text-heavy documentation pages should use direct fetch before rendered fallbacks.",
+      "input": {
+        "url": "https://docs.example.com/api",
+        "content_type": "text/html",
+        "body": "<html><main><h1>API Reference</h1><p>Use this API for reliable output with examples, parameters, return values, and migration notes.</p></main></html>"
+      },
+      "expected": {
+        "route": "direct",
+        "privacy": "public"
+      }
+    },
+    {
+      "id": "route-app-shell-browser",
+      "kind": "route-classification",
+      "description": "JavaScript app shells should route to browser-based verification.",
+      "input": {
+        "url": "https://app.example.com/dashboard",
+        "content_type": "text/html",
+        "body": "<html><body><div id=\"__next\"></div><script src=\"/_next/static/app.js\"></script></body></html>"
+      },
+      "expected": {
+        "route": "agent-browser",
+        "privacy": "public"
+      }
+    },
+    {
+      "id": "route-github-blob-api",
+      "kind": "route-classification",
+      "description": "GitHub blob URLs should route to GitHub API hydration instead of rendered page scraping.",
+      "input": {
+        "url": "https://github.com/openai/codex/blob/main/README.md",
+        "content_type": "text/html",
+        "body": "<html>large rendered github page</html>"
+      },
+      "expected": {
+        "route": "github",
+        "privacy": "public"
+      }
+    },
+    {
+      "id": "privacy-redacts-query-secrets",
+      "kind": "privacy-redaction",
+      "description": "Secret-bearing query parameters should be classified as private and redacted before cache metadata output.",
+      "input": {
+        "url": "https://example.com/docs?token=secret&page=2",
+        "metadata_text": "inspect api_key=secret usage"
+      },
+      "expected": {
+        "privacy": "private-or-authenticated",
+        "redacted_url": "https://example.com/docs?token=%5Bredacted%5D&page=2",
+        "metadata_text": "[redacted]"
+      }
+    },
+    {
+      "id": "budget-deep-dependency-routes-primary-sources",
+      "kind": "budget-plan",
+      "description": "Deep dependency research should start with docs/source routes and reserve enough GitHub hydration budget.",
+      "input": {
+        "query": "verify package upgrade behavior",
+        "profile": "deep",
+        "topic": "dependency"
+      },
+      "expected": {
+        "route_order_prefix": ["context7", "opensrc", "github"],
+        "budgets": {
+          "context7_calls": 4,
+          "github_calls": 8,
+          "direct_fetches": 12
+        }
+      }
+    },
+    {
+      "id": "evidence-claims-cited",
+      "kind": "evidence-contract",
+      "description": "Research reports should map every claim to hydrated source records.",
+      "input": {
+        "sources": [
+          {
+            "id": "src-official-docs",
+            "provider": "codex-web",
+            "url": "https://developers.openai.com/codex/concepts/subagents",
+            "freshness_status": "current"
+          },
+          {
+            "id": "src-github-source",
+            "provider": "github",
+            "url": "https://github.com/openai/codex",
+            "freshness_status": "current"
+          }
+        ],
+        "claims": [
+          {
+            "id": "claim-official-docs-first",
+            "text": "Official docs are the authority for subagent behavior.",
+            "sources": ["src-official-docs"],
+            "confidence": 0.95
+          },
+          {
+            "id": "claim-source-hydrated",
+            "text": "Repository source should be hydrated before relying on implementation details.",
+            "sources": ["src-github-source"],
+            "confidence": 0.9
+          }
+        ]
+      },
+      "expected": {
+        "min_sources": 2,
+        "min_claims": 2,
+        "max_uncited_claims": 0,
+        "min_confidence": 0.85
+      }
+    },
+    {
+      "id": "report-contract-source-ledger",
+      "kind": "report-contract",
+      "description": "Human research reports should expose claims, source hydration, provider limits, and privacy notes.",
+      "input": {
+        "report": "## Sources hydrated\n- src-official-docs\n- src-github-source\n\n## Claims\n- Official docs are authoritative. [src-official-docs]\n\n## Provider limits\n- GitHub search can be incomplete; hydrate hits before citing.\n\n## Privacy notes\n- No private material was sent to external scraping providers."
+      },
+      "expected": {
+        "required_sections": ["Sources hydrated", "Claims", "Provider limits", "Privacy notes"],
+        "required_source_mentions": ["src-official-docs", "src-github-source"],
+        "forbidden_phrases": ["trust me", "source pending"]
+      }
+    }
+  ]
+}

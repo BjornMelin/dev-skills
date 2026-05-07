@@ -406,15 +406,43 @@ Default cache root:
 
 ## eval
 
-Run deterministic offline checks and optional provider-readiness smoke checks.
+Run deterministic offline checks from a manifest-backed eval suite and optional
+provider-readiness smoke checks.
 
 ```bash
 codex-research eval
+codex-research eval --list
+codex-research --json eval --task evidence-claims-cited --strict
+codex-research --json eval --suite crates/codex-research/evals/research/core.json
 codex-research --json eval --live
 ```
 
-`--live` reports configured providers; it does not perform expensive scrape or
-search operations.
+Default suite:
+
+```text
+crates/codex-research/evals/research/core.json
+```
+
+Task kinds:
+
+- `route-classification`: validates source routing for direct, browser, and
+  GitHub hydration paths.
+- `privacy-redaction`: validates URL privacy classification and secret query
+  redaction.
+- `budget-plan`: validates profile/topic route order and provider budget
+  ceilings.
+- `evidence-contract`: validates hydrated source IDs, cited claims, and
+  confidence warnings.
+- `report-contract`: validates required report sections and source mentions.
+
+Options:
+
+- `--list`: print task IDs, kinds, and descriptions without running them.
+- `--task <id>`: run one task; repeat for multiple tasks.
+- `--suite <path>`: run a custom JSON suite with the same schema.
+- `--strict`: treat warnings as failures.
+- `--live`: report configured providers; it does not perform expensive scrape
+  or search operations.
 
 ## Exit and Failure Behavior
 

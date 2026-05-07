@@ -18,6 +18,8 @@ CLI smoke:
 ```bash
 codex-research --json doctor
 codex-research --json eval
+codex-research eval --list
+codex-research --json eval --task evidence-claims-cited --strict
 codex-research --json plan "validation smoke" --profile quick
 tmp=$(mktemp -d)
 codex-research --json run init validation-smoke --profile quick --topic github --out "$tmp/run.json"
@@ -30,6 +32,11 @@ Optional live readiness:
 ```bash
 codex-research --json eval --live
 ```
+
+Use `cargo run -q -p codex-research -- ...` for these commands before the new
+binary is installed locally. The default eval suite lives at
+`crates/codex-research/evals/research/core.json` and covers routing, privacy,
+budgets, cited claims, and report shape.
 
 ## Skills
 
@@ -120,6 +127,7 @@ cargo check -p codex-research
 cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
+codex-research --json eval --task evidence-claims-cited --strict
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents

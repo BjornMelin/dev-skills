@@ -21,6 +21,7 @@ use url::Url;
 
 const GITHUB_API_VERSION: &str = "2026-03-10";
 const USER_AGENT_VALUE: &str = "codex-research/0.2";
+const DEFAULT_EVAL_SUITE: &str = include_str!("../evals/research/core.json");
 
 #[derive(Parser)]
 #[command(name = "codex-research")]
@@ -432,6 +433,55 @@ enum RunCommand {
 struct EvalArgs {
     #[arg(long)]
     live: bool,
+    #[arg(long, value_name = "PATH", help = "Load an eval suite JSON file")]
+    suite: Option<PathBuf>,
+    #[arg(long, value_name = "ID", help = "Run only the selected task ID")]
+    task: Vec<String>,
+    #[arg(long, help = "List eval tasks without running them")]
+    list: bool,
+    #[arg(long, help = "Treat eval warnings as failures")]
+    strict: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct EvalSuite {
+    suite: String,
+    description: Option<String>,
+    tasks: Vec<EvalTask>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EvalTask {
+    id: String,
+    kind: String,
+    description: String,
+    input: Value,
+    expected: Value,
+}
+
+#[derive(Default)]
+struct EvalAssertions {
+    failures: Vec<String>,
+    warnings: Vec<String>,
+    details: BTreeMap<String, Value>,
+}
+
+#[derive(Serialize)]
+struct EvalTaskSummary {
+    id: String,
+    kind: String,
+    description: String,
+}
+
+#[derive(Serialize)]
+struct EvalTaskOutcome {
+    id: String,
+    kind: String,
+    description: String,
+    status: String,
+    failures: Vec<String>,
+    warnings: Vec<String>,
+    details: BTreeMap<String, Value>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, ValueEnum)]
@@ -1960,41 +2010,52 @@ fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> R
 }
 
 async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
-    let client = http_client()?;
-    let samples = vec![
-        (
-            "https://docs.example.com",
-            "<html><main><h1>Docs</h1><p>Use this API for reliable output with examples and guides.</p></main></html>",
-            Route::Direct,
-        ),
-        (
-            "https://app.example.com",
-            "<html><body><div id=\"__next\"></div><script src=\"/_next/static/app.js\"></script></body></html>",
-            Route::AgentBrowser,
-        ),
-        (
-            "https://github.com/org/repo/blob/main/README.md",
-            "github",
-            Route::Github,
-        ),
-    ];
-    let mut passed = 0;
-    let mut failures = Vec::new();
-    for (url, body, expected) in samples {
-        let report = classify_body(url, Some("text/html"), None, body);
-        if route_name(report.route) == route_name(expected) {
-            passed += 1;
+    let suite = load_eval_suite(args.suite.as_deref())?;
+    let selected = select_eval_tasks(&suite, &args.task)?;
+
+    if args.list {
+        let tasks = selected
+            .iter()
+            .map(|task| EvalTaskSummary {
+                id: task.id.clone(),
+                kind: task.kind.clone(),
+                description: task.description.clone(),
+            })
+            .collect::<Vec<_>>();
+        let result = json!({
+            "suite": suite.suite,
+            "description": suite.description,
+            "tasks": tasks,
+        });
+        if json_out {
+            print_json(&result)?;
         } else {
-            failures.push(json!({
-                "url": url,
-                "expected": route_name(expected),
-                "actual": route_name(report.route)
-            }));
+            for task in tasks {
+                println!("{} [{}] {}", task.id, task.kind, task.description);
+            }
         }
+        return Ok(());
+    }
+
+    let mut outcomes = Vec::new();
+    for task in selected {
+        let assertions = evaluate_eval_task(task);
+        let failed =
+            !assertions.failures.is_empty() || (args.strict && !assertions.warnings.is_empty());
+        outcomes.push(EvalTaskOutcome {
+            id: task.id.clone(),
+            kind: task.kind.clone(),
+            description: task.description.clone(),
+            status: if failed { "failed" } else { "passed" }.to_string(),
+            failures: assertions.failures,
+            warnings: assertions.warnings,
+            details: assertions.details,
+        });
     }
 
     let mut live = Vec::new();
     if args.live {
+        let _client = http_client()?;
         if std::env::var_os("CONTEXT7_API_KEY").is_some() {
             live.push(json!({ "provider": "context7", "status": "configured" }));
         }
@@ -2003,15 +2064,22 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
         }
         let github = github_token().is_some();
         live.push(json!({ "provider": "github", "status": if github { "configured" } else { "public-only" } }));
-        let _ = client;
     }
 
-    let failed = !failures.is_empty();
+    let failed = outcomes.iter().any(|outcome| outcome.status == "failed");
+    let passed = outcomes
+        .iter()
+        .filter(|outcome| outcome.status == "passed")
+        .count();
+    let failed_count = outcomes.len() - passed;
     let result = json!({
+        "suite": suite.suite,
+        "description": suite.description,
         "offline": {
             "passed": passed,
-            "failed": failures.len(),
-            "failures": failures
+            "failed": failed_count,
+            "strict": args.strict,
+            "tasks": outcomes
         },
         "live": live
     });
@@ -2026,7 +2094,7 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
         if failed {
             println!(
                 "{}",
-                serde_json::to_string_pretty(&result["offline"]["failures"])?
+                serde_json::to_string_pretty(&result["offline"]["tasks"])?
             );
             bail!("offline eval failures");
         }
@@ -2034,6 +2102,403 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&result["live"])?);
         }
         Ok(())
+    }
+}
+
+fn load_eval_suite(path: Option<&Path>) -> Result<EvalSuite> {
+    let text = match path {
+        Some(path) => fs::read_to_string(path)
+            .with_context(|| format!("failed to read {}", path.display()))?,
+        None => DEFAULT_EVAL_SUITE.to_string(),
+    };
+    let suite: EvalSuite =
+        serde_json::from_str(&text).context("failed to parse eval suite JSON")?;
+    if suite.tasks.is_empty() {
+        bail!("eval suite has no tasks");
+    }
+    let mut seen = BTreeSet::new();
+    for task in &suite.tasks {
+        if !seen.insert(task.id.clone()) {
+            bail!("duplicate eval task id `{}`", task.id);
+        }
+    }
+    Ok(suite)
+}
+
+fn select_eval_tasks<'a>(suite: &'a EvalSuite, ids: &[String]) -> Result<Vec<&'a EvalTask>> {
+    if ids.is_empty() {
+        return Ok(suite.tasks.iter().collect());
+    }
+    let requested = ids.iter().cloned().collect::<BTreeSet<_>>();
+    let selected = suite
+        .tasks
+        .iter()
+        .filter(|task| requested.contains(&task.id))
+        .collect::<Vec<_>>();
+    let found = selected
+        .iter()
+        .map(|task| task.id.clone())
+        .collect::<BTreeSet<_>>();
+    let missing = requested.difference(&found).cloned().collect::<Vec<_>>();
+    if !missing.is_empty() {
+        bail!("unknown eval task id(s): {}", missing.join(", "));
+    }
+    Ok(selected)
+}
+
+fn evaluate_eval_task(task: &EvalTask) -> EvalAssertions {
+    let mut assertions = EvalAssertions::default();
+    let result = match task.kind.as_str() {
+        "route-classification" => evaluate_route_eval(task, &mut assertions),
+        "privacy-redaction" => evaluate_privacy_eval(task, &mut assertions),
+        "budget-plan" => evaluate_budget_eval(task, &mut assertions),
+        "evidence-contract" => evaluate_evidence_contract_eval(task, &mut assertions),
+        "report-contract" => evaluate_report_contract_eval(task, &mut assertions),
+        other => {
+            assertions
+                .failures
+                .push(format!("unsupported eval task kind `{other}`"));
+            Ok(())
+        }
+    };
+    if let Err(error) = result {
+        assertions.failures.push(error.to_string());
+    }
+    assertions
+}
+
+fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let url = required_str(&task.input, "url")?;
+    let body = optional_str(&task.input, "body").unwrap_or("");
+    let content_type = optional_str(&task.input, "content_type");
+    let report = classify_body(url, content_type, None, body);
+
+    assertions
+        .details
+        .insert("route".to_string(), json!(route_name(report.route)));
+    assertions
+        .details
+        .insert("reason".to_string(), json!(report.reason));
+
+    if let Some(expected_route) = optional_str(&task.expected, "route") {
+        assert_text_eq(
+            assertions,
+            "route",
+            expected_route,
+            route_name(report.route),
+        );
+    }
+    if let Some(expected_privacy) = optional_str(&task.expected, "privacy") {
+        let privacy = classify_privacy(url);
+        assertions
+            .details
+            .insert("privacy".to_string(), json!(privacy_class_name(privacy)));
+        assert_text_eq(
+            assertions,
+            "privacy",
+            expected_privacy,
+            privacy_class_name(privacy),
+        );
+    }
+    Ok(())
+}
+
+fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let config = ResearchConfig::default();
+    if let Some(url) = optional_str(&task.input, "url") {
+        let privacy = classify_privacy(url);
+        let redacted = redact_url_query_secrets(url);
+        assertions
+            .details
+            .insert("privacy".to_string(), json!(privacy_class_name(privacy)));
+        assertions
+            .details
+            .insert("redacted_url".to_string(), json!(redacted));
+        if let Some(expected_privacy) = optional_str(&task.expected, "privacy") {
+            assert_text_eq(
+                assertions,
+                "privacy",
+                expected_privacy,
+                privacy_class_name(privacy),
+            );
+        }
+        if let Some(expected_redacted) = optional_str(&task.expected, "redacted_url") {
+            let actual = assertions
+                .details
+                .get("redacted_url")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            assert_text_eq(assertions, "redacted_url", expected_redacted, &actual);
+        }
+    }
+    if let Some(text) = optional_str(&task.input, "metadata_text") {
+        let redacted = metadata_text(text, &config);
+        assertions
+            .details
+            .insert("metadata_text".to_string(), json!(redacted));
+        if let Some(expected_text) = optional_str(&task.expected, "metadata_text") {
+            let actual = assertions
+                .details
+                .get("metadata_text")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            assert_text_eq(assertions, "metadata_text", expected_text, &actual);
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_budget_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let query = required_str(&task.input, "query")?;
+    let profile =
+        parse_research_profile(optional_str(&task.input, "profile").unwrap_or("standard"))?;
+    let topic = parse_topic_kind(optional_str(&task.input, "topic").unwrap_or("general"))?;
+    let plan = build_plan(query, profile, topic, &ResearchConfig::default());
+    let route_order = plan
+        .route_order
+        .iter()
+        .map(|route| route_name(*route))
+        .collect::<Vec<_>>();
+    assertions
+        .details
+        .insert("route_order".to_string(), json!(route_order));
+    assertions
+        .details
+        .insert("budgets".to_string(), json!(plan.budgets));
+
+    if let Some(prefix) = optional_str_array(&task.expected, "route_order_prefix") {
+        let actual = route_order
+            .iter()
+            .take(prefix.len())
+            .copied()
+            .collect::<Vec<_>>();
+        if actual != prefix {
+            assertions.failures.push(format!(
+                "route_order_prefix expected {:?}, got {:?}",
+                prefix, actual
+            ));
+        }
+    }
+    if let Some(expected_budgets) = task.expected.get("budgets").and_then(Value::as_object) {
+        for (key, expected) in expected_budgets {
+            let Some(expected) = expected.as_u64() else {
+                assertions
+                    .failures
+                    .push(format!("budgets.{key} expected value must be an integer"));
+                continue;
+            };
+            let actual = budget_value(&plan.budgets, key);
+            match actual {
+                Some(actual) if u64::from(actual) == expected => {}
+                Some(actual) => assertions
+                    .failures
+                    .push(format!("budgets.{key} expected {expected}, got {actual}")),
+                None => assertions
+                    .failures
+                    .push(format!("unknown budget field `{key}`")),
+            }
+        }
+    }
+    Ok(())
+}
+
+fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let sources = required_array(&task.input, "sources")?;
+    let claims = required_array(&task.input, "claims")?;
+    let source_ids = sources
+        .iter()
+        .filter_map(|source| source.get("id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    let min_sources = optional_u64(&task.expected, "min_sources").unwrap_or(1);
+    let min_claims = optional_u64(&task.expected, "min_claims").unwrap_or(1);
+    let max_uncited_claims = optional_u64(&task.expected, "max_uncited_claims").unwrap_or(0);
+    let min_confidence = optional_f64(&task.expected, "min_confidence");
+
+    let mut uncited_claims = 0_u64;
+    let mut missing_sources = Vec::new();
+    let mut low_confidence = Vec::new();
+    for claim in claims {
+        let claim_id = claim
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("<unnamed claim>");
+        let claim_sources = claim
+            .get("sources")
+            .and_then(Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if claim_sources.is_empty() {
+            uncited_claims += 1;
+        }
+        for source_id in claim_sources {
+            if !source_ids.contains(&source_id) {
+                missing_sources.push(format!("{claim_id}->{source_id}"));
+            }
+        }
+        if let Some(min_confidence) = min_confidence {
+            let confidence = claim
+                .get("confidence")
+                .and_then(Value::as_f64)
+                .unwrap_or_default();
+            if confidence < min_confidence {
+                low_confidence.push(format!("{claim_id}:{confidence:.2}"));
+            }
+        }
+    }
+
+    assertions
+        .details
+        .insert("source_count".to_string(), json!(source_ids.len()));
+    assertions
+        .details
+        .insert("claim_count".to_string(), json!(claims.len()));
+    assertions
+        .details
+        .insert("uncited_claims".to_string(), json!(uncited_claims));
+
+    if source_ids.len() < usize::try_from(min_sources).unwrap_or(usize::MAX) {
+        assertions.failures.push(format!(
+            "source_count expected at least {min_sources}, got {}",
+            source_ids.len()
+        ));
+    }
+    if claims.len() < usize::try_from(min_claims).unwrap_or(usize::MAX) {
+        assertions.failures.push(format!(
+            "claim_count expected at least {min_claims}, got {}",
+            claims.len()
+        ));
+    }
+    if uncited_claims > max_uncited_claims {
+        assertions.failures.push(format!(
+            "uncited_claims expected at most {max_uncited_claims}, got {uncited_claims}"
+        ));
+    }
+    if !missing_sources.is_empty() {
+        assertions.failures.push(format!(
+            "claims reference missing source ids: {}",
+            missing_sources.join(", ")
+        ));
+    }
+    if !low_confidence.is_empty() {
+        assertions.warnings.push(format!(
+            "claims below confidence threshold: {}",
+            low_confidence.join(", ")
+        ));
+    }
+    Ok(())
+}
+
+fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let report = required_str(&task.input, "report")?;
+    for section in optional_str_array(&task.expected, "required_sections").unwrap_or_default() {
+        let heading = format!("## {section}");
+        if !report.contains(&heading) && !report.contains(section) {
+            assertions
+                .failures
+                .push(format!("report missing required section `{section}`"));
+        }
+    }
+    for phrase in optional_str_array(&task.expected, "forbidden_phrases").unwrap_or_default() {
+        if report.contains(phrase) {
+            assertions
+                .failures
+                .push(format!("report contains forbidden phrase `{phrase}`"));
+        }
+    }
+    for source_id in
+        optional_str_array(&task.expected, "required_source_mentions").unwrap_or_default()
+    {
+        if !report.contains(source_id) {
+            assertions
+                .failures
+                .push(format!("report missing source mention `{source_id}`"));
+        }
+    }
+    assertions
+        .details
+        .insert("chars".to_string(), json!(report.chars().count()));
+    Ok(())
+}
+
+fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
+    optional_str(value, key).with_context(|| format!("missing string input `{key}`"))
+}
+
+fn optional_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(Value::as_str)
+}
+
+fn required_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .with_context(|| format!("missing array input `{key}`"))
+}
+
+fn optional_u64(value: &Value, key: &str) -> Option<u64> {
+    value.get(key).and_then(Value::as_u64)
+}
+
+fn optional_f64(value: &Value, key: &str) -> Option<f64> {
+    value.get(key).and_then(Value::as_f64)
+}
+
+fn optional_str_array<'a>(value: &'a Value, key: &str) -> Option<Vec<&'a str>> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+}
+
+fn assert_text_eq(assertions: &mut EvalAssertions, name: &str, expected: &str, actual: &str) {
+    if expected != actual {
+        assertions
+            .failures
+            .push(format!("{name} expected `{expected}`, got `{actual}`"));
+    }
+}
+
+fn parse_research_profile(value: &str) -> Result<ResearchProfile> {
+    match value {
+        "quick" => Ok(ResearchProfile::Quick),
+        "standard" => Ok(ResearchProfile::Standard),
+        "deep" => Ok(ResearchProfile::Deep),
+        "exhaustive" => Ok(ResearchProfile::Exhaustive),
+        _ => bail!("unknown research profile `{value}`"),
+    }
+}
+
+fn parse_topic_kind(value: &str) -> Result<TopicKind> {
+    match value {
+        "general" => Ok(TopicKind::General),
+        "docs" => Ok(TopicKind::Docs),
+        "github" => Ok(TopicKind::Github),
+        "dependency" => Ok(TopicKind::Dependency),
+        "openai" => Ok(TopicKind::Openai),
+        "rendered" => Ok(TopicKind::Rendered),
+        _ => bail!("unknown topic `{value}`"),
+    }
+}
+
+fn budget_value(budgets: &ProviderBudgets, key: &str) -> Option<u32> {
+    match key {
+        "codex_web_queries" => Some(budgets.codex_web_queries),
+        "context7_calls" => Some(budgets.context7_calls),
+        "github_calls" => Some(budgets.github_calls),
+        "exa_calls" => Some(budgets.exa_calls),
+        "direct_fetches" => Some(budgets.direct_fetches),
+        "browser_fetches" => Some(budgets.browser_fetches),
+        "firecrawl_calls" => Some(budgets.firecrawl_calls),
+        _ => None,
     }
 }
 
@@ -3706,6 +4171,33 @@ mod tests {
         assert_eq!(plan.route_order[0], Route::Context7);
         assert_eq!(plan.route_order[1], Route::Opensrc);
         assert!(plan.route_order.contains(&Route::Github));
+    }
+
+    #[test]
+    fn default_eval_suite_is_manifest_backed_and_passes_offline() -> Result<()> {
+        let suite = load_eval_suite(None)?;
+        assert_eq!(suite.suite, "research-core");
+        assert!(suite.tasks.len() >= 5);
+
+        for task in select_eval_tasks(&suite, &[])? {
+            let outcome = evaluate_eval_task(task);
+            assert!(
+                outcome.failures.is_empty(),
+                "{} failed: {:?}",
+                task.id,
+                outcome.failures
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn eval_task_filter_reports_unknown_ids() -> Result<()> {
+        let suite = load_eval_suite(None)?;
+        let result = select_eval_tasks(&suite, &["missing-task".to_string()]);
+
+        assert!(result.is_err());
+        Ok(())
     }
 
     #[test]

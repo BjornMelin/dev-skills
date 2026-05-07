@@ -184,6 +184,7 @@ cargo check -p codex-research
 cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
+codex-research eval --list
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
