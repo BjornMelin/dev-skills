@@ -23,9 +23,13 @@ Key docs:
 - [Onboarding](docs/guides/onboarding.md)
 - [System overview](docs/architecture/overview.md)
 - [Research architecture](docs/architecture/research-system.md)
+- [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
 - [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
+
+For local live-provider testing, copy `.env.example` to an untracked `.env` and
+export it in your shell before running provider commands.
 
 Each skill lives in `skills/<skill-name>/` and is designed to be:
 

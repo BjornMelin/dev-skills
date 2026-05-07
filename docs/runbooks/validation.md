@@ -19,6 +19,10 @@ CLI smoke:
 codex-research --json doctor
 codex-research --json eval
 codex-research --json plan "validation smoke" --profile quick
+tmp=$(mktemp -d)
+codex-research --json run init validation-smoke --profile quick --topic github --out "$tmp/run.json"
+codex-research --json run debit --run "$tmp/run.json" --provider github --count 1 --note validation
+codex-research --json run status --run "$tmp/run.json"
 ```
 
 Optional live readiness:
@@ -64,6 +68,11 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate \
   skills/deep-researcher/templates/agents \
   skills/subagent-creator/templates/agents
 ```
+
+The validator also enforces evidence-return headings for research-oriented
+custom agents such as `deep_researcher`, `github_researcher`,
+`context7_researcher`, `openai_docs_researcher`, `source_validator`, and
+`citation_auditor`.
 
 Validate global installed templates:
 

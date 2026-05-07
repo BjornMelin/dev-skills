@@ -41,6 +41,18 @@ official OpenAI docs via native web.
 | `exhaustive` | rare audits | high budget, explicit cost/latency expectation |
 
 Profiles are planning aids. Codex still decides whether a provider is useful.
+For replayable runs, initialize run state and pass `--run` to provider
+commands:
+
+```bash
+codex-research run init "question" --profile deep --topic github --out .codex/research/run.json
+codex-research github search-issues 'repo:owner/repo behavior is:issue' --run .codex/research/run.json
+codex-research run debit --run .codex/research/run.json --provider codex-web --count 1 --note "native web search"
+codex-research run status --run .codex/research/run.json
+```
+
+When a provider budget is exhausted, commands fail before making the provider
+call unless `--no-budget` is passed.
 
 ## Predictive Fetch Router
 
@@ -54,6 +66,10 @@ Profiles are planning aids. Codex still decides whether a provider is useful.
 
 Signals include content type, content length, byte-limited response text, script
 count, app-shell markers, text density, and known hosts.
+
+Route memory records successful provider outcomes by domain. Future probes show
+the route-memory hit and can prefer the previously successful route when it does
+not violate GitHub or privacy rules.
 
 ## Evidence Ledger
 
@@ -88,10 +104,15 @@ Global cache state defaults to:
 
 The first version initializes:
 
+- `schema_migrations`
 - `sources`
 - `route_memory`
 - `claims`
 - content-addressed blob storage for direct fetches stored with `--store`
+
+The source cache stores normalized source metadata for direct fetch, Context7,
+GitHub, and Firecrawl responses. Raw bodies are not stored for external or
+private provider responses by default.
 
 Override the cache root with:
 
@@ -135,6 +156,17 @@ Search strategy:
    evidence quality issues.
 5. Clone or sparse checkout only when API hydration cannot prove the claim.
 
+Standalone hydration commands now include:
+
+```bash
+codex-research github compare owner/repo main feature --per-page 100
+codex-research github tags owner/repo
+codex-research github release owner/repo --latest
+codex-research github release owner/repo --tag v1.2.3
+codex-research github issue owner/repo 123 --comments
+codex-research github pr owner/repo 456 --files --comments --reviews
+```
+
 ## Firecrawl Policy
 
 Firecrawl is a paid-capacity lane under a classified policy:
@@ -144,6 +176,10 @@ Firecrawl is a paid-capacity lane under a classified policy:
 - sensitive public pages use `--no-store-in-cache`;
 - private/confidential content is never sent unless the user explicitly allows
   external scraping for that material.
+
+The CLI enforces this with `--privacy` and `--allow-private-external`.
+Ambiguous or private/authenticated URLs are refused before the Firecrawl call by
+default.
 
 Use Firecrawl after route prediction, not as the default for every URL.
 

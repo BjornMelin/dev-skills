@@ -27,6 +27,9 @@ out of version control.
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
   data model, provider behavior, and extension points.
+- [codex-research v0.2 Spec](specs/codex-research-v0.2.md): implemented
+  follow-up plan covering config, budgets, GitHub hydration, source cache,
+  privacy, evals, and research-agent contracts.
 
 ## Skill References
 
@@ -61,4 +64,3 @@ out of version control.
 
 Search results are leads. Evidence is hydrated source material tied to claims,
 freshness, confidence, and a ledger.
-

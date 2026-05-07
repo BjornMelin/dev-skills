@@ -20,6 +20,7 @@ history, and possibly rendered web pages.
 
    ```bash
    codex-research plan "Should this repo adopt <technology/pattern>?" --profile deep
+   codex-research run init "Should this repo adopt <technology/pattern>?" --profile deep --topic dependency --out .codex/research/run.json
    ```
 
 3. Use Codex-native web tools first for current official docs and high-level
@@ -28,16 +29,16 @@ history, and possibly rendered web pages.
 4. Query Context7 for library docs:
 
    ```bash
-   codex-research context7 search --library "<library>" --query "<specific question>"
-   codex-research context7 context --library-id "/org/project" --query "<specific question>"
+   codex-research context7 search --library "<library>" --query "<specific question>" --run .codex/research/run.json
+   codex-research context7 context --library-id "/org/project" --query "<specific question>" --run .codex/research/run.json
    ```
 
 5. Search GitHub narrowly:
 
    ```bash
-   codex-research github search-repos "<library> official repo in:name" --per-page 5
-   codex-research github search-code 'repo:owner/repo <symbol-or-config> in:file' --per-page 5
-   codex-research github search-issues 'repo:owner/repo "<error or behavior>" is:issue' --per-page 5
+   codex-research github search-repos "<library> official repo in:name" --per-page 5 --run .codex/research/run.json
+   codex-research github search-code 'repo:owner/repo <symbol-or-config> in:file' --per-page 5 --run .codex/research/run.json
+   codex-research github search-issues 'repo:owner/repo "<error or behavior>" is:issue' --per-page 5 --run .codex/research/run.json
    ```
 
 6. Validate implementation:
@@ -49,19 +50,20 @@ history, and possibly rendered web pages.
 7. Probe rendered pages before escalating:
 
    ```bash
-   codex-research fetch probe "https://example.com/docs/page"
+   codex-research fetch probe "https://example.com/docs/page" --run .codex/research/run.json
    ```
 
 8. Use Firecrawl only when the probe or task warrants it:
 
    ```bash
-   codex-research fetch firecrawl "https://example.com/docs/page" --fresh
+   codex-research fetch firecrawl "https://example.com/docs/page" --fresh --privacy public --run .codex/research/run.json
    ```
 
 9. Record evidence:
 
    ```bash
    codex-research ledger init
+   codex-research ledger add-source --from-cache <source-id>
    codex-research ledger add-source --provider <provider> --url <url> --title "<title>" --route <route>
    codex-research ledger add-claim --text "<claim>" --confidence 0.85 --source <source-id>
    ```
@@ -91,4 +93,3 @@ Use `$subspawn` when independent lanes can run in parallel:
 - citation audit lane.
 
 After spawning, wait for all agents before continuing.
-
