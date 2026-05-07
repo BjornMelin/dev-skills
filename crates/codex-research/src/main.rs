@@ -861,7 +861,7 @@ async fn main() -> Result<()> {
         Commands::Cache { command } => handle_cache(command, cli.json),
         Commands::Config { command } => handle_config(command, loaded_config.path, cli.json),
         Commands::Run { command } => handle_run(command, &config, cli.json),
-        Commands::Eval(args) => run_eval(args, cli.json).await,
+        Commands::Eval(args) => run_eval(args, &config, cli.json).await,
     }
 }
 
@@ -2009,7 +2009,7 @@ fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> R
     }
 }
 
-async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
+async fn run_eval(args: EvalArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
     let suite = load_eval_suite(args.suite.as_deref())?;
     let selected = select_eval_tasks(&suite, &args.task)?;
 
@@ -2039,7 +2039,7 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
 
     let mut outcomes = Vec::new();
     for task in selected {
-        let assertions = evaluate_eval_task(task);
+        let assertions = evaluate_eval_task(task, config);
         let failed =
             !assertions.failures.is_empty() || (args.strict && !assertions.warnings.is_empty());
         outcomes.push(EvalTaskOutcome {
@@ -2146,12 +2146,12 @@ fn select_eval_tasks<'a>(suite: &'a EvalSuite, ids: &[String]) -> Result<Vec<&'a
     Ok(selected)
 }
 
-fn evaluate_eval_task(task: &EvalTask) -> EvalAssertions {
+fn evaluate_eval_task(task: &EvalTask, config: &ResearchConfig) -> EvalAssertions {
     let mut assertions = EvalAssertions::default();
     let result = match task.kind.as_str() {
         "route-classification" => evaluate_route_eval(task, &mut assertions),
-        "privacy-redaction" => evaluate_privacy_eval(task, &mut assertions),
-        "budget-plan" => evaluate_budget_eval(task, &mut assertions),
+        "privacy-redaction" => evaluate_privacy_eval(task, &mut assertions, config),
+        "budget-plan" => evaluate_budget_eval(task, &mut assertions, config),
         "evidence-contract" => evaluate_evidence_contract_eval(task, &mut assertions),
         "report-contract" => evaluate_report_contract_eval(task, &mut assertions),
         other => {
@@ -2203,8 +2203,11 @@ fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Resu
     Ok(())
 }
 
-fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
-    let config = ResearchConfig::default();
+fn evaluate_privacy_eval(
+    task: &EvalTask,
+    assertions: &mut EvalAssertions,
+    config: &ResearchConfig,
+) -> Result<()> {
     let url = optional_str(&task.input, "url")?;
     let metadata_input = optional_str(&task.input, "metadata_text")?;
     if url.is_none() && metadata_input.is_none() {
@@ -2248,7 +2251,7 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
         }
     }
     if let Some(text) = metadata_input {
-        let redacted = metadata_text(text, &config);
+        let redacted = metadata_text(text, config);
         assertions
             .details
             .insert("metadata_text".to_string(), json!(redacted));
@@ -2265,12 +2268,16 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
     Ok(())
 }
 
-fn evaluate_budget_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+fn evaluate_budget_eval(
+    task: &EvalTask,
+    assertions: &mut EvalAssertions,
+    config: &ResearchConfig,
+) -> Result<()> {
     let query = required_str(&task.input, "query")?;
     let profile =
         parse_research_profile(optional_str(&task.input, "profile")?.unwrap_or("standard"))?;
     let topic = parse_topic_kind(optional_str(&task.input, "topic")?.unwrap_or("general"))?;
-    let plan = build_plan(query, profile, topic, &ResearchConfig::default());
+    let plan = build_plan(query, profile, topic, config);
     let route_order = plan
         .route_order
         .iter()
@@ -4246,14 +4253,19 @@ mod tests {
         assert!(plan.route_order.contains(&Route::Github));
     }
 
+    fn evaluate_test_task(task: &EvalTask) -> EvalAssertions {
+        evaluate_eval_task(task, &ResearchConfig::default())
+    }
+
     #[test]
     fn default_eval_suite_is_manifest_backed_and_passes_offline() -> Result<()> {
         let suite = load_eval_suite(None)?;
         assert_eq!(suite.suite, "research-core");
         assert!(suite.tasks.len() >= 5);
+        let config = ResearchConfig::default();
 
         for task in select_eval_tasks(&suite, &[])? {
-            let outcome = evaluate_eval_task(task);
+            let outcome = evaluate_eval_task(task, &config);
             assert!(
                 outcome.failures.is_empty(),
                 "{} failed: {:?}",
@@ -4282,7 +4294,7 @@ mod tests {
             input: json!({}),
             expected: json!({}),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(outcome.failures[0].contains("requires `url` or `metadata_text`"));
     }
@@ -4300,7 +4312,7 @@ mod tests {
                 "required_sections": ["Provider limits"]
             }),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4323,7 +4335,7 @@ mod tests {
                 "required_sections": ["Claims", 42]
             }),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4347,7 +4359,7 @@ mod tests {
                 "min_confidence": "high"
             }),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4369,7 +4381,7 @@ mod tests {
             }),
             expected: json!({}),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4391,7 +4403,7 @@ mod tests {
             }),
             expected: json!({}),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4415,7 +4427,7 @@ mod tests {
                 "route": ["github"]
             }),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4440,7 +4452,7 @@ mod tests {
                 "budgets": []
             }),
         };
-        let outcome = evaluate_eval_task(&task);
+        let outcome = evaluate_test_task(&task);
 
         assert!(
             outcome
@@ -4448,6 +4460,30 @@ mod tests {
                 .iter()
                 .any(|failure| failure.contains("budgets"))
         );
+    }
+
+    #[test]
+    fn budget_eval_uses_loaded_config() {
+        let mut config = ResearchConfig::default();
+        config.profiles.deep.github_calls = 13;
+        let task = EvalTask {
+            id: "configured-budget".to_string(),
+            kind: "budget-plan".to_string(),
+            description: "configured budget validation".to_string(),
+            input: json!({
+                "query": "verify dependency behavior",
+                "profile": "deep",
+                "topic": "dependency"
+            }),
+            expected: json!({
+                "budgets": {
+                    "github_calls": 13
+                }
+            }),
+        };
+        let outcome = evaluate_eval_task(&task, &config);
+
+        assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
     }
 
     #[test]
