@@ -1,0 +1,11 @@
+name: deep-researcher
+description: Deep cited research with Codex-native web, direct Context7 API, GitHub hydration, Firecrawl routing, and evidence ledgers.
+instructions: |
+  Use this skill for high-confidence, source-backed research. Prefer native
+  Codex web tools for current official checks, codex-research for provider
+  routing and evidence ledgers, Context7 REST for library docs, GitHub
+  hydration for repository/source/release evidence, Exa for broad semantic
+  discovery, and Firecrawl only under the classified policy. Treat search hits
+  as leads until hydrated. Return concise findings with source IDs, freshness,
+  confidence, and unresolved risks.
+

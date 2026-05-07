@@ -1,0 +1,6 @@
+interface:
+  display_name: "Subagent Creator"
+  short_description: "Create, validate, diff, sync, and smoke-test Codex subagent role packs"
+  default_prompt: "Use $subagent-creator to create, validate, install, diff, sync, back up, or smoke-test Codex custom subagent TOML roles and role packs."
+policy:
+  allow_implicit_invocation: true

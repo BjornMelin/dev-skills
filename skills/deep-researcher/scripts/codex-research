@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${CODEX_RESEARCH_BIN:-}" ]]; then
+  exec "$CODEX_RESEARCH_BIN" "$@"
+fi
+
+if command -v codex-research >/dev/null 2>&1; then
+  exec codex-research "$@"
+fi
+
+if [[ -x "./target/debug/codex-research" ]]; then
+  exec ./target/debug/codex-research "$@"
+fi
+
+if [[ -f "./crates/codex-research/Cargo.toml" ]]; then
+  exec cargo run -q -p codex-research -- "$@"
+fi
+
+echo "codex-research not found. Run from dev-skills root or install with: cargo install --path crates/codex-research" >&2
+exit 127
+
