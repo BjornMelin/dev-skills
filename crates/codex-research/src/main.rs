@@ -1942,10 +1942,7 @@ fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> R
             }
         }
         RunCommand::Close { run } => {
-            let mut state = read_run_state(&run)?;
-            state.status = RunStatus::Closed;
-            state.updated_at = Utc::now();
-            write_run_state(&run, &state)?;
+            let state = close_run_state(&run)?;
             if json_out {
                 print_json(&json!({ "run": run, "state": state }))
             } else {
@@ -2687,6 +2684,7 @@ fn read_run_state(path: &Path) -> Result<ResearchRunState> {
         .with_context(|| format!("failed to parse run state: {}", path.display()))
 }
 
+#[cfg(test)]
 fn write_run_state(path: &Path, state: &ResearchRunState) -> Result<()> {
     let _lock = acquire_run_lock(path)?;
     write_run_state_unlocked(path, state)
@@ -2831,6 +2829,15 @@ fn attach_source_to_run(budget: &BudgetArgs, source_id: &str) -> Result<()> {
         write_run_state_unlocked(path, &state)?;
     }
     Ok(())
+}
+
+fn close_run_state(path: &Path) -> Result<ResearchRunState> {
+    let _lock = acquire_run_lock(path)?;
+    let mut state = read_run_state(path)?;
+    state.status = RunStatus::Closed;
+    state.updated_at = Utc::now();
+    write_run_state_unlocked(path, &state)?;
+    Ok(state)
 }
 
 fn append_provider_error_from_budget(
@@ -3322,6 +3329,9 @@ fn classify_privacy(value: &str) -> PrivacyClass {
     if url.scheme() == "file" {
         return PrivacyClass::PrivateOrAuthenticated;
     }
+    if !url.username().is_empty() || url.password().is_some() {
+        return PrivacyClass::PrivateOrAuthenticated;
+    }
     if let Some(host) = url.host()
         && let Some(ip) = host_ip_addr(host)
         && private_or_local_ip(ip)
@@ -3797,6 +3807,45 @@ mod tests {
     }
 
     #[test]
+    fn close_run_state_preserves_existing_run_history() -> Result<()> {
+        let dir = temp_path("run-close");
+        fs::create_dir_all(&dir)?;
+        let run = dir.join("run.json");
+        let state = ResearchRunState {
+            query: "smoke".to_string(),
+            profile: ResearchProfile::Quick,
+            topic: TopicKind::Github,
+            status: RunStatus::Open,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            budgets: quick_budget(),
+            spent: ProviderBudgets::default(),
+            debits: vec![RunDebit {
+                provider: ProviderKind::Github,
+                count: 1,
+                note: Some("test".to_string()),
+                created_at: Utc::now(),
+            }],
+            provider_errors: vec![ProviderError {
+                provider: ProviderKind::Github,
+                message: "rate limited".to_string(),
+                created_at: Utc::now(),
+            }],
+            source_ids: vec!["src123".to_string()],
+        };
+        write_run_state(&run, &state)?;
+
+        let state = close_run_state(&run)?;
+
+        assert_eq!(state.status, RunStatus::Closed);
+        assert_eq!(state.debits.len(), 1);
+        assert_eq!(state.provider_errors.len(), 1);
+        assert_eq!(state.source_ids, vec!["src123"]);
+        fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
     fn provider_call_counts_reflect_hydration_requests() {
         assert_eq!(github_issue_call_count(false), 1);
         assert_eq!(github_issue_call_count(true), 2);
@@ -3844,6 +3893,10 @@ mod tests {
         );
         assert_eq!(
             classify_privacy("https://example.com/file?token=secret"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
+        assert_eq!(
+            classify_privacy("https://user:token@example.com/docs"),
             PrivacyClass::PrivateOrAuthenticated
         );
         assert_eq!(
