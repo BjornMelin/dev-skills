@@ -15,8 +15,8 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_TEMPLATE_DIRS = [
-    REPO_ROOT / "skills/subagent-creator/templates/agents",
     REPO_ROOT / "skills/deep-researcher/templates/agents",
+    REPO_ROOT / "skills/subagent-creator/templates/agents",
 ]
 BUILT_IN_ROLES = {
     "default": "Codex built-in default agent.",
