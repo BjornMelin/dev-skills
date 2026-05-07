@@ -2283,7 +2283,7 @@ fn evaluate_budget_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Res
         .details
         .insert("budgets".to_string(), json!(plan.budgets));
 
-    if let Some(prefix) = optional_str_array(&task.expected, "route_order_prefix") {
+    if let Some(prefix) = optional_str_array(&task.expected, "route_order_prefix")? {
         let actual = route_order
             .iter()
             .take(prefix.len())
@@ -2414,14 +2414,14 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
 
 fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let report = required_str(&task.input, "report")?;
-    for section in optional_str_array(&task.expected, "required_sections").unwrap_or_default() {
+    for section in optional_str_array(&task.expected, "required_sections")?.unwrap_or_default() {
         if !report_has_heading(report, section) {
             assertions
                 .failures
                 .push(format!("report missing required section `{section}`"));
         }
     }
-    for phrase in optional_str_array(&task.expected, "forbidden_phrases").unwrap_or_default() {
+    for phrase in optional_str_array(&task.expected, "forbidden_phrases")?.unwrap_or_default() {
         if report.contains(phrase) {
             assertions
                 .failures
@@ -2429,7 +2429,7 @@ fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertion
         }
     }
     for source_id in
-        optional_str_array(&task.expected, "required_source_mentions").unwrap_or_default()
+        optional_str_array(&task.expected, "required_source_mentions")?.unwrap_or_default()
     {
         if !report.contains(source_id) {
             assertions
@@ -2476,11 +2476,21 @@ fn optional_f64(value: &Value, key: &str) -> Option<f64> {
     value.get(key).and_then(Value::as_f64)
 }
 
-fn optional_str_array<'a>(value: &'a Value, key: &str) -> Option<Vec<&'a str>> {
-    value
-        .get(key)
-        .and_then(Value::as_array)
-        .map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>())
+fn optional_str_array<'a>(value: &'a Value, key: &str) -> Result<Option<Vec<&'a str>>> {
+    let Some(values) = value.get(key) else {
+        return Ok(None);
+    };
+    let Some(values) = values.as_array() else {
+        bail!("`{key}` must be an array of strings");
+    };
+    let mut out = Vec::new();
+    for (index, value) in values.iter().enumerate() {
+        let Some(text) = value.as_str() else {
+            bail!("`{key}[{index}]` must be a string");
+        };
+        out.push(text);
+    }
+    Ok(Some(out))
 }
 
 fn assert_text_eq(assertions: &mut EvalAssertions, name: &str, expected: &str, actual: &str) {
@@ -4258,6 +4268,29 @@ mod tests {
                 .failures
                 .iter()
                 .any(|failure| failure.contains("missing required section"))
+        );
+    }
+
+    #[test]
+    fn eval_rejects_malformed_expected_string_arrays() {
+        let task = EvalTask {
+            id: "bad-array".to_string(),
+            kind: "report-contract".to_string(),
+            description: "array validation".to_string(),
+            input: json!({
+                "report": "## Claims\n- cited"
+            }),
+            expected: json!({
+                "required_sections": ["Claims", 42]
+            }),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("required_sections[1]"))
         );
     }
 
