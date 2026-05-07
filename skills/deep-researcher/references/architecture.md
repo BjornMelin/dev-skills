@@ -61,6 +61,23 @@ Opensrc:
 - installed package source, version diffs, internal implementation proof, and
   dependency upgrade verification.
 
+## Config And Run State
+
+`codex-research` owns replayable run state outside the Codex conversation:
+
+- TOML config defines profile budgets, provider defaults, privacy posture, and
+  cache policy.
+- `run init` materializes a JSON state file for one research question.
+- provider commands with `--run` debit budgets before network calls;
+  `run debit --provider codex-web` records native Codex web calls manually.
+- source-cache rows store normalized metadata for direct fetch, Context7,
+  GitHub, and Firecrawl results; raw bodies are stored only when policy allows.
+- route memory records successful domain/provider outcomes so later probes can
+  skip repeated weak routes.
+
+Treat the run file and source cache as audit support, not as a substitute for
+claim-level citation and synthesis.
+
 ## Predictive Router
 
 The router should avoid blind fetch cascades:
@@ -88,4 +105,3 @@ Each run should separate:
 
 Confidence is claim-level, not report-level. High confidence requires primary
 source support and freshness appropriate to the claim.
-

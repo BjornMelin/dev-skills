@@ -14,7 +14,7 @@ codex-research --help
 ```
 
 The binary supports `--json` globally for machine-readable output where
-supported.
+supported, and `--config <path>` to load an explicit TOML config.
 
 ## Environment
 
@@ -23,21 +23,32 @@ Optional environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `CODEX_RESEARCH_HOME` | Override cache database and blob root |
+| `CODEX_RESEARCH_CONFIG` | Load a default config path when `--config` is not passed |
 | `CONTEXT7_API_KEY` | Enable direct Context7 REST calls |
 | `FIRECRAWL_API_KEY` | Enable Firecrawl scrape fallback |
 | `GITHUB_TOKEN` | GitHub REST fallback token |
 | `GH_TOKEN` | GitHub REST fallback token |
 | `EXA_API_KEY` | Records Exa readiness in doctor output; Exa calls are Codex MCP-side |
 
+For local live-provider testing, copy `.env.example` to an untracked `.env` and
+export it before running commands:
+
+```bash
+set -a; source .env; set +a
+```
+
+`codex-research` reads process environment variables directly and does not
+auto-load `.env`.
+
 Tool fallback:
 
-- `gh auth token` is used before `GITHUB_TOKEN`/`GH_TOKEN` for GitHub.
+- `GITHUB_TOKEN`/`GH_TOKEN` are used before `gh auth token` for GitHub.
 - `agent-browser`, `ctx7`, and `opensrc` are detected by `doctor`.
 
 ## Commands
 
 ```text
-codex-research [--json] <command>
+codex-research [--json] [--config <path>] <command>
 ```
 
 Commands:
@@ -51,7 +62,43 @@ Commands:
 - `ledger`
 - `report`
 - `cache`
+- `config`
+- `run`
 - `eval`
+
+## config
+
+Manage reusable profile, privacy, provider, and cache policy.
+
+```bash
+codex-research config init
+codex-research config init --path .codex/research/config.toml --force
+codex-research --json config show
+```
+
+Config precedence:
+
+1. `--config <path>`
+2. `CODEX_RESEARCH_CONFIG`
+3. nearest `.codex/research/config.toml`
+4. `$XDG_CONFIG_HOME/codex-research/config.toml`
+5. built-in defaults
+
+## run
+
+Manage per-run budgets. Provider commands accept `--run <path>` and debit the
+matching provider before the network call. Use `--no-budget` to skip debit for
+an intentional exception.
+
+```bash
+codex-research --json run init "research question" --profile deep --topic github --out .codex/research/run.json
+codex-research --json run status --run .codex/research/run.json
+codex-research --json run debit --run .codex/research/run.json --provider codex-web --count 1 --note "native web search"
+codex-research --json run close --run .codex/research/run.json
+```
+
+Use manual `run debit --provider codex-web` for native Codex web calls because
+the CLI cannot intercept session tools.
 
 ## doctor
 
@@ -109,7 +156,7 @@ Classify a URL and recommend the best route.
 
 ```bash
 codex-research fetch probe "https://docs.github.com/en/rest/search/search"
-codex-research --json fetch probe "https://github.com/openai/codex"
+codex-research --json fetch probe "https://github.com/openai/codex" --run .codex/research/run.json
 ```
 
 Options:
@@ -129,7 +176,7 @@ Fetch a URL through direct HTTP.
 
 ```bash
 codex-research fetch get "https://example.com/page.md"
-codex-research fetch get "https://example.com/page.md" --store
+codex-research fetch get "https://example.com/page.md" --store --run .codex/research/run.json
 ```
 
 Options:
@@ -144,7 +191,7 @@ Scrape a public URL through Firecrawl v2.
 
 ```bash
 codex-research fetch firecrawl "https://example.com/docs"
-codex-research fetch firecrawl "https://example.com/docs" --fresh --no-store-in-cache
+codex-research fetch firecrawl "https://example.com/docs" --fresh --no-store-in-cache --privacy public
 ```
 
 Options:
@@ -153,6 +200,11 @@ Options:
 - `--no-store-in-cache`: disable Firecrawl server-side cache storage for
   sensitive public pages.
 - `--timeout-ms <n>`: default `60000`.
+- `--privacy <class>`: one of `public`, `sensitive-public`,
+  `private-or-authenticated`, or `ambiguous`.
+- `--allow-private-external`: override the default refusal for private or
+  ambiguous external-provider input.
+- `--run <path>` / `--no-budget`: budget enforcement.
 
 Requires `FIRECRAWL_API_KEY`.
 
@@ -165,7 +217,7 @@ Direct Context7 REST API commands.
 Find a Context7 library ID.
 
 ```bash
-codex-research context7 search --library "Turborepo" --query "package configurations and task graph"
+codex-research context7 search --library "Turborepo" --query "package configurations and task graph" --version v2.0.0
 ```
 
 Requires `CONTEXT7_API_KEY`.
@@ -204,10 +256,14 @@ Authentication order:
 3. `gh auth token`
 4. public unauthenticated mode
 
+All GitHub commands return JSON with a top-level `source_id`, `provider`, and
+`data` wrapper. Search commands include provider limitation metadata so search
+hits are treated as leads until hydrated.
+
 ### github search-repos
 
 ```bash
-codex-research github search-repos "openai codex in:name" --per-page 3
+codex-research github search-repos "openai codex in:name" --per-page 3 --run .codex/research/run.json
 ```
 
 ### github search-code
@@ -230,6 +286,43 @@ Search issues and pull requests. Hydrate threads before citing.
 
 ```bash
 codex-research github releases openai/codex --per-page 5
+```
+
+### github release
+
+```bash
+codex-research github release openai/codex --latest
+codex-research github release openai/codex --tag v0.121.0
+```
+
+Pass exactly one of `--latest` or `--tag`.
+
+### github compare
+
+```bash
+codex-research github compare openai/codex main feature-branch --per-page 100
+```
+
+The response includes GitHub's compare payload plus a `file_summary` array with
+filename, status, previous filename, additions, deletions, changes, and
+`patch_present`.
+
+### github tags
+
+```bash
+codex-research github tags openai/codex --per-page 30
+```
+
+### github issue
+
+```bash
+codex-research github issue openai/codex 18335 --comments
+```
+
+### github pr
+
+```bash
+codex-research github pr openai/codex 123 --files --comments --reviews
 ```
 
 ### github file
@@ -259,6 +352,8 @@ codex-research ledger add-source \
   --url https://github.com/openai/codex \
   --title "openai/codex" \
   --route github
+
+codex-research ledger add-source --from-cache <source-id>
 ```
 
 The command prints a source ID.
@@ -297,6 +392,10 @@ Initialize or inspect global cache state.
 codex-research cache init
 codex-research cache stats
 codex-research --json cache stats
+codex-research cache sources --provider github --limit 20
+codex-research cache source <source-id>
+codex-research cache route-memory --domain docs.example.com
+codex-research cache prune --older-than-days 30 --dry-run
 ```
 
 Default cache root:
@@ -321,6 +420,12 @@ search operations.
 
 - Missing required API keys produce an error from provider commands.
 - Firecrawl 429 reports `Retry-After` when present.
+- Firecrawl refuses private or ambiguous external-provider input unless
+  `--allow-private-external` is passed.
+- Context7 202, redirects, 429, and retryable 5xx statuses are reported as
+  structured command failures.
 - GitHub 403 reports rate-limit headers when present.
 - `fetch probe` tries to classify even when direct fetch fails by using
   whatever metadata the HEAD request returned.
+- Provider commands using `--run` fail before the network call when the matching
+  budget is exhausted.

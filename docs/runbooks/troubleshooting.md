@@ -33,7 +33,9 @@ Common causes:
 - `CONTEXT7_API_KEY` missing;
 - library ID not found;
 - library not finalized;
+- library redirected;
 - rate limit;
+- retryable 5xx or timeout;
 - latest-critical docs still refreshing.
 
 Recovery:
@@ -59,8 +61,52 @@ Recovery:
 - narrow the query;
 - reduce `--per-page`;
 - hydrate files through `github file`;
+- hydrate issues through `github issue --comments`;
+- hydrate PRs through `github pr --files --comments --reviews`;
+- use `github compare`, `github tags`, or `github release` for version
+  archaeology;
 - switch to GitHub app/plugin for private/session data;
 - clone or sparse checkout if code search is incomplete.
+
+If the command reports GitHub rate-limit headers, wait for reset or switch to a
+better-authenticated route. Do not retry in a tight loop.
+
+## Provider Budget Exhausted
+
+Symptom:
+
+```text
+budget exhausted for github; remaining=0 requested=1
+```
+
+Recovery:
+
+- inspect `codex-research run status --run .codex/research/run.json`;
+- narrow the query and reuse cached source IDs where possible;
+- close the run and start a deeper profile only if the extra calls are
+  justified;
+- pass `--no-budget` only for a deliberate one-off exception.
+
+Native Codex web calls are not visible to the CLI, so record them with:
+
+```bash
+codex-research run debit --provider codex-web --run .codex/research/run.json --count 1 --note "native web search"
+```
+
+## External Provider Privacy Refusal
+
+Symptom:
+
+```text
+firecrawl refused private/authenticated input
+```
+
+Recovery:
+
+- use GitHub, Context7, direct fetch, local files, or browser extraction first;
+- pass `--privacy public` only when you have verified the URL is public;
+- pass `--allow-private-external` only when the user explicitly allows sending
+  that material to the external provider.
 
 ## Firecrawl Rate Limited
 
@@ -105,6 +151,7 @@ Common causes:
 - invalid `sandbox_mode`;
 - invalid `model_reasoning_effort`;
 - missing redaction or no-nested-subagent instruction.
+- research templates missing required evidence return headings.
 
 Fix templates before installing.
 
@@ -149,4 +196,3 @@ If a feature is invalid, inspect the crate's current feature names and update
 `crates/codex-research/Cargo.toml`.
 
 Keep `Cargo.lock` committed for reproducible CLI builds.
-

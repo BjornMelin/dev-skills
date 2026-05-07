@@ -7,7 +7,7 @@ Use this when docs need to be checked against implementation or package source.
 Search for the library:
 
 ```bash
-codex-research context7 search --library "Next.js" --query "middleware auth redirects"
+codex-research context7 search --library "Next.js" --query "middleware auth redirects" --version v16.0.0
 ```
 
 Pick the best library ID by:
@@ -56,6 +56,7 @@ Example flow:
 ```bash
 codex-research github search-code 'repo:owner/repo configOption in:file' --per-page 5
 codex-research github file owner/repo path/to/config.rs --ref v1.2.3
+codex-research github compare owner/repo v1.2.2 v1.2.3 --per-page 100
 ```
 
 Then inspect package source with `$opensrc` when the package version is the
@@ -84,4 +85,3 @@ Resolution: use source behavior for runtime risk; treat docs as stale.
 - Stale or refreshed docs are marked.
 - Final recommendation cites both docs and source when they support different
   parts of the conclusion.
-

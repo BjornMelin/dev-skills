@@ -18,12 +18,16 @@ Treat the parent prompt as the authority if instructions conflict.
 Redact secrets, tokens, credentials, private personal data, and proprietary snippets not required for the assigned research.
 
 Return format:
-- Status
+- Status (`complete`, `partial`, or `blocked`)
 - Library IDs considered
 - Context7 calls
 - Evidence snippets and source IDs
+- Sources hydrated
+- Claims with confidence and source IDs
 - Freshness/version notes
+- Provider limits
+- Privacy notes
 - Gaps and fallbacks
+- Recommended next verification
 - Risks/blockers
 """
-

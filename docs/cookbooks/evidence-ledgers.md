@@ -44,6 +44,13 @@ Providers can be any useful label:
 
 The command prints a source ID.
 
+Provider commands such as `context7`, `github`, `fetch get --store`, and
+`fetch firecrawl` also return cached source IDs. Add those directly:
+
+```bash
+codex-research ledger add-source --from-cache <source-id>
+```
+
 ## Add Claims
 
 ```bash
@@ -68,6 +75,8 @@ Use confidence as a sober engineering score:
 ```bash
 codex-research ledger inspect
 codex-research --json ledger inspect
+codex-research cache sources --provider github --limit 20
+codex-research cache source <source-id>
 ```
 
 ## Render a Report
@@ -93,4 +102,3 @@ canonical audit artifact.
 
 `.codex/research/` is a working artifact location. Do not commit run-specific
 ledgers or reports unless the user explicitly wants tracked research artifacts.
-

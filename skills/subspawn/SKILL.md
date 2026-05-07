@@ -86,6 +86,10 @@ new unrelated tool calls, or produce the final answer until the spawned batch
 has completed and its results have been synthesized. The only exception is an
 explicit user instruction to run asynchronous delegation without waiting.
 
+When the runtime exposes explicit close operations, close completed subagent
+threads after synthesis so long-lived sessions do not accumulate stale agent or
+MCP resources.
+
 ## Model Policy
 
 Follow the active Codex tool schema and the custom agent files available in the

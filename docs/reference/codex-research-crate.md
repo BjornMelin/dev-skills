@@ -38,6 +38,7 @@ path = "src/main.rs"
 | `serde` / `serde_json` | JSON output, ledgers, provider responses |
 | `sha2` | content-addressed blob IDs and short IDs |
 | `tokio` | async runtime |
+| `toml` | profile and provider config parsing/rendering |
 | `url` | URL classification |
 
 ## Main Types
@@ -47,6 +48,7 @@ path = "src/main.rs"
 `Cli` is the root parser:
 
 - global `--json`
+- global `--config <path>`
 - subcommand enum `Commands`
 
 `Commands` variants:
@@ -60,6 +62,8 @@ path = "src/main.rs"
 - `Ledger`
 - `Report`
 - `Cache`
+- `Config`
+- `Run`
 - `Eval`
 
 Nested command enums:
@@ -69,6 +73,8 @@ Nested command enums:
 - `GithubCommand`
 - `LedgerCommand`
 - `CacheCommand`
+- `ConfigCommand`
+- `RunCommand`
 
 ### ResearchProfile
 
@@ -130,7 +136,8 @@ Budget fields:
 - `browser_fetches`
 - `firecrawl_calls`
 
-Budgets are planning guidance, not enforced hard limits yet.
+Budgets are emitted by `plan`, materialized by `run init`, and enforced by
+provider commands when `--run <path>` is supplied.
 
 ### ProbeReport
 
@@ -145,6 +152,36 @@ Returned by `fetch probe`:
 - `app_shell_markers`
 - `route`
 - `reason`
+- `route_memory`
+
+### ResearchConfig
+
+Loaded from `--config`, `CODEX_RESEARCH_CONFIG`, nearest
+`.codex/research/config.toml`, `$XDG_CONFIG_HOME/codex-research/config.toml`,
+or built-in defaults.
+
+Config sections:
+
+- `profiles`: per-profile provider budgets;
+- `privacy`: external-provider default posture;
+- `providers.github`: per-page and retry defaults;
+- `providers.context7`: metadata TTL and version-pin policy;
+- `providers.firecrawl`: cache and max-age policy;
+- `cache`: source metadata and raw-body storage defaults.
+
+### ResearchRunState
+
+JSON run state created by `run init`:
+
+- `query`
+- `profile`
+- `topic`
+- `status`
+- `budgets`
+- `spent`
+- `debits`
+- `provider_errors`
+- `source_ids`
 
 ### LedgerRecord
 
@@ -184,6 +221,8 @@ Tagged enum:
 - `handle_ledger`
 - `render_report`
 - `handle_cache`
+- `handle_config`
+- `handle_run`
 - `run_eval`
 
 Async provider commands run under `tokio`.
@@ -194,7 +233,7 @@ Async provider commands run under `tokio`.
 
 `http_client()` creates a `reqwest::Client` with:
 
-- `User-Agent: codex-research/0.1`
+- `User-Agent: codex-research/0.2`
 - `Accept: application/json, text/plain, text/html`
 - redirect limit of 8
 - 30-second timeout
@@ -207,9 +246,9 @@ Async provider commands run under `tokio`.
 - `GET https://context7.com/api/v2/context`
 - `POST https://context7.com/api/v1/refresh`
 
-Provider responses are returned as JSON without lossy remapping. This preserves
-Context7 metadata such as library IDs, trust, benchmark score, snippets, and
-refresh status.
+Provider responses are wrapped with a cached `source_id`. The raw provider
+payload stays under `data`; normalized source metadata is stored in SQLite.
+Context7 202, redirects, 429, 503, and 504 are surfaced as explicit failures.
 
 ### GitHub
 
@@ -230,7 +269,16 @@ Supported endpoints:
 - code search
 - issue/PR search
 - releases
+- latest release and release-by-tag
+- compare refs
+- tags
+- issue hydration and comments
+- PR hydration, files, comments, and reviews
 - contents API file fetch
+
+All GitHub commands store normalized source metadata and return a top-level
+`source_id`. Search commands attach limitations metadata. Compare responses are
+augmented with a `file_summary` array.
 
 ### Direct Fetch
 
@@ -267,6 +315,8 @@ The command supports:
 - `--fresh` mapping to `maxAge=0`;
 - `--no-store-in-cache`;
 - `--timeout-ms`.
+- `--privacy`;
+- `--allow-private-external`.
 
 429 responses report `Retry-After` when present.
 
@@ -279,6 +329,7 @@ The command supports:
 
 `init_db` creates:
 
+- `schema_migrations`
 - `sources`
 - `route_memory`
 - `claims`
@@ -289,8 +340,12 @@ The command supports:
 <cache>/blobs/<first-two-hash-chars>/<full-sha256>
 ```
 
-`record_source_cache` stores source metadata for direct fetches saved with
-`--store`.
+`record_source_cache` stores normalized source metadata for direct fetches,
+Context7, GitHub, and Firecrawl. Raw bodies are stored only for direct fetches
+saved with `--store`.
+
+Cache commands can list sources, inspect one source ID, inspect route memory,
+and prune old source rows.
 
 ## Ledger and Report
 
@@ -312,13 +367,10 @@ This keeps the report readable while the JSONL ledger remains the audit source.
 
 Good next additions:
 
-- enforce provider budgets during `plan`-driven runs;
-- persist route-memory outcomes from probes and provider failures;
-- add structured source-cache metadata for Context7/GitHub/Firecrawl results;
-- add more offline eval fixtures for app shells, PDFs, redirects, and blocked
-  pages;
-- add subcommands for GitHub compare/tags/issues hydration;
-- add an Exa REST provider if direct CLI-owned Exa calls become necessary.
+- add direct CLI-owned Exa calls if MCP-side Exa proves insufficient;
+- add richer live eval cost caps if optional live checks expand;
+- split provider implementations into modules once the single-binary shape
+  stops being reviewable.
 
 ## Validation
 

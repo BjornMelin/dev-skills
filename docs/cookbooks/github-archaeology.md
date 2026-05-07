@@ -67,15 +67,23 @@ Use issue/PR search for:
 Do not over-weight stale closed issues when release notes or current source
 contradict them.
 
+Hydrate promising threads before citing:
+
+```bash
+codex-research github issue owner/repo 123 --comments
+codex-research github pr owner/repo 456 --files --comments --reviews
+```
+
 ## Releases and Changelogs
 
 ```bash
 codex-research github releases owner/repo --per-page 10
+codex-research github release owner/repo --latest
+codex-research github release owner/repo --tag v1.2.3
+codex-research github tags owner/repo --per-page 30
+codex-research github compare owner/repo v1.2.2 v1.2.3 --per-page 100
 codex-research github file owner/repo CHANGELOG.md --ref main
 ```
-
-If tags or compare ranges matter, use the GitHub app or `gh api` until the CLI
-adds first-class compare/tag subcommands.
 
 ## When to Clone
 
@@ -104,4 +112,3 @@ For each GitHub-derived claim, record:
 - fetched time;
 - whether search was incomplete;
 - confidence.
-

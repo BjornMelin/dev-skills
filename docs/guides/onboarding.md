@@ -36,6 +36,20 @@ Recommended for full research capability:
 - `FIRECRAWL_API_KEY` for Firecrawl scrape/crawl fallback
 - `EXA_API_KEY` for Exa MCP usage in Codex sessions
 
+Local provider secrets should live in an untracked root `.env` copied from
+`.env.example`:
+
+```bash
+cp .env.example .env
+$EDITOR .env
+set -a; source .env; set +a
+```
+
+The CLI reads process environment variables; it does not auto-load `.env`.
+Use `gh auth login` instead of `GITHUB_TOKEN` when possible. Local
+`.codex/research` run ledgers and reports are ignored because they can contain
+source excerpts or private research context.
+
 Inspect local readiness:
 
 ```bash
@@ -125,4 +139,3 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate ~/.codex/ag
 - `$subspawn` governs delegation and forces wait-before-synthesis behavior.
 - `codex-research` makes research evidence replayable and auditable.
 - The main Codex session owns final synthesis and decisions.
-
