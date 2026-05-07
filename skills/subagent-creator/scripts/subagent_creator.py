@@ -494,10 +494,17 @@ def installed_templates(dest: Path) -> dict[str, Path]:
 
     if not dest.exists():
         return {}
-    return {path.stem: path for path in sorted(dest.glob("*.toml")) if path.is_file()}
+    return {
+        path.stem: path
+        for path in sorted(dest.glob("*.toml"))
+        if path.is_file()
+    }
 
 
-def compare_template_to_target(template: Path | None, target: Path | None) -> str:
+def compare_template_to_target(
+    template: Path | None,
+    target: Path | None,
+) -> str:
     """Compare one bundled template against one installed target.
 
     Args:
@@ -512,7 +519,9 @@ def compare_template_to_target(template: Path | None, target: Path | None) -> st
         return "extra" if target is not None and target.exists() else "unknown"
     if target is None or not target.exists():
         return "missing"
-    return "same" if template.read_bytes() == target.read_bytes() else "different"
+    if template.read_bytes() == target.read_bytes():
+        return "same"
+    return "different"
 
 
 def status_rows(
@@ -555,14 +564,28 @@ def status_rows(
     for name in sorted(row_names):
         selected = name in templates
         template = templates.get(name) or all_templates.get(name)
-        global_target = global_installed.get(name) or global_dir / f"{name}.toml"
-        project_target = project_installed.get(name) or project_dir_path / f"{name}.toml"
+        global_target = (
+            global_installed.get(name) or global_dir / f"{name}.toml"
+        )
+        project_target = (
+            project_installed.get(name) or project_dir_path / f"{name}.toml"
+        )
         if selected:
-            global_status = compare_template_to_target(template, global_installed.get(name))
-            project_status = compare_template_to_target(template, project_installed.get(name))
+            global_status = compare_template_to_target(
+                template,
+                global_installed.get(name),
+            )
+            project_status = compare_template_to_target(
+                template,
+                project_installed.get(name),
+            )
         else:
-            global_status = "extra" if name in global_installed else "not_selected"
-            project_status = "extra" if name in project_installed else "not_selected"
+            global_status = (
+                "extra" if name in global_installed else "not_selected"
+            )
+            project_status = (
+                "extra" if name in project_installed else "not_selected"
+            )
         rows.append(
             {
                 "name": name,
@@ -596,7 +619,8 @@ def summarize_status(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
     for row in rows:
         for target_name in ("global", "project"):
             status = str(row[target_name]["status"])
-            summary[target_name][status] = summary[target_name].get(status, 0) + 1
+            target_summary = summary[target_name]
+            target_summary[status] = target_summary.get(status, 0) + 1
     return summary
 
 
@@ -727,10 +751,11 @@ def cmd_plan_sync(args: argparse.Namespace) -> int:
         for name, target in sorted(installed.items()):
             if name in selected:
                 continue
+            template = all_templates.get(name)
             rows.append(
                 {
                     "name": name,
-                    "template": None if name not in all_templates else str(all_templates[name]),
+                    "template": None if template is None else str(template),
                     "target": str(target),
                     "status": "extra",
                     "action": "prune" if args.prune_extra else "keep_extra",
@@ -746,7 +771,11 @@ def cmd_plan_sync(args: argparse.Namespace) -> int:
         emit_json(report)
     else:
         for row in rows:
-            print(f"{row['action']}: {row['name']} ({row['status']}) -> {row['target']}")
+            print(
+                f"{row['action']}: "
+                f"{row['name']} ({row['status']}) -> "
+                f"{row['target']}"
+            )
     return 0
 
 
@@ -771,7 +800,11 @@ def cmd_prune(args: argparse.Namespace) -> int:
     stale = [path for path in installed if path.name not in selected_files]
     dry_run = args.dry_run or not args.confirm
     backup = not args.no_backup
-    backup_dir = Path(args.backup_dir).expanduser().resolve() if args.backup_dir else None
+    backup_dir = (
+        Path(args.backup_dir).expanduser().resolve()
+        if args.backup_dir
+        else None
+    )
     results: list[PruneResult] = []
 
     for target in stale:
@@ -1175,7 +1208,11 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument("--project-dir", default=".")
     status_parser.add_argument("--include-extra", action="store_true")
     status_parser.add_argument("--fail-on-drift", action="store_true")
-    status_parser.add_argument("--check", choices=("all", "global", "project"), default="all")
+    status_parser.add_argument(
+        "--check",
+        choices=("all", "global", "project"),
+        default="all",
+    )
     status_parser.add_argument("--json", action="store_true")
     status_parser.set_defaults(func=cmd_status)
 
