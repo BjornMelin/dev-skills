@@ -1,0 +1,6 @@
+interface:
+  display_name: "Taste Metaskill"
+  short_description: "Route frontend UI work to a focused visual-taste reference"
+  default_prompt: "Use $taste-metaskill for frontend UI design, redesign, art direction, motion, layout, typography, color, density, and anti-AI-slop work. Pick one primary reference from the router before implementing."
+policy:
+  allow_implicit_invocation: true

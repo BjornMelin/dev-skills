@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ -n "${CODEX_RESEARCH_BIN:-}" ]]; then
+  exec "$CODEX_RESEARCH_BIN" "$@"
+fi
+
+if command -v codex-research >/dev/null 2>&1; then
+  exec codex-research "$@"
+fi
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+skill_dir="$(cd -- "$script_dir/.." && pwd -P)"
+repo_root="$(cd -- "$skill_dir/../.." && pwd -P)"
+
+if [[ -x "$repo_root/target/debug/codex-research" ]]; then
+  exec "$repo_root/target/debug/codex-research" "$@"
+fi
+
+if [[ -f "$repo_root/crates/codex-research/Cargo.toml" ]]; then
+  cd "$repo_root"
+  exec cargo run -q -p codex-research -- "$@"
+fi
+
+echo "codex-research not found. Install it with: cargo install --path /path/to/dev-skills/crates/codex-research" >&2
+exit 127

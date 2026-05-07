@@ -1,4 +1,6 @@
 interface:
   display_name: "Subspawn"
-  short_description: "Bounded subagent delegation and synthesis policy"
-  default_prompt: "Use $subspawn to plan and execute bounded subagent delegation with evidence-first synthesis."
+  short_description: "Bounded subagent delegation with strict wait synthesis"
+  default_prompt: "Use $subspawn to plan bounded subagent delegation, wait for all spawned agents, and synthesize evidence."
+policy:
+  allow_implicit_invocation: true

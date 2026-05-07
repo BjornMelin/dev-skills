@@ -1,6 +1,6 @@
 interface:
   display_name: "Opensrc Inspect"
-  short_description: "Fetch local source snapshots for package internals"
-  default_prompt: "Use $opensrc-inspect to inspect local opensrc snapshots or fetch a package/repo source safely with --modify=false before analyzing internals."
+  short_description: "Inspect dependency source and upgrade diffs"
+  default_prompt: "Use $opensrc-inspect to prewarm cache state with opensrc fetch when helpful, resolve exact source paths with opensrc path, inspect the current source, and compare it against a target or latest version before recommending a hard-cut migration."
 policy:
   allow_implicit_invocation: false

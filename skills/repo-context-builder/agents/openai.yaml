@@ -1,0 +1,6 @@
+interface:
+  display_name: "Repo Context Builder"
+  short_description: "Analyze a repository and generate REPO_CONTEXT.md plus REVIEW_BRIEF.md."
+  default_prompt: "Analyze this repository and create or refresh REPO_CONTEXT.md and REVIEW_BRIEF.md using the bundled templates. Ground every claim in repository evidence and label unknowns explicitly."
+policy:
+  allow_implicit_invocation: false
