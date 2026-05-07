@@ -63,6 +63,9 @@ Validate planner-visible role names and return contracts:
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 ```
 
+`skills/subspawn/templates/agents/` contains packaged fallback copies for the
+planner presets. Keep those copies aligned when changing preset role contracts.
+
 ## Role Selection Guidance
 
 Use the narrowest role that matches the question.

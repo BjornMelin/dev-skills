@@ -63,6 +63,10 @@ Default presets:
 Use `--role` to select explicit roles, `--mode edit` only when write surfaces
 are disjoint, `--max-agents` to keep the batch bounded, and
 `--allow-large-batch` only when the user explicitly requests a larger batch.
+In a full repository checkout, the planner loads the deeper research and
+subagent template directories first. In a packaged standalone `subspawn` skill,
+it falls back to the local `skills/subspawn/templates/agents/` copies so preset
+plans remain usable without sibling skills.
 
 ## Core Contract
 
@@ -146,12 +150,15 @@ Model: inherited, custom-agent pinned, or explicit override with reason
 Reasoning: inherited, custom-agent pinned, or explicit override with reason
 Return format:
 - Status
-- Evidence
-- Files inspected/changed
-- Commands run
-- Findings
+- Evidence or role-specific source headings
+- Files inspected/changed, queries run, or sources hydrated
+- Commands run or provider calls
+- Findings or claims with confidence and source IDs
 - Risks/blockers
 ```
+
+Template roles may emit narrower return headings from their TOML
+`developer_instructions`; built-in roles use the generic minimum shown above.
 
 ## Model and Effort
 

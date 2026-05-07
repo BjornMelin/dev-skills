@@ -60,11 +60,16 @@ Role: openai_docs_researcher.
 Model: gpt-5.5.
 Reasoning: medium.
 Return format:
-- Status
-- Evidence
-- Files inspected/changed
-- Commands run
-- Findings
+- Status (`complete`, `partial`, or `blocked`)
+- Official sources read
+- Sources hydrated
+- Current findings
+- Claims with confidence and source IDs
+- Deprecated or changed guidance
+- Provider limits
+- Privacy notes
+- Open questions
+- Recommended next verification
 - Risks/blockers
 ```
 

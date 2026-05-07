@@ -35,6 +35,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_TEMPLATE_DIRS = [
     REPO_ROOT / "skills/deep-researcher/templates/agents",
     REPO_ROOT / "skills/subagent-creator/templates/agents",
+    Path(__file__).resolve().parents[1] / "templates/agents",
 ]
 BUILT_IN_ROLES = {
     "default": "Codex built-in default agent.",
@@ -43,7 +44,7 @@ BUILT_IN_ROLES = {
 }
 BUILT_IN_NAMES = frozenset(BUILT_IN_ROLES)
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
-RETURN_HEADINGS = (
+DEFAULT_RETURN_HEADINGS = (
     "- Status",
     "- Evidence",
     "- Files inspected/changed",
@@ -104,6 +105,17 @@ class Role:
         reasoning: Pinned reasoning effort or inherited runtime marker.
         sandbox: Sandbox policy from the template or runtime default.
         source: Role source, such as template or built-in.
+        return_headings: Prompt return headings from the role contract.
+        path: Template file path, if the role came from a TOML file.
+
+    Attributes:
+        name: Stable role name used by Codex.
+        description: Human-readable role description.
+        model: Pinned model or inherited runtime marker.
+        reasoning: Pinned reasoning effort or inherited runtime marker.
+        sandbox: Sandbox policy from the template or runtime default.
+        source: Role source, such as template or built-in.
+        return_headings: Prompt return headings from the role contract.
         path: Template file path, if the role came from a TOML file.
 
     Returns:
@@ -116,13 +128,14 @@ class Role:
     reasoning: str
     sandbox: str
     source: str
+    return_headings: tuple[str, ...] = DEFAULT_RETURN_HEADINGS
     path: str | None = None
 
-    def to_dict(self) -> dict[str, str | None]:
+    def to_dict(self) -> dict[str, object]:
         """Return JSON-serializable role metadata.
 
         Returns:
-            dict[str, str | None]: Role metadata suitable for JSON output.
+            dict[str, object]: Role metadata suitable for JSON output.
         """
 
         return {
@@ -132,6 +145,7 @@ class Role:
             "reasoning": self.reasoning,
             "sandbox": self.sandbox,
             "source": self.source,
+            "return_headings": list(self.return_headings),
             "path": self.path,
         }
 
@@ -141,6 +155,11 @@ class Registry:
     """Role registry plus validation metadata.
 
     Args:
+        roles: Resolved roles keyed by role name.
+        duplicates: Ignored duplicate template paths keyed by role name.
+        issues: Validation issues discovered while loading role metadata.
+
+    Attributes:
         roles: Resolved roles keyed by role name.
         duplicates: Ignored duplicate template paths keyed by role name.
         issues: Validation issues discovered while loading role metadata.
@@ -234,10 +253,33 @@ def built_in_roles() -> dict[str, Role]:
             reasoning="inherited",
             sandbox="runtime default",
             source="built-in",
+            return_headings=DEFAULT_RETURN_HEADINGS,
             path=None,
         )
         for name, description in BUILT_IN_ROLES.items()
     }
+
+
+def return_headings_from_instructions(instructions: str) -> tuple[str, ...]:
+    """Extract role-specific return headings from developer instructions.
+
+    Args:
+        instructions: Template developer instructions text.
+
+    Returns:
+        tuple[str, ...]: Bullet headings after the Return format marker.
+    """
+
+    headings: list[str] = []
+    in_return_format = False
+    for line in instructions.splitlines():
+        stripped = line.strip()
+        if not in_return_format:
+            in_return_format = stripped == "Return format:"
+            continue
+        if stripped.startswith("- "):
+            headings.append(stripped)
+    return tuple(headings) or DEFAULT_RETURN_HEADINGS
 
 
 def role_from_template(path: Path) -> tuple[Role | None, list[str]]:
@@ -281,6 +323,7 @@ def role_from_template(path: Path) -> tuple[Role | None, list[str]]:
         reasoning=str(data.get("model_reasoning_effort", "inherited")).strip(),
         sandbox=str(data.get("sandbox_mode", "runtime default")).strip(),
         source="template",
+        return_headings=return_headings_from_instructions(instructions),
         path=str(path),
     )
     return role, issues
@@ -302,6 +345,8 @@ def load_registry(paths: list[str]) -> Registry:
 
     for directory in template_dirs(paths):
         if not directory.exists():
+            if not paths:
+                continue
             issues.append(f"{directory}: template directory missing")
             continue
         if not directory.is_dir():
@@ -446,7 +491,7 @@ def build_prompt(
             ]
         )
     lines.append("Return format:")
-    lines.extend(RETURN_HEADINGS)
+    lines.extend(role.return_headings)
     return "\n".join(lines)
 
 

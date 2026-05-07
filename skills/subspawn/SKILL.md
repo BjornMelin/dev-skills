@@ -69,6 +69,9 @@ python3 skills/subspawn/scripts/subspawn_plan.py plan \
 Use `--role` for explicit custom role selection, `--mode edit` only with
 disjoint write surfaces, and `--json` when another tool needs to consume the
 plan. Run `validate-roles` after changing subagent templates.
+Packaged standalone `subspawn` installs include local preset template copies in
+`templates/agents/`; full repo checkouts prefer the sibling deep-researcher and
+subagent-creator templates first.
 
 ## Fan-Out Rules
 
@@ -203,12 +206,15 @@ Model: inherited, custom-agent pinned, or explicit override with reason
 Reasoning: inherited, custom-agent pinned, or explicit override with reason
 Return format:
 - Status
-- Evidence
-- Files inspected/changed
-- Commands run
-- Findings
+- Evidence or role-specific source headings
+- Files inspected/changed, queries run, or sources hydrated
+- Commands run or provider calls
+- Findings or claims with confidence and source IDs
 - Risks/blockers
 ```
+
+When a custom role template provides a narrower return contract, use the
+template-specific headings emitted by the planner.
 
 For edit-capable workers, also say:
 
