@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Manage Codex custom subagent TOML templates and installs."""
+
 from __future__ import annotations
 
 import argparse
@@ -121,11 +123,25 @@ class CopyResult:
 
 @dataclass
 class PruneResult:
+    """Result for one stale role prune operation.
+
+    Args:
+        target: Installed TOML role path considered for pruning.
+        action: Action taken or planned for the target.
+        backup: Optional backup path created before deletion.
+    """
+
     target: Path
     action: str
     backup: Path | None = None
 
     def to_dict(self) -> dict[str, str | None]:
+        """Return a JSON-serializable prune result.
+
+        Returns:
+            dict[str, str | None]: Target, action, and backup path.
+        """
+
         return {
             "target": str(self.target),
             "action": self.action,
@@ -399,11 +415,33 @@ def selected_template_rows(selected: list[Path]) -> list[dict[str, str]]:
     return rows
 
 
-def selected_template_map(names: list[str], packs: list[str] | None = None) -> dict[str, Path]:
+def selected_template_map(
+    names: list[str],
+    packs: list[str] | None = None,
+) -> dict[str, Path]:
+    """Resolve selected template paths keyed by role name.
+
+    Args:
+        names: Explicit template names.
+        packs: Optional pack names to expand before explicit names.
+
+    Returns:
+        dict[str, Path]: Template path by template stem.
+
+    Raises:
+        SystemExit: If a requested template or pack is unknown.
+    """
+
     return {path.stem: path for path in resolve_templates(names, packs)}
 
 
 def template_pack_membership() -> dict[str, list[str]]:
+    """Build pack membership by template name.
+
+    Returns:
+        dict[str, list[str]]: Pack names keyed by template name.
+    """
+
     membership: dict[str, list[str]] = {}
     for pack, names in sorted(PACKS.items()):
         for name in names:
@@ -412,24 +450,64 @@ def template_pack_membership() -> dict[str, list[str]]:
 
 
 def codex_home() -> Path:
+    """Return the configured Codex home directory.
+
+    Returns:
+        Path: Resolved CODEX_HOME, defaulting to ~/.codex.
+    """
+
     return Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser().resolve()
 
 
 def global_agents_dir() -> Path:
+    """Return the global Codex custom agents directory.
+
+    Returns:
+        Path: Resolved global agents directory.
+    """
+
     return codex_home() / "agents"
 
 
 def project_agents_dir(project_dir: str) -> Path:
+    """Return the project-scoped Codex custom agents directory.
+
+    Args:
+        project_dir: Project root directory.
+
+    Returns:
+        Path: Resolved project agents directory.
+    """
+
     return Path(project_dir).expanduser().resolve() / ".codex" / "agents"
 
 
 def installed_templates(dest: Path) -> dict[str, Path]:
+    """Return installed TOML role files from a destination.
+
+    Args:
+        dest: Directory to inspect.
+
+    Returns:
+        dict[str, Path]: Regular TOML files keyed by filename stem.
+    """
+
     if not dest.exists():
         return {}
     return {path.stem: path for path in sorted(dest.glob("*.toml")) if path.is_file()}
 
 
 def compare_template_to_target(template: Path | None, target: Path | None) -> str:
+    """Compare one bundled template against one installed target.
+
+    Args:
+        template: Bundled template path, if any.
+        target: Installed target path, if any.
+
+    Returns:
+        str: One of extra, unknown, missing, same, or different.
+    """
+
     if template is None:
         return "extra" if target is not None and target.exists() else "unknown"
     if target is None or not target.exists():
@@ -444,6 +522,22 @@ def status_rows(
     *,
     include_extra: bool,
 ) -> tuple[list[dict[str, Any]], dict[str, Path]]:
+    """Build cross-scope install inventory rows.
+
+    Args:
+        names: Explicit template names.
+        packs: Pack names to expand.
+        project_dir: Project root for project-scoped agents.
+        include_extra: Include installed roles outside the selected set.
+
+    Returns:
+        tuple[list[dict[str, Any]], dict[str, Path]]: Inventory rows and target
+            directories keyed by scope.
+
+    Raises:
+        SystemExit: If selection contains unknown templates or packs.
+    """
+
     all_templates = template_paths()
     templates = selected_template_map(names, packs)
     global_dir = global_agents_dir()
@@ -489,6 +583,15 @@ def status_rows(
 
 
 def summarize_status(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Count inventory statuses by install scope.
+
+    Args:
+        rows: Inventory rows from status_rows().
+
+    Returns:
+        dict[str, dict[str, int]]: Status counts keyed by global/project scope.
+    """
+
     summary: dict[str, dict[str, int]] = {"global": {}, "project": {}}
     for row in rows:
         for target_name in ("global", "project"):
@@ -498,6 +601,15 @@ def summarize_status(rows: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
 
 
 def status_is_drift(status: str) -> bool:
+    """Return whether an install status represents drift.
+
+    Args:
+        status: Status string from an inventory row.
+
+    Returns:
+        bool: True when status needs install, sync, or cleanup action.
+    """
+
     return status in {"missing", "different", "extra"}
 
 
@@ -521,6 +633,18 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    """Handle the status subcommand.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+
+    Raises:
+        SystemExit: If selection contains unknown templates or packs.
+    """
+
     rows, dirs = status_rows(
         args.names,
         args.pack,
@@ -563,6 +687,18 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_plan_sync(args: argparse.Namespace) -> int:
+    """Handle the plan-sync subcommand.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+
+    Raises:
+        SystemExit: If selection or destination arguments are invalid.
+    """
+
     all_templates = template_paths()
     selected = selected_template_map(args.names, args.pack)
     dest = resolve_destination(args)
@@ -615,6 +751,19 @@ def cmd_plan_sync(args: argparse.Namespace) -> int:
 
 
 def cmd_prune(args: argparse.Namespace) -> int:
+    """Handle the prune subcommand.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+
+    Raises:
+        SystemExit: If selection or destination arguments are invalid.
+        OSError: If confirmed backup or deletion fails.
+    """
+
     selected = selected_template_map(args.names, args.pack)
     selected_files = {path.name for path in selected.values()}
     dest = resolve_destination(args)

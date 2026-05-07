@@ -55,7 +55,8 @@ Use `--overwrite` carefully. Global roles may be hand-edited.
 2. Update pack membership in `scripts/subagent_creator.py`.
 3. Validate templates.
 4. Run `list --packs`.
-5. Run `status` and `plan-sync` against the intended target before writing.
+5. Run `status` to inspect both global and project installs, then run
+   `plan-sync` against the intended target before writing.
 6. Smoke test relevant packs.
 
 Commands:
