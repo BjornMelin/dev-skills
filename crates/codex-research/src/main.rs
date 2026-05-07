@@ -2324,9 +2324,15 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
     let claims = required_array(&task.input, "claims")?;
     let source_ids = sources
         .iter()
-        .filter_map(|source| source.get("id").and_then(Value::as_str))
-        .map(str::to_string)
-        .collect::<BTreeSet<_>>();
+        .enumerate()
+        .map(|(index, source)| {
+            source
+                .get("id")
+                .and_then(Value::as_str)
+                .with_context(|| format!("sources[{index}].id must be a string"))
+                .map(str::to_string)
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
     let min_sources = optional_u64(&task.expected, "min_sources")?.unwrap_or(1);
     let min_claims = optional_u64(&task.expected, "min_claims")?.unwrap_or(1);
     let max_uncited_claims = optional_u64(&task.expected, "max_uncited_claims")?.unwrap_or(0);
@@ -2343,14 +2349,16 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
         let claim_sources = claim
             .get("sources")
             .and_then(Value::as_array)
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(Value::as_str)
+            .with_context(|| format!("{claim_id}.sources must be an array"))?
+            .iter()
+            .enumerate()
+            .map(|(index, value)| {
+                value
+                    .as_str()
+                    .with_context(|| format!("{claim_id}.sources[{index}] must be a string"))
                     .map(str::to_string)
-                    .collect::<Vec<_>>()
             })
-            .unwrap_or_default();
+            .collect::<Result<Vec<_>>>()?;
         if claim_sources.is_empty() {
             uncited_claims += 1;
         }
@@ -4327,6 +4335,50 @@ mod tests {
                 .failures
                 .iter()
                 .any(|failure| failure.contains("min_confidence"))
+        );
+    }
+
+    #[test]
+    fn evidence_contract_rejects_malformed_source_entries() {
+        let task = EvalTask {
+            id: "bad-source".to_string(),
+            kind: "evidence-contract".to_string(),
+            description: "source validation".to_string(),
+            input: json!({
+                "sources": [{"id": 42}],
+                "claims": [{"id": "claim-1", "sources": ["source-1"]}]
+            }),
+            expected: json!({}),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("sources[0].id"))
+        );
+    }
+
+    #[test]
+    fn evidence_contract_rejects_malformed_claim_citations() {
+        let task = EvalTask {
+            id: "bad-citation".to_string(),
+            kind: "evidence-contract".to_string(),
+            description: "citation validation".to_string(),
+            input: json!({
+                "sources": [{"id": "source-1"}],
+                "claims": [{"id": "claim-1", "sources": ["source-1", 42]}]
+            }),
+            expected: json!({}),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("claim-1.sources[1]"))
         );
     }
 

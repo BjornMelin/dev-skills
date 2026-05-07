@@ -125,9 +125,9 @@ cargo fmt --all --check
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
-codex-research --json doctor
-codex-research --json eval
-codex-research --json eval --task evidence-claims-cited --strict
+cargo run -q -p codex-research -- --json doctor
+cargo run -q -p codex-research -- --json eval
+cargo run -q -p codex-research -- --json eval --task evidence-claims-cited --strict
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
