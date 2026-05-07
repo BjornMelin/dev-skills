@@ -4,7 +4,7 @@ Status: implemented in `feat/codex-research-v0.2-spec`
 
 Branch: `feat/codex-research-v0.2-spec`
 
-Target release type: SemVer minor, Conventional Commit scope `feat(codex-research)`
+Target release type: pre-1.0 SemVer patch via Conventional Commit scope `feat(codex-research)`
 
 ## Purpose
 
@@ -181,7 +181,7 @@ New commands:
 
 ```bash
 codex-research config init [--path <path>] [--force]
-codex-research config show [--effective] [--json]
+codex-research config show [--json]
 codex-research run init "query" --profile deep --topic github --out .codex/research/run.json
 codex-research run status --run .codex/research/run.json
 codex-research run debit --run .codex/research/run.json --provider github --count 1 --note "search issues"
@@ -199,7 +199,8 @@ Behavior:
 
 - `run init` materializes the effective profile, provider order, policy, and
   starting budgets.
-- Provider commands with `--run` atomically debit the matching provider budget.
+- Provider commands with `--run` serialize run-state writes with a lockfile and
+  atomic rename, then debit the matching provider budget before network calls.
 - If a budget would go negative, fail before calling the provider unless
   `--no-budget` is set.
 - Codex-native web calls cannot be automatically intercepted; the skill docs
@@ -213,7 +214,7 @@ Behavior:
 Initial config shape:
 
 ```toml
-[profiles.standard.budgets]
+[profiles.standard]
 codex_web_queries = 4
 context7_calls = 3
 github_calls = 4
@@ -222,7 +223,7 @@ direct_fetches = 8
 browser_fetches = 2
 firecrawl_calls = 1
 
-[profiles.deep.budgets]
+[profiles.deep]
 codex_web_queries = 8
 context7_calls = 4
 github_calls = 8

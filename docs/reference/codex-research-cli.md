@@ -42,7 +42,7 @@ auto-load `.env`.
 
 Tool fallback:
 
-- `gh auth token` is used before `GITHUB_TOKEN`/`GH_TOKEN` for GitHub.
+- `GITHUB_TOKEN`/`GH_TOKEN` are used before `gh auth token` for GitHub.
 - `agent-browser`, `ctx7`, and `opensrc` are detected by `doctor`.
 
 ## Commands
@@ -73,7 +73,7 @@ Manage reusable profile, privacy, provider, and cache policy.
 ```bash
 codex-research config init
 codex-research config init --path .codex/research/config.toml --force
-codex-research --json config show --effective
+codex-research --json config show
 ```
 
 Config precedence:

@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
+use std::io::ErrorKind;
 use std::io::{BufRead, BufReader, Write};
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::process::Command as StdCommand;
 use std::time::Duration;
@@ -200,32 +202,32 @@ enum GithubCommand {
     /// Search repositories.
     SearchRepos {
         query: String,
-        #[arg(long, default_value_t = 10)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[command(flatten)]
         budget: BudgetArgs,
     },
     /// Search code. This endpoint has strict limits; use narrow queries.
     SearchCode {
         query: String,
-        #[arg(long, default_value_t = 10)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[command(flatten)]
         budget: BudgetArgs,
     },
     /// Search issues and pull requests.
     SearchIssues {
         query: String,
-        #[arg(long, default_value_t = 10)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[command(flatten)]
         budget: BudgetArgs,
     },
     /// List repository releases.
     Releases {
         repo: String,
-        #[arg(long, default_value_t = 10)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[command(flatten)]
         budget: BudgetArgs,
     },
@@ -244,8 +246,8 @@ enum GithubCommand {
         repo: String,
         base: String,
         head: String,
-        #[arg(long, default_value_t = 100)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[arg(long, default_value_t = 1)]
         page: u32,
         #[command(flatten)]
@@ -254,8 +256,8 @@ enum GithubCommand {
     /// List repository tags.
     Tags {
         repo: String,
-        #[arg(long, default_value_t = 30)]
-        per_page: u8,
+        #[arg(long)]
+        per_page: Option<u8>,
         #[command(flatten)]
         budget: BudgetArgs,
     },
@@ -387,10 +389,7 @@ enum ConfigCommand {
         force: bool,
     },
     /// Show the effective config.
-    Show {
-        #[arg(long)]
-        effective: bool,
-    },
+    Show,
 }
 
 #[derive(Subcommand)]
@@ -488,7 +487,6 @@ enum ProviderKind {
     Direct,
     Browser,
     Firecrawl,
-    Opensrc,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
@@ -761,6 +759,11 @@ struct ProviderError {
     created_at: DateTime<Utc>,
 }
 
+struct FirecrawlScrape {
+    status: u16,
+    value: Value,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct ConfigReport {
     path: Option<PathBuf>,
@@ -995,11 +998,7 @@ async fn handle_fetch(
             budget,
         } => {
             let privacy_class = privacy.unwrap_or_else(|| classify_privacy(&url));
-            enforce_external_privacy(
-                privacy_class,
-                allow_private_external || config.privacy.allow_private_external,
-                "firecrawl",
-            )?;
+            enforce_external_privacy(privacy_class, allow_private_external, config, "firecrawl")?;
             maybe_debit(
                 &budget,
                 ProviderKind::Firecrawl,
@@ -1007,7 +1006,7 @@ async fn handle_fetch(
                 Some("firecrawl scrape"),
             )?;
             let store_in_cache = effective_firecrawl_store_in_cache(no_store_in_cache, config);
-            let value = firecrawl_scrape(&url, fresh, store_in_cache, timeout_ms, config).await?;
+            let scrape = firecrawl_scrape(&url, fresh, store_in_cache, timeout_ms, config).await?;
             let paths = research_paths()?;
             init_db(&paths)?;
             let source_id = record_source_cache(
@@ -1015,7 +1014,7 @@ async fn handle_fetch(
                 SourceCacheInsert {
                     url: &url,
                     provider: "firecrawl",
-                    status: Some(200),
+                    status: Some(scrape.status),
                     content_hash: None,
                     route: Some("firecrawl"),
                     title: None,
@@ -1036,10 +1035,11 @@ async fn handle_fetch(
                 &url,
                 Route::Firecrawl,
                 true,
-                Some(200),
+                Some(scrape.status),
                 "firecrawl scrape succeeded",
             )?;
-            let value = json!({ "source_id": source_id, "provider": "firecrawl", "data": value });
+            let value =
+                json!({ "source_id": source_id, "provider": "firecrawl", "data": scrape.value });
             print_json(&value)
         }
     }
@@ -1060,6 +1060,7 @@ async fn handle_context7(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Context7, 1, Some("context7 search"))?;
+            let metadata_query = metadata_text(&query, config);
             let version_pin_hint = version.as_ref().map(|version| {
                 json!({
                     "slash": format!("/owner/repo/{version}"),
@@ -1079,7 +1080,7 @@ async fn handle_context7(
                 json!({
                     "operation": "search",
                     "library": library,
-                    "query": query,
+                    "query": metadata_query,
                     "version": version,
                     "version_pin_hint": version_pin_hint
                 }),
@@ -1093,6 +1094,7 @@ async fn handle_context7(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Context7, 1, Some("context7 context"))?;
+            let metadata_query = metadata_text(&query, config);
             let value = context7_send(
                 client
                     .get("https://context7.com/api/v2/context")
@@ -1108,7 +1110,7 @@ async fn handle_context7(
             (
                 value,
                 format!("https://context7.com{library_id}"),
-                json!({ "operation": "context", "library_id": library_id, "query": query, "fast": fast }),
+                json!({ "operation": "context", "library_id": library_id, "query": metadata_query, "fast": fast }),
                 budget,
             )
         }
@@ -1175,7 +1177,9 @@ async fn handle_github(
     json_out: bool,
 ) -> Result<()> {
     let client = http_client()?;
+    let per_page_default = config.providers.github.per_page_default;
     let per_page_max = config.providers.github.per_page_max;
+    let retries = config.providers.github.backoff_retries;
     let (value, source_url, metadata, budget) = match command {
         GithubCommand::SearchRepos {
             query,
@@ -1188,18 +1192,20 @@ async fn handle_github(
                 1,
                 Some("github search repos"),
             )?;
-            let per_page = per_page.min(per_page_max);
+            let metadata_query = metadata_text(&query, config);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let url = "https://api.github.com/search/repositories";
             let value = github_get(
                 &client,
                 url,
                 &[("q", query.clone()), ("per_page", per_page.to_string())],
+                retries,
             )
             .await?;
             (
                 value,
                 github_api_source_url(url),
-                json!({ "operation": "search-repos", "query": query, "per_page": per_page, "limitations": github_search_limitations("repositories") }),
+                json!({ "operation": "search-repos", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("repositories") }),
                 budget,
             )
         }
@@ -1209,18 +1215,20 @@ async fn handle_github(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Github, 1, Some("github search code"))?;
-            let per_page = per_page.min(per_page_max);
+            let metadata_query = metadata_text(&query, config);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let url = "https://api.github.com/search/code";
             let value = github_get(
                 &client,
                 url,
                 &[("q", query.clone()), ("per_page", per_page.to_string())],
+                retries,
             )
             .await?;
             (
                 value,
                 github_api_source_url(url),
-                json!({ "operation": "search-code", "query": query, "per_page": per_page, "limitations": github_search_limitations("code") }),
+                json!({ "operation": "search-code", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("code") }),
                 budget,
             )
         }
@@ -1235,18 +1243,20 @@ async fn handle_github(
                 1,
                 Some("github search issues"),
             )?;
-            let per_page = per_page.min(per_page_max);
+            let metadata_query = metadata_text(&query, config);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let url = "https://api.github.com/search/issues";
             let value = github_get(
                 &client,
                 url,
                 &[("q", query.clone()), ("per_page", per_page.to_string())],
+                retries,
             )
             .await?;
             (
                 value,
                 github_api_source_url(url),
-                json!({ "operation": "search-issues", "query": query, "per_page": per_page, "limitations": github_search_limitations("issues") }),
+                json!({ "operation": "search-issues", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("issues") }),
                 budget,
             )
         }
@@ -1256,9 +1266,15 @@ async fn handle_github(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Github, 1, Some("github releases"))?;
-            let per_page = per_page.min(per_page_max);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let url = format!("https://api.github.com/repos/{repo}/releases");
-            let value = github_get(&client, &url, &[("per_page", per_page.to_string())]).await?;
+            let value = github_get(
+                &client,
+                &url,
+                &[("per_page", per_page.to_string())],
+                retries,
+            )
+            .await?;
             (
                 value,
                 github_repo_url(&repo, "releases"),
@@ -1293,7 +1309,7 @@ async fn handle_github(
                     github_repo_url(&repo, &format!("releases/tag/{tag}")),
                 )
             };
-            let value = github_get(&client, &url, &[]).await?;
+            let value = github_get(&client, &url, &[], retries).await?;
             (
                 value,
                 source_url,
@@ -1310,7 +1326,7 @@ async fn handle_github(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Github, 1, Some("github compare"))?;
-            let per_page = per_page.min(per_page_max);
+            let per_page = per_page.unwrap_or(per_page_max).min(per_page_max);
             let basehead = format!("{base}...{head}");
             let url = format!(
                 "https://api.github.com/repos/{repo}/compare/{}",
@@ -1323,6 +1339,7 @@ async fn handle_github(
                     ("per_page", per_page.to_string()),
                     ("page", page.to_string()),
                 ],
+                retries,
             )
             .await?;
             (
@@ -1338,9 +1355,15 @@ async fn handle_github(
             budget,
         } => {
             maybe_debit(&budget, ProviderKind::Github, 1, Some("github tags"))?;
-            let per_page = per_page.min(per_page_max);
+            let per_page = per_page.unwrap_or(per_page_default).min(per_page_max);
             let url = format!("https://api.github.com/repos/{repo}/tags");
-            let value = github_get(&client, &url, &[("per_page", per_page.to_string())]).await?;
+            let value = github_get(
+                &client,
+                &url,
+                &[("per_page", per_page.to_string())],
+                retries,
+            )
+            .await?;
             (
                 value,
                 github_repo_url(&repo, "tags"),
@@ -1362,10 +1385,10 @@ async fn handle_github(
                 Some("github issue"),
             )?;
             let issue_url = format!("https://api.github.com/repos/{repo}/issues/{number}");
-            let issue = github_get(&client, &issue_url, &[]).await?;
+            let issue = github_get(&client, &issue_url, &[], retries).await?;
             let comments_value = if comments {
                 let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
-                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+                github_get(&client, &url, &[("per_page", "100".to_string())], retries).await?
             } else {
                 json!([])
             };
@@ -1387,27 +1410,27 @@ async fn handle_github(
             let call_count = github_pr_call_count(files, comments, reviews);
             maybe_debit(&budget, ProviderKind::Github, call_count, Some("github pr"))?;
             let pr_url = format!("https://api.github.com/repos/{repo}/pulls/{number}");
-            let pr = github_get(&client, &pr_url, &[]).await?;
+            let pr = github_get(&client, &pr_url, &[], retries).await?;
             let files_value = if files {
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/files");
-                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+                github_get(&client, &url, &[("per_page", "100".to_string())], retries).await?
             } else {
                 json!([])
             };
             let comments_value = if comments {
                 let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
                 let issue_comments =
-                    github_get(&client, &url, &[("per_page", "100".to_string())]).await?;
+                    github_get(&client, &url, &[("per_page", "100".to_string())], retries).await?;
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/comments");
                 let review_comments =
-                    github_get(&client, &url, &[("per_page", "100".to_string())]).await?;
+                    github_get(&client, &url, &[("per_page", "100".to_string())], retries).await?;
                 json!({ "issue_comments": issue_comments, "review_comments": review_comments })
             } else {
                 json!({ "issue_comments": [], "review_comments": [] })
             };
             let reviews_value = if reviews {
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/reviews");
-                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+                github_get(&client, &url, &[("per_page", "100".to_string())], retries).await?
             } else {
                 json!([])
             };
@@ -1429,7 +1452,7 @@ async fn handle_github(
                 "https://api.github.com/repos/{repo}/contents/{}",
                 slash_path(&path)
             );
-            let value = github_get(&client, &url, &[("ref", r#ref.clone())]).await?;
+            let value = github_get(&client, &url, &[("ref", r#ref.clone())], retries).await?;
             (
                 value,
                 github_repo_url(&repo, &format!("blob/{ref_name}/{path}", ref_name = r#ref)),
@@ -1484,6 +1507,11 @@ fn handle_ledger(command: LedgerCommand, json_out: bool) -> Result<()> {
         LedgerCommand::AddSource(args) => {
             ensure_parent(&args.ledger)?;
             let (provider, url, title, route) = if let Some(source_id) = args.from_cache {
+                if args.provider.is_some() || args.url.is_some() || args.route.is_some() {
+                    bail!(
+                        "--from-cache cannot be combined with --provider, --url, or --route; use --title only to override the cached title"
+                    );
+                }
                 let paths = research_paths()?;
                 init_db(&paths)?;
                 let cached = cached_source(&paths, &source_id)?
@@ -1743,7 +1771,7 @@ fn handle_config(
                 Ok(())
             }
         }
-        ConfigCommand::Show { effective: _ } => {
+        ConfigCommand::Show => {
             let loaded = load_config(loaded_path.as_deref())?;
             let report = ConfigReport {
                 path: loaded.path,
@@ -2170,7 +2198,7 @@ async fn firecrawl_scrape(
     store_in_cache: bool,
     timeout_ms: u64,
     config: &ResearchConfig,
-) -> Result<Value> {
+) -> Result<FirecrawlScrape> {
     let api_key = required_env("FIRECRAWL_API_KEY")?;
     let client = http_client()?;
     let max_age = if fresh {
@@ -2201,39 +2229,56 @@ async fn firecrawl_scrape(
             .to_string();
         bail!("Firecrawl rate limited; Retry-After={retry_after}");
     }
-    Ok(resp.error_for_status()?.json::<Value>().await?)
+    let status = resp.status().as_u16();
+    let value = resp.error_for_status()?.json::<Value>().await?;
+    Ok(FirecrawlScrape { status, value })
 }
 
 async fn github_get(
     client: &reqwest::Client,
     url: &str,
     params: &[(&str, String)],
+    retries: u8,
 ) -> Result<Value> {
-    let mut req = client.get(url);
-    if let Some(token) = github_token() {
-        req = req.bearer_auth(token);
+    let token = github_token();
+    for attempt in 0..=retries {
+        let mut req = client
+            .get(url)
+            .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+            .query(params);
+        if let Some(token) = &token {
+            req = req.bearer_auth(token);
+        }
+        let resp = req.send().await?;
+        let status = resp.status();
+        if status.as_u16() == 403 {
+            let remaining = resp
+                .headers()
+                .get("x-ratelimit-remaining")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("unknown")
+                .to_string();
+            let reset = resp
+                .headers()
+                .get("x-ratelimit-reset")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("unknown")
+                .to_string();
+            bail!("GitHub request forbidden or rate-limited; remaining={remaining} reset={reset}");
+        }
+        if matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504) && attempt < retries {
+            let wait_seconds = resp
+                .headers()
+                .get("retry-after")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(u64::from(attempt + 1));
+            tokio::time::sleep(Duration::from_secs(wait_seconds)).await;
+            continue;
+        }
+        return Ok(resp.error_for_status()?.json::<Value>().await?);
     }
-    let resp = req
-        .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
-        .query(params)
-        .send()
-        .await?;
-    if resp.status().as_u16() == 403 {
-        let remaining = resp
-            .headers()
-            .get("x-ratelimit-remaining")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown")
-            .to_string();
-        let reset = resp
-            .headers()
-            .get("x-ratelimit-reset")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("unknown")
-            .to_string();
-        bail!("GitHub request forbidden or rate-limited; remaining={remaining} reset={reset}");
-    }
-    Ok(resp.error_for_status()?.json::<Value>().await?)
+    unreachable!("github retry loop always returns or bails")
 }
 
 async fn context7_send(request: reqwest::RequestBuilder) -> Result<Value> {
@@ -2486,9 +2531,66 @@ fn read_run_state(path: &Path) -> Result<ResearchRunState> {
 }
 
 fn write_run_state(path: &Path, state: &ResearchRunState) -> Result<()> {
+    let _lock = acquire_run_lock(path)?;
+    write_run_state_unlocked(path, state)
+}
+
+fn write_run_state_unlocked(path: &Path, state: &ResearchRunState) -> Result<()> {
     ensure_parent(path)?;
-    fs::write(path, serde_json::to_vec_pretty(state)?)?;
+    let temp_path = path.with_file_name(format!(
+        ".{}.tmp-{}",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("run.json"),
+        short_hash(Utc::now().to_rfc3339())
+    ));
+    fs::write(&temp_path, serde_json::to_vec_pretty(state)?)?;
+    fs::rename(&temp_path, path)?;
     Ok(())
+}
+
+struct RunLock {
+    path: PathBuf,
+}
+
+impl Drop for RunLock {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+fn run_lock_path(path: &Path) -> PathBuf {
+    path.with_file_name(format!(
+        "{}.lock",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("run.json")
+    ))
+}
+
+fn acquire_run_lock(path: &Path) -> Result<RunLock> {
+    ensure_parent(path)?;
+    let lock_path = run_lock_path(path);
+    for _ in 0..100 {
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&lock_path)
+        {
+            Ok(mut file) => {
+                writeln!(file, "pid={} created_at={}", std::process::id(), Utc::now())?;
+                return Ok(RunLock { path: lock_path });
+            }
+            Err(err) if err.kind() == ErrorKind::AlreadyExists => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(err) => {
+                return Err(err)
+                    .with_context(|| format!("failed to create run lock: {}", lock_path.display()));
+            }
+        }
+    }
+    bail!("timed out waiting for run lock: {}", lock_path.display())
 }
 
 fn maybe_debit(
@@ -2511,6 +2613,7 @@ fn debit_run_budget(
     count: u32,
     note: Option<&str>,
 ) -> Result<ResearchRunState> {
+    let _lock = acquire_run_lock(path)?;
     let mut state = read_run_state(path)?;
     if state.status == RunStatus::Closed {
         bail!("research run is closed: {}", path.display());
@@ -2532,7 +2635,7 @@ fn debit_run_budget(
         created_at: Utc::now(),
     });
     state.updated_at = Utc::now();
-    write_run_state(path, &state)?;
+    write_run_state_unlocked(path, &state)?;
     Ok(state)
 }
 
@@ -2540,6 +2643,7 @@ fn attach_source_to_run(budget: &BudgetArgs, source_id: &str) -> Result<()> {
     let Some(path) = &budget.run else {
         return Ok(());
     };
+    let _lock = acquire_run_lock(path)?;
     let mut state = read_run_state(path)?;
     if state.status == RunStatus::Closed {
         bail!("research run is closed: {}", path.display());
@@ -2547,7 +2651,7 @@ fn attach_source_to_run(budget: &BudgetArgs, source_id: &str) -> Result<()> {
     if !state.source_ids.iter().any(|id| id == source_id) {
         state.source_ids.push(source_id.to_string());
         state.updated_at = Utc::now();
-        write_run_state(path, &state)?;
+        write_run_state_unlocked(path, &state)?;
     }
     Ok(())
 }
@@ -2577,7 +2681,6 @@ fn budget_slot(budgets: &ProviderBudgets, provider: ProviderKind) -> u32 {
         ProviderKind::Direct => budgets.direct_fetches,
         ProviderKind::Browser => budgets.browser_fetches,
         ProviderKind::Firecrawl => budgets.firecrawl_calls,
-        ProviderKind::Opensrc => 0,
     }
 }
 
@@ -2590,7 +2693,6 @@ fn budget_slot_mut(budgets: &mut ProviderBudgets, provider: ProviderKind) -> &mu
         ProviderKind::Direct => &mut budgets.direct_fetches,
         ProviderKind::Browser => &mut budgets.browser_fetches,
         ProviderKind::Firecrawl => &mut budgets.firecrawl_calls,
-        ProviderKind::Opensrc => &mut budgets.direct_fetches,
     }
 }
 
@@ -2836,7 +2938,10 @@ fn record_route_memory(
           (domain, preferred_route, successes, failures, updated_at, last_reason, last_status)
         values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
         on conflict(domain) do update set
-          preferred_route = excluded.preferred_route,
+          preferred_route = case
+            when excluded.successes > 0 then excluded.preferred_route
+            else route_memory.preferred_route
+          end,
           successes = route_memory.successes + excluded.successes,
           failures = route_memory.failures + excluded.failures,
           updated_at = excluded.updated_at,
@@ -2993,6 +3098,12 @@ fn classify_privacy(value: &str) -> PrivacyClass {
     if url.scheme() == "file" {
         return PrivacyClass::PrivateOrAuthenticated;
     }
+    if let Some(host) = url.host()
+        && let Some(ip) = host_ip_addr(host)
+        && private_or_local_ip(ip)
+    {
+        return PrivacyClass::PrivateOrAuthenticated;
+    }
     let Some(host) = url.host_str().map(|host| host.to_ascii_lowercase()) else {
         return PrivacyClass::Ambiguous;
     };
@@ -3028,13 +3139,29 @@ fn classify_privacy(value: &str) -> PrivacyClass {
 
 fn enforce_external_privacy(
     privacy: PrivacyClass,
-    allow_private_external: bool,
+    explicit_allow_private_external: bool,
+    config: &ResearchConfig,
     provider: &str,
 ) -> Result<()> {
+    let allow_private_external =
+        explicit_allow_private_external || config.privacy.allow_private_external;
     match privacy {
         PrivacyClass::Public | PrivacyClass::SensitivePublic => Ok(()),
-        PrivacyClass::PrivateOrAuthenticated | PrivacyClass::Ambiguous
-            if allow_private_external =>
+        PrivacyClass::PrivateOrAuthenticated
+            if allow_private_external
+                || config
+                    .privacy
+                    .private_external_default
+                    .eq_ignore_ascii_case("allow") =>
+        {
+            Ok(())
+        }
+        PrivacyClass::Ambiguous
+            if allow_private_external
+                || config
+                    .privacy
+                    .ambiguous_external_default
+                    .eq_ignore_ascii_case("allow") =>
         {
             Ok(())
         }
@@ -3049,6 +3176,51 @@ fn enforce_external_privacy(
             )
         }
     }
+}
+
+fn host_ip_addr(host: url::Host<&str>) -> Option<IpAddr> {
+    match host {
+        url::Host::Ipv4(ip) => Some(IpAddr::V4(ip)),
+        url::Host::Ipv6(ip) => Some(IpAddr::V6(ip)),
+        url::Host::Domain(_) => None,
+    }
+}
+
+fn private_or_local_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => {
+            ip.is_private() || ip.is_loopback() || ip.is_link_local() || ip.is_unspecified()
+        }
+        IpAddr::V6(ip) => {
+            let first = ip.segments()[0];
+            ip.is_loopback()
+                || ip.is_unspecified()
+                || (first & 0xfe00) == 0xfc00
+                || (first & 0xffc0) == 0xfe80
+        }
+    }
+}
+
+fn metadata_text(value: &str, config: &ResearchConfig) -> String {
+    if config.privacy.redact_query_secrets && text_looks_secret_bearing(value) {
+        "[redacted]".to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+fn text_looks_secret_bearing(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    [
+        "token",
+        "api_key",
+        "apikey",
+        "secret",
+        "password",
+        "authorization",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle))
 }
 
 fn privacy_class_name(privacy: PrivacyClass) -> &'static str {
@@ -3069,7 +3241,6 @@ fn provider_name(provider: ProviderKind) -> &'static str {
         ProviderKind::Direct => "direct",
         ProviderKind::Browser => "browser",
         ProviderKind::Firecrawl => "firecrawl",
-        ProviderKind::Opensrc => "opensrc",
     }
 }
 
@@ -3348,9 +3519,22 @@ mod tests {
             classify_privacy("https://example.com/file?token=secret"),
             PrivacyClass::PrivateOrAuthenticated
         );
+        assert_eq!(
+            classify_privacy("https://10.0.0.12/internal"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
+        assert_eq!(
+            classify_privacy("https://[fd00::1]/internal"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
         assert!(
-            enforce_external_privacy(PrivacyClass::PrivateOrAuthenticated, false, "firecrawl")
-                .is_err()
+            enforce_external_privacy(
+                PrivacyClass::PrivateOrAuthenticated,
+                false,
+                &ResearchConfig::default(),
+                "firecrawl"
+            )
+            .is_err()
         );
     }
 
@@ -3371,14 +3555,44 @@ mod tests {
             Some(200),
             "rendered route worked",
         )?;
+        record_route_memory(
+            &paths,
+            "https://docs.example.com/app",
+            Route::Firecrawl,
+            false,
+            Some(500),
+            "crawl route failed",
+        )?;
 
         let hit = route_memory_for_url(&paths, "https://docs.example.com/other")?
             .expect("route memory should exist");
         assert_eq!(hit.domain, "docs.example.com");
         assert_eq!(hit.preferred_route, "agent-browser");
         assert_eq!(hit.successes, 1);
+        assert_eq!(hit.failures, 1);
         fs::remove_dir_all(paths.cache_dir)?;
         Ok(())
+    }
+
+    #[test]
+    fn metadata_redaction_uses_privacy_config() {
+        let config = ResearchConfig::default();
+        assert_eq!(
+            metadata_text("find api_key=secret usage", &config),
+            "[redacted]"
+        );
+
+        let config = ResearchConfig {
+            privacy: PrivacyConfig {
+                redact_query_secrets: false,
+                ..PrivacyConfig::default()
+            },
+            ..ResearchConfig::default()
+        };
+        assert_eq!(
+            metadata_text("find api_key=secret usage", &config),
+            "find api_key=secret usage"
+        );
     }
 
     #[test]
