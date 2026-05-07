@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use directories::BaseDirs;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, RANGE, USER_AGENT};
 use rusqlite::{Connection, params};
@@ -146,11 +146,9 @@ enum FetchCommand {
         fresh: bool,
         #[arg(
             long = "no-store-in-cache",
-            action = ArgAction::SetFalse,
-            default_value_t = true,
             help = "Disable Firecrawl server-side cache storage for this request"
         )]
-        store_in_cache: bool,
+        no_store_in_cache: bool,
         #[arg(long, default_value_t = 60_000)]
         timeout_ms: u64,
         #[arg(long, value_enum)]
@@ -968,6 +966,9 @@ async fn handle_fetch(
                         metadata: json!({ "bytes": fetched.bytes }),
                     },
                 )?);
+                if let Some(source_id) = &source_id {
+                    attach_source_to_run(&budget, source_id)?;
+                }
             }
             record_route_memory(
                 &paths,
@@ -987,7 +988,7 @@ async fn handle_fetch(
         FetchCommand::Firecrawl {
             url,
             fresh,
-            store_in_cache,
+            no_store_in_cache,
             timeout_ms,
             privacy,
             allow_private_external,
@@ -1005,6 +1006,7 @@ async fn handle_fetch(
                 1,
                 Some("firecrawl scrape"),
             )?;
+            let store_in_cache = effective_firecrawl_store_in_cache(no_store_in_cache, config);
             let value = firecrawl_scrape(&url, fresh, store_in_cache, timeout_ms, config).await?;
             let paths = research_paths()?;
             init_db(&paths)?;
@@ -1028,6 +1030,7 @@ async fn handle_fetch(
                     }),
                 },
             )?;
+            attach_source_to_run(&budget, &source_id)?;
             record_route_memory(
                 &paths,
                 &url,
@@ -1049,7 +1052,7 @@ async fn handle_context7(
 ) -> Result<()> {
     let api_key = required_env("CONTEXT7_API_KEY")?;
     let client = http_client()?;
-    let (value, source_url, metadata) = match command {
+    let (value, source_url, metadata, budget) = match command {
         Context7Command::Search {
             library,
             query,
@@ -1080,6 +1083,7 @@ async fn handle_context7(
                     "version": version,
                     "version_pin_hint": version_pin_hint
                 }),
+                budget,
             )
         }
         Context7Command::Context {
@@ -1105,6 +1109,7 @@ async fn handle_context7(
                 value,
                 format!("https://context7.com{library_id}"),
                 json!({ "operation": "context", "library_id": library_id, "query": query, "fast": fast }),
+                budget,
             )
         }
         Context7Command::Refresh {
@@ -1128,6 +1133,7 @@ async fn handle_context7(
                 value,
                 format!("https://context7.com{library_name}"),
                 json!({ "operation": "refresh", "library_name": library_name, "branch": branch }),
+                budget,
             )
         }
     };
@@ -1152,6 +1158,7 @@ async fn handle_context7(
             ),
         },
     )?;
+    attach_source_to_run(&budget, &source_id)?;
     let value = json!({ "source_id": source_id, "provider": "context7", "data": value });
 
     if json_out {
@@ -1169,7 +1176,7 @@ async fn handle_github(
 ) -> Result<()> {
     let client = http_client()?;
     let per_page_max = config.providers.github.per_page_max;
-    let (value, source_url, metadata) = match command {
+    let (value, source_url, metadata, budget) = match command {
         GithubCommand::SearchRepos {
             query,
             per_page,
@@ -1193,6 +1200,7 @@ async fn handle_github(
                 value,
                 github_api_source_url(url),
                 json!({ "operation": "search-repos", "query": query, "per_page": per_page, "limitations": github_search_limitations("repositories") }),
+                budget,
             )
         }
         GithubCommand::SearchCode {
@@ -1213,6 +1221,7 @@ async fn handle_github(
                 value,
                 github_api_source_url(url),
                 json!({ "operation": "search-code", "query": query, "per_page": per_page, "limitations": github_search_limitations("code") }),
+                budget,
             )
         }
         GithubCommand::SearchIssues {
@@ -1238,6 +1247,7 @@ async fn handle_github(
                 value,
                 github_api_source_url(url),
                 json!({ "operation": "search-issues", "query": query, "per_page": per_page, "limitations": github_search_limitations("issues") }),
+                budget,
             )
         }
         GithubCommand::Releases {
@@ -1253,6 +1263,7 @@ async fn handle_github(
                 value,
                 github_repo_url(&repo, "releases"),
                 json!({ "operation": "releases", "repo": repo, "per_page": per_page }),
+                budget,
             )
         }
         GithubCommand::Release {
@@ -1287,6 +1298,7 @@ async fn handle_github(
                 value,
                 source_url,
                 json!({ "operation": operation, "repo": repo, "tag": tag, "latest": latest }),
+                budget,
             )
         }
         GithubCommand::Compare {
@@ -1317,6 +1329,7 @@ async fn handle_github(
                 normalize_compare(value),
                 github_repo_url(&repo, &format!("compare/{basehead}")),
                 json!({ "operation": "compare", "repo": repo, "base": base, "head": head, "per_page": per_page, "page": page }),
+                budget,
             )
         }
         GithubCommand::Tags {
@@ -1332,6 +1345,7 @@ async fn handle_github(
                 value,
                 github_repo_url(&repo, "tags"),
                 json!({ "operation": "tags", "repo": repo, "per_page": per_page }),
+                budget,
             )
         }
         GithubCommand::Issue {
@@ -1340,7 +1354,13 @@ async fn handle_github(
             comments,
             budget,
         } => {
-            maybe_debit(&budget, ProviderKind::Github, 1, Some("github issue"))?;
+            let call_count = github_issue_call_count(comments);
+            maybe_debit(
+                &budget,
+                ProviderKind::Github,
+                call_count,
+                Some("github issue"),
+            )?;
             let issue_url = format!("https://api.github.com/repos/{repo}/issues/{number}");
             let issue = github_get(&client, &issue_url, &[]).await?;
             let comments_value = if comments {
@@ -1352,7 +1372,8 @@ async fn handle_github(
             (
                 json!({ "issue": issue, "comments": comments_value }),
                 github_repo_url(&repo, &format!("issues/{number}")),
-                json!({ "operation": "issue", "repo": repo, "number": number, "comments": comments }),
+                json!({ "operation": "issue", "repo": repo, "number": number, "comments": comments, "github_calls": call_count }),
+                budget,
             )
         }
         GithubCommand::Pr {
@@ -1363,7 +1384,8 @@ async fn handle_github(
             reviews,
             budget,
         } => {
-            maybe_debit(&budget, ProviderKind::Github, 1, Some("github pr"))?;
+            let call_count = github_pr_call_count(files, comments, reviews);
+            maybe_debit(&budget, ProviderKind::Github, call_count, Some("github pr"))?;
             let pr_url = format!("https://api.github.com/repos/{repo}/pulls/{number}");
             let pr = github_get(&client, &pr_url, &[]).await?;
             let files_value = if files {
@@ -1392,7 +1414,8 @@ async fn handle_github(
             (
                 json!({ "pull_request": pr, "files": files_value, "comments": comments_value, "reviews": reviews_value }),
                 github_repo_url(&repo, &format!("pull/{number}")),
-                json!({ "operation": "pr", "repo": repo, "number": number, "files": files, "comments": comments, "reviews": reviews }),
+                json!({ "operation": "pr", "repo": repo, "number": number, "files": files, "comments": comments, "reviews": reviews, "github_calls": call_count }),
+                budget,
             )
         }
         GithubCommand::File {
@@ -1411,6 +1434,7 @@ async fn handle_github(
                 value,
                 github_repo_url(&repo, &format!("blob/{ref_name}/{path}", ref_name = r#ref)),
                 json!({ "operation": "file", "repo": repo, "path": path, "ref": r#ref }),
+                budget,
             )
         }
     };
@@ -1432,6 +1456,7 @@ async fn handle_github(
             metadata,
         },
     )?;
+    attach_source_to_run(&budget, &source_id)?;
     let value = json!({ "source_id": source_id, "provider": "github", "data": value });
 
     if json_out {
@@ -1767,11 +1792,15 @@ fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> R
         RunCommand::Status { run } => {
             let state = read_run_state(&run)?;
             let remaining = remaining_budgets(&state);
+            let source_count = state.source_ids.len();
             if json_out {
-                print_json(&json!({ "run": run, "state": state, "remaining": remaining }))
+                print_json(
+                    &json!({ "run": run, "state": state, "remaining": remaining, "source_count": source_count }),
+                )
             } else {
                 println!("status: {:?}", state.status);
                 println!("profile: {}", state.profile);
+                println!("source_count: {}", source_count);
                 println!("remaining:");
                 print_budgets(&remaining);
                 Ok(())
@@ -2437,6 +2466,18 @@ fn default_firecrawl_max_age_ms() -> u64 {
     172_800_000
 }
 
+fn effective_firecrawl_store_in_cache(no_store_in_cache: bool, config: &ResearchConfig) -> bool {
+    config.providers.firecrawl.store_in_cache_default && !no_store_in_cache
+}
+
+fn github_issue_call_count(comments: bool) -> u32 {
+    1 + u32::from(comments)
+}
+
+fn github_pr_call_count(files: bool, comments: bool, reviews: bool) -> u32 {
+    1 + u32::from(files) + if comments { 2 } else { 0 } + u32::from(reviews)
+}
+
 fn read_run_state(path: &Path) -> Result<ResearchRunState> {
     let text = fs::read_to_string(path)
         .with_context(|| format!("failed to read run state: {}", path.display()))?;
@@ -2493,6 +2534,22 @@ fn debit_run_budget(
     state.updated_at = Utc::now();
     write_run_state(path, &state)?;
     Ok(state)
+}
+
+fn attach_source_to_run(budget: &BudgetArgs, source_id: &str) -> Result<()> {
+    let Some(path) = &budget.run else {
+        return Ok(());
+    };
+    let mut state = read_run_state(path)?;
+    if state.status == RunStatus::Closed {
+        bail!("research run is closed: {}", path.display());
+    }
+    if !state.source_ids.iter().any(|id| id == source_id) {
+        state.source_ids.push(source_id.to_string());
+        state.updated_at = Utc::now();
+        write_run_state(path, &state)?;
+    }
+    Ok(())
 }
 
 fn provider_remaining(state: &ResearchRunState, provider: ProviderKind) -> u32 {
@@ -3222,6 +3279,59 @@ mod tests {
         assert!(debit_run_budget(&run, ProviderKind::Github, 1, Some("test")).is_err());
         fs::remove_dir_all(&dir)?;
         Ok(())
+    }
+
+    #[test]
+    fn source_attachment_updates_active_run_state() -> Result<()> {
+        let dir = temp_path("run-source");
+        fs::create_dir_all(&dir)?;
+        let run = dir.join("run.json");
+        let state = ResearchRunState {
+            query: "smoke".to_string(),
+            profile: ResearchProfile::Quick,
+            topic: TopicKind::Github,
+            status: RunStatus::Open,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            budgets: quick_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: Vec::new(),
+            source_ids: Vec::new(),
+        };
+        write_run_state(&run, &state)?;
+        let budget = BudgetArgs {
+            run: Some(run.clone()),
+            no_budget: true,
+        };
+
+        attach_source_to_run(&budget, "src123")?;
+        attach_source_to_run(&budget, "src123")?;
+
+        let state = read_run_state(&run)?;
+        assert_eq!(state.source_ids, vec!["src123"]);
+        fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn provider_call_counts_reflect_hydration_requests() {
+        assert_eq!(github_issue_call_count(false), 1);
+        assert_eq!(github_issue_call_count(true), 2);
+        assert_eq!(github_pr_call_count(false, false, false), 1);
+        assert_eq!(github_pr_call_count(true, true, true), 5);
+    }
+
+    #[test]
+    fn firecrawl_cache_default_uses_config_until_flag_overrides() {
+        let mut config = ResearchConfig::default();
+
+        assert!(effective_firecrawl_store_in_cache(false, &config));
+        assert!(!effective_firecrawl_store_in_cache(true, &config));
+
+        config.providers.firecrawl.store_in_cache_default = false;
+        assert!(!effective_firecrawl_store_in_cache(false, &config));
+        assert!(!effective_firecrawl_store_in_cache(true, &config));
     }
 
     #[test]
