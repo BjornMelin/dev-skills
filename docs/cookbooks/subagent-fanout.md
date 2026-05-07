@@ -49,7 +49,7 @@ After spawning:
 
 ## Prompt Shape
 
-Generated prompt shape:
+Illustrative prompt shape:
 
 ```text
 Task: Research current official OpenAI docs for Codex custom subagents and summarize only confirmed current behavior.

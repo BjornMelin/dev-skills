@@ -7,10 +7,14 @@ import argparse
 import json
 import re
 import sys
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback.
+    tomllib = None
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -128,6 +132,8 @@ def split_csv(values: list[str]) -> list[str]:
 def read_toml(path: Path) -> dict[str, Any]:
     """Read a TOML file as a dictionary."""
 
+    if tomllib is None:
+        raise SystemExit("Python 3.11+ is required for TOML parsing")
     with path.open("rb") as handle:
         return tomllib.load(handle)
 
@@ -260,7 +266,7 @@ def wait_text(wait_policy: str) -> str:
     """Return the prompt wait instruction."""
 
     if wait_policy == "strict":
-        return "parent will wait for all spawned agents before next work"
+        return "parent will wait for all spawned agents before substantive next work"
     return "user explicitly requested asynchronous delegation"
 
 
@@ -326,7 +332,8 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "task": args.task,
         "mode": args.mode,
-        "scope": args.scope,
+        "scope": scope,
+        "scope_items": args.scope,
         "wait_policy": args.wait_policy,
         "rendezvous_required": args.wait_policy == "strict",
         "roles": [role.to_dict() for role in roles],

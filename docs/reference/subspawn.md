@@ -132,9 +132,9 @@ Bad fanout examples:
 
 ## Mandatory Spawn Contract
 
-Every spawned prompt should include the fields below. The planner emits this
-shape directly so prompts can be copied into `spawn_agent` calls without
-reconstructing the contract by hand.
+Every spawned prompt should include the fields below. Planner output is the
+authoritative copy-ready shape; the block below is the conceptual contract it
+must preserve.
 
 ```text
 Task: one bounded task or question
