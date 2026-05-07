@@ -342,8 +342,23 @@ def validate_paths(paths: list[Path]) -> list[ValidationIssue]:
 
 
 def resolve_destination(args: argparse.Namespace) -> Path:
+    """Return the resolved install destination for write commands.
+
+    Args:
+        args: Parsed command-line arguments with destination options.
+
+    Returns:
+        Path: Resolved destination directory.
+
+    Raises:
+        SystemExit: If target is invalid or destination is a file.
+    """
+
     if getattr(args, "dest", None):
-        return Path(args.dest).expanduser().resolve()
+        dest = Path(args.dest).expanduser().resolve()
+        if dest.exists() and not dest.is_dir():
+            raise SystemExit(f"destination must be a directory: {dest}")
+        return dest
     if args.target == "global":
         return global_agents_dir()
     if args.target == "project":
@@ -477,9 +492,15 @@ def project_agents_dir(project_dir: str) -> Path:
 
     Returns:
         Path: Resolved project agents directory.
+
+    Raises:
+        SystemExit: If project_dir exists and is not a directory.
     """
 
-    return Path(project_dir).expanduser().resolve() / ".codex" / "agents"
+    root = Path(project_dir).expanduser().resolve()
+    if root.exists() and not root.is_dir():
+        raise SystemExit(f"project_dir must be a directory: {root}")
+    return root / ".codex" / "agents"
 
 
 def installed_templates(dest: Path) -> dict[str, Path]:

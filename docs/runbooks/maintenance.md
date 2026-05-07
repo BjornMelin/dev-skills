@@ -57,7 +57,8 @@ Use `--overwrite` carefully. Global roles may be hand-edited.
 4. Run `list --packs`.
 5. Run `status` to inspect both global and project installs, then run
    `plan-sync` against the intended target before writing.
-6. Smoke test relevant packs.
+6. Stage the smoke project for relevant packs; add `--run-codex` when you need a
+   full Codex execution smoke.
 
 Commands:
 
@@ -66,6 +67,7 @@ python3 skills/subagent-creator/scripts/subagent_creator.py list --packs
 python3 skills/subagent-creator/scripts/subagent_creator.py status --pack docs --project-dir . --include-extra
 python3 skills/subagent-creator/scripts/subagent_creator.py plan-sync --pack docs --target project --project-dir . --include-extra
 python3 skills/subagent-creator/scripts/subagent_creator.py smoke --pack docs
+python3 skills/subagent-creator/scripts/subagent_creator.py smoke --pack docs --run-codex
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/subagent-creator/templates/agents
 ```
 
