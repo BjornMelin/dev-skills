@@ -5,6 +5,20 @@ user explicitly asked for subagents or delegation.
 
 ## Good Fanout Shape
 
+Start with the planner:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py list-presets
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset research \
+  --task "Research current Codex subagent docs" \
+  --scope "official OpenAI docs and official GitHub repositories only"
+```
+
+The planner emits role metadata, copy-ready spawn prompts, and a synthesis
+checklist that repeats the strict wait requirement. Use `--json` when you want
+to feed the plan into another tool or script.
+
 Example deep research batch:
 
 - `openai_docs_researcher`: official OpenAI docs lane.
@@ -35,22 +49,32 @@ After spawning:
 
 ## Prompt Shape
 
+Example planner output for `openai_docs_researcher`:
+
 ```text
 Task: Research current official OpenAI docs for Codex custom subagents and summarize only confirmed current behavior.
 Scope: Official OpenAI docs and official OpenAI GitHub repositories only.
-Mode: read-only.
+Mode: read-only; do not edit files, stage changes, or commit.
 Wait: parent will wait for all spawned agents before substantive next work.
 Role: openai_docs_researcher.
-Model: use role default.
-Reasoning: use role default.
+Model: gpt-5.5.
+Reasoning: medium.
 Return format:
-- Status
+- Status (`complete`, `partial`, or `blocked`)
 - Official sources read
+- Sources hydrated
 - Current findings
+- Claims with confidence and source IDs
 - Deprecated or changed guidance
+- Provider limits
+- Privacy notes
 - Open questions
+- Recommended next verification
 - Risks/blockers
 ```
+
+For edit-capable plans, pass `--mode edit` only with disjoint ownership in
+`--scope`, then keep each worker's write surface non-overlapping.
 
 ## Synthesis Pattern
 
@@ -90,4 +114,3 @@ If a subagent does not finish:
 2. Wait once more with a bounded timeout.
 3. Close it if no longer useful.
 4. Mark its lane incomplete in synthesis.
-

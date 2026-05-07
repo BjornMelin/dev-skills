@@ -637,7 +637,7 @@ codex-research --json doctor
 codex-research --json eval
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 git diff --check
 ```

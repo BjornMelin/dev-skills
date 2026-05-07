@@ -44,8 +44,9 @@ There is no single repo-wide test harness. Treat the following as the required g
 
 - Any skill: `python3 tools/skill/quick_validate.py skills/<skill-name>`
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
-- Python helpers: `python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts`
-- Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents`
+- Python helpers: `python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts`
+- Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents`
+- Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
 - Rust CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
 - Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
@@ -69,7 +70,7 @@ If you add scripts, keep them runnable without external secrets and avoid networ
 - Use `codex-research` for provider planning, Context7 REST, GitHub REST, direct fetch probes, Firecrawl calls, evidence ledgers, reports, cache, doctor, and evals.
 - Use native Codex web tools for current official facts; `codex-research` records provider evidence and handles external calls it owns directly.
 - Use `skills/subagent-creator/scripts/subagent_creator.py` to validate or install custom agent templates.
-- Use `skills/subspawn` when spawning agents. After spawning a planned batch, wait for every spawned subagent before substantive next work or final synthesis.
+- Use `skills/subspawn` when spawning agents. Use `skills/subspawn/scripts/subspawn_plan.py` for nontrivial fanout plans. After spawning a planned batch, wait for every spawned subagent before substantive next work or final synthesis.
 
 ## Commit & Pull Request Guidelines
 

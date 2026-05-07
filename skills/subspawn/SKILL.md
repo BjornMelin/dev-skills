@@ -57,6 +57,22 @@ Before spawning:
 4. Default to read-only exploration unless scoped edits materially advance the
    task.
 
+For nontrivial batches, generate a plan before spawning:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset research \
+  --task "Research current Codex subagent docs" \
+  --scope "official OpenAI docs and GitHub only"
+```
+
+Use `--role` for explicit custom role selection, `--mode edit` only with
+disjoint write surfaces, and `--json` when another tool needs to consume the
+plan. Run `validate-roles` after changing subagent templates.
+Packaged standalone `subspawn` installs include local preset template copies in
+`templates/agents/`; full repo checkouts prefer the sibling deep-researcher and
+subagent-creator templates first.
+
 ## Fan-Out Rules
 
 - Prefer 1-3 focused subagents.
@@ -190,12 +206,15 @@ Model: inherited, custom-agent pinned, or explicit override with reason
 Reasoning: inherited, custom-agent pinned, or explicit override with reason
 Return format:
 - Status
-- Evidence
-- Files inspected/changed
-- Commands run
-- Findings
+- Evidence or role-specific source headings
+- Files inspected/changed, queries run, or sources hydrated
+- Commands run or provider calls
+- Findings or claims with confidence and source IDs
 - Risks/blockers
 ```
+
+When a custom role template provides a narrower return contract, use the
+template-specific headings emitted by the planner.
 
 For edit-capable workers, also say:
 
@@ -271,6 +290,16 @@ Good probe:
 - disjoint bounded questions
 - strict wait-for-all synthesis
 - each spawn includes full mandatory spawn contract
+
+Planning-only smoke:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset review \
+  --task "Review this PR for correctness and test gaps" \
+  --scope "current PR diff only"
+```
 
 ## Failure Modes
 

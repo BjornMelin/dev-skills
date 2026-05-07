@@ -90,12 +90,15 @@ Deliver:
 ```text
 Use $subspawn $deep-researcher.
 
+First generate the orchestration plan:
+python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "<question>" --scope "official docs, GitHub source, releases, and cited evidence only"
+
 Spawn exactly three read-only subagents and wait for all before doing any other substantive work:
 1. openai_docs_researcher: official docs lane for <question>.
 2. github_researcher: GitHub/source/release lane for <question>.
 3. citation_auditor: audit the evidence quality after the other findings are available; if it starts before they are ready, audit the parent-provided sources only.
 
-Each subagent prompt must include scope, read-only mode, strict wait expectation, role, inherited model/effort, and return sections:
+Use the generated spawn prompts as the base contract. Each subagent prompt must include scope, read-only mode, strict wait expectation, role, inherited model/effort, and return sections:
 - Status
 - Sources hydrated
 - Claims with confidence and source IDs
@@ -146,6 +149,7 @@ Check:
 
 Run:
 python3 skills/subagent-creator/scripts/subagent_creator.py validate <path>
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subagent-creator/scripts/subagent_creator.py diff --target global --include-extra
 
 Return prioritized fixes and exact files to edit.
@@ -187,9 +191,12 @@ codex-research --json eval
 tmp=$(mktemp -d)
 codex-research --json run init validation-smoke --profile quick --topic github --out "$tmp/run.json"
 codex-research --json run debit --run "$tmp/run.json" --provider github --count 1 --note validation
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
+python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
+python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 
 Report exact command outcomes and residual risk.

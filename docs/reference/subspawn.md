@@ -8,6 +8,66 @@ skills/subspawn/
 
 Purpose: bounded subagent delegation and synthesis policy for Codex sessions.
 
+## Planner CLI
+
+Path:
+
+```text
+skills/subspawn/scripts/subspawn_plan.py
+```
+
+Use the planner before nontrivial fanout to make role selection, scope, wait
+policy, and synthesis expectations explicit.
+
+List presets:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py list-presets
+```
+
+Generate a strict research fanout plan:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset research \
+  --task "Research current Codex subagent docs" \
+  --scope "official OpenAI docs and official GitHub repositories only"
+```
+
+Generate JSON for another tool:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset dependency \
+  --task "Assess whether the dependency upgrade is safe" \
+  --scope "package docs, release notes, source, and issue tracker" \
+  --json
+```
+
+Validate available role names and return-contract headings:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
+```
+
+Default presets:
+
+| Preset | Roles |
+| --- | --- |
+| `research` | `openai_docs_researcher`, `github_researcher`, `citation_auditor` |
+| `dependency` | `context7_researcher`, `source_validator`, `github_researcher` |
+| `review` | `reviewer`, `false_positive_validator`, `test_runner` |
+| `implementation` | `repo_explorer`, `implementation_worker`, `test_runner` |
+| `docs` | `docs_researcher`, `docs_auditor`, `citation_auditor` |
+
+Use `--role` to select explicit roles, `--mode edit` only when write surfaces
+are disjoint, `--max-agents` to keep the batch bounded, and
+`--allow-large-batch` only when the user explicitly requests a larger batch.
+In a full repository checkout, the planner loads the deeper research and
+subagent template directories first. In a packaged standalone `subspawn` skill,
+it falls back to the local `skills/subspawn/templates/agents/` copies so preset
+plans remain usable without sibling skills.
+
 ## Core Contract
 
 The main Codex session owns:
@@ -76,7 +136,9 @@ Bad fanout examples:
 
 ## Mandatory Spawn Contract
 
-Every spawned prompt should include:
+Every spawned prompt should include the fields below. Planner output is the
+authoritative copy-ready shape; the block below is the conceptual contract it
+must preserve.
 
 ```text
 Task: one bounded task or question
@@ -88,12 +150,15 @@ Model: inherited, custom-agent pinned, or explicit override with reason
 Reasoning: inherited, custom-agent pinned, or explicit override with reason
 Return format:
 - Status
-- Evidence
-- Files inspected/changed
-- Commands run
-- Findings
+- Evidence or role-specific source headings
+- Files inspected/changed, queries run, or sources hydrated
+- Commands run or provider calls
+- Findings or claims with confidence and source IDs
 - Risks/blockers
 ```
+
+Template roles may emit narrower return headings from their TOML
+`developer_instructions`; built-in roles use the generic minimum shown above.
 
 ## Model and Effort
 
@@ -135,4 +200,3 @@ If a role/model override is rejected:
 1. retry with a fresh prompt and no full-context fork;
 2. omit per-call model/effort if a custom role pins them;
 3. fall back to built-in `explorer`, `worker`, or `default` when needed.
-

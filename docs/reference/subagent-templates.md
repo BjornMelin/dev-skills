@@ -57,6 +57,15 @@ Use `list --packs` for the exact current map:
 python3 skills/subagent-creator/scripts/subagent_creator.py list --packs
 ```
 
+Validate planner-visible role names and return contracts:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
+```
+
+`skills/subspawn/templates/agents/` contains packaged fallback copies for the
+planner presets. Keep those copies aligned when changing preset role contracts.
+
 ## Role Selection Guidance
 
 Use the narrowest role that matches the question.
@@ -100,4 +109,3 @@ Research-specific roles may add:
 - No file edits unless the role explicitly owns implementation.
 - No external scraping of private material without explicit user permission.
 - Parent prompt overrides role defaults.
-
