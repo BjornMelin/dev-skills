@@ -52,8 +52,8 @@ codex-research run status --run .codex/research/run.json
 ```
 
 Native Codex web calls are not visible to the CLI. Debit them manually with
-`codex-research run debit --provider codex-web` when they are part of the same
-budgeted run.
+`codex-research run debit --run .codex/research/run.json --provider codex-web`
+when they are part of the same budgeted run.
 
 ## Firecrawl Policy
 
