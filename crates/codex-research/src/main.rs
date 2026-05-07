@@ -12,7 +12,7 @@ use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use directories::BaseDirs;
-use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, RANGE, USER_AGENT};
+use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, LINK, RANGE, USER_AGENT};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -768,6 +768,7 @@ struct FirecrawlScrape {
 struct GithubResponse {
     value: Value,
     rate_limit: Value,
+    pagination: Value,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1434,23 +1435,24 @@ async fn handle_github(
             )?;
             let issue_url = format!("https://api.github.com/repos/{repo}/issues/{number}");
             let issue = github_get_tracked(&budget, &client, &issue_url, &[], retries).await?;
+            let mut pagination = serde_json::Map::new();
             let comments_value = if comments {
                 let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
-                github_get_tracked(
+                let response = track_provider_result(
                     &budget,
-                    &client,
-                    &url,
-                    &[("per_page", "100".to_string())],
-                    retries,
+                    ProviderKind::Github,
+                    github_get_response(&client, &url, &[("per_page", "100".to_string())], retries),
                 )
-                .await?
+                .await?;
+                pagination.insert("comments".to_string(), response.pagination);
+                response.value
             } else {
                 json!([])
             };
             (
                 json!({ "issue": issue, "comments": comments_value }),
                 github_repo_url(&repo, &format!("issues/{number}")),
-                json!({ "operation": "issue", "repo": repo, "number": number, "comments": comments, "github_calls": call_count }),
+                json!({ "operation": "issue", "repo": repo, "number": number, "comments": comments, "github_calls": call_count, "pagination": pagination }),
                 budget,
             )
         }
@@ -1466,59 +1468,58 @@ async fn handle_github(
             maybe_debit(&budget, ProviderKind::Github, call_count, Some("github pr"))?;
             let pr_url = format!("https://api.github.com/repos/{repo}/pulls/{number}");
             let pr = github_get_tracked(&budget, &client, &pr_url, &[], retries).await?;
+            let mut pagination = serde_json::Map::new();
             let files_value = if files {
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/files");
-                github_get_tracked(
+                let response = track_provider_result(
                     &budget,
-                    &client,
-                    &url,
-                    &[("per_page", "100".to_string())],
-                    retries,
+                    ProviderKind::Github,
+                    github_get_response(&client, &url, &[("per_page", "100".to_string())], retries),
                 )
-                .await?
+                .await?;
+                pagination.insert("files".to_string(), response.pagination);
+                response.value
             } else {
                 json!([])
             };
             let comments_value = if comments {
                 let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
-                let issue_comments = github_get_tracked(
+                let issue_response = track_provider_result(
                     &budget,
-                    &client,
-                    &url,
-                    &[("per_page", "100".to_string())],
-                    retries,
+                    ProviderKind::Github,
+                    github_get_response(&client, &url, &[("per_page", "100".to_string())], retries),
                 )
                 .await?;
+                pagination.insert("issue_comments".to_string(), issue_response.pagination);
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/comments");
-                let review_comments = github_get_tracked(
+                let review_response = track_provider_result(
                     &budget,
-                    &client,
-                    &url,
-                    &[("per_page", "100".to_string())],
-                    retries,
+                    ProviderKind::Github,
+                    github_get_response(&client, &url, &[("per_page", "100".to_string())], retries),
                 )
                 .await?;
-                json!({ "issue_comments": issue_comments, "review_comments": review_comments })
+                pagination.insert("review_comments".to_string(), review_response.pagination);
+                json!({ "issue_comments": issue_response.value, "review_comments": review_response.value })
             } else {
                 json!({ "issue_comments": [], "review_comments": [] })
             };
             let reviews_value = if reviews {
                 let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/reviews");
-                github_get_tracked(
+                let response = track_provider_result(
                     &budget,
-                    &client,
-                    &url,
-                    &[("per_page", "100".to_string())],
-                    retries,
+                    ProviderKind::Github,
+                    github_get_response(&client, &url, &[("per_page", "100".to_string())], retries),
                 )
-                .await?
+                .await?;
+                pagination.insert("reviews".to_string(), response.pagination);
+                response.value
             } else {
                 json!([])
             };
             (
                 json!({ "pull_request": pr, "files": files_value, "comments": comments_value, "reviews": reviews_value }),
                 github_repo_url(&repo, &format!("pull/{number}")),
-                json!({ "operation": "pr", "repo": repo, "number": number, "files": files, "comments": comments, "reviews": reviews, "github_calls": call_count }),
+                json!({ "operation": "pr", "repo": repo, "number": number, "files": files, "comments": comments, "reviews": reviews, "github_calls": call_count, "pagination": pagination }),
                 budget,
             )
         }
@@ -2393,8 +2394,13 @@ async fn github_get_response(
             continue;
         }
         let rate_limit = github_rate_limit_metadata(resp.headers());
+        let pagination = github_pagination_metadata(resp.headers());
         let value = resp.error_for_status()?.json::<Value>().await?;
-        return Ok(GithubResponse { value, rate_limit });
+        return Ok(GithubResponse {
+            value,
+            rate_limit,
+            pagination,
+        });
     }
     unreachable!("github retry loop always returns or bails")
 }
@@ -2413,6 +2419,20 @@ fn github_rate_limit_metadata(headers: &HeaderMap) -> Value {
         }
     }
     Value::Object(out)
+}
+
+fn github_pagination_metadata(headers: &HeaderMap) -> Value {
+    let link = headers
+        .get(LINK)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    if link.is_empty() {
+        return json!({ "truncated": false });
+    }
+    json!({
+        "truncated": link.split(',').any(|part| part.contains("rel=\"next\"")),
+        "link": link
+    })
 }
 
 async fn context7_send(request: reqwest::RequestBuilder) -> Result<Value> {
@@ -3782,6 +3802,22 @@ mod tests {
         assert_eq!(github_issue_call_count(true), 2);
         assert_eq!(github_pr_call_count(false, false, false), 1);
         assert_eq!(github_pr_call_count(true, true, true), 5);
+    }
+
+    #[test]
+    fn github_pagination_metadata_marks_truncated_link_headers() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            LINK,
+            HeaderValue::from_static(
+                "<https://api.github.com/repositories/1/pulls/2/files?page=2>; rel=\"next\", <https://api.github.com/repositories/1/pulls/2/files?page=4>; rel=\"last\"",
+            ),
+        );
+
+        let metadata = github_pagination_metadata(&headers);
+
+        assert_eq!(metadata["truncated"], true);
+        assert!(metadata["link"].as_str().unwrap().contains("rel=\"next\""));
     }
 
     #[test]
