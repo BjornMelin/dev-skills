@@ -2169,8 +2169,8 @@ fn evaluate_eval_task(task: &EvalTask) -> EvalAssertions {
 
 fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let url = required_str(&task.input, "url")?;
-    let body = optional_str(&task.input, "body").unwrap_or("");
-    let content_type = optional_str(&task.input, "content_type");
+    let body = optional_str(&task.input, "body")?.unwrap_or("");
+    let content_type = optional_str(&task.input, "content_type")?;
     let report = classify_body(url, content_type, None, body);
 
     assertions
@@ -2180,7 +2180,7 @@ fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Resu
         .details
         .insert("reason".to_string(), json!(report.reason));
 
-    if let Some(expected_route) = optional_str(&task.expected, "route") {
+    if let Some(expected_route) = optional_str(&task.expected, "route")? {
         assert_text_eq(
             assertions,
             "route",
@@ -2188,7 +2188,7 @@ fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Resu
             route_name(report.route),
         );
     }
-    if let Some(expected_privacy) = optional_str(&task.expected, "privacy") {
+    if let Some(expected_privacy) = optional_str(&task.expected, "privacy")? {
         let privacy = classify_privacy(url);
         assertions
             .details
@@ -2205,18 +2205,18 @@ fn evaluate_route_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Resu
 
 fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let config = ResearchConfig::default();
-    let url = optional_str(&task.input, "url");
-    let metadata_input = optional_str(&task.input, "metadata_text");
+    let url = optional_str(&task.input, "url")?;
+    let metadata_input = optional_str(&task.input, "metadata_text")?;
     if url.is_none() && metadata_input.is_none() {
         bail!("privacy-redaction requires `url` or `metadata_text` input");
     }
     if url.is_none()
-        && (optional_str(&task.expected, "privacy").is_some()
-            || optional_str(&task.expected, "redacted_url").is_some())
+        && (optional_str(&task.expected, "privacy")?.is_some()
+            || optional_str(&task.expected, "redacted_url")?.is_some())
     {
         bail!("privacy-redaction expectations `privacy` and `redacted_url` require `url` input");
     }
-    if metadata_input.is_none() && optional_str(&task.expected, "metadata_text").is_some() {
+    if metadata_input.is_none() && optional_str(&task.expected, "metadata_text")?.is_some() {
         bail!("privacy-redaction expectation `metadata_text` requires `metadata_text` input");
     }
 
@@ -2229,7 +2229,7 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
         assertions
             .details
             .insert("redacted_url".to_string(), json!(redacted));
-        if let Some(expected_privacy) = optional_str(&task.expected, "privacy") {
+        if let Some(expected_privacy) = optional_str(&task.expected, "privacy")? {
             assert_text_eq(
                 assertions,
                 "privacy",
@@ -2237,7 +2237,7 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
                 privacy_class_name(privacy),
             );
         }
-        if let Some(expected_redacted) = optional_str(&task.expected, "redacted_url") {
+        if let Some(expected_redacted) = optional_str(&task.expected, "redacted_url")? {
             let actual = assertions
                 .details
                 .get("redacted_url")
@@ -2252,7 +2252,7 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
         assertions
             .details
             .insert("metadata_text".to_string(), json!(redacted));
-        if let Some(expected_text) = optional_str(&task.expected, "metadata_text") {
+        if let Some(expected_text) = optional_str(&task.expected, "metadata_text")? {
             let actual = assertions
                 .details
                 .get("metadata_text")
@@ -2268,8 +2268,8 @@ fn evaluate_privacy_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Re
 fn evaluate_budget_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let query = required_str(&task.input, "query")?;
     let profile =
-        parse_research_profile(optional_str(&task.input, "profile").unwrap_or("standard"))?;
-    let topic = parse_topic_kind(optional_str(&task.input, "topic").unwrap_or("general"))?;
+        parse_research_profile(optional_str(&task.input, "profile")?.unwrap_or("standard"))?;
+    let topic = parse_topic_kind(optional_str(&task.input, "topic")?.unwrap_or("general"))?;
     let plan = build_plan(query, profile, topic, &ResearchConfig::default());
     let route_order = plan
         .route_order
@@ -2296,7 +2296,7 @@ fn evaluate_budget_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Res
             ));
         }
     }
-    if let Some(expected_budgets) = task.expected.get("budgets").and_then(Value::as_object) {
+    if let Some(expected_budgets) = optional_object(&task.expected, "budgets")? {
         for (key, expected) in expected_budgets {
             let Some(expected) = expected.as_u64() else {
                 assertions
@@ -2462,11 +2462,17 @@ fn report_has_heading(report: &str, section: &str) -> bool {
 }
 
 fn required_str<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
-    optional_str(value, key).with_context(|| format!("missing string input `{key}`"))
+    optional_str(value, key)?.with_context(|| format!("missing string input `{key}`"))
 }
 
-fn optional_str<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key).and_then(Value::as_str)
+fn optional_str<'a>(value: &'a Value, key: &str) -> Result<Option<&'a str>> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_str()
+        .map(Some)
+        .with_context(|| format!("`{key}` must be a string"))
 }
 
 fn required_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
@@ -2474,6 +2480,19 @@ fn required_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
         .get(key)
         .and_then(Value::as_array)
         .with_context(|| format!("missing array input `{key}`"))
+}
+
+fn optional_object<'a>(
+    value: &'a Value,
+    key: &str,
+) -> Result<Option<&'a serde_json::Map<String, Value>>> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_object()
+        .map(Some)
+        .with_context(|| format!("`{key}` must be an object"))
 }
 
 fn optional_u64(value: &Value, key: &str) -> Result<Option<u64>> {
@@ -4379,6 +4398,55 @@ mod tests {
                 .failures
                 .iter()
                 .any(|failure| failure.contains("claim-1.sources[1]"))
+        );
+    }
+
+    #[test]
+    fn eval_rejects_malformed_scalar_expectations() {
+        let task = EvalTask {
+            id: "bad-route".to_string(),
+            kind: "route-classification".to_string(),
+            description: "scalar validation".to_string(),
+            input: json!({
+                "url": "https://github.com/example/repo/blob/main/README.md",
+                "body": "# README"
+            }),
+            expected: json!({
+                "route": ["github"]
+            }),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("route"))
+        );
+    }
+
+    #[test]
+    fn budget_eval_rejects_malformed_budget_expectations() {
+        let task = EvalTask {
+            id: "bad-budgets".to_string(),
+            kind: "budget-plan".to_string(),
+            description: "budget validation".to_string(),
+            input: json!({
+                "query": "verify dependency behavior",
+                "profile": "deep",
+                "topic": "dependency"
+            }),
+            expected: json!({
+                "budgets": []
+            }),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("budgets"))
         );
     }
 
