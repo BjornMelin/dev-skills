@@ -48,7 +48,7 @@ Tool fallback:
 ## Commands
 
 ```text
-codex-research [--json] <command>
+codex-research [--json] [--config <path>] <command>
 ```
 
 Commands:

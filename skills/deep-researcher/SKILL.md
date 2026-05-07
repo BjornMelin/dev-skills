@@ -74,7 +74,7 @@ Use hybrid GitHub access:
 - In Codex sessions, prefer the GitHub app/plugin for PRs, private repos, review
   threads, workflow logs, and authenticated repository metadata.
 - Use `codex-research github` for standalone, replayable, and reportable REST
-  calls. It falls back through `gh auth token`, `GITHUB_TOKEN`, `GH_TOKEN`, then
+  calls. It falls back through `GITHUB_TOKEN`, `GH_TOKEN`, `gh auth token`, then
   public unauthenticated mode.
 - Target and hydrate. Generate narrow query shards, respect search result and
   rate limits, then fetch full files, issue threads, releases, or compare ranges
