@@ -329,11 +329,9 @@ def resolve_destination(args: argparse.Namespace) -> Path:
     if getattr(args, "dest", None):
         return Path(args.dest).expanduser().resolve()
     if args.target == "global":
-        codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser()
-        return (codex_home / "agents").resolve()
+        return global_agents_dir()
     if args.target == "project":
-        project_dir = Path(args.project_dir).expanduser().resolve()
-        return project_dir / ".codex" / "agents"
+        return project_agents_dir(args.project_dir)
     raise SystemExit("target must be global or project")
 
 
@@ -620,7 +618,7 @@ def cmd_prune(args: argparse.Namespace) -> int:
     selected = selected_template_map(args.names, args.pack)
     selected_files = {path.name for path in selected.values()}
     dest = resolve_destination(args)
-    installed = sorted(dest.glob("*.toml")) if dest.exists() else []
+    installed = sorted(installed_templates(dest).values())
     stale = [path for path in installed if path.name not in selected_files]
     dry_run = args.dry_run or not args.confirm
     backup = not args.no_backup
@@ -852,11 +850,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "error": "not found",
     }
 
-    codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex")).expanduser().resolve()
-    global_agents = codex_home / "agents"
+    codex_home_path = codex_home()
+    global_agents = global_agents_dir()
     project_dir = Path(args.project_dir).expanduser().resolve()
-    project_agents = project_dir / ".codex" / "agents"
-    config_path = codex_home / "config.toml"
+    project_agents = project_agents_dir(args.project_dir)
+    config_path = codex_home_path / "config.toml"
 
     config: dict[str, Any] = {}
     config_error: str | None = None
@@ -872,7 +870,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "codex_bin": codex_bin,
         "codex_version": codex_version,
         "codex_exec_help_available": codex_help.get("returncode") == 0,
-        "codex_home": str(codex_home),
+        "codex_home": str(codex_home_path),
         "config_path": str(config_path),
         "config_exists": config_path.exists(),
         "config_error": config_error,
