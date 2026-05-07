@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 use url::Url;
 
 const GITHUB_API_VERSION: &str = "2026-03-10";
-const USER_AGENT_VALUE: &str = "codex-research/0.1";
+const USER_AGENT_VALUE: &str = "codex-research/0.2";
 
 #[derive(Parser)]
 #[command(name = "codex-research")]
@@ -29,6 +29,14 @@ struct Cli {
         help = "Emit machine-readable JSON when supported"
     )]
     json: bool,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "PATH",
+        help = "Load codex-research TOML config from an explicit path"
+    )]
+    config: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -69,6 +77,16 @@ enum Commands {
         #[command(subcommand)]
         command: CacheCommand,
     },
+    /// Manage codex-research TOML configuration.
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
+    /// Manage per-research-run budgets and state.
+    Run {
+        #[command(subcommand)]
+        command: RunCommand,
+    },
     /// Run deterministic offline checks and optional live-provider smoke checks.
     Eval(EvalArgs),
 }
@@ -89,6 +107,18 @@ struct SearchArgs {
     topic: TopicKind,
 }
 
+#[derive(Args, Clone, Debug, Default)]
+struct BudgetArgs {
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Debit this research run before calling a provider"
+    )]
+    run: Option<PathBuf>,
+    #[arg(long, help = "Skip run-budget debit even when --run is provided")]
+    no_budget: bool,
+}
+
 #[derive(Subcommand)]
 enum FetchCommand {
     /// Classify a URL and recommend direct/browser/Firecrawl routing.
@@ -96,6 +126,8 @@ enum FetchCommand {
         url: String,
         #[arg(long, default_value_t = 65_536)]
         max_bytes: usize,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Fetch a URL with direct HTTP and optionally store it in the content-addressed cache.
     Get {
@@ -104,6 +136,8 @@ enum FetchCommand {
         max_bytes: usize,
         #[arg(long)]
         store: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Scrape a URL through Firecrawl v2.
     Firecrawl {
@@ -119,6 +153,12 @@ enum FetchCommand {
         store_in_cache: bool,
         #[arg(long, default_value_t = 60_000)]
         timeout_ms: u64,
+        #[arg(long, value_enum)]
+        privacy: Option<PrivacyClass>,
+        #[arg(long)]
+        allow_private_external: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
 }
 
@@ -130,6 +170,10 @@ enum Context7Command {
         library: String,
         #[arg(long)]
         query: String,
+        #[arg(long)]
+        version: Option<String>,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Retrieve documentation context for a library ID.
     Context {
@@ -139,6 +183,8 @@ enum Context7Command {
         query: String,
         #[arg(long)]
         fast: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Trigger a Context7 refresh.
     Refresh {
@@ -146,6 +192,8 @@ enum Context7Command {
         library_name: String,
         #[arg(long)]
         branch: Option<String>,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
 }
 
@@ -156,24 +204,84 @@ enum GithubCommand {
         query: String,
         #[arg(long, default_value_t = 10)]
         per_page: u8,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Search code. This endpoint has strict limits; use narrow queries.
     SearchCode {
         query: String,
         #[arg(long, default_value_t = 10)]
         per_page: u8,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Search issues and pull requests.
     SearchIssues {
         query: String,
         #[arg(long, default_value_t = 10)]
         per_page: u8,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// List repository releases.
     Releases {
         repo: String,
         #[arg(long, default_value_t = 10)]
         per_page: u8,
+        #[command(flatten)]
+        budget: BudgetArgs,
+    },
+    /// Fetch one release by tag or the latest release.
+    Release {
+        repo: String,
+        #[arg(long)]
+        tag: Option<String>,
+        #[arg(long)]
+        latest: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
+    },
+    /// Compare two refs and include changed-file metadata.
+    Compare {
+        repo: String,
+        base: String,
+        head: String,
+        #[arg(long, default_value_t = 100)]
+        per_page: u8,
+        #[arg(long, default_value_t = 1)]
+        page: u32,
+        #[command(flatten)]
+        budget: BudgetArgs,
+    },
+    /// List repository tags.
+    Tags {
+        repo: String,
+        #[arg(long, default_value_t = 30)]
+        per_page: u8,
+        #[command(flatten)]
+        budget: BudgetArgs,
+    },
+    /// Hydrate one issue and optionally comments.
+    Issue {
+        repo: String,
+        number: u32,
+        #[arg(long)]
+        comments: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
+    },
+    /// Hydrate one pull request and optional files, comments, and reviews.
+    Pr {
+        repo: String,
+        number: u32,
+        #[arg(long)]
+        files: bool,
+        #[arg(long)]
+        comments: bool,
+        #[arg(long)]
+        reviews: bool,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
     /// Fetch one repository file through the contents API.
     File {
@@ -181,6 +289,8 @@ enum GithubCommand {
         path: String,
         #[arg(long, default_value = "HEAD")]
         r#ref: String,
+        #[command(flatten)]
+        budget: BudgetArgs,
     },
 }
 
@@ -206,10 +316,12 @@ enum LedgerCommand {
 struct AddSourceArgs {
     #[arg(long, default_value = ".codex/research/ledger.jsonl")]
     ledger: PathBuf,
+    #[arg(long = "from-cache", value_name = "SOURCE_ID")]
+    from_cache: Option<String>,
     #[arg(long)]
-    provider: String,
+    provider: Option<String>,
     #[arg(long)]
-    url: String,
+    url: Option<String>,
     #[arg(long)]
     title: Option<String>,
     #[arg(long)]
@@ -244,6 +356,78 @@ enum CacheCommand {
     Init,
     /// Print cache table counts and paths.
     Stats,
+    /// List cached source metadata.
+    Sources {
+        #[arg(long)]
+        provider: Option<String>,
+        #[arg(long, default_value_t = 20)]
+        limit: u32,
+    },
+    /// Show one cached source.
+    Source { source_id: String },
+    /// Inspect route memory.
+    RouteMemory {
+        #[arg(long)]
+        domain: Option<String>,
+    },
+    /// Delete old cache rows while preserving blobs.
+    Prune {
+        #[arg(long = "older-than-days")]
+        older_than_days: i64,
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigCommand {
+    /// Write a starter config file.
+    Init {
+        #[arg(long)]
+        path: Option<PathBuf>,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show the effective config.
+    Show {
+        #[arg(long)]
+        effective: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum RunCommand {
+    /// Initialize a research run state file.
+    Init {
+        query: String,
+        #[arg(long, value_enum, default_value_t = ResearchProfile::Standard)]
+        profile: ResearchProfile,
+        #[arg(long, value_enum, default_value_t = TopicKind::General)]
+        topic: TopicKind,
+        #[arg(long, value_name = "PATH", default_value = ".codex/research/run.json")]
+        out: PathBuf,
+    },
+    /// Show run status.
+    Status {
+        #[arg(long, value_name = "PATH", default_value = ".codex/research/run.json")]
+        run: PathBuf,
+    },
+    /// Debit provider budget from a run state file.
+    Debit {
+        #[arg(long, value_name = "PATH", default_value = ".codex/research/run.json")]
+        run: PathBuf,
+        #[arg(long, value_enum)]
+        provider: ProviderKind,
+        #[arg(long, default_value_t = 1)]
+        count: u32,
+        #[arg(long)]
+        note: Option<String>,
+    },
+    /// Mark a run closed.
+    Close {
+        #[arg(long, value_name = "PATH", default_value = ".codex/research/run.json")]
+        run: PathBuf,
+    },
 }
 
 #[derive(Args)]
@@ -252,7 +436,7 @@ struct EvalArgs {
     live: bool,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, ValueEnum)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 enum ResearchProfile {
     Quick,
@@ -272,7 +456,7 @@ impl std::fmt::Display for ResearchProfile {
     }
 }
 
-#[derive(Clone, Copy, Debug, Serialize, ValueEnum)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 enum TopicKind {
     General,
@@ -296,6 +480,28 @@ enum Route {
     Opensrc,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+enum ProviderKind {
+    CodexWeb,
+    Context7,
+    Github,
+    Exa,
+    Direct,
+    Browser,
+    Firecrawl,
+    Opensrc,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+enum PrivacyClass {
+    Public,
+    SensitivePublic,
+    PrivateOrAuthenticated,
+    Ambiguous,
+}
+
 #[derive(Serialize)]
 struct DoctorReport {
     cache_dir: PathBuf,
@@ -315,15 +521,15 @@ struct ResearchPlan {
     rules: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 struct ProviderBudgets {
-    codex_web_queries: u8,
-    context7_calls: u8,
-    github_calls: u8,
-    exa_calls: u8,
-    direct_fetches: u8,
-    browser_fetches: u8,
-    firecrawl_calls: u8,
+    codex_web_queries: u32,
+    context7_calls: u32,
+    github_calls: u32,
+    exa_calls: u32,
+    direct_fetches: u32,
+    browser_fetches: u32,
+    firecrawl_calls: u32,
 }
 
 #[derive(Serialize)]
@@ -337,6 +543,16 @@ struct ProbeReport {
     app_shell_markers: Vec<String>,
     route: Route,
     reason: String,
+    route_memory: Vec<RouteMemoryHit>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RouteMemoryHit {
+    domain: String,
+    preferred_route: String,
+    successes: u32,
+    failures: u32,
+    updated_at: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -368,19 +584,225 @@ struct ClaimRecord {
     created_at: DateTime<Utc>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+struct ResearchConfig {
+    #[serde(default)]
+    profiles: ProfilesConfig,
+    #[serde(default)]
+    privacy: PrivacyConfig,
+    #[serde(default)]
+    providers: ProvidersConfig,
+    #[serde(default)]
+    cache: CacheConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct ProfilesConfig {
+    #[serde(default = "quick_budget")]
+    quick: ProviderBudgets,
+    #[serde(default = "standard_budget")]
+    standard: ProviderBudgets,
+    #[serde(default = "deep_budget")]
+    deep: ProviderBudgets,
+    #[serde(default = "exhaustive_budget")]
+    exhaustive: ProviderBudgets,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct PrivacyConfig {
+    #[serde(default = "deny_string")]
+    private_external_default: String,
+    #[serde(default = "deny_string")]
+    ambiguous_external_default: String,
+    #[serde(default)]
+    allow_private_external: bool,
+    #[serde(default = "default_true")]
+    redact_query_secrets: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+struct ProvidersConfig {
+    #[serde(default)]
+    github: GithubProviderConfig,
+    #[serde(default)]
+    context7: Context7ProviderConfig,
+    #[serde(default)]
+    firecrawl: FirecrawlProviderConfig,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct GithubProviderConfig {
+    #[serde(default = "default_github_per_page")]
+    per_page_default: u8,
+    #[serde(default = "default_github_per_page_max")]
+    per_page_max: u8,
+    #[serde(default = "default_backoff_retries")]
+    backoff_retries: u8,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Context7ProviderConfig {
+    #[serde(default = "default_cache_ttl_hours")]
+    cache_ttl_hours: u32,
+    #[serde(default = "default_true")]
+    prefer_version_pinned_ids: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct FirecrawlProviderConfig {
+    #[serde(default = "default_firecrawl_max_age_ms")]
+    default_max_age_ms: u64,
+    #[serde(default)]
+    latest_critical_max_age_ms: u64,
+    #[serde(default = "default_true")]
+    store_in_cache_default: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct CacheConfig {
+    #[serde(default = "default_cache_ttl_hours")]
+    source_metadata_ttl_hours: u32,
+    #[serde(default)]
+    store_raw_external_default: bool,
+}
+
+impl Default for ProfilesConfig {
+    fn default() -> Self {
+        Self {
+            quick: quick_budget(),
+            standard: standard_budget(),
+            deep: deep_budget(),
+            exhaustive: exhaustive_budget(),
+        }
+    }
+}
+
+impl Default for PrivacyConfig {
+    fn default() -> Self {
+        Self {
+            private_external_default: deny_string(),
+            ambiguous_external_default: deny_string(),
+            allow_private_external: false,
+            redact_query_secrets: true,
+        }
+    }
+}
+
+impl Default for GithubProviderConfig {
+    fn default() -> Self {
+        Self {
+            per_page_default: default_github_per_page(),
+            per_page_max: default_github_per_page_max(),
+            backoff_retries: default_backoff_retries(),
+        }
+    }
+}
+
+impl Default for Context7ProviderConfig {
+    fn default() -> Self {
+        Self {
+            cache_ttl_hours: default_cache_ttl_hours(),
+            prefer_version_pinned_ids: true,
+        }
+    }
+}
+
+impl Default for FirecrawlProviderConfig {
+    fn default() -> Self {
+        Self {
+            default_max_age_ms: default_firecrawl_max_age_ms(),
+            latest_critical_max_age_ms: 0,
+            store_in_cache_default: true,
+        }
+    }
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            source_metadata_ttl_hours: default_cache_ttl_hours(),
+            store_raw_external_default: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct ResearchRunState {
+    query: String,
+    profile: ResearchProfile,
+    topic: TopicKind,
+    status: RunStatus,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    budgets: ProviderBudgets,
+    spent: ProviderBudgets,
+    debits: Vec<RunDebit>,
+    provider_errors: Vec<ProviderError>,
+    source_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum RunStatus {
+    Open,
+    Closed,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct RunDebit {
+    provider: ProviderKind,
+    count: u32,
+    note: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct ProviderError {
+    provider: ProviderKind,
+    message: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ConfigReport {
+    path: Option<PathBuf>,
+    config: ResearchConfig,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct SourceCacheRecord {
+    id: String,
+    provider: String,
+    route: Option<String>,
+    url: String,
+    canonical_url: Option<String>,
+    title: Option<String>,
+    fetched_at: String,
+    freshness_status: String,
+    privacy_classification: String,
+    status: Option<u16>,
+    content_hash: Option<String>,
+    raw_body_stored: bool,
+    metadata: Value,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let loaded_config = load_config(cli.config.as_deref())?;
+    let config = loaded_config.config;
     match cli.command {
         Commands::Doctor => doctor(cli.json),
-        Commands::Plan(args) => output_plan(args, cli.json),
-        Commands::Search(args) => output_search_plan(args, cli.json),
-        Commands::Fetch { command } => handle_fetch(command, cli.json).await,
-        Commands::Context7 { command } => handle_context7(command, cli.json).await,
-        Commands::Github { command } => handle_github(command, cli.json).await,
+        Commands::Plan(args) => output_plan(args, &config, cli.json),
+        Commands::Search(args) => output_search_plan(args, &config, cli.json),
+        Commands::Fetch { command } => handle_fetch(command, &config, cli.json).await,
+        Commands::Context7 { command } => handle_context7(command, &config, cli.json).await,
+        Commands::Github { command } => handle_github(command, &config, cli.json).await,
         Commands::Ledger { command } => handle_ledger(command, cli.json),
         Commands::Report(args) => render_report(args, cli.json),
         Commands::Cache { command } => handle_cache(command, cli.json),
+        Commands::Config { command } => handle_config(command, loaded_config.path, cli.json),
+        Commands::Run { command } => handle_run(command, &config, cli.json),
         Commands::Eval(args) => run_eval(args, cli.json).await,
     }
 }
@@ -444,8 +866,8 @@ fn doctor(json_out: bool) -> Result<()> {
     }
 }
 
-fn output_plan(args: PlanArgs, json_out: bool) -> Result<()> {
-    let plan = build_plan(&args.query, args.profile, TopicKind::General);
+fn output_plan(args: PlanArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
+    let plan = build_plan(&args.query, args.profile, TopicKind::General, config);
     if json_out {
         print_json(&plan)
     } else {
@@ -470,8 +892,8 @@ fn output_plan(args: PlanArgs, json_out: bool) -> Result<()> {
     }
 }
 
-fn output_search_plan(args: SearchArgs, json_out: bool) -> Result<()> {
-    let plan = build_plan(&args.query, args.profile, args.topic);
+fn output_search_plan(args: SearchArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
+    let plan = build_plan(&args.query, args.profile, args.topic, config);
     if json_out {
         print_json(&plan)
     } else {
@@ -488,9 +910,18 @@ fn output_search_plan(args: SearchArgs, json_out: bool) -> Result<()> {
     }
 }
 
-async fn handle_fetch(command: FetchCommand, json_out: bool) -> Result<()> {
+async fn handle_fetch(
+    command: FetchCommand,
+    config: &ResearchConfig,
+    json_out: bool,
+) -> Result<()> {
     match command {
-        FetchCommand::Probe { url, max_bytes } => {
+        FetchCommand::Probe {
+            url,
+            max_bytes,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Direct, 1, Some("fetch probe"))?;
             let client = http_client()?;
             let report = probe_url(&client, &url, max_bytes).await?;
             if json_out {
@@ -511,17 +942,43 @@ async fn handle_fetch(command: FetchCommand, json_out: bool) -> Result<()> {
             url,
             max_bytes,
             store,
+            budget,
         } => {
+            maybe_debit(&budget, ProviderKind::Direct, 1, Some("fetch get"))?;
             let client = http_client()?;
             let fetched = direct_fetch(&client, &url, max_bytes).await?;
+            let paths = research_paths()?;
+            init_db(&paths)?;
+            let mut source_id = None;
             if store {
-                let paths = research_paths()?;
-                init_db(&paths)?;
                 let hash = store_blob(&paths, &fetched.raw_body)?;
-                record_source_cache(&paths, &url, "direct", fetched.status, &hash, None)?;
+                source_id = Some(record_source_cache(
+                    &paths,
+                    SourceCacheInsert {
+                        url: &url,
+                        provider: "direct",
+                        status: Some(fetched.status),
+                        content_hash: Some(&hash),
+                        route: Some("direct"),
+                        title: None,
+                        canonical_url: None,
+                        freshness_status: "current",
+                        privacy_classification: privacy_class_name(classify_privacy(&url)),
+                        raw_body_stored: true,
+                        metadata: json!({ "bytes": fetched.bytes }),
+                    },
+                )?);
             }
+            record_route_memory(
+                &paths,
+                &url,
+                Route::Direct,
+                true,
+                Some(fetched.status),
+                "direct fetch succeeded",
+            )?;
             if json_out {
-                print_json(&fetched)
+                print_json(&FetchedOutput { source_id, fetched })
             } else {
                 println!("{}", fetched.body);
                 Ok(())
@@ -532,67 +989,170 @@ async fn handle_fetch(command: FetchCommand, json_out: bool) -> Result<()> {
             fresh,
             store_in_cache,
             timeout_ms,
+            privacy,
+            allow_private_external,
+            budget,
         } => {
-            let value = firecrawl_scrape(&url, fresh, store_in_cache, timeout_ms).await?;
+            let privacy_class = privacy.unwrap_or_else(|| classify_privacy(&url));
+            enforce_external_privacy(
+                privacy_class,
+                allow_private_external || config.privacy.allow_private_external,
+                "firecrawl",
+            )?;
+            maybe_debit(
+                &budget,
+                ProviderKind::Firecrawl,
+                1,
+                Some("firecrawl scrape"),
+            )?;
+            let value = firecrawl_scrape(&url, fresh, store_in_cache, timeout_ms, config).await?;
+            let paths = research_paths()?;
+            init_db(&paths)?;
+            let source_id = record_source_cache(
+                &paths,
+                SourceCacheInsert {
+                    url: &url,
+                    provider: "firecrawl",
+                    status: Some(200),
+                    content_hash: None,
+                    route: Some("firecrawl"),
+                    title: None,
+                    canonical_url: Some(&url),
+                    freshness_status: if fresh { "current" } else { "unverified" },
+                    privacy_classification: privacy_class_name(privacy_class),
+                    raw_body_stored: false,
+                    metadata: json!({
+                        "fresh": fresh,
+                        "store_in_cache": store_in_cache,
+                        "timeout_ms": timeout_ms
+                    }),
+                },
+            )?;
+            record_route_memory(
+                &paths,
+                &url,
+                Route::Firecrawl,
+                true,
+                Some(200),
+                "firecrawl scrape succeeded",
+            )?;
+            let value = json!({ "source_id": source_id, "provider": "firecrawl", "data": value });
             print_json(&value)
         }
     }
 }
 
-async fn handle_context7(command: Context7Command, json_out: bool) -> Result<()> {
+async fn handle_context7(
+    command: Context7Command,
+    config: &ResearchConfig,
+    json_out: bool,
+) -> Result<()> {
     let api_key = required_env("CONTEXT7_API_KEY")?;
     let client = http_client()?;
-    let value = match command {
-        Context7Command::Search { library, query } => {
-            client
-                .get("https://context7.com/api/v2/libs/search")
-                .bearer_auth(api_key)
-                .query(&[("libraryName", library), ("query", query)])
-                .send()
-                .await?
-                .error_for_status()?
-                .json::<Value>()
-                .await?
+    let (value, source_url, metadata) = match command {
+        Context7Command::Search {
+            library,
+            query,
+            version,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Context7, 1, Some("context7 search"))?;
+            let version_pin_hint = version.as_ref().map(|version| {
+                json!({
+                    "slash": format!("/owner/repo/{version}"),
+                    "at": format!("/owner/repo@{version}")
+                })
+            });
+            let value = context7_send(
+                client
+                    .get("https://context7.com/api/v2/libs/search")
+                    .bearer_auth(&api_key)
+                    .query(&[("libraryName", library.clone()), ("query", query.clone())]),
+            )
+            .await?;
+            (
+                value,
+                "https://context7.com/api/v2/libs/search".to_string(),
+                json!({
+                    "operation": "search",
+                    "library": library,
+                    "query": query,
+                    "version": version,
+                    "version_pin_hint": version_pin_hint
+                }),
+            )
         }
         Context7Command::Context {
             library_id,
             query,
             fast,
+            budget,
         } => {
-            client
-                .get("https://context7.com/api/v2/context")
-                .bearer_auth(api_key)
-                .query(&[
-                    ("libraryId", library_id),
-                    ("query", query),
-                    ("type", "json".to_string()),
-                    ("fast", fast.to_string()),
-                ])
-                .send()
-                .await?
-                .error_for_status()?
-                .json::<Value>()
-                .await?
+            maybe_debit(&budget, ProviderKind::Context7, 1, Some("context7 context"))?;
+            let value = context7_send(
+                client
+                    .get("https://context7.com/api/v2/context")
+                    .bearer_auth(&api_key)
+                    .query(&[
+                        ("libraryId", library_id.clone()),
+                        ("query", query.clone()),
+                        ("type", "json".to_string()),
+                        ("fast", fast.to_string()),
+                    ]),
+            )
+            .await?;
+            (
+                value,
+                format!("https://context7.com{library_id}"),
+                json!({ "operation": "context", "library_id": library_id, "query": query, "fast": fast }),
+            )
         }
         Context7Command::Refresh {
             library_name,
             branch,
+            budget,
         } => {
+            maybe_debit(&budget, ProviderKind::Context7, 1, Some("context7 refresh"))?;
             let mut body = json!({ "libraryName": library_name });
-            if let Some(branch) = branch {
+            if let Some(branch) = branch.clone() {
                 body["branch"] = json!(branch);
             }
-            client
-                .post("https://context7.com/api/v1/refresh")
-                .bearer_auth(api_key)
-                .json(&body)
-                .send()
-                .await?
-                .error_for_status()?
-                .json::<Value>()
-                .await?
+            let value = context7_send(
+                client
+                    .post("https://context7.com/api/v1/refresh")
+                    .bearer_auth(&api_key)
+                    .json(&body),
+            )
+            .await?;
+            (
+                value,
+                format!("https://context7.com{library_name}"),
+                json!({ "operation": "refresh", "library_name": library_name, "branch": branch }),
+            )
         }
     };
+    let paths = research_paths()?;
+    init_db(&paths)?;
+    let source_id = record_source_cache(
+        &paths,
+        SourceCacheInsert {
+            url: &source_url,
+            provider: "context7",
+            status: Some(200),
+            content_hash: None,
+            route: Some("context7"),
+            title: None,
+            canonical_url: Some(&source_url),
+            freshness_status: "unverified",
+            privacy_classification: "public",
+            raw_body_stored: false,
+            metadata: merge_metadata(
+                metadata,
+                json!({ "cache_ttl_hours": config.providers.context7.cache_ttl_hours }),
+            ),
+        },
+    )?;
+    let value = json!({ "source_id": source_id, "provider": "context7", "data": value });
 
     if json_out {
         print_json(&value)
@@ -602,42 +1162,277 @@ async fn handle_context7(command: Context7Command, json_out: bool) -> Result<()>
     }
 }
 
-async fn handle_github(command: GithubCommand, json_out: bool) -> Result<()> {
+async fn handle_github(
+    command: GithubCommand,
+    config: &ResearchConfig,
+    json_out: bool,
+) -> Result<()> {
     let client = http_client()?;
-    let value = match command {
-        GithubCommand::SearchRepos { query, per_page } => {
-            github_get(
+    let per_page_max = config.providers.github.per_page_max;
+    let (value, source_url, metadata) = match command {
+        GithubCommand::SearchRepos {
+            query,
+            per_page,
+            budget,
+        } => {
+            maybe_debit(
+                &budget,
+                ProviderKind::Github,
+                1,
+                Some("github search repos"),
+            )?;
+            let per_page = per_page.min(per_page_max);
+            let url = "https://api.github.com/search/repositories";
+            let value = github_get(
                 &client,
-                "https://api.github.com/search/repositories",
-                &[("q", query), ("per_page", per_page.to_string())],
+                url,
+                &[("q", query.clone()), ("per_page", per_page.to_string())],
             )
-            .await?
+            .await?;
+            (
+                value,
+                github_api_source_url(url),
+                json!({ "operation": "search-repos", "query": query, "per_page": per_page, "limitations": github_search_limitations("repositories") }),
+            )
         }
-        GithubCommand::SearchCode { query, per_page } => {
-            github_get(
+        GithubCommand::SearchCode {
+            query,
+            per_page,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github search code"))?;
+            let per_page = per_page.min(per_page_max);
+            let url = "https://api.github.com/search/code";
+            let value = github_get(
                 &client,
-                "https://api.github.com/search/code",
-                &[("q", query), ("per_page", per_page.to_string())],
+                url,
+                &[("q", query.clone()), ("per_page", per_page.to_string())],
             )
-            .await?
+            .await?;
+            (
+                value,
+                github_api_source_url(url),
+                json!({ "operation": "search-code", "query": query, "per_page": per_page, "limitations": github_search_limitations("code") }),
+            )
         }
-        GithubCommand::SearchIssues { query, per_page } => {
-            github_get(
+        GithubCommand::SearchIssues {
+            query,
+            per_page,
+            budget,
+        } => {
+            maybe_debit(
+                &budget,
+                ProviderKind::Github,
+                1,
+                Some("github search issues"),
+            )?;
+            let per_page = per_page.min(per_page_max);
+            let url = "https://api.github.com/search/issues";
+            let value = github_get(
                 &client,
-                "https://api.github.com/search/issues",
-                &[("q", query), ("per_page", per_page.to_string())],
+                url,
+                &[("q", query.clone()), ("per_page", per_page.to_string())],
             )
-            .await?
+            .await?;
+            (
+                value,
+                github_api_source_url(url),
+                json!({ "operation": "search-issues", "query": query, "per_page": per_page, "limitations": github_search_limitations("issues") }),
+            )
         }
-        GithubCommand::Releases { repo, per_page } => {
+        GithubCommand::Releases {
+            repo,
+            per_page,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github releases"))?;
+            let per_page = per_page.min(per_page_max);
             let url = format!("https://api.github.com/repos/{repo}/releases");
-            github_get(&client, &url, &[("per_page", per_page.to_string())]).await?
+            let value = github_get(&client, &url, &[("per_page", per_page.to_string())]).await?;
+            (
+                value,
+                github_repo_url(&repo, "releases"),
+                json!({ "operation": "releases", "repo": repo, "per_page": per_page }),
+            )
         }
-        GithubCommand::File { repo, path, r#ref } => {
-            let url = format!("https://api.github.com/repos/{repo}/contents/{path}");
-            github_get(&client, &url, &[("ref", r#ref)]).await?
+        GithubCommand::Release {
+            repo,
+            tag,
+            latest,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github release"))?;
+            if latest == tag.is_some() {
+                bail!("pass exactly one of --latest or --tag <tag>");
+            }
+            let (url, operation, source_url) = if latest {
+                (
+                    format!("https://api.github.com/repos/{repo}/releases/latest"),
+                    "release-latest".to_string(),
+                    github_repo_url(&repo, "releases/latest"),
+                )
+            } else {
+                let tag = tag.clone().expect("validated tag presence");
+                (
+                    format!(
+                        "https://api.github.com/repos/{repo}/releases/tags/{}",
+                        path_segment(&tag)
+                    ),
+                    "release-by-tag".to_string(),
+                    github_repo_url(&repo, &format!("releases/tag/{tag}")),
+                )
+            };
+            let value = github_get(&client, &url, &[]).await?;
+            (
+                value,
+                source_url,
+                json!({ "operation": operation, "repo": repo, "tag": tag, "latest": latest }),
+            )
+        }
+        GithubCommand::Compare {
+            repo,
+            base,
+            head,
+            per_page,
+            page,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github compare"))?;
+            let per_page = per_page.min(per_page_max);
+            let basehead = format!("{base}...{head}");
+            let url = format!(
+                "https://api.github.com/repos/{repo}/compare/{}",
+                path_segment(&basehead)
+            );
+            let value = github_get(
+                &client,
+                &url,
+                &[
+                    ("per_page", per_page.to_string()),
+                    ("page", page.to_string()),
+                ],
+            )
+            .await?;
+            (
+                normalize_compare(value),
+                github_repo_url(&repo, &format!("compare/{basehead}")),
+                json!({ "operation": "compare", "repo": repo, "base": base, "head": head, "per_page": per_page, "page": page }),
+            )
+        }
+        GithubCommand::Tags {
+            repo,
+            per_page,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github tags"))?;
+            let per_page = per_page.min(per_page_max);
+            let url = format!("https://api.github.com/repos/{repo}/tags");
+            let value = github_get(&client, &url, &[("per_page", per_page.to_string())]).await?;
+            (
+                value,
+                github_repo_url(&repo, "tags"),
+                json!({ "operation": "tags", "repo": repo, "per_page": per_page }),
+            )
+        }
+        GithubCommand::Issue {
+            repo,
+            number,
+            comments,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github issue"))?;
+            let issue_url = format!("https://api.github.com/repos/{repo}/issues/{number}");
+            let issue = github_get(&client, &issue_url, &[]).await?;
+            let comments_value = if comments {
+                let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
+                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+            } else {
+                json!([])
+            };
+            (
+                json!({ "issue": issue, "comments": comments_value }),
+                github_repo_url(&repo, &format!("issues/{number}")),
+                json!({ "operation": "issue", "repo": repo, "number": number, "comments": comments }),
+            )
+        }
+        GithubCommand::Pr {
+            repo,
+            number,
+            files,
+            comments,
+            reviews,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github pr"))?;
+            let pr_url = format!("https://api.github.com/repos/{repo}/pulls/{number}");
+            let pr = github_get(&client, &pr_url, &[]).await?;
+            let files_value = if files {
+                let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/files");
+                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+            } else {
+                json!([])
+            };
+            let comments_value = if comments {
+                let url = format!("https://api.github.com/repos/{repo}/issues/{number}/comments");
+                let issue_comments =
+                    github_get(&client, &url, &[("per_page", "100".to_string())]).await?;
+                let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/comments");
+                let review_comments =
+                    github_get(&client, &url, &[("per_page", "100".to_string())]).await?;
+                json!({ "issue_comments": issue_comments, "review_comments": review_comments })
+            } else {
+                json!({ "issue_comments": [], "review_comments": [] })
+            };
+            let reviews_value = if reviews {
+                let url = format!("https://api.github.com/repos/{repo}/pulls/{number}/reviews");
+                github_get(&client, &url, &[("per_page", "100".to_string())]).await?
+            } else {
+                json!([])
+            };
+            (
+                json!({ "pull_request": pr, "files": files_value, "comments": comments_value, "reviews": reviews_value }),
+                github_repo_url(&repo, &format!("pull/{number}")),
+                json!({ "operation": "pr", "repo": repo, "number": number, "files": files, "comments": comments, "reviews": reviews }),
+            )
+        }
+        GithubCommand::File {
+            repo,
+            path,
+            r#ref,
+            budget,
+        } => {
+            maybe_debit(&budget, ProviderKind::Github, 1, Some("github file"))?;
+            let url = format!(
+                "https://api.github.com/repos/{repo}/contents/{}",
+                slash_path(&path)
+            );
+            let value = github_get(&client, &url, &[("ref", r#ref.clone())]).await?;
+            (
+                value,
+                github_repo_url(&repo, &format!("blob/{ref_name}/{path}", ref_name = r#ref)),
+                json!({ "operation": "file", "repo": repo, "path": path, "ref": r#ref }),
+            )
         }
     };
+    let paths = research_paths()?;
+    init_db(&paths)?;
+    let source_id = record_source_cache(
+        &paths,
+        SourceCacheInsert {
+            url: &source_url,
+            provider: "github",
+            status: Some(200),
+            content_hash: None,
+            route: Some("github"),
+            title: None,
+            canonical_url: Some(&source_url),
+            freshness_status: "current",
+            privacy_classification: privacy_class_name(classify_privacy(&source_url)),
+            raw_body_stored: false,
+            metadata,
+        },
+    )?;
+    let value = json!({ "source_id": source_id, "provider": "github", "data": value });
 
     if json_out {
         print_json(&value)
@@ -663,13 +1458,34 @@ fn handle_ledger(command: LedgerCommand, json_out: bool) -> Result<()> {
         }
         LedgerCommand::AddSource(args) => {
             ensure_parent(&args.ledger)?;
-            let id = short_hash(format!("{}:{}:{}", args.provider, args.url, Utc::now()));
+            let (provider, url, title, route) = if let Some(source_id) = args.from_cache {
+                let paths = research_paths()?;
+                init_db(&paths)?;
+                let cached = cached_source(&paths, &source_id)?
+                    .with_context(|| format!("cached source not found: {source_id}"))?;
+                (
+                    cached.provider,
+                    cached.url,
+                    cached.title.or(args.title),
+                    cached.route.or(args.route),
+                )
+            } else {
+                (
+                    args.provider
+                        .context("--provider is required unless --from-cache is used")?,
+                    args.url
+                        .context("--url is required unless --from-cache is used")?,
+                    args.title,
+                    args.route,
+                )
+            };
+            let id = short_hash(format!("{}:{}:{}", provider, url, Utc::now()));
             let record = LedgerRecord::Source(SourceRecord {
                 id: id.clone(),
-                provider: args.provider,
-                url: args.url,
-                title: args.title,
-                route: args.route,
+                provider,
+                url,
+                title,
+                route,
                 fetched_at: Utc::now(),
             });
             append_ledger_record(&args.ledger, &record)?;
@@ -822,6 +1638,173 @@ fn handle_cache(command: CacheCommand, json_out: bool) -> Result<()> {
                 Ok(())
             }
         }
+        CacheCommand::Sources { provider, limit } => {
+            init_db(&paths)?;
+            let sources = list_cached_sources(&paths, provider.as_deref(), limit)?;
+            if json_out {
+                print_json(&json!({ "sources": sources }))
+            } else {
+                for source in sources {
+                    println!(
+                        "{} {} {} {}",
+                        source.id, source.provider, source.fetched_at, source.url
+                    );
+                }
+                Ok(())
+            }
+        }
+        CacheCommand::Source { source_id } => {
+            init_db(&paths)?;
+            let source = cached_source(&paths, &source_id)?
+                .with_context(|| format!("cached source not found: {source_id}"))?;
+            if json_out {
+                print_json(&source)
+            } else {
+                println!("{}", serde_json::to_string_pretty(&source)?);
+                Ok(())
+            }
+        }
+        CacheCommand::RouteMemory { domain } => {
+            init_db(&paths)?;
+            let rows = list_route_memory(&paths, domain.as_deref())?;
+            if json_out {
+                print_json(&json!({ "route_memory": rows }))
+            } else {
+                for row in rows {
+                    println!(
+                        "{} -> {} (successes={} failures={})",
+                        row.domain, row.preferred_route, row.successes, row.failures
+                    );
+                }
+                Ok(())
+            }
+        }
+        CacheCommand::Prune {
+            older_than_days,
+            dry_run,
+        } => {
+            init_db(&paths)?;
+            let pruned = prune_cache(&paths, older_than_days, dry_run)?;
+            if json_out {
+                print_json(&json!({ "dry_run": dry_run, "sources": pruned }))
+            } else {
+                println!("sources: {pruned}");
+                Ok(())
+            }
+        }
+    }
+}
+
+fn handle_config(
+    command: ConfigCommand,
+    loaded_path: Option<PathBuf>,
+    json_out: bool,
+) -> Result<()> {
+    match command {
+        ConfigCommand::Init { path, force } => {
+            let path = path.unwrap_or_else(|| PathBuf::from(".codex/research/config.toml"));
+            if path.exists() && !force {
+                bail!(
+                    "config exists; pass --force to overwrite: {}",
+                    path.display()
+                );
+            }
+            ensure_parent(&path)?;
+            fs::write(&path, default_config_toml()?.as_bytes())?;
+            if json_out {
+                print_json(&json!({ "path": path, "written": true }))
+            } else {
+                println!("config: {}", path.display());
+                Ok(())
+            }
+        }
+        ConfigCommand::Show { effective: _ } => {
+            let loaded = load_config(loaded_path.as_deref())?;
+            let report = ConfigReport {
+                path: loaded.path,
+                config: loaded.config,
+            };
+            if json_out {
+                print_json(&report)
+            } else {
+                println!("{}", toml::to_string_pretty(&report.config)?);
+                Ok(())
+            }
+        }
+    }
+}
+
+fn handle_run(command: RunCommand, config: &ResearchConfig, json_out: bool) -> Result<()> {
+    match command {
+        RunCommand::Init {
+            query,
+            profile,
+            topic,
+            out,
+        } => {
+            let state = ResearchRunState {
+                query: query.clone(),
+                profile,
+                topic,
+                status: RunStatus::Open,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+                budgets: profile_budget(config, profile),
+                spent: ProviderBudgets::default(),
+                debits: Vec::new(),
+                provider_errors: Vec::new(),
+                source_ids: Vec::new(),
+            };
+            ensure_parent(&out)?;
+            fs::write(&out, serde_json::to_vec_pretty(&state)?)?;
+            if json_out {
+                print_json(&json!({ "run": out, "state": state }))
+            } else {
+                println!("run: {}", out.display());
+                Ok(())
+            }
+        }
+        RunCommand::Status { run } => {
+            let state = read_run_state(&run)?;
+            let remaining = remaining_budgets(&state);
+            if json_out {
+                print_json(&json!({ "run": run, "state": state, "remaining": remaining }))
+            } else {
+                println!("status: {:?}", state.status);
+                println!("profile: {}", state.profile);
+                println!("remaining:");
+                print_budgets(&remaining);
+                Ok(())
+            }
+        }
+        RunCommand::Debit {
+            run,
+            provider,
+            count,
+            note,
+        } => {
+            let state = debit_run_budget(&run, provider, count, note.as_deref())?;
+            if json_out {
+                print_json(
+                    &json!({ "run": run, "state": state, "remaining": remaining_budgets(&state) }),
+                )
+            } else {
+                println!("debited {} from {}", count, provider_name(provider));
+                Ok(())
+            }
+        }
+        RunCommand::Close { run } => {
+            let mut state = read_run_state(&run)?;
+            state.status = RunStatus::Closed;
+            state.updated_at = Utc::now();
+            write_run_state(&run, &state)?;
+            if json_out {
+                print_json(&json!({ "run": run, "state": state }))
+            } else {
+                println!("closed: {}", run.display());
+                Ok(())
+            }
+        }
     }
 }
 
@@ -903,46 +1886,13 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
     }
 }
 
-fn build_plan(query: &str, profile: ResearchProfile, topic: TopicKind) -> ResearchPlan {
-    let budgets = match profile {
-        ResearchProfile::Quick => ProviderBudgets {
-            codex_web_queries: 2,
-            context7_calls: 1,
-            github_calls: 1,
-            exa_calls: 0,
-            direct_fetches: 2,
-            browser_fetches: 0,
-            firecrawl_calls: 0,
-        },
-        ResearchProfile::Standard => ProviderBudgets {
-            codex_web_queries: 4,
-            context7_calls: 2,
-            github_calls: 4,
-            exa_calls: 2,
-            direct_fetches: 6,
-            browser_fetches: 2,
-            firecrawl_calls: 2,
-        },
-        ResearchProfile::Deep => ProviderBudgets {
-            codex_web_queries: 8,
-            context7_calls: 4,
-            github_calls: 8,
-            exa_calls: 4,
-            direct_fetches: 12,
-            browser_fetches: 4,
-            firecrawl_calls: 6,
-        },
-        ResearchProfile::Exhaustive => ProviderBudgets {
-            codex_web_queries: 12,
-            context7_calls: 8,
-            github_calls: 16,
-            exa_calls: 8,
-            direct_fetches: 24,
-            browser_fetches: 8,
-            firecrawl_calls: 12,
-        },
-    };
-
+fn build_plan(
+    query: &str,
+    profile: ResearchProfile,
+    topic: TopicKind,
+    config: &ResearchConfig,
+) -> ResearchPlan {
+    let budgets = profile_budget(config, profile);
     let route_order = match topic {
         TopicKind::Docs => vec![
             Route::Context7,
@@ -1031,11 +1981,13 @@ async fn probe_url(client: &reqwest::Client, url: &str, max_bytes: usize) -> Res
             if report.content_type.is_none() {
                 report.content_type = content_type;
             }
+            apply_route_memory(url, &mut report)?;
             Ok(report)
         }
         Err(_) => {
             let mut report = classify_body(url, content_type.as_deref(), content_length, "");
             report.status = status;
+            apply_route_memory(url, &mut report)?;
             Ok(report)
         }
     }
@@ -1050,6 +2002,13 @@ struct FetchedBody {
     body: String,
     #[serde(skip_serializing)]
     raw_body: Vec<u8>,
+}
+
+#[derive(Serialize)]
+struct FetchedOutput {
+    source_id: Option<String>,
+    #[serde(flatten)]
+    fetched: FetchedBody,
 }
 
 async fn direct_fetch(
@@ -1105,6 +2064,7 @@ fn classify_body(
             app_shell_markers: vec!["github".to_string()],
             route: Route::Github,
             reason: "GitHub URL should be hydrated through GitHub APIs when possible.".to_string(),
+            route_memory: Vec::new(),
         };
     }
 
@@ -1171,6 +2131,7 @@ fn classify_body(
         app_shell_markers,
         route,
         reason,
+        route_memory: Vec::new(),
     }
 }
 
@@ -1179,10 +2140,15 @@ async fn firecrawl_scrape(
     fresh: bool,
     store_in_cache: bool,
     timeout_ms: u64,
+    config: &ResearchConfig,
 ) -> Result<Value> {
     let api_key = required_env("FIRECRAWL_API_KEY")?;
     let client = http_client()?;
-    let max_age = if fresh { 0 } else { 86_400_000 };
+    let max_age = if fresh {
+        config.providers.firecrawl.latest_critical_max_age_ms
+    } else {
+        config.providers.firecrawl.default_max_age_ms
+    };
     let body = json!({
         "url": url,
         "formats": ["markdown"],
@@ -1237,6 +2203,26 @@ async fn github_get(
             .unwrap_or("unknown")
             .to_string();
         bail!("GitHub request forbidden or rate-limited; remaining={remaining} reset={reset}");
+    }
+    Ok(resp.error_for_status()?.json::<Value>().await?)
+}
+
+async fn context7_send(request: reqwest::RequestBuilder) -> Result<Value> {
+    let resp = request.send().await?;
+    let status = resp.status();
+    if status.as_u16() == 429 {
+        let retry_after = resp
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("unknown")
+            .to_string();
+        bail!("Context7 rate limited; Retry-After={retry_after}");
+    }
+    if matches!(status.as_u16(), 202 | 301 | 503 | 504) {
+        let status_code = status.as_u16();
+        let body = resp.text().await.unwrap_or_default();
+        bail!("Context7 returned status={status_code}; body={body}");
     }
     Ok(resp.error_for_status()?.json::<Value>().await?)
 }
@@ -1314,12 +2300,263 @@ fn research_paths() -> Result<ResearchPaths> {
     })
 }
 
+struct LoadedConfig {
+    path: Option<PathBuf>,
+    config: ResearchConfig,
+}
+
+fn load_config(explicit: Option<&Path>) -> Result<LoadedConfig> {
+    let path = if let Some(path) = explicit {
+        Some(path.to_path_buf())
+    } else if let Some(path) = std::env::var_os("CODEX_RESEARCH_CONFIG") {
+        Some(PathBuf::from(path))
+    } else {
+        find_nearest_config().or_else(|| {
+            BaseDirs::new()
+                .map(|base| base.config_dir().join("codex-research").join("config.toml"))
+                .filter(|path| path.exists())
+        })
+    };
+
+    let config = if let Some(path) = &path {
+        if path.exists() {
+            let text = fs::read_to_string(path)
+                .with_context(|| format!("failed to read config: {}", path.display()))?;
+            toml::from_str(&text)
+                .with_context(|| format!("failed to parse config: {}", path.display()))?
+        } else if explicit.is_some() {
+            bail!("config path does not exist: {}", path.display());
+        } else {
+            ResearchConfig::default()
+        }
+    } else {
+        ResearchConfig::default()
+    };
+    Ok(LoadedConfig { path, config })
+}
+
+fn find_nearest_config() -> Option<PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        let candidate = dir.join(".codex").join("research").join("config.toml");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+fn default_config_toml() -> Result<String> {
+    Ok(toml::to_string_pretty(&ResearchConfig::default())?)
+}
+
+fn quick_budget() -> ProviderBudgets {
+    ProviderBudgets {
+        codex_web_queries: 2,
+        context7_calls: 1,
+        github_calls: 1,
+        exa_calls: 0,
+        direct_fetches: 2,
+        browser_fetches: 0,
+        firecrawl_calls: 0,
+    }
+}
+
+fn standard_budget() -> ProviderBudgets {
+    ProviderBudgets {
+        codex_web_queries: 4,
+        context7_calls: 3,
+        github_calls: 4,
+        exa_calls: 2,
+        direct_fetches: 8,
+        browser_fetches: 2,
+        firecrawl_calls: 1,
+    }
+}
+
+fn deep_budget() -> ProviderBudgets {
+    ProviderBudgets {
+        codex_web_queries: 8,
+        context7_calls: 4,
+        github_calls: 8,
+        exa_calls: 4,
+        direct_fetches: 12,
+        browser_fetches: 4,
+        firecrawl_calls: 6,
+    }
+}
+
+fn exhaustive_budget() -> ProviderBudgets {
+    ProviderBudgets {
+        codex_web_queries: 12,
+        context7_calls: 8,
+        github_calls: 16,
+        exa_calls: 8,
+        direct_fetches: 24,
+        browser_fetches: 8,
+        firecrawl_calls: 12,
+    }
+}
+
+fn profile_budget(config: &ResearchConfig, profile: ResearchProfile) -> ProviderBudgets {
+    match profile {
+        ResearchProfile::Quick => config.profiles.quick.clone(),
+        ResearchProfile::Standard => config.profiles.standard.clone(),
+        ResearchProfile::Deep => config.profiles.deep.clone(),
+        ResearchProfile::Exhaustive => config.profiles.exhaustive.clone(),
+    }
+}
+
+fn deny_string() -> String {
+    "deny".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_github_per_page() -> u8 {
+    10
+}
+
+fn default_github_per_page_max() -> u8 {
+    100
+}
+
+fn default_backoff_retries() -> u8 {
+    2
+}
+
+fn default_cache_ttl_hours() -> u32 {
+    168
+}
+
+fn default_firecrawl_max_age_ms() -> u64 {
+    172_800_000
+}
+
+fn read_run_state(path: &Path) -> Result<ResearchRunState> {
+    let text = fs::read_to_string(path)
+        .with_context(|| format!("failed to read run state: {}", path.display()))?;
+    serde_json::from_str(&text)
+        .with_context(|| format!("failed to parse run state: {}", path.display()))
+}
+
+fn write_run_state(path: &Path, state: &ResearchRunState) -> Result<()> {
+    ensure_parent(path)?;
+    fs::write(path, serde_json::to_vec_pretty(state)?)?;
+    Ok(())
+}
+
+fn maybe_debit(
+    budget: &BudgetArgs,
+    provider: ProviderKind,
+    count: u32,
+    note: Option<&str>,
+) -> Result<()> {
+    if let Some(path) = &budget.run
+        && !budget.no_budget
+    {
+        debit_run_budget(path, provider, count, note)?;
+    }
+    Ok(())
+}
+
+fn debit_run_budget(
+    path: &Path,
+    provider: ProviderKind,
+    count: u32,
+    note: Option<&str>,
+) -> Result<ResearchRunState> {
+    let mut state = read_run_state(path)?;
+    if state.status == RunStatus::Closed {
+        bail!("research run is closed: {}", path.display());
+    }
+    let remaining = provider_remaining(&state, provider);
+    if remaining < count {
+        bail!(
+            "budget exhausted for {}; remaining={} requested={}",
+            provider_name(provider),
+            remaining,
+            count
+        );
+    }
+    *budget_slot_mut(&mut state.spent, provider) += count;
+    state.debits.push(RunDebit {
+        provider,
+        count,
+        note: note.map(str::to_string),
+        created_at: Utc::now(),
+    });
+    state.updated_at = Utc::now();
+    write_run_state(path, &state)?;
+    Ok(state)
+}
+
+fn provider_remaining(state: &ResearchRunState, provider: ProviderKind) -> u32 {
+    budget_slot(&state.budgets, provider).saturating_sub(budget_slot(&state.spent, provider))
+}
+
+fn remaining_budgets(state: &ResearchRunState) -> ProviderBudgets {
+    ProviderBudgets {
+        codex_web_queries: provider_remaining(state, ProviderKind::CodexWeb),
+        context7_calls: provider_remaining(state, ProviderKind::Context7),
+        github_calls: provider_remaining(state, ProviderKind::Github),
+        exa_calls: provider_remaining(state, ProviderKind::Exa),
+        direct_fetches: provider_remaining(state, ProviderKind::Direct),
+        browser_fetches: provider_remaining(state, ProviderKind::Browser),
+        firecrawl_calls: provider_remaining(state, ProviderKind::Firecrawl),
+    }
+}
+
+fn budget_slot(budgets: &ProviderBudgets, provider: ProviderKind) -> u32 {
+    match provider {
+        ProviderKind::CodexWeb => budgets.codex_web_queries,
+        ProviderKind::Context7 => budgets.context7_calls,
+        ProviderKind::Github => budgets.github_calls,
+        ProviderKind::Exa => budgets.exa_calls,
+        ProviderKind::Direct => budgets.direct_fetches,
+        ProviderKind::Browser => budgets.browser_fetches,
+        ProviderKind::Firecrawl => budgets.firecrawl_calls,
+        ProviderKind::Opensrc => 0,
+    }
+}
+
+fn budget_slot_mut(budgets: &mut ProviderBudgets, provider: ProviderKind) -> &mut u32 {
+    match provider {
+        ProviderKind::CodexWeb => &mut budgets.codex_web_queries,
+        ProviderKind::Context7 => &mut budgets.context7_calls,
+        ProviderKind::Github => &mut budgets.github_calls,
+        ProviderKind::Exa => &mut budgets.exa_calls,
+        ProviderKind::Direct => &mut budgets.direct_fetches,
+        ProviderKind::Browser => &mut budgets.browser_fetches,
+        ProviderKind::Firecrawl => &mut budgets.firecrawl_calls,
+        ProviderKind::Opensrc => &mut budgets.direct_fetches,
+    }
+}
+
+fn print_budgets(budgets: &ProviderBudgets) {
+    println!("  codex-web: {}", budgets.codex_web_queries);
+    println!("  context7: {}", budgets.context7_calls);
+    println!("  github: {}", budgets.github_calls);
+    println!("  exa: {}", budgets.exa_calls);
+    println!("  direct: {}", budgets.direct_fetches);
+    println!("  browser: {}", budgets.browser_fetches);
+    println!("  firecrawl: {}", budgets.firecrawl_calls);
+}
+
 fn init_db(paths: &ResearchPaths) -> Result<()> {
     fs::create_dir_all(&paths.cache_dir)?;
     fs::create_dir_all(&paths.blobs_dir)?;
     let conn = Connection::open(&paths.database)?;
     conn.execute_batch(
         "
+        create table if not exists schema_migrations (
+            version integer primary key,
+            applied_at text not null
+        );
         create table if not exists sources (
             id text primary key,
             url text not null,
@@ -1347,6 +2584,32 @@ fn init_db(paths: &ResearchPaths) -> Result<()> {
         );
         ",
     )?;
+    add_column_if_missing(&conn, "sources", "canonical_url", "text")?;
+    add_column_if_missing(&conn, "sources", "title", "text")?;
+    add_column_if_missing(
+        &conn,
+        "sources",
+        "freshness_status",
+        "text not null default 'unverified'",
+    )?;
+    add_column_if_missing(
+        &conn,
+        "sources",
+        "privacy_classification",
+        "text not null default 'unverified'",
+    )?;
+    add_column_if_missing(
+        &conn,
+        "sources",
+        "raw_body_stored",
+        "integer not null default 0",
+    )?;
+    add_column_if_missing(&conn, "route_memory", "last_reason", "text")?;
+    add_column_if_missing(&conn, "route_memory", "last_status", "integer")?;
+    conn.execute(
+        "insert or ignore into schema_migrations (version, applied_at) values (?1, ?2)",
+        params![1_i64, Utc::now().to_rfc3339()],
+    )?;
     Ok(())
 }
 
@@ -1364,32 +2627,231 @@ fn store_blob(paths: &ResearchPaths, bytes: &[u8]) -> Result<String> {
     Ok(hash)
 }
 
-fn record_source_cache(
-    paths: &ResearchPaths,
-    url: &str,
-    provider: &str,
-    status: u16,
-    content_hash: &str,
-    route: Option<&str>,
-) -> Result<()> {
+struct SourceCacheInsert<'a> {
+    url: &'a str,
+    provider: &'a str,
+    status: Option<u16>,
+    content_hash: Option<&'a str>,
+    route: Option<&'a str>,
+    title: Option<&'a str>,
+    canonical_url: Option<&'a str>,
+    freshness_status: &'a str,
+    privacy_classification: &'a str,
+    raw_body_stored: bool,
+    metadata: Value,
+}
+
+fn record_source_cache(paths: &ResearchPaths, source: SourceCacheInsert<'_>) -> Result<String> {
     let conn = Connection::open(&paths.database)?;
-    let id = short_hash(format!("{provider}:{url}:{content_hash}"));
+    let content_hash = source.content_hash.unwrap_or("");
+    let id = short_hash(format!(
+        "{}:{}:{}:{}",
+        source.provider,
+        source.url,
+        content_hash,
+        serde_json::to_string(&source.metadata)?
+    ));
     conn.execute(
         "insert or replace into sources
-         (id, url, provider, fetched_at, content_hash, status, route, metadata_json)
-         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+         (id, url, provider, fetched_at, content_hash, status, route, metadata_json,
+          canonical_url, title, freshness_status, privacy_classification, raw_body_stored)
+         values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
         params![
             id,
-            url,
-            provider,
+            source.url,
+            source.provider,
             Utc::now().to_rfc3339(),
-            content_hash,
-            status,
+            source.content_hash,
+            source.status,
+            source.route,
+            serde_json::to_string(&source.metadata)?,
+            source.canonical_url,
+            source.title,
+            source.freshness_status,
+            source.privacy_classification,
+            if source.raw_body_stored { 1_i64 } else { 0_i64 }
+        ],
+    )?;
+    Ok(id)
+}
+
+fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<()> {
+    let mut stmt = conn.prepare(&format!("pragma table_info({table})"))?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<std::result::Result<BTreeSet<_>, _>>()?;
+    if !columns.contains(column) {
+        conn.execute(
+            &format!("alter table {table} add column {column} {definition}"),
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+fn cached_source(paths: &ResearchPaths, source_id: &str) -> Result<Option<SourceCacheRecord>> {
+    let conn = Connection::open(&paths.database)?;
+    let mut stmt = conn.prepare(
+        "select id, provider, route, url, canonical_url, title, fetched_at,
+                freshness_status, privacy_classification, status, content_hash,
+                raw_body_stored, metadata_json
+         from sources where id = ?1",
+    )?;
+    let mut rows = stmt.query(params![source_id])?;
+    if let Some(row) = rows.next()? {
+        return Ok(Some(source_from_row(row)?));
+    }
+    Ok(None)
+}
+
+fn list_cached_sources(
+    paths: &ResearchPaths,
+    provider: Option<&str>,
+    limit: u32,
+) -> Result<Vec<SourceCacheRecord>> {
+    let conn = Connection::open(&paths.database)?;
+    let sql = if provider.is_some() {
+        "select id, provider, route, url, canonical_url, title, fetched_at,
+                freshness_status, privacy_classification, status, content_hash,
+                raw_body_stored, metadata_json
+         from sources where provider = ?1 order by fetched_at desc limit ?2"
+            .to_string()
+    } else {
+        "select id, provider, route, url, canonical_url, title, fetched_at,
+                freshness_status, privacy_classification, status, content_hash,
+                raw_body_stored, metadata_json
+         from sources order by fetched_at desc limit ?1"
+            .to_string()
+    };
+    let mut stmt = conn.prepare(&sql)?;
+    let rows = if let Some(provider) = provider {
+        stmt.query_map(params![provider, limit], source_from_row)?
+            .collect::<std::result::Result<Vec<_>, _>>()?
+    } else {
+        stmt.query_map(params![limit], source_from_row)?
+            .collect::<std::result::Result<Vec<_>, _>>()?
+    };
+    Ok(rows)
+}
+
+fn source_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<SourceCacheRecord> {
+    let metadata_json: String = row.get(12)?;
+    let metadata = serde_json::from_str(&metadata_json).unwrap_or_else(|_| json!({}));
+    let status: Option<i64> = row.get(9)?;
+    Ok(SourceCacheRecord {
+        id: row.get(0)?,
+        provider: row.get(1)?,
+        route: row.get(2)?,
+        url: row.get(3)?,
+        canonical_url: row.get(4)?,
+        title: row.get(5)?,
+        fetched_at: row.get(6)?,
+        freshness_status: row.get(7)?,
+        privacy_classification: row.get(8)?,
+        status: status.map(|value| value as u16),
+        content_hash: row.get(10)?,
+        raw_body_stored: row.get::<_, i64>(11)? != 0,
+        metadata,
+    })
+}
+
+fn record_route_memory(
+    paths: &ResearchPaths,
+    url: &str,
+    route: Route,
+    success: bool,
+    status: Option<u16>,
+    reason: &str,
+) -> Result<()> {
+    let Some(domain) = url_domain(url) else {
+        return Ok(());
+    };
+    let conn = Connection::open(&paths.database)?;
+    let route = route_name(route);
+    conn.execute(
+        "
+        insert into route_memory
+          (domain, preferred_route, successes, failures, updated_at, last_reason, last_status)
+        values (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        on conflict(domain) do update set
+          preferred_route = excluded.preferred_route,
+          successes = route_memory.successes + excluded.successes,
+          failures = route_memory.failures + excluded.failures,
+          updated_at = excluded.updated_at,
+          last_reason = excluded.last_reason,
+          last_status = excluded.last_status
+        ",
+        params![
+            domain,
             route,
-            "{}"
+            if success { 1_i64 } else { 0_i64 },
+            if success { 0_i64 } else { 1_i64 },
+            Utc::now().to_rfc3339(),
+            reason,
+            status,
         ],
     )?;
     Ok(())
+}
+
+fn route_memory_for_url(paths: &ResearchPaths, url: &str) -> Result<Option<RouteMemoryHit>> {
+    let Some(domain) = url_domain(url) else {
+        return Ok(None);
+    };
+    let rows = list_route_memory(paths, Some(&domain))?;
+    Ok(rows.into_iter().next())
+}
+
+fn list_route_memory(paths: &ResearchPaths, domain: Option<&str>) -> Result<Vec<RouteMemoryHit>> {
+    let conn = Connection::open(&paths.database)?;
+    if let Some(domain) = domain {
+        let mut stmt = conn.prepare(
+            "select domain, preferred_route, successes, failures, updated_at
+             from route_memory where domain = ?1 order by updated_at desc",
+        )?;
+        return Ok(stmt
+            .query_map(params![domain], route_memory_hit_from_row)?
+            .collect::<std::result::Result<Vec<_>, _>>()?);
+    }
+    let mut stmt = conn.prepare(
+        "select domain, preferred_route, successes, failures, updated_at
+         from route_memory order by updated_at desc",
+    )?;
+    Ok(stmt
+        .query_map([], route_memory_hit_from_row)?
+        .collect::<std::result::Result<Vec<_>, _>>()?)
+}
+
+fn route_memory_hit_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<RouteMemoryHit> {
+    Ok(RouteMemoryHit {
+        domain: row.get(0)?,
+        preferred_route: row.get(1)?,
+        successes: row.get::<_, i64>(2)? as u32,
+        failures: row.get::<_, i64>(3)? as u32,
+        updated_at: row.get(4)?,
+    })
+}
+
+fn prune_cache(paths: &ResearchPaths, older_than_days: i64, dry_run: bool) -> Result<i64> {
+    let cutoff = Utc::now() - chrono::Duration::days(older_than_days);
+    let conn = Connection::open(&paths.database)?;
+    let count: i64 = conn.query_row(
+        "select count(*) from sources where fetched_at < ?1",
+        params![cutoff.to_rfc3339()],
+        |row| row.get(0),
+    )?;
+    if !dry_run {
+        conn.execute(
+            "delete from sources where fetched_at < ?1",
+            params![cutoff.to_rfc3339()],
+        )?;
+    }
+    Ok(count)
 }
 
 fn count_blobs(dir: &Path) -> Result<usize> {
@@ -1461,6 +2923,201 @@ fn is_github_url(value: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn url_domain(value: &str) -> Option<String> {
+    Url::parse(value)
+        .ok()
+        .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+}
+
+fn classify_privacy(value: &str) -> PrivacyClass {
+    let Ok(url) = Url::parse(value) else {
+        return PrivacyClass::Ambiguous;
+    };
+    if url.scheme() == "file" {
+        return PrivacyClass::PrivateOrAuthenticated;
+    }
+    let Some(host) = url.host_str().map(|host| host.to_ascii_lowercase()) else {
+        return PrivacyClass::Ambiguous;
+    };
+    if matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
+        || host.ends_with(".local")
+        || host.ends_with(".internal")
+        || host.ends_with(".corp")
+        || (!host.contains('.') && host != "github")
+    {
+        return PrivacyClass::PrivateOrAuthenticated;
+    }
+    for (key, _) in url.query_pairs() {
+        let key = key.to_ascii_lowercase();
+        if [
+            "token",
+            "access_token",
+            "auth",
+            "signature",
+            "sig",
+            "x-amz-signature",
+            "x-amz-credential",
+            "key",
+            "apikey",
+            "api_key",
+        ]
+        .contains(&key.as_str())
+        {
+            return PrivacyClass::PrivateOrAuthenticated;
+        }
+    }
+    PrivacyClass::Public
+}
+
+fn enforce_external_privacy(
+    privacy: PrivacyClass,
+    allow_private_external: bool,
+    provider: &str,
+) -> Result<()> {
+    match privacy {
+        PrivacyClass::Public | PrivacyClass::SensitivePublic => Ok(()),
+        PrivacyClass::PrivateOrAuthenticated | PrivacyClass::Ambiguous
+            if allow_private_external =>
+        {
+            Ok(())
+        }
+        PrivacyClass::PrivateOrAuthenticated => {
+            bail!(
+                "{provider} refused private/authenticated input; pass --allow-private-external to override"
+            )
+        }
+        PrivacyClass::Ambiguous => {
+            bail!(
+                "{provider} refused ambiguous input; pass --privacy public or --allow-private-external to override"
+            )
+        }
+    }
+}
+
+fn privacy_class_name(privacy: PrivacyClass) -> &'static str {
+    match privacy {
+        PrivacyClass::Public => "public",
+        PrivacyClass::SensitivePublic => "sensitive-public",
+        PrivacyClass::PrivateOrAuthenticated => "private-or-authenticated",
+        PrivacyClass::Ambiguous => "ambiguous",
+    }
+}
+
+fn provider_name(provider: ProviderKind) -> &'static str {
+    match provider {
+        ProviderKind::CodexWeb => "codex-web",
+        ProviderKind::Context7 => "context7",
+        ProviderKind::Github => "github",
+        ProviderKind::Exa => "exa",
+        ProviderKind::Direct => "direct",
+        ProviderKind::Browser => "browser",
+        ProviderKind::Firecrawl => "firecrawl",
+        ProviderKind::Opensrc => "opensrc",
+    }
+}
+
+fn apply_route_memory(url: &str, report: &mut ProbeReport) -> Result<()> {
+    if report.route == Route::Github {
+        return Ok(());
+    }
+    let paths = research_paths()?;
+    init_db(&paths)?;
+    if let Some(hit) = route_memory_for_url(&paths, url)? {
+        if hit.successes > hit.failures
+            && let Some(route) = route_from_name(&hit.preferred_route)
+        {
+            report.reason = format!(
+                "{} Route memory for {} prefers {} (successes={} failures={}).",
+                report.reason, hit.domain, hit.preferred_route, hit.successes, hit.failures
+            );
+            report.route = route;
+        }
+        report.route_memory.push(hit);
+    }
+    Ok(())
+}
+
+fn route_from_name(value: &str) -> Option<Route> {
+    match value {
+        "codex-web" => Some(Route::CodexWeb),
+        "context7" => Some(Route::Context7),
+        "github" => Some(Route::Github),
+        "direct" => Some(Route::Direct),
+        "agent-browser" => Some(Route::AgentBrowser),
+        "firecrawl" => Some(Route::Firecrawl),
+        "exa" => Some(Route::Exa),
+        "opensrc" => Some(Route::Opensrc),
+        _ => None,
+    }
+}
+
+fn path_segment(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+fn slash_path(value: &str) -> String {
+    value
+        .split('/')
+        .map(path_segment)
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn github_api_source_url(url: &str) -> String {
+    url.to_string()
+}
+
+fn github_repo_url(repo: &str, path: &str) -> String {
+    format!("https://github.com/{repo}/{path}")
+}
+
+fn github_search_limitations(kind: &str) -> Value {
+    match kind {
+        "code" => json!([
+            "requires at least one search term",
+            "default branch only",
+            "files larger than 384 KB are not searchable",
+            "strict search rate limits apply",
+            "hydrate promising hits before citing"
+        ]),
+        _ => json!([
+            "search can return incomplete_results on timeout",
+            "queries have length and boolean-operator limits",
+            "hydrate promising hits before citing"
+        ]),
+    }
+}
+
+fn normalize_compare(mut value: Value) -> Value {
+    if let Some(files) = value.get("files").and_then(Value::as_array) {
+        let summary = files
+            .iter()
+            .map(|file| {
+                json!({
+                    "filename": file.get("filename"),
+                    "status": file.get("status"),
+                    "previous_filename": file.get("previous_filename"),
+                    "additions": file.get("additions"),
+                    "deletions": file.get("deletions"),
+                    "changes": file.get("changes"),
+                    "patch_present": file.get("patch").is_some()
+                })
+            })
+            .collect::<Vec<_>>();
+        value["file_summary"] = json!(summary);
+    }
+    value
+}
+
+fn merge_metadata(mut left: Value, right: Value) -> Value {
+    if let (Some(left), Some(right)) = (left.as_object_mut(), right.as_object()) {
+        for (key, value) in right {
+            left.insert(key.clone(), value.clone());
+        }
+    }
+    left
+}
+
 fn short_hash(value: impl AsRef<[u8]>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(value);
@@ -1505,12 +3162,20 @@ fn print_json<T: Serialize>(value: &T) -> Result<()> {
 mod tests {
     use super::*;
 
+    fn temp_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "codex-research-{name}-{}",
+            short_hash(format!("{}-{}", std::process::id(), Utc::now()))
+        ))
+    }
+
     #[test]
     fn dependency_plan_prefers_docs_source_and_github_routes() {
         let plan = build_plan(
             "verify dependency behavior",
             ResearchProfile::Deep,
             TopicKind::Dependency,
+            &ResearchConfig::default(),
         );
 
         assert_eq!(plan.profile.to_string(), "deep");
@@ -1519,6 +3184,91 @@ mod tests {
         assert_eq!(plan.route_order[0], Route::Context7);
         assert_eq!(plan.route_order[1], Route::Opensrc);
         assert!(plan.route_order.contains(&Route::Github));
+    }
+
+    #[test]
+    fn default_config_serializes_and_parses() -> Result<()> {
+        let text = default_config_toml()?;
+        let parsed: ResearchConfig = toml::from_str(&text)?;
+
+        assert_eq!(parsed.profiles.deep.github_calls, 8);
+        assert_eq!(parsed.privacy.private_external_default, "deny");
+        assert_eq!(parsed.providers.firecrawl.default_max_age_ms, 172_800_000);
+        Ok(())
+    }
+
+    #[test]
+    fn run_budget_debit_exhausts_provider() -> Result<()> {
+        let dir = temp_path("run-budget");
+        fs::create_dir_all(&dir)?;
+        let run = dir.join("run.json");
+        let state = ResearchRunState {
+            query: "smoke".to_string(),
+            profile: ResearchProfile::Quick,
+            topic: TopicKind::Github,
+            status: RunStatus::Open,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            budgets: quick_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: Vec::new(),
+            source_ids: Vec::new(),
+        };
+        write_run_state(&run, &state)?;
+
+        let state = debit_run_budget(&run, ProviderKind::Github, 1, Some("test"))?;
+        assert_eq!(provider_remaining(&state, ProviderKind::Github), 0);
+        assert!(debit_run_budget(&run, ProviderKind::Github, 1, Some("test")).is_err());
+        fs::remove_dir_all(&dir)?;
+        Ok(())
+    }
+
+    #[test]
+    fn privacy_classifier_blocks_private_external_targets() {
+        assert_eq!(
+            classify_privacy("https://example.com/docs"),
+            PrivacyClass::Public
+        );
+        assert_eq!(
+            classify_privacy("http://localhost:3000/dashboard"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
+        assert_eq!(
+            classify_privacy("https://example.com/file?token=secret"),
+            PrivacyClass::PrivateOrAuthenticated
+        );
+        assert!(
+            enforce_external_privacy(PrivacyClass::PrivateOrAuthenticated, false, "firecrawl")
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn route_memory_records_and_lists_domain_preferences() -> Result<()> {
+        let dir = temp_path("route-memory");
+        let paths = ResearchPaths {
+            database: dir.join("research.sqlite"),
+            blobs_dir: dir.join("blobs"),
+            cache_dir: dir,
+        };
+        init_db(&paths)?;
+        record_route_memory(
+            &paths,
+            "https://docs.example.com/app",
+            Route::AgentBrowser,
+            true,
+            Some(200),
+            "rendered route worked",
+        )?;
+
+        let hit = route_memory_for_url(&paths, "https://docs.example.com/other")?
+            .expect("route memory should exist");
+        assert_eq!(hit.domain, "docs.example.com");
+        assert_eq!(hit.preferred_route, "agent-browser");
+        assert_eq!(hit.successes, 1);
+        fs::remove_dir_all(paths.cache_dir)?;
+        Ok(())
     }
 
     #[test]
