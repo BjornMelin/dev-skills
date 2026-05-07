@@ -227,6 +227,12 @@ Tagged enum:
 
 Async provider commands run under `tokio`.
 
+`run_eval` uses a default suite embedded at build time from
+`crates/codex-research/evals/research/core.json`; only `--suite` reads a
+caller-supplied suite file at runtime. The eval harness is deliberately
+offline-first so it can run in PR validation without provider credentials. It
+supports task filtering, listing, strict warning handling, and JSON output.
+
 ## Provider Implementations
 
 ### HTTP Client
@@ -369,6 +375,8 @@ Good next additions:
 
 - add direct CLI-owned Exa calls if MCP-side Exa proves insufficient;
 - add richer live eval cost caps if optional live checks expand;
+- add more manifest task kinds only when they can stay deterministic in
+  provider-disabled CI;
 - split provider implementations into modules once the single-binary shape
   stops being reviewable.
 
@@ -383,6 +391,7 @@ cargo check -p codex-research
 cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
+codex-research --json eval --task evidence-claims-cited --strict
 git diff --check
 ```
 
