@@ -27,6 +27,22 @@ NICKNAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
 VALID_EFFORTS = {"minimal", "low", "medium", "high", "xhigh"}
 VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 RESERVED_BUILTIN_AGENT_NAMES = {"default", "worker", "explorer"}
+RESEARCH_CONTRACT_AGENT_NAMES = {
+    "deep_researcher",
+    "github_researcher",
+    "context7_researcher",
+    "openai_docs_researcher",
+    "source_validator",
+    "citation_auditor",
+}
+RESEARCH_CONTRACT_HEADINGS = (
+    "Status",
+    "Sources hydrated",
+    "Claims",
+    "Provider limits",
+    "Privacy notes",
+    "Recommended next verification",
+)
 ALLOWED_TOP_LEVEL_KEYS = {
     "name",
     "description",
@@ -261,6 +277,15 @@ def validate_agent_file(path: Path) -> list[ValidationIssue]:
         ):
             if required not in developer_instructions:
                 issues.append(ValidationIssue(path, f"developer_instructions missing `{required}`"))
+        if isinstance(name, str) and name.strip() in RESEARCH_CONTRACT_AGENT_NAMES:
+            for required in RESEARCH_CONTRACT_HEADINGS:
+                if required not in developer_instructions:
+                    issues.append(
+                        ValidationIssue(
+                            path,
+                            f"research contract missing `{required}` return heading",
+                        )
+                    )
 
     return issues
 

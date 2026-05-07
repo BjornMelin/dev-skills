@@ -43,7 +43,17 @@ Default order for broad research:
 7. `$opensrc` when package implementation source is required.
 
 Use `codex-research plan "<query>" --profile quick|standard|deep|exhaustive`
-to create call budgets before broad research.
+to inspect call budgets before broad research. For replayable runs, initialize
+run state and pass `--run` to provider commands:
+
+```bash
+codex-research run init "<query>" --profile deep --topic github --out .codex/research/run.json
+codex-research run status --run .codex/research/run.json
+```
+
+Native Codex web calls are not visible to the CLI. Debit them manually with
+`codex-research run debit --provider codex-web` when they are part of the same
+budgeted run.
 
 ## Firecrawl Policy
 
@@ -110,10 +120,12 @@ Useful commands:
 codex-research doctor
 codex-research cache init
 codex-research plan "research question" --profile deep
+codex-research run init "research question" --profile deep --topic general --out .codex/research/run.json
 codex-research fetch probe "https://example.com/docs"
 codex-research context7 search --library "Next.js" --query "middleware auth"
 codex-research github search-code 'repo:owner/repo symbol in:file'
 codex-research ledger init
+codex-research ledger add-source --from-cache <source-id>
 codex-research report --ledger .codex/research/ledger.jsonl
 codex-research eval
 ```

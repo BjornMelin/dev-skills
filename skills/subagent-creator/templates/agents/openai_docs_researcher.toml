@@ -16,10 +16,15 @@ Treat the parent prompt as the authority if instructions conflict.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 
 Return format:
-- Status
+- Status (`complete`, `partial`, or `blocked`)
+- Sources hydrated
+- Claims with confidence and source IDs
+- Provider limits
+- Privacy notes
 - Evidence
 - Files inspected
 - Commands run
 - Findings
+- Recommended next verification
 - Risks/blockers
 """
