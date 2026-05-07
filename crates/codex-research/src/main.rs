@@ -2327,10 +2327,10 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
         .filter_map(|source| source.get("id").and_then(Value::as_str))
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
-    let min_sources = optional_u64(&task.expected, "min_sources").unwrap_or(1);
-    let min_claims = optional_u64(&task.expected, "min_claims").unwrap_or(1);
-    let max_uncited_claims = optional_u64(&task.expected, "max_uncited_claims").unwrap_or(0);
-    let min_confidence = optional_f64(&task.expected, "min_confidence");
+    let min_sources = optional_u64(&task.expected, "min_sources")?.unwrap_or(1);
+    let min_claims = optional_u64(&task.expected, "min_claims")?.unwrap_or(1);
+    let max_uncited_claims = optional_u64(&task.expected, "max_uncited_claims")?.unwrap_or(0);
+    let min_confidence = optional_f64(&task.expected, "min_confidence")?;
 
     let mut uncited_claims = 0_u64;
     let mut missing_sources = Vec::new();
@@ -2468,12 +2468,24 @@ fn required_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
         .with_context(|| format!("missing array input `{key}`"))
 }
 
-fn optional_u64(value: &Value, key: &str) -> Option<u64> {
-    value.get(key).and_then(Value::as_u64)
+fn optional_u64(value: &Value, key: &str) -> Result<Option<u64>> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_u64()
+        .map(Some)
+        .with_context(|| format!("`{key}` must be an unsigned integer"))
 }
 
-fn optional_f64(value: &Value, key: &str) -> Option<f64> {
-    value.get(key).and_then(Value::as_f64)
+fn optional_f64(value: &Value, key: &str) -> Result<Option<f64>> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_f64()
+        .map(Some)
+        .with_context(|| format!("`{key}` must be a number"))
 }
 
 fn optional_str_array<'a>(value: &'a Value, key: &str) -> Result<Option<Vec<&'a str>>> {
@@ -4291,6 +4303,30 @@ mod tests {
                 .failures
                 .iter()
                 .any(|failure| failure.contains("required_sections[1]"))
+        );
+    }
+
+    #[test]
+    fn eval_rejects_malformed_confidence_thresholds() {
+        let task = EvalTask {
+            id: "bad-confidence".to_string(),
+            kind: "evidence-contract".to_string(),
+            description: "threshold validation".to_string(),
+            input: json!({
+                "sources": [{"id": "source-1"}],
+                "claims": [{"id": "claim-1", "sources": ["source-1"], "confidence": 0.9}]
+            }),
+            expected: json!({
+                "min_confidence": "high"
+            }),
+        };
+        let outcome = evaluate_eval_task(&task);
+
+        assert!(
+            outcome
+                .failures
+                .iter()
+                .any(|failure| failure.contains("min_confidence"))
         );
     }
 
