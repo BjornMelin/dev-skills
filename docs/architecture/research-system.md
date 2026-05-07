@@ -141,7 +141,7 @@ Firecrawl is a paid-capacity lane under a classified policy:
 
 - public docs may use cache;
 - latest-critical pages use `--fresh`;
-- sensitive public pages use `--store-in-cache false`;
+- sensitive public pages use `--no-store-in-cache`;
 - private/confidential content is never sent unless the user explicitly allows
   external scraping for that material.
 
@@ -158,4 +158,3 @@ When research is split across agents:
 5. The parent synthesizes, resolves conflicts, and writes final claims.
 
 Subagents do not recursively spawn subagents.
-

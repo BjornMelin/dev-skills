@@ -265,7 +265,7 @@ https://api.firecrawl.dev/v2/scrape
 The command supports:
 
 - `--fresh` mapping to `maxAge=0`;
-- `--store-in-cache`;
+- `--no-store-in-cache`;
 - `--timeout-ms`.
 
 429 responses report `Retry-After` when present.

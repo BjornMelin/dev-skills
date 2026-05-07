@@ -51,7 +51,7 @@ Firecrawl is a paid-capacity fallback lane, not the first source.
 
 - Public docs: cache is allowed unless the task is latest-critical.
 - Latest-critical pages: use `--fresh` so `maxAge=0`.
-- Sensitive public pages: set `--store-in-cache false`.
+- Sensitive public pages: set `--no-store-in-cache`.
 - Private/confidential/repo-proprietary content: do not send to Firecrawl unless
   the user explicitly allows external scraping for that material.
 - If a page can be hydrated through GitHub, Context7, official docs, or direct
@@ -128,4 +128,3 @@ Stop and mark `UNVERIFIED` when:
 - private material would need to be sent to an external provider without
   explicit permission;
 - GitHub search is incomplete and hydration cannot validate the claim.
-

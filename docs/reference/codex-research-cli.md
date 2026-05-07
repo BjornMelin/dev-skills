@@ -144,13 +144,13 @@ Scrape a public URL through Firecrawl v2.
 
 ```bash
 codex-research fetch firecrawl "https://example.com/docs"
-codex-research fetch firecrawl "https://example.com/docs" --fresh --store-in-cache false
+codex-research fetch firecrawl "https://example.com/docs" --fresh --no-store-in-cache
 ```
 
 Options:
 
 - `--fresh`: request `maxAge=0`.
-- `--store-in-cache`: allow Firecrawl cache storage. Omit or set false for
+- `--no-store-in-cache`: disable Firecrawl server-side cache storage for
   sensitive public pages.
 - `--timeout-ms <n>`: default `60000`.
 
@@ -324,4 +324,3 @@ search operations.
 - GitHub 403 reports rate-limit headers when present.
 - `fetch probe` tries to classify even when direct fetch fails by using
   whatever metadata the HEAD request returned.
-

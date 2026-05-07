@@ -517,7 +517,7 @@ async fn handle_fetch(command: FetchCommand, json_out: bool) -> Result<()> {
             if store {
                 let paths = research_paths()?;
                 init_db(&paths)?;
-                let hash = store_blob(&paths, fetched.body.as_bytes())?;
+                let hash = store_blob(&paths, &fetched.raw_body)?;
                 record_source_cache(&paths, &url, "direct", fetched.status, &hash, None)?;
             }
             if json_out {
@@ -1048,6 +1048,8 @@ struct FetchedBody {
     content_type: Option<String>,
     bytes: usize,
     body: String,
+    #[serde(skip_serializing)]
+    raw_body: Vec<u8>,
 }
 
 async fn direct_fetch(
@@ -1075,12 +1077,14 @@ async fn direct_fetch(
         &bytes
     };
     let body = String::from_utf8_lossy(slice).to_string();
+    let raw_body = slice.to_vec();
     Ok(FetchedBody {
         url: url.to_string(),
         status,
         content_type,
         bytes: slice.len(),
         body,
+        raw_body,
     })
 }
 
