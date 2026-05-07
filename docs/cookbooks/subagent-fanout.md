@@ -49,22 +49,22 @@ After spawning:
 
 ## Prompt Shape
 
-Illustrative prompt shape:
+Example planner output for `openai_docs_researcher`:
 
 ```text
 Task: Research current official OpenAI docs for Codex custom subagents and summarize only confirmed current behavior.
 Scope: Official OpenAI docs and official OpenAI GitHub repositories only.
-Mode: read-only.
+Mode: read-only; do not edit files, stage changes, or commit.
 Wait: parent will wait for all spawned agents before substantive next work.
 Role: openai_docs_researcher.
-Model: use role default.
-Reasoning: use role default.
+Model: gpt-5.5.
+Reasoning: medium.
 Return format:
 - Status
-- Official sources read
-- Current findings
-- Deprecated or changed guidance
-- Open questions
+- Evidence
+- Files inspected/changed
+- Commands run
+- Findings
 - Risks/blockers
 ```
 

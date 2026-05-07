@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Generate bounded Codex subagent fanout plans."""
+"""Generate bounded Codex subagent fanout plans.
+
+Args:
+    None.
+
+Returns:
+    None.
+
+Raises:
+    SystemExit: Raised by CLI handlers for invalid user input.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +25,10 @@ try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback.
     tomllib = None
+
+TOML_DECODE_ERROR = (
+    tomllib.TOMLDecodeError if tomllib is not None else ValueError
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -81,7 +95,20 @@ PRESETS = {
 
 @dataclass(frozen=True)
 class Role:
-    """Resolved subagent role metadata."""
+    """Resolved subagent role metadata.
+
+    Args:
+        name: Stable role name used by Codex.
+        description: Human-readable role description.
+        model: Pinned model or inherited runtime marker.
+        reasoning: Pinned reasoning effort or inherited runtime marker.
+        sandbox: Sandbox policy from the template or runtime default.
+        source: Role source, such as template or built-in.
+        path: Template file path, if the role came from a TOML file.
+
+    Returns:
+        Role: Immutable role metadata.
+    """
 
     name: str
     description: str
@@ -92,7 +119,11 @@ class Role:
     path: str | None = None
 
     def to_dict(self) -> dict[str, str | None]:
-        """Return JSON-serializable role metadata."""
+        """Return JSON-serializable role metadata.
+
+        Returns:
+            dict[str, str | None]: Role metadata suitable for JSON output.
+        """
 
         return {
             "name": self.name,
@@ -107,21 +138,44 @@ class Role:
 
 @dataclass(frozen=True)
 class Registry:
-    """Role registry plus validation metadata."""
+    """Role registry plus validation metadata.
+
+    Args:
+        roles: Resolved roles keyed by role name.
+        duplicates: Ignored duplicate template paths keyed by role name.
+        issues: Validation issues discovered while loading role metadata.
+
+    Returns:
+        Registry: Immutable registry metadata.
+    """
 
     roles: dict[str, Role]
     duplicates: dict[str, list[str]]
     issues: list[str]
 
 
-def emit_json(data: Any) -> None:
-    """Print stable JSON output."""
+def emit_json(data: object) -> None:
+    """Print stable JSON output.
+
+    Args:
+        data: JSON-serializable value to print.
+
+    Returns:
+        None.
+    """
 
     print(json.dumps(data, indent=2, sort_keys=True))
 
 
 def split_csv(values: list[str]) -> list[str]:
-    """Split repeated comma-separated option values."""
+    """Split repeated comma-separated option values.
+
+    Args:
+        values: Raw option values.
+
+    Returns:
+        list[str]: Trimmed non-empty values.
+    """
 
     out: list[str] = []
     for value in values:
@@ -130,7 +184,19 @@ def split_csv(values: list[str]) -> list[str]:
 
 
 def read_toml(path: Path) -> dict[str, Any]:
-    """Read a TOML file as a dictionary."""
+    """Read a TOML file as a dictionary.
+
+    Args:
+        path: TOML file to read.
+
+    Returns:
+        dict[str, Any]: Parsed TOML document.
+
+    Raises:
+        SystemExit: If Python lacks tomllib support.
+        OSError: If the file cannot be read.
+        tomllib.TOMLDecodeError: If TOML parsing fails.
+    """
 
     if tomllib is None:
         raise SystemExit("Python 3.11+ is required for TOML parsing")
@@ -139,7 +205,14 @@ def read_toml(path: Path) -> dict[str, Any]:
 
 
 def template_dirs(paths: list[str]) -> list[Path]:
-    """Resolve template directory arguments."""
+    """Resolve template directory arguments.
+
+    Args:
+        paths: Optional user-specified template directories.
+
+    Returns:
+        list[Path]: Resolved directory list, or repository defaults.
+    """
 
     if paths:
         return [Path(path).expanduser().resolve() for path in paths]
@@ -147,7 +220,11 @@ def template_dirs(paths: list[str]) -> list[Path]:
 
 
 def built_in_roles() -> dict[str, Role]:
-    """Return metadata for built-in Codex agent roles."""
+    """Return metadata for built-in Codex agent roles.
+
+    Returns:
+        dict[str, Role]: Built-in roles keyed by role name.
+    """
 
     return {
         name: Role(
@@ -164,12 +241,21 @@ def built_in_roles() -> dict[str, Role]:
 
 
 def role_from_template(path: Path) -> tuple[Role | None, list[str]]:
-    """Load one custom role template."""
+    """Load one custom role template.
+
+    Args:
+        path: Template file path.
+
+    Returns:
+        tuple[Role | None, list[str]]: Role metadata and validation issues.
+    """
 
     issues: list[str] = []
     try:
         data = read_toml(path)
-    except tomllib.TOMLDecodeError as exc:
+    except OSError as exc:
+        return None, [f"{path}: could not read template: {exc}"]
+    except TOML_DECODE_ERROR as exc:
         return None, [f"{path}: invalid TOML: {exc}"]
 
     name = str(data.get("name", "")).strip()
@@ -201,7 +287,14 @@ def role_from_template(path: Path) -> tuple[Role | None, list[str]]:
 
 
 def load_registry(paths: list[str]) -> Registry:
-    """Load built-in and custom role metadata."""
+    """Load built-in and custom role metadata.
+
+    Args:
+        paths: Optional template directory overrides.
+
+    Returns:
+        Registry: Roles, duplicate template paths, and validation issues.
+    """
 
     roles = built_in_roles()
     duplicates: dict[str, list[str]] = {}
@@ -231,7 +324,18 @@ def load_registry(paths: list[str]) -> Registry:
 
 
 def selected_roles(args: argparse.Namespace, registry: Registry) -> list[Role]:
-    """Resolve requested roles from CLI arguments or presets."""
+    """Resolve requested roles from CLI arguments or presets.
+
+    Args:
+        args: Parsed command-line arguments for the plan command.
+        registry: Loaded role registry.
+
+    Returns:
+        list[Role]: Selected roles in execution order.
+
+    Raises:
+        SystemExit: If role selection is missing, unknown, or too large.
+    """
 
     names = split_csv(args.role)
     if not names:
@@ -255,7 +359,14 @@ def selected_roles(args: argparse.Namespace, registry: Registry) -> list[Role]:
 
 
 def scope_text(scopes: list[str]) -> str:
-    """Return a stable scope string for generated prompts."""
+    """Return a stable scope string for generated prompts.
+
+    Args:
+        scopes: Raw scope option values.
+
+    Returns:
+        str: Prompt-ready scope text.
+    """
 
     if not scopes:
         return "User-provided context only; do not broaden scope."
@@ -263,15 +374,33 @@ def scope_text(scopes: list[str]) -> str:
 
 
 def wait_text(wait_policy: str) -> str:
-    """Return the prompt wait instruction."""
+    """Return the prompt wait instruction.
+
+    Args:
+        wait_policy: Selected wait policy.
+
+    Returns:
+        str: Prompt-ready wait instruction.
+    """
 
     if wait_policy == "strict":
-        return "parent will wait for all spawned agents before substantive next work"
+        return (
+            "parent will wait for all spawned agents before substantive "
+            "next work"
+        )
     return "user explicitly requested asynchronous delegation"
 
 
 def mode_text(mode: str, scope: str) -> str:
-    """Return mode-specific prompt text."""
+    """Return mode-specific prompt text.
+
+    Args:
+        mode: Selected delegation mode.
+        scope: Normalized scope text.
+
+    Returns:
+        str: Prompt-ready mode text.
+    """
 
     if mode == "read-only":
         return "read-only; do not edit files, stage changes, or commit"
@@ -286,7 +415,18 @@ def build_prompt(
     wait_policy: str,
     role: Role,
 ) -> str:
-    """Build one mandatory spawn contract prompt."""
+    """Build one mandatory spawn contract prompt.
+
+    Args:
+        task: Bounded subtask or question.
+        scope: Normalized scope text.
+        mode: Delegation mode.
+        wait_policy: Wait policy.
+        role: Selected role metadata.
+
+    Returns:
+        str: Copy-ready spawn prompt.
+    """
 
     lines = [
         f"Task: {task}",
@@ -311,7 +451,17 @@ def build_prompt(
 
 
 def build_plan(args: argparse.Namespace) -> dict[str, Any]:
-    """Build a subspawn orchestration plan."""
+    """Build a subspawn orchestration plan.
+
+    Args:
+        args: Parsed plan command arguments.
+
+    Returns:
+        dict[str, Any]: JSON-serializable orchestration plan.
+
+    Raises:
+        SystemExit: If role selection is invalid.
+    """
 
     registry = load_registry(args.template_dir)
     roles = selected_roles(args, registry)
@@ -345,7 +495,14 @@ def build_plan(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def print_plan(plan: dict[str, Any]) -> None:
-    """Print a human-readable subspawn plan."""
+    """Print a human-readable subspawn plan.
+
+    Args:
+        plan: Plan returned by build_plan().
+
+    Returns:
+        None.
+    """
 
     print("Subspawn plan")
     print(f"Task: {plan['task']}")
@@ -382,7 +539,17 @@ def print_plan(plan: dict[str, Any]) -> None:
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
-    """Handle the plan command."""
+    """Handle the plan command.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+
+    Raises:
+        SystemExit: If role selection is invalid.
+    """
 
     plan = build_plan(args)
     if args.json:
@@ -393,7 +560,14 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_roles(args: argparse.Namespace) -> int:
-    """Validate role names and stable return contracts."""
+    """Validate role names and stable return contracts.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+    """
 
     registry = load_registry(args.template_dir)
     report = {
@@ -416,7 +590,14 @@ def cmd_validate_roles(args: argparse.Namespace) -> int:
 
 
 def cmd_list_presets(args: argparse.Namespace) -> int:
-    """List available orchestration presets."""
+    """List available orchestration presets.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        int: Process exit status.
+    """
 
     report = {"presets": PRESETS}
     if args.json:
@@ -428,7 +609,14 @@ def cmd_list_presets(args: argparse.Namespace) -> int:
 
 
 def add_registry_args(parser: argparse.ArgumentParser) -> None:
-    """Add shared role-registry options to a parser."""
+    """Add shared role-registry options to a parser.
+
+    Args:
+        parser: Parser to extend.
+
+    Returns:
+        None.
+    """
 
     parser.add_argument(
         "--template-dir",
@@ -439,7 +627,11 @@ def add_registry_args(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser."""
+    """Build the command-line parser.
+
+    Returns:
+        argparse.ArgumentParser: Configured root parser.
+    """
 
     parser = argparse.ArgumentParser(
         description="Generate bounded Codex subagent orchestration plans.",
@@ -492,7 +684,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the subspawn plan CLI."""
+    """Run the subspawn plan CLI.
+
+    Args:
+        argv: Optional argument vector override.
+
+    Returns:
+        int: Process exit status.
+    """
 
     parser = build_parser()
     args = parser.parse_args(argv)
