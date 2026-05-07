@@ -279,7 +279,8 @@ def validate_agent_file(path: Path) -> list[ValidationIssue]:
                 issues.append(ValidationIssue(path, f"developer_instructions missing `{required}`"))
         if isinstance(name, str) and name.strip() in RESEARCH_CONTRACT_AGENT_NAMES:
             for required in RESEARCH_CONTRACT_HEADINGS:
-                if required not in developer_instructions:
+                heading_pattern = rf"(?m)^\s*[-*+]\s*{re.escape(required)}(?:\s|\(|$)"
+                if re.search(heading_pattern, developer_instructions) is None:
                     issues.append(
                         ValidationIssue(
                             path,

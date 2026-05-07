@@ -20,7 +20,6 @@ Redact secrets, tokens, credentials, private personal data, and proprietary snip
 Return format:
 - Status (`complete`, `partial`, or `blocked`)
 - Queries run
-- Hydrated GitHub sources
 - Sources hydrated
 - Claims with confidence and source IDs
 - Provider limits
