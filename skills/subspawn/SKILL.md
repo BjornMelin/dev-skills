@@ -1,22 +1,27 @@
 ---
 name: subspawn
-description: Bounded subagent delegation + synthesis for Codex. Use for `spawn_agent` planning/exec, 1–3 bounded subtasks, model + effort pick, read-only vs edit scope, wait behavior, conflicting findings, evidence-first synthesis. Trigger -> explicit subagents/delegation/fan-out/model routing/spawn asks, or task needs parallel exploration or narrow implementation ownership.
+description: Bounded subagent delegation and synthesis. Use for explicit subagent, delegation, fan-out, spawn policy, custom agent routing, wait behavior, and evidence-first synthesis.
 ---
 
 # Subspawn
 
-Keep subagents bounded; main agent owns planning, synthesis, final decisions unless user says otherwise.
+Keep subagents bounded. The main agent owns planning, waits for delegated
+results, synthesizes evidence, and makes final decisions unless the user says
+otherwise.
 
 ## Trigger Rules
 
 Use this skill when:
 
 - user asks for subagents, delegation, fan-out, or spawn policy
-- task benefits from 1–3 independent bounded subtasks
+- task benefits from 1-3 independent bounded subtasks
 - model or effort routing for subagents matters
 - session needs evidence-first synthesis across delegated results
+- custom agent selection or fork behavior matters
 
-Skip skill to rationalize extra delegation. Keep work local when next critical-path step urgent, tightly coupled, or faster direct.
+Only spawn when the user explicitly asks for subagents or parallel agent work.
+Do not use this skill to rationalize extra delegation. Keep work local when
+delegation would add coordination cost without improving quality.
 
 ## User Overrides
 
@@ -30,6 +35,7 @@ If user specifies any below, honor unless unsafe or impossible:
 - specific reasoning effort
 - explicit wait behavior
 - explicit read-only vs edit-capable delegation
+- specific custom agent role
 
 When override differs from default:
 
@@ -41,76 +47,111 @@ When override differs from default:
 
 Before spawning:
 
-1. State immediate local task you will keep.
-2. Identify bounded sidecar subtasks that can be run in parallel.
-3. Tighten each subtask before bumping model or effort:
+1. State the exact batch you will spawn and why each subtask is independent.
+2. Identify any work the main agent must pause until results arrive.
+3. Tighten each subtask before increasing model or effort:
    - narrow task statement
    - narrow allowed scope or write surface
    - define exact output contract
    - define verification expectations
-4. Default read-only exploration unless scoped edits materially advance task.
+4. Default to read-only exploration unless scoped edits materially advance the
+   task.
 
 ## Fan-Out Rules
 
-- Prefer 1–3 focused subagents.
+- Prefer 1-3 focused subagents.
 - No nested subagents unless user asks.
-- Explorer-style: read-heavy, evidence-focused.
+- Explorer-style: read-heavy, evidence-focused. Prefer a custom
+  `repo_explorer` role when installed; keep Codex built-in `explorer` as a
+  fallback and avoid custom names that accidentally shadow built-ins.
 - Implementation: narrow, explicit file ownership.
-- Wait for all requested subagents before final synthesis.
-- Do not block on `wait_agent` reflexively. Continue useful local work unless next step blocked on result.
+- Prefer custom roles when they exist and match the task; fall back to built-in
+  `explorer`, `worker`, or `default`.
+- State selected roles in the spawn prompt.
+
+## Rendezvous Rule
+
+After spawning a planned batch, immediately wait for every spawned subagent in
+that batch before doing substantive next work.
+
+While subagents are running, allowed actions are limited to:
+
+- `wait_agent` or equivalent wait/status operations
+- `send_input` only to unblock or correct a running subagent
+- `resume_agent` or `close_agent` for lifecycle recovery
+- reporting a wait timeout, tool error, or explicit blocker to the user
+
+Do not inspect files, run tests, browse, edit, continue local analysis, start
+new unrelated tool calls, or produce the final answer until the spawned batch
+has completed and its results have been synthesized. The only exception is an
+explicit user instruction to run asynchronous delegation without waiting.
 
 ## Model Policy
 
-Default subagent model policy:
+Follow the active Codex tool schema and the custom agent files available in the
+session.
 
-- use `gpt-5.4-mini` first
-- prefer `gpt-5.3-codex` as larger fallback
-- do not use `gpt-5.4` unless user asks
+- Omit per-call `model` and `reasoning_effort` when inheriting the parent model
+  or when a custom agent file already pins them.
+- Use `gpt-5.5` for demanding review, debugging, security, planning, and
+  implementation agents when available.
+- Use `gpt-5.4` when `gpt-5.5` is unavailable or the workflow is pinned to it.
+- Use `gpt-5.4-mini` for lighter read-heavy scans, docs checks, inventories,
+  and supporting workers.
+- Use `gpt-5.3-codex-spark` only for low-latency, low-token, text-only triage
+  where depth is not required.
 
-Always set `model` and `reasoning_effort` explicitly on every `spawn_agent` call.
-
-Non-default model or effort: one-line reason in spawn prompt.
+Only set `model` or `reasoning_effort` directly when the user asks or the
+current tool schema supports that override and it is necessary. Include a
+one-line reason in the spawn prompt when overriding.
 
 ## Effort Routing
 
-For `gpt-5.4-mini`:
+Use `medium` as the default for most agents.
 
-- `medium`: default most bounded work—exploration, read-heavy scans, codebase tracing, doc/API verification, focused audits, standard review, normal tool calling, standard bounded implementation
-- `high`: ambiguous findings, cross-file reasoning, conflicting evidence, tricky debugging, edge cases, security-sensitive inspection, critical logic
-- `xhigh`: rarely necessary, reserved for unusually hard bounded reasoning
-- `low`: only simple deterministic tasks—path lookup, quick grep, tiny file checks, surface inventory
+- Use `high` when an agent must trace complex logic, check assumptions, handle
+  edge cases, investigate security-sensitive code, or resolve conflicting
+  evidence.
+- Use `low` only for straightforward lookup, inventory, or deterministic
+  narrow checks.
+- Use `xhigh` rarely, only for unusually hard bounded reasoning where the
+  selected model supports it.
 
-Prefer `medium` over `low` by default.
-
-Before moving from `medium` to `high`, tighten:
+Before increasing effort, tighten:
 
 - task statement
 - output contract
 - verification requirements
 
-For `gpt-5.3-codex`:
+## Fork And Context Policy
 
-- `low`: straightforward implementation
-- `medium`: normal non-trivial work
-- `high`: only when genuinely necessary
+Use the current `spawn_agent` schema exactly.
 
-No default `xhigh`. Only use for unusually hard, bounded reasoning tasks.
+Runtime compatibility matrix:
 
-## Spark Lane
+| Surface | Typical fields | Safe custom-role posture |
+| --- | --- | --- |
+| legacy tool | `agent_type`, `model`, `reasoning_effort`, `fork_context` | Keep prompt self-contained. Avoid combining full `fork_context` with role/model overrides if rejected. |
+| multi-agent v2 | `agent_type`, `model`, `reasoning_effort`, `task_name`, `fork_turns` | Set stable `task_name`; use `fork_turns: "none"` for custom role/model/effort overrides unless inherited history is required. |
+| custom agent file | standalone TOML role under `~/.codex/agents` or `.codex/agents` | Prefer omitting per-call model/effort when the role file pins them. |
 
-Use `gpt-5.3-codex-spark` only low-token, low-latency exploration, quick triage, light drafting.
+If the schema exposes `fork_turns` and `task_name`:
 
-Do not use Spark for:
+- Always provide a stable snake_case `task_name`.
+- For custom agents, built-in `agent_type`, or direct model/reasoning overrides,
+  set `fork_turns: "none"` unless the user explicitly requests inherited
+  history. Current Codex multi-agent v2 rejects full-history forks with role,
+  model, or reasoning overrides.
+- Use `fork_turns: "all"` only when the child must inherit full parent context
+  and no role/model/reasoning override is required.
+- Use a positive integer string for partial history when a small amount of
+  recent context is enough.
 
-- broad or ambiguous research
-- heavy tool-calling workflows
-- code changes
-- final decisions
-- high-risk reasoning
+If the schema exposes legacy `fork_context`:
 
-Spark has a 128K context window and may get stuck in compaction loops on
-overscoped tasks. Prefer `gpt-5.4-mini` for heavier research and tool-driven
-exploration because it is safer on context-heavy tasks.
+- Do not combine full-context fork behavior with explicit role/model/reasoning
+  overrides if the tool reports that combination is unsupported.
+- Prefer fresh, bounded prompts with the required context embedded.
 
 ## Escalation Rules
 
@@ -120,40 +161,36 @@ Escalation order:
 
 1. tighten scope + output contract
 2. tighten verification requirements
-3. raise `gpt-5.4-mini` `medium` → `high` if needed
-4. switch only that subagent to `gpt-5.3-codex`
-
-`gpt-5.3-codex` only when:
-
-- `gpt-5.4-mini` clearly underfits after one tighten pass
-- task cross-cutting, ambiguous, or high-risk
+3. raise effort on only that subagent if needed
+4. switch only that subagent to a stronger model when available
 
 ## Mandatory Spawn Contract
 
-Every `spawn_agent` call must explicitly specify:
+Every spawned subagent prompt must explicitly specify:
 
 1. narrow task or question
 2. allowed scope or surfaces
 3. whether the agent is read-only or may edit
-4. wait for all agents before continuing or not
+4. strict wait expectation
 5. exact return format
 
 Spawn prompt shape:
 
 ```text
-Task: <one bounded task or question>
-Scope: <paths, modules, docs, APIs, or explicit ownership>
-Mode: <read-only | may edit <files>>
-Wait: <wait for all agents before final synthesis: yes|no>
-Model: <explicit model>
-Reasoning: <explicit reasoning_effort>
-Reason: <only include when using non-default model or effort>
+Task: one bounded task or question
+Scope: paths, modules, docs, APIs, or explicit ownership
+Mode: read-only, or may edit named files only
+Wait: parent will wait for all spawned agents before substantive next work
+Role: selected custom or built-in agent role
+Model: inherited, custom-agent pinned, or explicit override with reason
+Reasoning: inherited, custom-agent pinned, or explicit override with reason
 Return format:
-- Key finding or result
-- Files and symbols touched or inspected
-- Commands or checks run, if any
-- Recommended next action
-- Unresolved questions or risks
+- Status
+- Evidence
+- Files inspected/changed
+- Commands run
+- Findings
+- Risks/blockers
 ```
 
 For edit-capable workers, also say:
@@ -189,9 +226,22 @@ For proposed changes, require one of:
 
 Subagent proposes edits without tests: require exact checks to run next.
 
+## Wait Timeout Rules
+
+Use long bounded waits for the full batch rather than short polling loops. If a
+wait times out:
+
+1. make one status or follow-up attempt for the running agents
+2. wait once more with a bounded timeout
+3. synthesize completed results and clearly mark unresolved agents, or close
+   stuck agents if their output is no longer useful
+
+Do not forget open subagents. Final output must account for every spawned
+subagent as completed, timed out, closed, or failed.
+
 ## Synthesis Rules
 
-Before final answer:
+Before any substantive next work or final answer:
 
 1. wait for all requested subagents
 2. merge overlapping findings
@@ -208,13 +258,14 @@ When findings conflict, produce a conflict ledger with:
 
 ## Forward-Testing
 
-Validating skill: include ≥1 probe forcing real delegation, not only refusal path.
+Validating this skill requires at least one probe forcing real delegation, not
+only a refusal path.
 
 Good probe:
 
 - explicitly 2 read-only subagents
 - disjoint bounded questions
-- final wait-for-all synthesis
+- strict wait-for-all synthesis
 - each spawn includes full mandatory spawn contract
 
 ## Failure Modes
@@ -223,7 +274,10 @@ Common failure modes + fixes:
 
 - Overscoped subtask: shrink task + allowed surface.
 - Weak output: restate return contract + evidence requirements.
-- Mini underfits: tighten once, escalate only that subagent.
-- Spark stalls or compacts: cut context sharply or move task to `gpt-5.4-mini`.
+- Parent overlaps work: stop, wait for the batch, then synthesize.
+- Parent forgot a subagent: wait or close it, then account for it in synthesis.
+- Role/model override rejected: retry with fresh context or compatible fork
+  fields for the active tool schema.
+- Lightweight model underfits: tighten once, then escalate only that subagent.
 - Too many agents: collapse to 1–3, synthesis local.
 - Edit collisions: read-only discovery or disjoint write surfaces.
