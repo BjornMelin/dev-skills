@@ -17,8 +17,9 @@ test reusable agent roles.
    - custom destination: explicit directory passed to the helper
 2. Choose templates from `templates/agents/`, a bundled pack, or create a
    narrow custom role.
-3. Use `scripts/subagent_creator.py` for deterministic list, install,
-   validate, render, diff, sync, backup, doctor, and smoke workflows.
+3. Use `scripts/subagent_creator.py` for deterministic list, status,
+   plan-sync, install, validate, render, diff, sync, prune, backup, doctor, and
+   smoke workflows.
 4. Validate every generated TOML file before telling the user it is ready.
 5. For live runtime behavior, pair generated roles with `$subspawn` strict
    rendezvous guidance so spawned results are considered before next work.
@@ -31,10 +32,13 @@ Resolve paths relative to this skill directory.
 python3 scripts/subagent_creator.py list
 python3 scripts/subagent_creator.py list --packs
 python3 scripts/subagent_creator.py doctor --project-dir .
+python3 scripts/subagent_creator.py status --pack core --project-dir . --include-extra
+python3 scripts/subagent_creator.py plan-sync --pack core --target global --include-extra
 python3 scripts/subagent_creator.py install reviewer repo_explorer --target global --dry-run
 python3 scripts/subagent_creator.py pack install core --target project --project-dir . --dry-run
 python3 scripts/subagent_creator.py diff --pack core --target global --include-extra
 python3 scripts/subagent_creator.py sync --pack core --target global --dry-run
+python3 scripts/subagent_creator.py prune --pack core --target global
 python3 scripts/subagent_creator.py backup --target global
 python3 scripts/subagent_creator.py validate ~/.codex/agents
 python3 scripts/subagent_creator.py smoke --pack docs
@@ -43,7 +47,8 @@ python3 scripts/subagent_creator.py smoke --pack docs
 Use `--overwrite` only when replacing a role intentionally. Prefer `sync` when
 updating already-installed templates because it backs up overwritten files by
 default. Use `--dry-run` before writing to global or project config when the
-target is unclear.
+target is unclear. Use `status --include-extra` and `plan-sync` before broad
+updates. `prune` is dry-run only unless `--confirm` is present.
 
 ## Defaults
 

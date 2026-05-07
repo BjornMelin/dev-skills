@@ -6,8 +6,8 @@ Path:
 skills/subagent-creator/
 ```
 
-Purpose: create, validate, install, diff, sync, back up, and smoke-test Codex
-custom subagent TOML roles.
+Purpose: create, validate, install, inventory, diff, plan syncs, prune stale
+installs, back up, and smoke-test Codex custom subagent TOML roles.
 
 ## Files
 
@@ -51,9 +51,12 @@ Supported commands:
 
 - `list`: list bundled templates.
 - `render`: print or copy templates.
+- `status`: inventory template drift across global and project installs.
 - `install`: install templates.
 - `sync`: overwrite installed templates with backups.
 - `diff`: compare bundled templates to installed roles.
+- `plan-sync`: show the install/overwrite/prune plan without writing files.
+- `prune`: remove stale installed roles, dry-run by default.
 - `backup`: back up installed roles.
 - `validate`: validate TOML roles.
 - `doctor`: inspect Codex subagent environment.
@@ -99,11 +102,36 @@ Diff installed templates:
 python3 skills/subagent-creator/scripts/subagent_creator.py diff --pack docs --target global --include-extra
 ```
 
+Inventory global and project installs:
+
+```bash
+python3 skills/subagent-creator/scripts/subagent_creator.py status --pack core --project-dir . --include-extra
+python3 skills/subagent-creator/scripts/subagent_creator.py status --pack core --project-dir . --include-extra --fail-on-drift --check project
+```
+
+Plan a sync without writing files:
+
+```bash
+python3 skills/subagent-creator/scripts/subagent_creator.py plan-sync --pack docs --target global --include-extra
+python3 skills/subagent-creator/scripts/subagent_creator.py plan-sync --pack docs --target global --prune-extra
+```
+
 Sync with backups:
 
 ```bash
 python3 skills/subagent-creator/scripts/subagent_creator.py sync --pack docs --target global
 ```
+
+Prune stale roles:
+
+```bash
+python3 skills/subagent-creator/scripts/subagent_creator.py prune --pack docs --target global
+python3 skills/subagent-creator/scripts/subagent_creator.py prune --pack docs --target global --confirm
+```
+
+`prune` is a dry run unless `--confirm` is present. Confirmed prunes back up
+deleted TOML files by default; pass `--no-backup` only when another backup
+exists.
 
 Validate everything:
 
@@ -143,4 +171,5 @@ The validator checks:
   findings, and risks.
 - Pair installed roles with `$subspawn`; templates alone do not enforce runtime
   wait behavior.
-
+- Run `status --include-extra` before broad `sync` or `prune` operations so
+  hand-authored global roles are visible before writes.
