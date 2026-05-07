@@ -90,6 +90,7 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 
 | Skill | Description | Source |
 | --- | --- | --- |
+| `agents-md-maintainer` | Durable `AGENTS.md` maintenance rules for deciding when repo guidance should change after implementation. | [skills/agents-md-maintainer/SKILL.md](skills/agents-md-maintainer/SKILL.md) |
 | `ai-sdk-agents` | AI SDK v6+ agents with `ToolLoopAgent`: loop control, dynamic tools, and agent workflows. | [skills/ai-sdk-agents/SKILL.md](skills/ai-sdk-agents/SKILL.md) |
 | `ai-sdk-core` | AI SDK Core: text/structured output, tools, MCP, embeddings/reranking, middleware, telemetry. | [skills/ai-sdk-core/SKILL.md](skills/ai-sdk-core/SKILL.md) |
 | `ai-sdk-ui` | Chat and generative UIs with AI SDK React (`useChat`, persistence, streaming, backends). | [skills/ai-sdk-ui/SKILL.md](skills/ai-sdk-ui/SKILL.md) |
@@ -118,10 +119,14 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |
 | `new-branch` | Create a conventional, semver-friendly branch first, then plan work and the PR. | [skills/new-branch/SKILL.md](skills/new-branch/SKILL.md) |
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
+| `opensrc` | Source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
 | `opensrc-inspect` | Local `opensrc` snapshots for dependency/upstream source inspection (not general web research). | [skills/opensrc-inspect/SKILL.md](skills/opensrc-inspect/SKILL.md) |
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
+| `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
+| `repo-modernize-upgrade-audit` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernize-upgrade-audit/SKILL.md](skills/repo-modernize-upgrade-audit/SKILL.md) |
+| `review-remediation` | Fix local review notes with verify-first triage; excludes hosted GitHub PR review loops. | [skills/review-remediation/SKILL.md](skills/review-remediation/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `signr-pr-closure-loop` | Signr-style PR closure: review threads, CI, Expo/EAS, Vercel/Turborepo, docs, babysit to merge-ready. | [skills/signr-pr-closure-loop/SKILL.md](skills/signr-pr-closure-loop/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
@@ -130,6 +135,7 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `subspawn` | Bounded Codex subagent delegation with strict wait and evidence-first synthesis. | [skills/subspawn/SKILL.md](skills/subspawn/SKILL.md) |
 | `supabase-ts` | Supabase with Next/React/TS: SSR auth, RLS, storage, realtime, Edge Functions, pgvector, deploy. | [skills/supabase-ts/SKILL.md](skills/supabase-ts/SKILL.md) |
 | `taste-metaskill` | Route frontend UI work to focused visual-taste references (premium, distinct, anti-generic). | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
+| `technical-writing` | Internal engineering docs: specs, architecture, runbooks, API references, and changelogs. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
 | `vitest-dev` | Vitest for TypeScript + Next.js: stable suites, fast local + CI, sharding. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
 | `zod-v4` | Zod v4: schemas, v3 migration, errors, JSON Schema/OpenAPI, framework hooks. | [skills/zod-v4/SKILL.md](skills/zod-v4/SKILL.md) |

@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Args, Parser, Subcommand, ValueEnum};
 use directories::BaseDirs;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, RANGE, USER_AGENT};
 use rusqlite::{Connection, params};
@@ -110,7 +110,12 @@ enum FetchCommand {
         url: String,
         #[arg(long)]
         fresh: bool,
-        #[arg(long, default_value_t = true)]
+        #[arg(
+            long = "no-store-in-cache",
+            action = ArgAction::SetFalse,
+            default_value_t = true,
+            help = "Disable Firecrawl server-side cache storage for this request"
+        )]
         store_in_cache: bool,
         #[arg(long, default_value_t = 60_000)]
         timeout_ms: u64,
@@ -877,7 +882,11 @@ async fn run_eval(args: EvalArgs, json_out: bool) -> Result<()> {
         "live": live
     });
     if json_out {
-        print_json(&result)
+        print_json(&result)?;
+        if failed {
+            bail!("offline eval failures");
+        }
+        Ok(())
     } else {
         println!("offline passed: {passed}");
         if failed {

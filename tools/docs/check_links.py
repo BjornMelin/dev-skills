@@ -38,10 +38,24 @@ def check_paths(paths: list[Path], repo_root: Path) -> list[str]:
                 try:
                     resolved.relative_to(repo_root)
                 except ValueError:
+                    errors.append(f"{path}: link target escapes repo root {target}")
                     continue
                 if not resolved.exists():
                     errors.append(f"{path}: missing link target {target}")
     return errors
+
+
+def discover_repo_root() -> Path:
+    for parent in Path(__file__).resolve().parents:
+        if (parent / ".git").exists() or (
+            (parent / "AGENTS.md").is_file() and (parent / "skills").is_dir()
+        ):
+            return parent
+    return Path.cwd().resolve()
+
+
+def normalize_paths(paths: list[Path], repo_root: Path) -> list[Path]:
+    return [(path if path.is_absolute() else repo_root / path).resolve() for path in paths]
 
 
 def main() -> int:
@@ -49,8 +63,8 @@ def main() -> int:
     parser.add_argument("paths", nargs="*", type=Path, default=[Path("docs")])
     args = parser.parse_args()
 
-    repo_root = Path.cwd().resolve()
-    errors = check_paths(args.paths, repo_root)
+    repo_root = discover_repo_root()
+    errors = check_paths(normalize_paths(args.paths, repo_root), repo_root)
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
@@ -60,4 +74,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

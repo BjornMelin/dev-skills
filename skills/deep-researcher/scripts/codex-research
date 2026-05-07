@@ -9,14 +9,18 @@ if command -v codex-research >/dev/null 2>&1; then
   exec codex-research "$@"
 fi
 
-if [[ -x "./target/debug/codex-research" ]]; then
-  exec ./target/debug/codex-research "$@"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+skill_dir="$(cd -- "$script_dir/.." && pwd -P)"
+repo_root="$(cd -- "$skill_dir/../.." && pwd -P)"
+
+if [[ -x "$repo_root/target/debug/codex-research" ]]; then
+  exec "$repo_root/target/debug/codex-research" "$@"
 fi
 
-if [[ -f "./crates/codex-research/Cargo.toml" ]]; then
+if [[ -f "$repo_root/crates/codex-research/Cargo.toml" ]]; then
+  cd "$repo_root"
   exec cargo run -q -p codex-research -- "$@"
 fi
 
-echo "codex-research not found. Run from dev-skills root or install with: cargo install --path crates/codex-research" >&2
+echo "codex-research not found. Install it with: cargo install --path /path/to/dev-skills/crates/codex-research" >&2
 exit 127
-

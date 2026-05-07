@@ -28,7 +28,6 @@ def main() -> int:
     skill_dir = Path(__file__).resolve().parents[1]
     templates = skill_dir / "templates" / "agents"
     dest = args.dest or target_dir(args.target, args.project_dir.resolve())
-    dest.mkdir(parents=True, exist_ok=True)
 
     installed = []
     for src in sorted(templates.glob("*.toml")):
@@ -38,6 +37,7 @@ def main() -> int:
             continue
         installed.append((src, dst))
         if not args.dry_run:
+            dest.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst)
         print(f"{'would install' if args.dry_run else 'installed'} {src.name} -> {dst}")
 
@@ -48,4 +48,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
