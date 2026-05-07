@@ -204,8 +204,9 @@ Behavior:
 - If a budget would go negative, fail before calling the provider unless
   `--no-budget` is set.
 - Codex-native web calls cannot be automatically intercepted; the skill docs
-  must instruct the parent agent to call `run debit --provider codex-web`
-  whenever native web searches are used as part of the same run.
+  must instruct the parent agent to call
+  `run debit --run .codex/research/run.json --provider codex-web` whenever
+  native web searches are used as part of the same run.
 - `run status --json` must expose remaining calls, spent calls, last provider
   errors, and source counts.
 - `run close` marks the run final and refuses further debits unless
