@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Use $rust-mega-eng to design a multi-crate Rust workspace with CLI, TUI, Tauri, web service, CI, and releases.",
+    "should_trigger": true,
+    "reason": "Explicit invocation plus broad Rust architecture is the intended use."
+  },
+  {
+    "query": "Use rust-mega-eng for a Rust ecosystem architecture plan across crates, binaries, services, distribution, and security gates.",
+    "should_trigger": true,
+    "reason": "The request is broad and cross-cutting enough for orchestration."
+  },
+  {
+    "query": "Use $rust-mega-eng to plan a staged Rust refactor from one crate into library, CLI, and service crates with semver-safe releases.",
+    "should_trigger": true,
+    "reason": "Multi-crate staged architecture and release planning are in scope."
+  },
+  {
+    "query": "Fix this Rust borrow checker error in one function.",
+    "should_trigger": false,
+    "reason": "A local compiler fix belongs to rust-expert, not the orchestrator."
+  },
+  {
+    "query": "Add a clap --json flag to one CLI command.",
+    "should_trigger": false,
+    "reason": "Focused CLI work belongs to rust-cli-clap."
+  },
+  {
+    "query": "Review this single Axum handler for error mapping.",
+    "should_trigger": false,
+    "reason": "Focused web handler review belongs to rust-web-services."
+  }
+]

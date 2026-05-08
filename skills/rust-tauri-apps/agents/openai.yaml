@@ -1,0 +1,12 @@
+display_name: Rust Tauri Apps
+short_description: Rust Tauri app architecture.
+default_prompt: Use $rust-tauri-apps to design, implement, test, or review Tauri v2 Rust backends and IPC.
+policy:
+  allow_implicit_invocation: true
+metadata:
+  skill_category: rust
+  primary_domains:
+    - tauri
+    - secure-ipc
+    - desktop
+    - mobile

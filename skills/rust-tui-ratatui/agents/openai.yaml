@@ -1,0 +1,12 @@
+display_name: Rust TUI Ratatui
+short_description: Rust terminal UI architecture.
+default_prompt: Use $rust-tui-ratatui to design, implement, test, or review Rust terminal UIs with Ratatui.
+policy:
+  allow_implicit_invocation: true
+metadata:
+  skill_category: rust
+  primary_domains:
+    - tui
+    - ratatui
+    - crossterm
+    - terminal-ui

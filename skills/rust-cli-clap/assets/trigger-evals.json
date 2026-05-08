@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Add a new --format json flag to our Rust CLI using clap and test the stdout contract.",
+    "should_trigger": true,
+    "reason": "Rust CLI, clap, and machine-readable output are direct matches."
+  },
+  {
+    "query": "Design subcommands for a cargo-style Rust binary with env overrides and shell completions.",
+    "should_trigger": true,
+    "reason": "Subcommands, env, and completions are core CLI concerns."
+  },
+  {
+    "query": "Review this clap derive parser for positional arguments, aliases, and error messages.",
+    "should_trigger": true,
+    "reason": "Clap parser design is the primary trigger."
+  },
+  {
+    "query": "Implement a ratatui dashboard with async key handling.",
+    "should_trigger": false,
+    "reason": "TUI work belongs to rust-tui-ratatui."
+  },
+  {
+    "query": "Secure a Tauri command exposed to the frontend.",
+    "should_trigger": false,
+    "reason": "Tauri command and capability work belongs to rust-tauri-apps."
+  },
+  {
+    "query": "Create an Axum middleware stack with tower layers.",
+    "should_trigger": false,
+    "reason": "Web service architecture belongs to rust-web-services."
+  }
+]

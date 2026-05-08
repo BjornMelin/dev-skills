@@ -1,0 +1,12 @@
+display_name: Rust Expert
+short_description: Core Rust engineering guidance.
+default_prompt: Use $rust-expert to implement, debug, review, or refactor Rust code with repo-native verification.
+policy:
+  allow_implicit_invocation: true
+metadata:
+  skill_category: rust
+  primary_domains:
+    - core-rust
+    - cargo
+    - async
+    - quality

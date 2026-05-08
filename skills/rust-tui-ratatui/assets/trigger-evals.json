@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Build a ratatui dashboard with tabs, async refresh, and keybindings.",
+    "should_trigger": true,
+    "reason": "Ratatui dashboard architecture is the direct trigger."
+  },
+  {
+    "query": "Review this crossterm event loop for terminal cleanup and resize handling.",
+    "should_trigger": true,
+    "reason": "Terminal event loop reliability belongs to this skill."
+  },
+  {
+    "query": "Add insta snapshots for Ratatui buffers and test focus movement.",
+    "should_trigger": true,
+    "reason": "TUI rendering tests are in scope."
+  },
+  {
+    "query": "Add a clap subcommand that prints JSON.",
+    "should_trigger": false,
+    "reason": "CLI parser and stdout contracts belong to rust-cli-clap."
+  },
+  {
+    "query": "Configure a Tauri capability for filesystem access.",
+    "should_trigger": false,
+    "reason": "Tauri capability work belongs to rust-tauri-apps."
+  },
+  {
+    "query": "Design an Axum REST API with request tracing.",
+    "should_trigger": false,
+    "reason": "HTTP service work belongs to rust-web-services."
+  }
+]

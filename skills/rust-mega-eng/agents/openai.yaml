@@ -1,0 +1,12 @@
+display_name: Rust Mega Eng
+short_description: Explicit Rust architecture planning.
+default_prompt: Use $rust-mega-eng for broad Rust architecture, multi-crate strategy, and release engineering plans.
+policy:
+  allow_implicit_invocation: false
+metadata:
+  skill_category: rust
+  primary_domains:
+    - architecture
+    - multi-crate
+    - release-engineering
+    - rust-strategy

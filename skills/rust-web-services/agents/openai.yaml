@@ -1,0 +1,12 @@
+display_name: Rust Web Services
+short_description: Rust Axum and Tokio services.
+default_prompt: Use $rust-web-services to design, implement, test, or review production Rust HTTP services.
+policy:
+  allow_implicit_invocation: true
+metadata:
+  skill_category: rust
+  primary_domains:
+    - axum
+    - tokio
+    - tower
+    - web-services

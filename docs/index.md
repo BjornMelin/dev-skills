@@ -6,6 +6,8 @@ added to this repository:
 - `codex-research`: Rust CLI for evidence-first research helpers.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
+- Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
+  Tauri v2 apps, Axum/Tokio services, and explicit broad architecture planning.
 - `subagent-creator`: skill and Python helper for authoring, installing,
   validating, diffing, syncing, backing up, and smoke-testing Codex custom
   agents.
@@ -36,6 +38,7 @@ out of version control.
 ## Skill References
 
 - [Deep Researcher Skill](reference/deep-researcher-skill.md)
+- [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
 - [Subagent Templates](reference/subagent-templates.md)

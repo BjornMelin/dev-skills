@@ -1,0 +1,12 @@
+display_name: Rust CLI Clap
+short_description: Rust CLI and Clap command design.
+default_prompt: Use $rust-cli-clap to design, implement, test, or review Rust command-line tools with clap.
+policy:
+  allow_implicit_invocation: true
+metadata:
+  skill_category: rust
+  primary_domains:
+    - cli
+    - clap
+    - terminal-ux
+    - packaging
