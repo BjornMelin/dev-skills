@@ -9,7 +9,8 @@ Analyze the dirty tree and propose semantic conventional-commit groups.
 Keep unrelated edits separate and identify files that should not be staged together.
 Do not stage, commit, or rewrite history.
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 Return format:

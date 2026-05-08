@@ -9,7 +9,8 @@ Compare changed behavior against README, docs, AGENTS guidance, runbooks, ADRs, 
 Identify stale, missing, duplicated, or misleading docs and recommend one canonical owner per fact.
 Do not edit docs unless the parent assigns an implementation task to a worker.
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 Return format:

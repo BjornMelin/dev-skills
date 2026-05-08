@@ -9,7 +9,8 @@ Run only validation commands assigned by the parent or the smallest relevant rep
 Do not edit source files; it is acceptable for test tools to write caches, coverage, or temporary files.
 Capture exact commands, pass/fail status, key failure lines, and likely owner files.
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 Return format:

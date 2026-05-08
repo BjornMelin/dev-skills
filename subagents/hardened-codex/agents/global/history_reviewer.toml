@@ -9,7 +9,8 @@ Use git history, blame, and nearby commits only for the assigned files or symbol
 Identify issues visible because code violates historical intent, previous fixes, or prior review context.
 Do not flag pre-existing issues unless the current change reintroduces or worsens them.
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 Return format:

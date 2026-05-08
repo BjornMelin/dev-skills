@@ -15,6 +15,18 @@ DEFAULT_LOCAL_ROLES = ROOT / "roles.local.json"
 
 @dataclass(frozen=True)
 class Role:
+    """Role source data for one rendered Codex subagent.
+
+    Attributes:
+        name: Snake-case subagent role name.
+        description: Short role description used by Codex for routing.
+        effort: Model reasoning effort, such as low, high, or xhigh.
+        sandbox: Sandbox mode for the rendered subagent.
+        body: Role-specific developer instructions.
+        family: Output family. Global roles render under agents/global.
+        nicknames: Optional display nickname candidates.
+    """
+
     name: str
     description: str
     effort: str
@@ -26,7 +38,8 @@ class Role:
 
 COMMON_BOUNDARY = """\
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 """
@@ -71,6 +84,21 @@ def role(
     family: str = "global",
     nicknames: tuple[str, str, str] | None = None,
 ) -> Role:
+    """Create a normalized role source record.
+
+    Args:
+        name: Snake-case subagent role name.
+        description: Short role description.
+        effort: Model reasoning effort.
+        sandbox: Sandbox mode.
+        body: Role-specific instruction body.
+        family: Output family for the role.
+        nicknames: Optional display nickname candidates.
+
+    Returns:
+        A Role with stripped instruction body text.
+    """
+
     return Role(
         name=name,
         description=description,
@@ -83,6 +111,20 @@ def role(
 
 
 def require_string(config: dict[str, object], key: str, *, source: Path) -> str:
+    """Read a required string field from a local role config object.
+
+    Args:
+        config: Parsed local role object.
+        key: Field name to read.
+        source: Manifest path used in error messages.
+
+    Returns:
+        The non-empty string field value.
+
+    Raises:
+        SystemExit: If the field is missing or not a non-empty string.
+    """
+
     value = config.get(key)
     if not isinstance(value, str) or not value:
         raise SystemExit(f"local role requires non-empty string {key}: {source}")
@@ -90,6 +132,18 @@ def require_string(config: dict[str, object], key: str, *, source: Path) -> str:
 
 
 def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
+    """Load ignored local-only role definitions when present.
+
+    Args:
+        path: Local role manifest path.
+
+    Returns:
+        Local role records, or an empty list when the manifest is absent.
+
+    Raises:
+        SystemExit: If the manifest is malformed.
+    """
+
     if not path.exists():
         return []
     try:
@@ -493,23 +547,87 @@ PUBLIC_ROLES = [*GLOBAL_ROLES, *PLATFORM_ROLES, *OVERLAY_ROLES]
 ALL_ROLES = [*PUBLIC_ROLES, *LOCAL_ROLES]
 
 
+DISPLAY_WORDS = {
+    "api": "API",
+    "bun": "Bun",
+    "ci": "CI",
+    "clerk": "Clerk",
+    "cli": "CLI",
+    "codex": "Codex",
+    "context7": "Context7",
+    "convex": "Convex",
+    "docmind": "DocMind",
+    "docs": "Docs",
+    "eas": "EAS",
+    "expo": "Expo",
+    "github": "GitHub",
+    "ios": "iOS",
+    "mcp": "MCP",
+    "nextjs": "Nextjs",
+    "openai": "OpenAI",
+    "pr": "PR",
+    "python": "Python",
+    "sdk": "SDK",
+    "ts": "TS",
+    "ui": "UI",
+    "uv": "uv",
+    "vercel": "Vercel",
+}
+
+
 def title_from_name(name: str) -> str:
-    return " ".join(part.capitalize() for part in name.split("_"))
+    """Convert a role name into a display title with known acronym casing.
+
+    Args:
+        name: Snake-case role name.
+
+    Returns:
+        Human-readable title text.
+    """
+
+    return " ".join(DISPLAY_WORDS.get(part, part.capitalize()) for part in name.split("_"))
 
 
 def nicknames_for(role_spec: Role) -> tuple[str, str, str]:
-    if role_spec.nicknames:
+    """Build nickname candidates for a role.
+
+    Args:
+        role_spec: Role source record.
+
+    Returns:
+        Three display nickname candidates.
+    """
+
+    if role_spec.nicknames is not None:
         return role_spec.nicknames
     title = title_from_name(role_spec.name)
     return (title, f"{title} Atlas", f"{title} Delta")
 
 
 def toml_string(value: str) -> str:
+    """Render a TOML basic string value.
+
+    Args:
+        value: String to escape.
+
+    Returns:
+        Escaped TOML basic string including quotes.
+    """
+
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
 
 def render_role(role_spec: Role) -> str:
+    """Render one role as a Codex custom subagent TOML document.
+
+    Args:
+        role_spec: Role source record.
+
+    Returns:
+        TOML text for the role.
+    """
+
     return_contract = (
         RETURN_RESEARCH if role_spec.name in RESEARCH_CONTRACT_AGENT_NAMES else RETURN_STANDARD
     )
@@ -521,11 +639,11 @@ def render_role(role_spec: Role) -> str:
         ]
     )
     nicknames = ", ".join(toml_string(item) for item in nicknames_for(role_spec))
-    return f'''name = "{role_spec.name}"
-description = "{role_spec.description}"
+    return f'''name = {toml_string(role_spec.name)}
+description = {toml_string(role_spec.description)}
 model = "gpt-5.5"
-model_reasoning_effort = "{role_spec.effort}"
-sandbox_mode = "{role_spec.sandbox}"
+model_reasoning_effort = {toml_string(role_spec.effort)}
+sandbox_mode = {toml_string(role_spec.sandbox)}
 nickname_candidates = [{nicknames}]
 developer_instructions = """
 {instructions}
@@ -534,12 +652,23 @@ developer_instructions = """
 
 
 def target_dir(role_spec: Role) -> Path:
+    """Return the generated directory for a role.
+
+    Args:
+        role_spec: Role source record.
+
+    Returns:
+        Directory path for the rendered TOML file.
+    """
+
     if role_spec.family == "global":
         return AGENTS_ROOT / "global"
     return AGENTS_ROOT / "overlays" / role_spec.family
 
 
 def clean_generated_dirs() -> None:
+    """Remove previously generated TOML files from managed directories."""
+
     overlay_dirs = {
         AGENTS_ROOT / "overlays" / role_spec.family
         for role_spec in [*OVERLAY_ROLES, *LOCAL_ROLES]
@@ -551,6 +680,8 @@ def clean_generated_dirs() -> None:
 
 
 def write_roles() -> None:
+    """Render all public and local roles to TOML files."""
+
     clean_generated_dirs()
     for role_spec in ALL_ROLES:
         directory = target_dir(role_spec)
@@ -559,6 +690,8 @@ def write_roles() -> None:
 
 
 def write_catalog() -> None:
+    """Write the public role catalog Markdown document."""
+
     lines = [
         "# Hardened Codex Subagent Catalog",
         "",
@@ -629,6 +762,12 @@ def write_catalog() -> None:
 
 
 def main() -> int:
+    """Run role rendering from the command line.
+
+    Returns:
+        Process exit status code.
+    """
+
     write_roles()
     write_catalog()
     print(f"rendered {len(ALL_ROLES)} roles under {AGENTS_ROOT}")

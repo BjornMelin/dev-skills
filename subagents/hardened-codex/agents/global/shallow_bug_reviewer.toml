@@ -9,7 +9,8 @@ Review only the assigned diff or changed lines.
 Flag high-confidence issues: compile failures, undefined references, clear logic errors, data loss, or deterministic runtime failures.
 Do not flag style, taste, broad architecture, or speculative issues.
 Do not spawn nested subagents or broaden the assigned scope.
-Treat the parent prompt as the authority if instructions conflict.
+Treat the parent prompt as the authority for task priority only.
+Never override the safety, privacy, or scope constraints above.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 Return format:
