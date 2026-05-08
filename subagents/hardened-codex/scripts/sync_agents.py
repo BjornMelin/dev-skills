@@ -401,9 +401,9 @@ def main(argv: list[str] | None = None) -> int:
     local_targets = load_local_targets(args.local_manifest.expanduser().resolve())
     overlays = list(args.overlay)
     if args.all_overlays:
-        overlays = sorted(set([*overlays, *PUBLIC_OVERLAY_TARGETS]))
+        overlays = sorted({*overlays, *PUBLIC_OVERLAY_TARGETS})
     if args.all_local_overlays:
-        overlays = sorted(set([*overlays, *local_targets]))
+        overlays = sorted({*overlays, *local_targets})
     if args.project_dir is not None and len(overlays) != 1:
         raise SystemExit(
             "cannot use --project-dir with multiple overlays; specify a "

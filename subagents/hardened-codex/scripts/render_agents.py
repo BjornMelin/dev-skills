@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,7 +40,7 @@ class Role:
 COMMON_BOUNDARY = """\
 Do not spawn nested subagents or broaden the assigned scope.
 Treat the parent prompt as the authority for task priority only.
-Never override the safety, privacy, or scope constraints above.
+Safety, privacy, and scope constraints are non-overridable.
 Redact secrets, tokens, credentials, and private personal data from outputs.
 Keep outputs concise, evidence-first, and scoped to the assigned task.
 """
@@ -702,6 +703,56 @@ def toml_string(value: str) -> str:
     return f'"{escaped}"'
 
 
+def toml_multiline_string(value: str, *, width: int = 76) -> str:
+    """Render a wrapped TOML multiline basic string.
+
+    Args:
+        value: String to wrap and escape.
+        width: Maximum content width before wrapping.
+
+    Returns:
+        Escaped TOML multiline basic string.
+    """
+
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    lines = textwrap.wrap(escaped, width=width) or [""]
+    return '"""\\\n' + "\n".join(lines) + '"""'
+
+
+def toml_string_array(values: tuple[str, ...]) -> str:
+    """Render a TOML string array with one item per line.
+
+    Args:
+        values: String values to render.
+
+    Returns:
+        Multiline TOML array text.
+    """
+
+    rendered = [f"  {toml_string(value)}" for value in values]
+    return "[\n" + ",\n".join(rendered) + "\n]"
+
+
+def wrap_instruction_text(value: str, *, width: int = 76) -> str:
+    """Wrap prose instruction lines while preserving list structure.
+
+    Args:
+        value: Instruction text to wrap.
+        width: Maximum line width for prose.
+
+    Returns:
+        Wrapped instruction text.
+    """
+
+    lines: list[str] = []
+    for line in value.splitlines():
+        if not line or line.startswith("- "):
+            lines.append(line)
+            continue
+        lines.extend(textwrap.wrap(line, width=width) or [""])
+    return "\n".join(lines)
+
+
 def render_role(role_spec: Role) -> str:
     """Render one role as a Codex custom subagent TOML document.
 
@@ -717,18 +768,18 @@ def render_role(role_spec: Role) -> str:
     )
     instructions = "\n".join(
         [
-            role_spec.body,
-            COMMON_BOUNDARY.strip(),
+            wrap_instruction_text(role_spec.body),
+            wrap_instruction_text(COMMON_BOUNDARY.strip()),
             return_contract.strip(),
         ]
     )
-    nicknames = ", ".join(toml_string(item) for item in nicknames_for(role_spec))
+    nicknames = toml_string_array(nicknames_for(role_spec))
     return f'''name = {toml_string(role_spec.name)}
-description = {toml_string(role_spec.description)}
+description = {toml_multiline_string(role_spec.description)}
 model = "gpt-5.5"
 model_reasoning_effort = {toml_string(role_spec.effort)}
 sandbox_mode = {toml_string(role_spec.sandbox)}
-nickname_candidates = [{nicknames}]
+nickname_candidates = {nicknames}
 developer_instructions = """
 {instructions}
 """
