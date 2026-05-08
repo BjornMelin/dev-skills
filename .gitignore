@@ -24,6 +24,8 @@ Icon?
 !.env.example
 
 # Local Codex research artifacts
+.codex/agents/
+.codex/agent-backups/
 .codex/research/run*.json
 .codex/research/ledger*.jsonl
 .codex/research/report*.md
@@ -76,3 +78,16 @@ skills/bun-dev/.bun-platform/
 skills/bun-dev/references/release-sync-report.json
 .agents/
 skills-lock.json
+
+# Local-only private subagent overlays; explicitly unignore public overlays.
+subagents/hardened-codex/overlays.local.json
+subagents/hardened-codex/overlays.local.*.json
+!subagents/hardened-codex/overlays.local.example.json
+subagents/hardened-codex/roles.local.json
+subagents/hardened-codex/roles.local.*.json
+!subagents/hardened-codex/roles.local.example.json
+subagents/hardened-codex/agents/overlays/*/
+!subagents/hardened-codex/agents/overlays/docmind/
+!subagents/hardened-codex/agents/overlays/docmind/*.toml
+!subagents/hardened-codex/agents/overlays/tooling/
+!subagents/hardened-codex/agents/overlays/tooling/*.toml

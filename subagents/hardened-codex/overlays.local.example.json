@@ -1,0 +1,8 @@
+{
+  "overlays": {
+    "private-repo": {
+      "project_dir": "/path/to/private/repo",
+      "source_dir": "agents/overlays/private-repo"
+    }
+  }
+}
