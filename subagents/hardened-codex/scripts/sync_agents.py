@@ -404,6 +404,11 @@ def main(argv: list[str] | None = None) -> int:
         overlays = sorted(set([*overlays, *PUBLIC_OVERLAY_TARGETS]))
     if args.all_local_overlays:
         overlays = sorted(set([*overlays, *local_targets]))
+    if args.project_dir is not None and len(overlays) != 1:
+        raise SystemExit(
+            "cannot use --project-dir with multiple overlays; specify a "
+            "single --overlay or omit --project-dir"
+        )
     if args.list:
         print("public overlays:")
         for name, target in sorted(PUBLIC_OVERLAY_TARGETS.items()):

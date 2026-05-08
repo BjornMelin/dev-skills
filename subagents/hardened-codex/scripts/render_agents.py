@@ -530,15 +530,99 @@ PLATFORM_ROLES: list[Role] = [
 
 
 OVERLAY_ROLES: list[Role] = [
-    role("docmind_dependency_safety_reviewer", "DocMind dependency safety reviewer for Dependabot, security bumps, uv locks, release notes, and source compatibility.", "xhigh", "read-only", "Assess DocMind dependency changes from live diff, uv.lock, upstream release notes/source, CI status, and runtime usage before declaring safe.", "docmind"),
-    role("docmind_python_runtime_reviewer", "DocMind Python runtime reviewer for Streamlit/runtime behavior, model loading, Apple MPS parity, and test taxonomy.", "high", "read-only", "Review DocMind Python runtime changes for compatibility, optional dependency behavior, device parity, and focused pytest coverage.", "docmind"),
-    role("docmind_ci_triager", "DocMind CI triager for GitHub Actions, uv frozen installs, docs lint, tests, and release automation failures.", "high", "read-only", "Start from live CI evidence and committed workflow files. Separate frozen CI installs from release lock-refresh automation.", "docmind"),
-    role("docmind_docs_release_auditor", "DocMind docs/release auditor for Release Please, changelogs, markdown lint, worklogs, and rendered docs behavior.", "high", "read-only", "Validate DocMind docs and release automation against committed configuration, rendered behavior when requested, and parseable SemVer release note rules.", "docmind"),
-    role("docmind_model_source_validator", "DocMind model/source validator for Transformers, SigLIP, GGUF, image safety, and upstream implementation claims.", "high", "read-only", "Validate model/runtime claims against installed versions, source, and DocMind loader ownership. Preserve custom-model revision semantics unless parent says otherwise.", "docmind"),
-    role("skill_package_validator", "Agent tooling skill package validator for AgentSkills metadata, packaging, quick validation, and install portability.", "high", "read-only", "Validate skill packages against repo tooling, agents/openai.yaml metadata, quick_validate behavior, and install-relative path rules.", "tooling"),
-    role("subagent_pack_reviewer", "Agent tooling subagent pack reviewer for TOML role catalogs, model/effort policy, safety contracts, and smoke readiness.", "xhigh", "read-only", "Review Codex subagent packs against authoring guide, subspawn policy, validator constraints, and runtime smoke expectations.", "tooling"),
-    role("mcp_tooling_reviewer", "Agent tooling MCP/source reviewer for research CLI, Context7/GitHub/source routing, and provider evidence contracts.", "high", "read-only", "Review MCP/tooling changes for provider routing, evidence hydration, secret redaction, timeout behavior, and replayable source records.", "tooling"),
-    role("agent_runtime_smoke_tester", "Agent tooling runtime smoke tester for Codex custom agents, spawn contracts, and representative live checks.", "high", "workspace-write", "Run assigned non-destructive smoke commands, temporary projects, or Codex exec checks. Report exact commands and role responses.", "tooling"),
+    role(
+        "docmind_dependency_safety_reviewer",
+        "DocMind dependency safety reviewer for Dependabot, security bumps, "
+        "uv locks, release notes, and source compatibility.",
+        "xhigh",
+        "read-only",
+        "Assess DocMind dependency changes from live diff, uv.lock, upstream "
+        "release notes/source, CI status, and runtime usage before declaring "
+        "safe.",
+        "docmind",
+    ),
+    role(
+        "docmind_python_runtime_reviewer",
+        "DocMind Python runtime reviewer for Streamlit/runtime behavior, "
+        "model loading, Apple MPS parity, and test taxonomy.",
+        "high",
+        "read-only",
+        "Review DocMind Python runtime changes for compatibility, optional "
+        "dependency behavior, device parity, and focused pytest coverage.",
+        "docmind",
+    ),
+    role(
+        "docmind_ci_triager",
+        "DocMind CI triager for GitHub Actions, uv frozen installs, docs "
+        "lint, tests, and release automation failures.",
+        "high",
+        "read-only",
+        "Start from live CI evidence and committed workflow files. Separate "
+        "frozen CI installs from release lock-refresh automation.",
+        "docmind",
+    ),
+    role(
+        "docmind_docs_release_auditor",
+        "DocMind docs/release auditor for Release Please, changelogs, "
+        "markdown lint, worklogs, and rendered docs behavior.",
+        "high",
+        "read-only",
+        "Validate DocMind docs and release automation against committed "
+        "configuration, rendered behavior when requested, and parseable "
+        "SemVer release note rules.",
+        "docmind",
+    ),
+    role(
+        "docmind_model_source_validator",
+        "DocMind model/source validator for Transformers, SigLIP, GGUF, "
+        "image safety, and upstream implementation claims.",
+        "high",
+        "read-only",
+        "Validate model/runtime claims against installed versions, source, "
+        "and DocMind loader ownership. Preserve custom-model revision "
+        "semantics unless parent says otherwise.",
+        "docmind",
+    ),
+    role(
+        "skill_package_validator",
+        "Agent tooling skill package validator for AgentSkills metadata, "
+        "packaging, quick validation, and install portability.",
+        "high",
+        "read-only",
+        "Validate skill packages against repo tooling, agents/openai.yaml "
+        "metadata, quick_validate behavior, and install-relative path rules.",
+        "tooling",
+    ),
+    role(
+        "subagent_pack_reviewer",
+        "Agent tooling subagent pack reviewer for TOML role catalogs, "
+        "model/effort policy, safety contracts, and smoke readiness.",
+        "xhigh",
+        "read-only",
+        "Review Codex subagent packs against authoring guide, subspawn "
+        "policy, validator constraints, and runtime smoke expectations.",
+        "tooling",
+    ),
+    role(
+        "mcp_tooling_reviewer",
+        "Agent tooling MCP/source reviewer for research CLI, Context7/GitHub/"
+        "source routing, and provider evidence contracts.",
+        "high",
+        "read-only",
+        "Review MCP/tooling changes for provider routing, evidence hydration, "
+        "secret redaction, timeout behavior, and replayable source records.",
+        "tooling",
+    ),
+    role(
+        "agent_runtime_smoke_tester",
+        "Agent tooling runtime smoke tester for Codex custom agents, spawn "
+        "contracts, and representative live checks.",
+        "high",
+        "workspace-write",
+        "Run assigned non-destructive smoke commands, temporary projects, or "
+        "Codex exec checks. Report exact commands and role responses.",
+        "tooling",
+    ),
 ]
 
 
