@@ -11,6 +11,11 @@ if (roots.length === 0) {
 let ok = true;
 for (const rootArg of roots) {
   const skillDir = path.resolve(rootArg);
+  if (!isDirectory(skillDir)) {
+    ok = false;
+    console.error(`invalid skill directory: ${rootArg}`);
+    continue;
+  }
   for (const file of listMarkdown(skillDir)) {
     const text = fs.readFileSync(file, "utf8");
     const relFile = path.relative(skillDir, file);
@@ -43,4 +48,12 @@ function listMarkdown(dir) {
     else if (entry.name.endsWith(".md")) out.push(full);
   }
   return out;
+}
+
+function isDirectory(dir) {
+  try {
+    return fs.statSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
 }

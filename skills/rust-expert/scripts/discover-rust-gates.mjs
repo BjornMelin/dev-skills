@@ -4,6 +4,7 @@ import path from "node:path";
 
 const root = path.resolve(process.argv[2] ?? ".");
 const commands = new Set();
+const RUN_COMMAND = /(cargo .+|just .+|mise run .+|make .+)/;
 
 if (exists("Cargo.toml")) {
   commands.add("cargo fmt --all -- --check");
@@ -21,8 +22,34 @@ if (exists("Makefile")) commands.add("make help # inspect Rust-related targets")
 
 for (const workflow of listFiles(path.join(root, ".github", "workflows"))) {
   const text = fs.readFileSync(workflow, "utf8");
-  for (const line of text.split(/\r?\n/)) {
-    const match = /^\s*(?:-\s*)?run:\s*(cargo .+|just .+|mise run .+|make .+)/.exec(line);
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const inline = /^\s*(?:-\s*)?run:\s*(cargo .+|just .+|mise run .+|make .+)/.exec(line);
+    if (inline) {
+      commands.add(inline[1].trim());
+      continue;
+    }
+
+    const block = /^(\s*)(?:-\s*)?run:\s*([|>])\s*$/.exec(line);
+    if (!block) continue;
+
+    const baseIndent = block[1].length;
+    const blockLines = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const next = lines[j];
+      if (next.trim() === "") {
+        blockLines.push("");
+        continue;
+      }
+      const nextIndent = next.match(/^\s*/)[0].length;
+      if (nextIndent <= baseIndent) break;
+      blockLines.push(next.trim());
+      i = j;
+    }
+
+    const separator = block[2] === "|" ? " && " : " ";
+    const match = RUN_COMMAND.exec(blockLines.filter(Boolean).join(separator));
     if (match) commands.add(match[1].trim());
   }
 }
