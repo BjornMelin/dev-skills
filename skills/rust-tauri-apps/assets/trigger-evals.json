@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Add a Tauri v2 Rust command that validates input and returns a typed result to the frontend.",
+    "should_trigger": true,
+    "reason": "Tauri command and IPC design are direct triggers."
+  },
+  {
+    "query": "Review src-tauri capabilities for filesystem and shell permissions.",
+    "should_trigger": true,
+    "reason": "Tauri capability security is in scope."
+  },
+  {
+    "query": "Design a Tauri updater and bundling workflow for desktop releases.",
+    "should_trigger": true,
+    "reason": "Distribution and updater work belong to this skill."
+  },
+  {
+    "query": "Build a Ratatui table widget for terminal logs.",
+    "should_trigger": false,
+    "reason": "Terminal UI work belongs to rust-tui-ratatui."
+  },
+  {
+    "query": "Implement clap parser aliases for a cargo-style CLI.",
+    "should_trigger": false,
+    "reason": "CLI parser design belongs to rust-cli-clap."
+  },
+  {
+    "query": "Add Axum middleware for request IDs.",
+    "should_trigger": false,
+    "reason": "HTTP services belong to rust-web-services."
+  }
+]

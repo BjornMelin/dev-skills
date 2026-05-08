@@ -1,0 +1,32 @@
+[
+  {
+    "query": "Design an Axum API with typed errors, request tracing, and graceful shutdown.",
+    "should_trigger": true,
+    "reason": "Axum service architecture is a direct trigger."
+  },
+  {
+    "query": "Add a Tower middleware layer for auth and request IDs in a Rust service.",
+    "should_trigger": true,
+    "reason": "Tower middleware and service concerns are in scope."
+  },
+  {
+    "query": "Review SQLx pool ownership and Tokio task cancellation for our Rust web backend.",
+    "should_trigger": true,
+    "reason": "Runtime and data ownership for web services is covered."
+  },
+  {
+    "query": "Create shell completions for a clap CLI.",
+    "should_trigger": false,
+    "reason": "CLI distribution belongs to rust-cli-clap."
+  },
+  {
+    "query": "Build a Ratatui modal for filtering table rows.",
+    "should_trigger": false,
+    "reason": "Terminal UI belongs to rust-tui-ratatui."
+  },
+  {
+    "query": "Configure Tauri mobile permissions.",
+    "should_trigger": false,
+    "reason": "Tauri permissions belong to rust-tauri-apps."
+  }
+]

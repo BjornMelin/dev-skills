@@ -1,0 +1,37 @@
+[
+  {
+    "query": "Fix this Rust borrow checker error in the parser without just cloning everything.",
+    "should_trigger": true,
+    "reason": "Core Rust compiler and ownership debugging."
+  },
+  {
+    "query": "Review this Rust PR for unsafe, async lifecycle, error handling, and missing tests.",
+    "should_trigger": true,
+    "reason": "Core Rust review across cross-cutting concerns."
+  },
+  {
+    "query": "Our Cargo workspace has feature conflicts and MSRV failures after a dependency bump.",
+    "should_trigger": true,
+    "reason": "Cargo, feature, and MSRV policy."
+  },
+  {
+    "query": "Write a new CLI with clap subcommands and JSON output.",
+    "should_trigger": false,
+    "reason": "Owned by rust-cli-clap."
+  },
+  {
+    "query": "Build a Ratatui dashboard with keyboard navigation.",
+    "should_trigger": false,
+    "reason": "Owned by rust-tui-ratatui."
+  },
+  {
+    "query": "Add Tauri v2 commands and capabilities for a desktop app.",
+    "should_trigger": false,
+    "reason": "Owned by rust-tauri-apps."
+  },
+  {
+    "query": "Design an Axum API with middleware and sqlx pool handling.",
+    "should_trigger": false,
+    "reason": "Owned by rust-web-services."
+  }
+]

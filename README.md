@@ -26,6 +26,7 @@ Key docs:
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
+- [Rust skill suite](docs/reference/rust-skill-suite.md)
 - [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
 
 For local live-provider testing, copy `.env.example` to an untracked `.env` and
@@ -131,6 +132,12 @@ All skills are stored in `skills/`. The canonical entrypoint for each skill is i
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
 | `repo-modernize-upgrade-audit` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernize-upgrade-audit/SKILL.md](skills/repo-modernize-upgrade-audit/SKILL.md) |
 | `review-remediation` | Fix local review notes with verify-first triage; excludes hosted GitHub PR review loops. | [skills/review-remediation/SKILL.md](skills/review-remediation/SKILL.md) |
+| `rust-cli-clap` | Rust CLI and Clap command design: parsers, output contracts, tests, packaging. | [skills/rust-cli-clap/SKILL.md](skills/rust-cli-clap/SKILL.md) |
+| `rust-expert` | Core Rust engineering router for ownership, async, crates, tests, performance, and security. | [skills/rust-expert/SKILL.md](skills/rust-expert/SKILL.md) |
+| `rust-mega-eng` | Explicit Rust architecture orchestrator for broad multi-crate strategy and release planning. | [skills/rust-mega-eng/SKILL.md](skills/rust-mega-eng/SKILL.md) |
+| `rust-tauri-apps` | Tauri v2 Rust app backends: commands, secure IPC, capabilities, bundling, distribution. | [skills/rust-tauri-apps/SKILL.md](skills/rust-tauri-apps/SKILL.md) |
+| `rust-tui-ratatui` | Rust terminal UI architecture with Ratatui, crossterm event loops, snapshots, and UX. | [skills/rust-tui-ratatui/SKILL.md](skills/rust-tui-ratatui/SKILL.md) |
+| `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `signr-pr-closure-loop` | Signr-style PR closure: review threads, CI, Expo/EAS, Vercel/Turborepo, docs, babysit to merge-ready. | [skills/signr-pr-closure-loop/SKILL.md](skills/signr-pr-closure-loop/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
@@ -192,6 +199,13 @@ python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 git diff --check
+```
+
+Rust skill suite validation:
+
+```bash
+node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
+node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
 ```
 
 Notes:
