@@ -80,6 +80,9 @@ skills/bun-dev/references/release-sync-report.json
 skills-lock.json
 
 # Local-only private subagent overlays; explicitly unignore public overlays.
+subagents/hardened-codex/overlays.local.json
+subagents/hardened-codex/overlays.local.*.json
+!subagents/hardened-codex/overlays.local.example.json
 subagents/hardened-codex/agents/overlays/*/
 !subagents/hardened-codex/agents/overlays/docmind/
 !subagents/hardened-codex/agents/overlays/docmind/*.toml

@@ -48,6 +48,15 @@ python3 subagents/hardened-codex/scripts/sync_agents.py \
   --dry-run
 ```
 
+For repeated private installs, copy `overlays.local.example.json` to the ignored
+`overlays.local.json`, set local overlay names and project paths there, then use:
+
+```bash
+python3 subagents/hardened-codex/scripts/sync_agents.py --list
+python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --validate-sources
+python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --dry-run
+```
+
 Apply with timestamp backups:
 
 ```bash
