@@ -341,6 +341,10 @@ def install_overlay_with_targets(
     if project_dir is None and default_project is None:
         raise SystemExit(f"overlay {name} requires --project-dir")
     project = (project_dir or default_project).expanduser().resolve()
+    if not project.is_dir():
+        raise SystemExit(
+            f"overlay {name} target project does not exist: {project}"
+        )
     target = project / ".codex" / "agents"
     backup_dir = target.parent / "agent-backups" / f"{name}-{stamp()}"
     actions = copy_tree(source, target, dry_run=dry_run, backup_dir=backup_dir)

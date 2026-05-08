@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS_ROOT = ROOT / "agents"
 DEFAULT_LOCAL_ROLES = ROOT / "roles.local.json"
+SAFE_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 @dataclass(frozen=True)
@@ -132,6 +134,27 @@ def require_string(config: dict[str, object], key: str, *, source: Path) -> str:
     return value
 
 
+def require_slug(config: dict[str, object], key: str, *, source: Path) -> str:
+    """Read a required safe slug field from a local role config object.
+
+    Args:
+        config: Parsed local role object.
+        key: Field name to read.
+        source: Manifest path used in error messages.
+
+    Returns:
+        The validated slug field value.
+
+    Raises:
+        SystemExit: If the field is missing or not a safe slug.
+    """
+
+    value = require_string(config, key, source=source)
+    if not SAFE_SLUG_RE.fullmatch(value):
+        raise SystemExit(f"local role {key} must be a safe slug: {source}")
+    return value
+
+
 def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
     """Load ignored local-only role definitions when present.
 
@@ -160,7 +183,7 @@ def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
     for raw_role in raw_roles:
         if not isinstance(raw_role, dict):
             raise SystemExit(f"local role entries must be objects: {path}")
-        name = require_string(raw_role, "name", source=path)
+        name = require_slug(raw_role, "name", source=path)
         if name in seen:
             raise SystemExit(f"duplicate local role name {name}: {path}")
         seen.add(name)
@@ -181,7 +204,7 @@ def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
                 require_string(raw_role, "effort", source=path),
                 require_string(raw_role, "sandbox", source=path),
                 require_string(raw_role, "body", source=path),
-                require_string(raw_role, "family", source=path),
+                require_slug(raw_role, "family", source=path),
                 nicknames,
             )
         )
@@ -719,6 +742,20 @@ def toml_multiline_string(value: str, *, width: int = 76) -> str:
     return '"""\\\n' + "\n".join(lines) + '"""'
 
 
+def toml_multiline_basic_string(value: str) -> str:
+    """Render a TOML multiline basic string without reflowing lines.
+
+    Args:
+        value: String to escape and render.
+
+    Returns:
+        Escaped TOML multiline basic string.
+    """
+
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return '"""\n' + escaped + '\n"""'
+
+
 def toml_string_array(values: tuple[str, ...]) -> str:
     """Render a TOML string array with one item per line.
 
@@ -774,15 +811,14 @@ def render_role(role_spec: Role) -> str:
         ]
     )
     nicknames = toml_string_array(nicknames_for(role_spec))
+    rendered_instructions = toml_multiline_basic_string(instructions)
     return f'''name = {toml_string(role_spec.name)}
 description = {toml_multiline_string(role_spec.description)}
 model = "gpt-5.5"
 model_reasoning_effort = {toml_string(role_spec.effort)}
 sandbox_mode = {toml_string(role_spec.sandbox)}
 nickname_candidates = {nicknames}
-developer_instructions = """
-{instructions}
-"""
+developer_instructions = {rendered_instructions}
 '''
 
 
