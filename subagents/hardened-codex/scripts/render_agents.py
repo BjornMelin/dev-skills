@@ -3,12 +3,14 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS_ROOT = ROOT / "agents"
+DEFAULT_LOCAL_ROLES = ROOT / "roles.local.json"
 
 
 @dataclass(frozen=True)
@@ -78,6 +80,57 @@ def role(
         family=family,
         nicknames=nicknames,
     )
+
+
+def require_string(config: dict[str, object], key: str, *, source: Path) -> str:
+    value = config.get(key)
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"local role requires non-empty string {key}: {source}")
+    return value
+
+
+def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid local role manifest {path}: {exc}") from exc
+    raw_roles = payload.get("roles")
+    if not isinstance(raw_roles, list):
+        raise SystemExit(f"local role manifest must contain a roles array: {path}")
+
+    roles: list[Role] = []
+    seen: set[str] = set()
+    for raw_role in raw_roles:
+        if not isinstance(raw_role, dict):
+            raise SystemExit(f"local role entries must be objects: {path}")
+        name = require_string(raw_role, "name", source=path)
+        if name in seen:
+            raise SystemExit(f"duplicate local role name {name}: {path}")
+        seen.add(name)
+        nicknames_value = raw_role.get("nicknames")
+        nicknames: tuple[str, str, str] | None = None
+        if nicknames_value is not None:
+            if (
+                not isinstance(nicknames_value, list)
+                or len(nicknames_value) != 3
+                or not all(isinstance(item, str) and item for item in nicknames_value)
+            ):
+                raise SystemExit(f"local role {name} nicknames must be three strings: {path}")
+            nicknames = (nicknames_value[0], nicknames_value[1], nicknames_value[2])
+        roles.append(
+            role(
+                name,
+                require_string(raw_role, "description", source=path),
+                require_string(raw_role, "effort", source=path),
+                require_string(raw_role, "sandbox", source=path),
+                require_string(raw_role, "body", source=path),
+                require_string(raw_role, "family", source=path),
+                nicknames,
+            )
+        )
+    return roles
 
 
 GLOBAL_ROLES: list[Role] = [
@@ -435,7 +488,9 @@ OVERLAY_ROLES: list[Role] = [
 ]
 
 
-ALL_ROLES = [*GLOBAL_ROLES, *PLATFORM_ROLES, *OVERLAY_ROLES]
+LOCAL_ROLES = load_local_roles()
+PUBLIC_ROLES = [*GLOBAL_ROLES, *PLATFORM_ROLES, *OVERLAY_ROLES]
+ALL_ROLES = [*PUBLIC_ROLES, *LOCAL_ROLES]
 
 
 def title_from_name(name: str) -> str:
@@ -485,11 +540,11 @@ def target_dir(role_spec: Role) -> Path:
 
 
 def clean_generated_dirs() -> None:
-    public_overlay_dirs = {
+    overlay_dirs = {
         AGENTS_ROOT / "overlays" / role_spec.family
-        for role_spec in OVERLAY_ROLES
+        for role_spec in [*OVERLAY_ROLES, *LOCAL_ROLES]
     }
-    for directory in [AGENTS_ROOT / "global", *sorted(public_overlay_dirs)]:
+    for directory in [AGENTS_ROOT / "global", *sorted(overlay_dirs)]:
         if directory.exists():
             for path in sorted(directory.rglob("*.toml")):
                 path.unlink()

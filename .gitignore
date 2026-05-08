@@ -83,6 +83,9 @@ skills-lock.json
 subagents/hardened-codex/overlays.local.json
 subagents/hardened-codex/overlays.local.*.json
 !subagents/hardened-codex/overlays.local.example.json
+subagents/hardened-codex/roles.local.json
+subagents/hardened-codex/roles.local.*.json
+!subagents/hardened-codex/roles.local.example.json
 subagents/hardened-codex/agents/overlays/*/
 !subagents/hardened-codex/agents/overlays/docmind/
 !subagents/hardened-codex/agents/overlays/docmind/*.toml

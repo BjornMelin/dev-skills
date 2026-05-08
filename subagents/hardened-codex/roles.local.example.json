@@ -1,0 +1,12 @@
+{
+  "roles": [
+    {
+      "name": "private_repo_reviewer",
+      "description": "Private repository reviewer for local-only project contracts.",
+      "effort": "high",
+      "sandbox": "read-only",
+      "family": "private-repo",
+      "body": "Review private repository changes against local AGENTS.md guidance, repo-native validation, and project-specific operating contracts."
+    }
+  ]
+}

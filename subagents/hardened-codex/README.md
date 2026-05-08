@@ -57,6 +57,11 @@ python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --v
 python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --dry-run
 ```
 
+For maintainable private role definitions, keep the source specs in ignored
+`roles.local.json` using `roles.local.example.json` as the shape. The renderer
+loads that file when present, regenerates the matching ignored overlay TOMLs, and
+keeps `ROLE_CATALOG.md` limited to the public catalog.
+
 Apply with timestamp backups:
 
 ```bash
