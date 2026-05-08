@@ -21,8 +21,9 @@ for (const rootArg of roots) {
     for (const pattern of patterns) {
       for (const match of text.matchAll(pattern)) {
         const target = match[1].split("#")[0].split(/\s+/)[0];
-        const full = path.join(skillDir, target);
-        if (!fs.existsSync(full)) {
+        const full = path.resolve(skillDir, target);
+        const insideSkill = full === skillDir || full.startsWith(`${skillDir}${path.sep}`);
+        if (!insideSkill || !fs.existsSync(full)) {
           ok = false;
           console.error(`${path.basename(skillDir)}/${relFile}: missing linked file ${target}`);
         }

@@ -71,8 +71,8 @@ using `rust-mega-eng` for a local borrow-checker fix.
 ## Global Install
 
 The tracked source of truth is `skills/<skill-name>/`. Global installs should
-copy the same folder into `~/.agents/skills/<skill-name>` with a backup when the
-target already exists.
+copy the same folder into `~/.agents/skills/<skill-name>`. Existing targets may
+be replaced during sync; backups are optional.
 
 After syncing, verify parity:
 

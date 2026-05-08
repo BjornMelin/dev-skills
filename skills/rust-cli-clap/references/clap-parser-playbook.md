@@ -42,7 +42,7 @@ Do not let `clap` environment values silently bypass config validation. Parse an
 
 - Use command names as verbs: `sync`, `check`, `init`, `serve`.
 - Keep help examples current by testing them.
-- Generate shell completions and manpages for shipped CLIs when the distribution channel supports them.
+- Generate shell completions and man pages for shipped CLIs when the distribution channel supports them.
 - Hide truly internal flags with `hide = true`, but avoid undocumented "support-only" behavior for public workflows.
 
 ## Migration Notes

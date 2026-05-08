@@ -45,23 +45,33 @@ for (const rootArg of roots) {
     console.error(`${skillName}: expected at least 3 positive and 3 negative evals`);
   }
   for (const [index, item] of data.entries()) {
-    if (typeof item.query !== "string" || item.query.length < 10) {
+    const isObject = typeof item === "object" && item !== null;
+    if (!isObject) {
+      ok = false;
+      console.error(`${skillName}[${index}]: eval item must be an object`);
+      continue;
+    }
+    const query = typeof item.query === "string" ? item.query : "";
+    const shouldTrigger = item.should_trigger;
+    const reason = typeof item.reason === "string" ? item.reason : "";
+
+    if (query.length < 10) {
       ok = false;
       console.error(`${skillName}[${index}]: missing realistic query`);
     }
-    if (typeof item.should_trigger !== "boolean") {
+    if (typeof shouldTrigger !== "boolean") {
       ok = false;
       console.error(`${skillName}[${index}]: should_trigger must be boolean`);
     }
-    if (typeof item.reason !== "string" || item.reason.length < 8) {
+    if (reason.length < 8) {
       ok = false;
       console.error(`${skillName}[${index}]: missing reason`);
     }
     if (
       explicitOnly &&
-      item.should_trigger === true &&
-      !item.query.includes(skillName) &&
-      !item.query.includes(`$${skillName}`)
+      shouldTrigger === true &&
+      !query.includes(skillName) &&
+      !query.includes(`$${skillName}`)
     ) {
       ok = false;
       console.error(`${skillName}[${index}]: explicit-only positive eval must name ${skillName}`);

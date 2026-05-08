@@ -46,7 +46,7 @@ For CLI changes, prefer the smallest ladder that proves the contract:
 ```bash
 cargo fmt --all --check
 cargo test --all-targets
-cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
 Add focused command tests for new flags, output modes, exit codes, config precedence, and examples shown in docs. Snapshot CLI output only after normalizing volatile paths, timestamps, colors, and ordering.

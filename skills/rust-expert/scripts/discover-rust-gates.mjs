@@ -22,7 +22,7 @@ if (exists("Makefile")) commands.add("make help # inspect Rust-related targets")
 for (const workflow of listFiles(path.join(root, ".github", "workflows"))) {
   const text = fs.readFileSync(workflow, "utf8");
   for (const line of text.split(/\r?\n/)) {
-    const match = /^\s*run:\s*(cargo .+|just .+|mise run .+|make .+)/.exec(line);
+    const match = /^\s*(?:-\s*)?run:\s*(cargo .+|just .+|mise run .+|make .+)/.exec(line);
     if (match) commands.add(match[1].trim());
   }
 }
