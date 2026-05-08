@@ -276,7 +276,12 @@ def install_global(*, dry_run: bool) -> int:
     return validate(action.target for action in actions)
 
 
-def install_overlay(name: str, *, dry_run: bool, project_dir: Path | None = None) -> int:
+def install_overlay(
+    name: str,
+    *,
+    dry_run: bool,
+    project_dir: Path | None = None,
+) -> int:
     """Install or preview one public or explicitly targeted overlay.
 
     Args:
@@ -327,7 +332,11 @@ def install_overlay_with_targets(
         if local_target is not None and local_target.source_dir is not None
         else AGENTS_ROOT / "overlays" / name
     )
-    if project_dir is None and name not in PUBLIC_OVERLAY_TARGETS and local_target is None:
+    if (
+        project_dir is None
+        and name not in PUBLIC_OVERLAY_TARGETS
+        and local_target is None
+    ):
         available = ", ".join(sorted(PUBLIC_OVERLAY_TARGETS))
         raise SystemExit(
             f"unknown public overlay {name}; available: {available}; "
