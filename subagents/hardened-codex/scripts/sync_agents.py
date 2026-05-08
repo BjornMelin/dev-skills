@@ -324,7 +324,7 @@ def install_overlay_with_targets(
     local_target = local_targets.get(name)
     source = (
         local_target.source_dir
-        if local_target and local_target.source_dir
+        if local_target is not None and local_target.source_dir is not None
         else AGENTS_ROOT / "overlays" / name
     )
     if project_dir is None and name not in PUBLIC_OVERLAY_TARGETS and local_target is None:
@@ -335,7 +335,7 @@ def install_overlay_with_targets(
         )
     default_project = (
         local_target.project_dir
-        if local_target
+        if local_target is not None
         else PUBLIC_OVERLAY_TARGETS.get(name)
     )
     if project_dir is None and default_project is None:
@@ -446,7 +446,7 @@ def main(argv: list[str] | None = None) -> int:
             local_target = local_targets.get(overlay)
             source = (
                 local_target.source_dir
-                if local_target and local_target.source_dir
+                if local_target is not None and local_target.source_dir is not None
                 else AGENTS_ROOT / "overlays" / overlay
             )
             status = keep_first_failure(status, validate_sources(overlay, source))
