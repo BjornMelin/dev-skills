@@ -2,15 +2,16 @@
 
 Status: active implementation.
 
-Tracking: #20, #21, #22, and #23.
+Tracking: #20, #21, #22, #23, #24, and #25.
 
 ## Purpose
 
 `codex-dev` is the development control-plane family for this repo. The CLI
 delivered by issue #22 records agent work as local task capsules. Issue #23
 adds a repo-native policy gate that can plan or execute local validation while
-recording the result in the capsule. Later lanes add evaluation evidence
-appenders, PR evidence appenders, bootstrap composition, and stable JSON
+recording the result in the capsule. Issue #24 adds offline skill and subagent
+eval coverage, and issue #25 adds PR evidence planning plus local normalized
+snapshot recording. Later lanes add bootstrap composition and stable JSON
 contracts for optional consumers such as a terminal workbench.
 
 `codex-dev` is deliberately separate from `codex-research`. The research CLI
@@ -262,6 +263,14 @@ thread closure.
 When `checks` entries are present, each entry must use the typed fields shown
 above. Later PR-control work may add more typed PR evidence, but it should not
 replace this field with raw provider JSON.
+
+`codex-dev.pr-control-plan.v1` records the live-command plan for PR evidence
+capture. It may reference network- and auth-dependent `gh`, `review-pack`, and
+`gh-pr-review-fix` commands, but those tools remain the live source of truth for
+hosted review and CI state. Commands that need a caller-supplied artifact expose
+that requirement with `manual_input` and are not marked directly required.
+`codex-dev pr record` accepts local normalized snapshots and writes only the
+typed `pr.json` evidence contract plus an `evidence.jsonl` summary.
 
 ### Markdown Notes
 

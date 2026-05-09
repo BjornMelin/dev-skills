@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result, bail};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -18,6 +18,7 @@ pub const EVIDENCE_SCHEMA: &str = "codex-dev.evidence.v1";
 pub const VERIFICATION_SCHEMA: &str = "codex-dev.verification.v1";
 pub const SUBAGENTS_SCHEMA: &str = "codex-dev.subagents.v1";
 pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
+pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 
@@ -49,6 +50,11 @@ impl Cli {
                 PolicyCommand::Manifest(_) => "policy manifest",
                 PolicyCommand::Run(_) => "policy run",
             },
+            Commands::Pr { command } => match command {
+                PrCommand::Plan(_) => "pr plan",
+                PrCommand::Record(_) => "pr record",
+                PrCommand::Status(_) => "pr status",
+            },
         }
     }
 }
@@ -64,6 +70,11 @@ enum Commands {
     Policy {
         #[command(subcommand)]
         command: PolicyCommand,
+    },
+    /// Capture hosted PR evidence into task capsules.
+    Pr {
+        #[command(subcommand)]
+        command: PrCommand,
     },
 }
 
@@ -85,6 +96,46 @@ enum PolicyCommand {
     Manifest(PolicyManifestArgs),
     /// Plan or execute gates and record capsule evidence.
     Run(PolicyRunArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum PrCommand {
+    /// Print the live-command plan for PR evidence capture.
+    Plan(PrPlanArgs),
+    /// Record a normalized PR snapshot into a task capsule.
+    Record(PrRecordArgs),
+    /// Print the PR snapshot currently stored in a task capsule.
+    Status(PrStatusArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct PrPlanArgs {
+    #[arg(long, value_name = "OWNER/REPO")]
+    pub repo: String,
+    #[arg(long, value_name = "PR_NUMBER")]
+    pub number: u64,
+    #[arg(long, value_name = "RFC3339")]
+    pub generated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Args, Debug)]
+pub struct PrRecordArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(
+        long,
+        value_name = "SNAPSHOT_JSON",
+        help = "Local normalized PR snapshot fixture to record"
+    )]
+    pub source: PathBuf,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Args, Debug)]
+pub struct PrStatusArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
 }
 
 #[derive(Args, Debug)]
@@ -270,6 +321,74 @@ pub struct CheckRecord {
 pub struct ReviewThreadSummary {
     pub unresolved: u64,
     pub last_checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrControlPlan {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub generated_at: DateTime<Utc>,
+    pub commands: Vec<PrControlCommand>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrControlCommand {
+    pub id: String,
+    pub name: String,
+    pub command: Vec<String>,
+    pub source: String,
+    pub required: bool,
+    pub network: bool,
+    pub secrets: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manual_input: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrRecordResult {
+    pub capsule: PathBuf,
+    pub pr_path: PathBuf,
+    pub evidence_path: PathBuf,
+    pub pr: PrEvidence,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrStatusResult {
+    pub capsule: PathBuf,
+    pub pr: PrEvidence,
+}
+
+#[derive(Debug, Deserialize)]
+struct PrSnapshotInput {
+    #[allow(dead_code)]
+    schema: Option<String>,
+    repository: Option<String>,
+    number: Option<u64>,
+    url: Option<String>,
+    state: String,
+    #[serde(default)]
+    checks: Vec<CheckSnapshotInput>,
+    review_threads: ReviewThreadSnapshotInput,
+}
+
+#[derive(Debug, Deserialize)]
+struct CheckSnapshotInput {
+    name: String,
+    status: String,
+    #[serde(default)]
+    conclusion: Option<String>,
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ReviewThreadSnapshotInput {
+    unresolved: u64,
+    #[serde(default)]
+    last_checked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -494,6 +613,48 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Pr { command } => match command {
+            PrCommand::Plan(args) => {
+                let generated_at = args.generated_at.unwrap_or_else(Utc::now);
+                let result = pr_control_plan(args.repo, args.number, generated_at);
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "pr plan",
+                    human: format!(
+                        "planned {} PR evidence command(s) for {}#{}",
+                        result.commands.len(),
+                        result.repository,
+                        result.number
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            PrCommand::Record(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = record_pr_snapshot(args, checked_at)?;
+                let unresolved = result.pr.review_threads.unresolved;
+                let human = format!(
+                    "recorded PR snapshot for {} with {} unresolved thread(s)",
+                    render_pr_label(&result.pr),
+                    unresolved
+                );
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "pr record",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            PrCommand::Status(args) => {
+                let result = pr_status(&args.capsule)?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "pr status",
+                    human: render_pr_status(&result.pr),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
     }
 }
 
@@ -615,6 +776,154 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
         passed,
         gates: results,
     })
+}
+
+pub fn pr_control_plan(
+    repository: String,
+    number: u64,
+    generated_at: DateTime<Utc>,
+) -> PrControlPlan {
+    PrControlPlan {
+        schema: PR_CONTROL_PLAN_SCHEMA.to_string(),
+        repository: repository.clone(),
+        number,
+        generated_at,
+        commands: vec![
+            pr_control_command(
+                "gh-pr-view",
+                "GitHub PR metadata snapshot",
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    &number.to_string(),
+                    "--repo",
+                    &repository,
+                    "--json",
+                    "number,url,state,statusCheckRollup,reviewDecision,headRefOid",
+                ],
+            ),
+            pr_control_command(
+                "gh-pr-checks",
+                "GitHub PR check summary",
+                [
+                    "gh",
+                    "pr",
+                    "checks",
+                    &number.to_string(),
+                    "--repo",
+                    &repository,
+                ],
+            ),
+            pr_control_command(
+                "review-pack-start",
+                "Fresh hosted review-thread bundle",
+                [
+                    "review-pack",
+                    "start",
+                    "--repo",
+                    &repository,
+                    "--pr",
+                    &number.to_string(),
+                    "--fresh",
+                ],
+            ),
+            pr_control_command_with_manual_input(
+                "review-pack-remaining",
+                "Unresolved review-thread count from bundle",
+                [
+                    "review-pack",
+                    "remaining",
+                    "--repo",
+                    &repository,
+                    "--pr",
+                    &number.to_string(),
+                    "--previous",
+                    "<bundle.json>",
+                ],
+                "replace <bundle.json> with the bundle path produced by review-pack start",
+            ),
+            pr_control_command(
+                "gh-pr-review-fix",
+                "Verify-first hosted review remediation workflow",
+                ["gh-pr-review-fix", "pr", &number.to_string()],
+            ),
+        ],
+    }
+}
+
+pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Result<PrRecordResult> {
+    validate_capsule_for_pr_record(&args.capsule)?;
+
+    let snapshot: PrSnapshotInput = read_json(&args.source)?;
+    let pr = snapshot.into_pr_evidence(checked_at);
+    write_json(args.capsule.join("pr.json"), &pr)?;
+
+    let mut capsule: Capsule = read_json(&args.capsule.join("capsule.json"))?;
+    if let Some(number) = pr.number
+        && !capsule.pull_requests.contains(&number)
+    {
+        capsule.pull_requests.push(number);
+    }
+    capsule.updated_at = checked_at;
+    write_json(args.capsule.join("capsule.json"), &capsule)?;
+
+    append_jsonl(
+        args.capsule.join("evidence.jsonl"),
+        &EvidenceRecord {
+            schema: EVIDENCE_SCHEMA.to_string(),
+            kind: EvidenceKind::Review,
+            at: checked_at,
+            summary: format!(
+                "PR snapshot recorded for {}; {} unresolved review thread(s); {} check(s)",
+                render_pr_label(&pr),
+                pr.review_threads.unresolved,
+                pr.checks.len()
+            ),
+            command: Some(render_pr_record_command(
+                &args.capsule,
+                &args.source,
+                checked_at,
+            )),
+            exit_code: Some(0),
+            artifacts: vec!["pr.json".to_string()],
+        },
+    )?;
+
+    Ok(PrRecordResult {
+        pr_path: args.capsule.join("pr.json"),
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        capsule: args.capsule,
+        pr,
+    })
+}
+
+pub fn pr_status(capsule_path: &Path) -> Result<PrStatusResult> {
+    let validation = validate_capsule(capsule_path)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            capsule_path.display(),
+            validation.errors.join("; ")
+        );
+    }
+    let pr: PrEvidence = read_json(&capsule_path.join("pr.json"))?;
+    Ok(PrStatusResult {
+        capsule: capsule_path.to_path_buf(),
+        pr,
+    })
+}
+
+fn validate_capsule_for_pr_record(capsule_path: &Path) -> Result<()> {
+    let validation = validate_capsule_files(capsule_path, true)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            capsule_path.display(),
+            validation.errors.join("; ")
+        );
+    }
+    Ok(())
 }
 
 pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
@@ -753,6 +1062,10 @@ const REQUIRED_FILES: &[&str] = &[
 ];
 
 pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
+    validate_capsule_files(path, false)
+}
+
+fn validate_capsule_files(path: &Path, allow_missing_pr_json: bool) -> Result<ValidationResult> {
     let mut errors = Vec::new();
     if !path.is_dir() {
         errors.push(format!(
@@ -772,6 +1085,9 @@ pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
         .filter(|file| !path.join(file).is_file())
         .collect::<Vec<_>>();
     for file in &missing_files {
+        if allow_missing_pr_json && *file == "pr.json" {
+            continue;
+        }
         errors.push(format!("missing required file: {file}"));
     }
 
@@ -989,6 +1305,92 @@ fn policy_gate<const N: usize>(id: &str, name: &str, command: [&str; N]) -> Poli
         network: false,
         secrets: false,
     }
+}
+
+fn pr_control_command<const N: usize>(
+    id: &str,
+    name: &str,
+    command: [&str; N],
+) -> PrControlCommand {
+    PrControlCommand {
+        id: id.to_string(),
+        name: name.to_string(),
+        command: command.iter().map(|part| (*part).to_string()).collect(),
+        source: "gh-pr-review-fix / review-pack / gh".to_string(),
+        required: true,
+        network: true,
+        secrets: true,
+        manual_input: None,
+    }
+}
+
+fn pr_control_command_with_manual_input<const N: usize>(
+    id: &str,
+    name: &str,
+    command: [&str; N],
+    manual_input: &str,
+) -> PrControlCommand {
+    PrControlCommand {
+        required: false,
+        manual_input: Some(manual_input.to_string()),
+        ..pr_control_command(id, name, command)
+    }
+}
+
+impl PrSnapshotInput {
+    fn into_pr_evidence(self, checked_at: DateTime<Utc>) -> PrEvidence {
+        PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: self.repository,
+            number: self.number,
+            url: self.url,
+            state: self.state.to_ascii_lowercase(),
+            checks: self
+                .checks
+                .into_iter()
+                .map(|check| CheckRecord {
+                    name: check.name,
+                    status: check.status.to_ascii_lowercase(),
+                    conclusion: check.conclusion.map(|value| value.to_ascii_lowercase()),
+                    url: check.url,
+                    checked_at: check.checked_at.unwrap_or(checked_at),
+                })
+                .collect(),
+            review_threads: ReviewThreadSummary {
+                unresolved: self.review_threads.unresolved,
+                last_checked_at: self.review_threads.last_checked_at.unwrap_or(checked_at),
+            },
+        }
+    }
+}
+
+fn render_pr_status(pr: &PrEvidence) -> String {
+    format!(
+        "{} {}: {} unresolved review thread(s), {} check(s)",
+        render_pr_label(pr),
+        pr.state,
+        pr.review_threads.unresolved,
+        pr.checks.len()
+    )
+}
+
+fn render_pr_label(pr: &PrEvidence) -> String {
+    match (&pr.repository, pr.number) {
+        (Some(repository), Some(number)) => format!("{repository}#{number}"),
+        (None, Some(number)) => format!("#{number}"),
+        (Some(repository), None) => repository.clone(),
+        (None, None) => "unlinked PR".to_string(),
+    }
+}
+
+fn render_pr_record_command(capsule: &Path, source: &Path, checked_at: DateTime<Utc>) -> String {
+    let checked_at = checked_at.to_rfc3339_opts(SecondsFormat::AutoSi, true);
+    format!(
+        "codex-dev pr record --capsule {} --source {} --checked-at {}",
+        shell_quote(&capsule.display().to_string()),
+        shell_quote(&source.display().to_string()),
+        shell_quote(&checked_at)
+    )
 }
 
 fn plan_gate(gate: &PolicyGate) -> PolicyGateResult {
@@ -1648,6 +2050,137 @@ mod tests {
         assert_eq!(result.status, GateStatus::Failed);
         assert_eq!(result.exit_code, Some(9));
         assert_eq!(result.stderr.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn pr_plan_lists_existing_review_commands() {
+        let plan = pr_control_plan(
+            "BjornMelin/dev-skills".to_string(),
+            25,
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        );
+
+        assert_eq!(plan.schema, PR_CONTROL_PLAN_SCHEMA);
+        assert_eq!(plan.repository, "BjornMelin/dev-skills");
+        assert_eq!(plan.number, 25);
+        assert!(plan.commands.iter().all(|command| command.network));
+        assert!(plan.commands.iter().any(|command| {
+            command.id == "review-pack-start" && command.command[0] == "review-pack"
+        }));
+        let remaining = plan
+            .commands
+            .iter()
+            .find(|command| command.id == "review-pack-remaining")
+            .expect("remaining command");
+        assert!(!remaining.required);
+        assert!(remaining.manual_input.is_some());
+        assert!(plan.commands.iter().any(|command| {
+            command.id == "gh-pr-review-fix" && command.command[0] == "gh-pr-review-fix"
+        }));
+    }
+
+    #[test]
+    fn pr_record_updates_capsule_contracts() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("pr-snapshot.json");
+        fs::write(
+            &source,
+            r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
+  "state": "OPEN",
+  "checks": [
+    {
+      "name": "CodeRabbit",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://example.test/check"
+    }
+  ],
+  "review_threads": {
+    "unresolved": 0
+  }
+}"#,
+        )
+        .expect("write fixture");
+
+        let result = record_pr_snapshot(
+            PrRecordArgs {
+                capsule: capsule.clone(),
+                source,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect("record pr");
+
+        assert_eq!(result.pr.schema, PR_SCHEMA);
+        assert_eq!(result.pr.state, "open");
+        assert_eq!(result.pr.checks[0].status, "completed");
+        assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("success"));
+        assert_eq!(result.pr.review_threads.unresolved, 0);
+
+        let pr: PrEvidence = read_json(&capsule.join("pr.json")).expect("pr json");
+        assert_eq!(pr.number, Some(25));
+
+        let capsule_state: Capsule = read_json(&capsule.join("capsule.json")).expect("capsule");
+        assert_eq!(capsule_state.pull_requests, vec![25]);
+
+        let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
+        assert!(evidence.contains("PR snapshot recorded"));
+        assert!(evidence.contains("codex-dev pr record --capsule"));
+        assert!(evidence.contains("--source"));
+        assert!(evidence.contains("--checked-at 2026-05-09T05:00:00Z"));
+    }
+
+    #[test]
+    fn pr_record_can_create_missing_pr_json() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        fs::remove_file(capsule.join("pr.json")).expect("remove placeholder");
+        let source = temp.path().join("pr-snapshot.json");
+        fs::write(
+            &source,
+            r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "state": "OPEN",
+  "review_threads": {
+    "unresolved": 0
+  }
+}"#,
+        )
+        .expect("write fixture");
+
+        let result = record_pr_snapshot(
+            PrRecordArgs {
+                capsule: capsule.clone(),
+                source,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect("record pr");
+
+        assert_eq!(result.pr.number, Some(25));
+        assert!(capsule.join("pr.json").is_file());
+    }
+
+    #[test]
+    fn pr_record_command_preserves_timestamp_precision() {
+        let command = render_pr_record_command(
+            Path::new("/tmp/capsule"),
+            Path::new("/tmp/pr-snapshot.json"),
+            "2026-05-09T05:00:00.123456789Z".parse().unwrap(),
+        );
+
+        assert!(command.contains("--checked-at 2026-05-09T05:00:00.123456789Z"));
     }
 
     #[test]

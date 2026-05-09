@@ -217,3 +217,105 @@ fn policy_manifest_and_dry_run_update_capsule() {
         .expect("policy run gates");
     assert!(run_gates.iter().all(|gate| gate["status"] == "planned"));
 }
+
+#[test]
+fn pr_plan_and_record_support_fixture_mode() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let plan_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "plan",
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "25",
+            "--generated-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let plan_json: Value = serde_json::from_slice(&plan_output).expect("plan json");
+    assert_eq!(plan_json["command"], "pr plan");
+    assert_eq!(
+        plan_json["result"]["schema"],
+        "codex-dev.pr-control-plan.v1"
+    );
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "PR control smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "pr-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+    let source = temp.path().join("pr-snapshot.json");
+    std::fs::write(
+        &source,
+        r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
+  "state": "OPEN",
+  "checks": [
+    {"name": "GitGuardian", "status": "COMPLETED", "conclusion": "SUCCESS"}
+  ],
+  "review_threads": {"unresolved": 0}
+}"#,
+    )
+    .expect("write fixture");
+
+    let record_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "record",
+            "--capsule",
+            capsule,
+            "--source",
+            source.to_str().expect("utf8 fixture path"),
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let record_json: Value = serde_json::from_slice(&record_output).expect("record json");
+    assert_eq!(record_json["command"], "pr record");
+    assert_eq!(record_json["result"]["pr"]["number"], 25);
+    assert_eq!(
+        record_json["result"]["pr"]["review_threads"]["unresolved"],
+        0
+    );
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["pr", "status", "--capsule", capsule])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("BjornMelin/dev-skills#25 open"));
+}
