@@ -11,9 +11,10 @@ Tracking: #20 and #28.
 
 The TUI consumes:
 
-- `capsule.json` through `codex_dev::capsule_status`;
+- `capsule.json` as the `codex-dev.task-capsule.v1` contract after
+  `codex_dev::validate_capsule`;
 - `verification.json` as `codex-dev.verification.v1`;
-- `pr.json` through `codex_dev::pr_status`;
+- `pr.json` as `codex-dev.pr-evidence.v1`;
 - `codex_dev::validate_capsule` for validation errors.
 
 The TUI must not scrape Markdown notes or duplicate policy-gate decisions.
@@ -45,7 +46,8 @@ Keys:
 
 Use `--render-once` for automation, CI logs, and review evidence. It renders
 one frame through Ratatui's `TestBackend`, prints the buffer, and does not enter
-raw terminal mode. It exits nonzero when the capsule is invalid.
+raw terminal mode. It exits nonzero when the capsule is invalid. `--capsule` is
+always required; the TUI does not discover or create task capsules.
 
 ```bash
 cargo run -q -p codex-dev-tui -- \

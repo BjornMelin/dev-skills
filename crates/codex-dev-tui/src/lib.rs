@@ -5,8 +5,8 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::Parser;
 use codex_dev::{
-    CapsuleStatus, CheckRecord, PrEvidence, StatusResult, ValidationResult, Verification,
-    capsule_status, pr_status, validate_capsule,
+    Capsule, CapsuleStatus, CheckRecord, PrEvidence, StatusResult, ValidationResult, Verification,
+    validate_capsule,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::backend::{Backend, TestBackend};
@@ -43,7 +43,7 @@ pub struct Cli {
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     if cli.render_once {
-        let result = render_once(&cli.capsule, cli.width, cli.height)?;
+        let result = render_once_for_cli(&cli.capsule, cli.width, cli.height)?;
         print!("{}", result.output);
         if !result.valid {
             anyhow::bail!("invalid capsule; see render output for validation details");
@@ -51,7 +51,8 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    run_interactive(&cli.capsule, Duration::from_millis(cli.tick_ms))
+    run_interactive(&cli.capsule, interactive_tick_rate(cli.tick_ms)?)
+        .map_err(|error| sanitized_cli_error(error, &cli.capsule))
 }
 
 pub fn run_interactive(capsule_path: &Path, tick_rate: Duration) -> Result<()> {
@@ -187,9 +188,9 @@ impl WorkbenchState {
         let validation = validate_capsule(&path)?;
         let (capsule, verification, pr) = if validation.valid {
             (
-                Some(capsule_status(&path)?),
+                Some(read_capsule_status(&path)?),
                 read_optional_json(path.join("verification.json"))?,
-                Some(pr_status(&path)?.pr),
+                read_optional_json(path.join("pr.json"))?,
             )
         } else {
             (None, None, None)
@@ -228,6 +229,31 @@ impl WorkbenchState {
     }
 }
 
+fn read_capsule_status(path: &Path) -> Result<StatusResult> {
+    let capsule: Capsule = read_required_json(path.join("capsule.json"))?;
+    Ok(StatusResult {
+        path: path.to_path_buf(),
+        id: capsule.id,
+        title: capsule.title,
+        status: capsule.status,
+        objective: capsule.objective,
+        branch: capsule.branch,
+        base_branch: capsule.base_branch,
+        issues: capsule.issues,
+        pull_requests: capsule.pull_requests,
+        updated_at: capsule.updated_at,
+    })
+}
+
+fn read_required_json<T>(path: PathBuf) -> Result<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let content =
+        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+    serde_json::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))
+}
+
 fn read_optional_json<T>(path: PathBuf) -> Result<Option<T>>
 where
     T: serde::de::DeserializeOwned,
@@ -235,11 +261,7 @@ where
     if !path.is_file() {
         return Ok(None);
     }
-    let content =
-        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    let value = serde_json::from_str(&content)
-        .with_context(|| format!("failed to parse {}", path.display()))?;
-    Ok(Some(value))
+    read_required_json(path).map(Some)
 }
 
 pub struct RestoreGuard<F>
@@ -555,6 +577,15 @@ pub fn render_once(capsule_path: &Path, width: u16, height: u16) -> Result<Rende
     Ok(RenderOnceResult { output, valid })
 }
 
+pub fn render_once_for_cli(
+    capsule_path: &Path,
+    width: u16,
+    height: u16,
+) -> Result<RenderOnceResult> {
+    render_once(capsule_path, width, height)
+        .map_err(|error| sanitized_cli_error(error, capsule_path))
+}
+
 fn buffer_to_string(buffer: &Buffer) -> String {
     let area = buffer.area;
     let mut lines = Vec::new();
@@ -578,6 +609,17 @@ fn redact_path_text(text: &str, path: &Path) -> String {
         return text.to_string();
     }
     text.replace(&path, "<capsule>")
+}
+
+fn sanitized_cli_error(error: anyhow::Error, capsule_path: &Path) -> anyhow::Error {
+    anyhow::anyhow!("{}", redact_path_text(&format!("{error:#}"), capsule_path))
+}
+
+fn interactive_tick_rate(tick_ms: u64) -> Result<Duration> {
+    if tick_ms == 0 {
+        anyhow::bail!("--tick-ms must be greater than 0");
+    }
+    Ok(Duration::from_millis(tick_ms))
 }
 
 #[cfg(test)]
@@ -659,6 +701,31 @@ mod tests {
         assert!(result.output.contains("Capsule failed validation"));
         assert!(result.output.contains("<capsule>"));
         assert!(!result.output.contains(&capsule.display().to_string()));
+    }
+
+    #[test]
+    fn cli_error_sanitizer_redacts_capsule_path() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = temp.path().join("private-task-name");
+
+        let error = sanitized_cli_error(
+            anyhow::anyhow!("failed to read {}", capsule.display()),
+            &capsule,
+        );
+
+        let message = format!("{error:#}");
+        assert!(message.contains("<capsule>"));
+        assert!(!message.contains(&capsule.display().to_string()));
+    }
+
+    #[test]
+    fn interactive_tick_rate_rejects_zero_delay() {
+        let error = interactive_tick_rate(0).expect_err("zero tick rate fails");
+        assert!(format!("{error:#}").contains("--tick-ms must be greater than 0"));
+        assert_eq!(
+            interactive_tick_rate(1).expect("positive tick"),
+            Duration::from_millis(1)
+        );
     }
 
     #[test]
