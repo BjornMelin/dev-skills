@@ -25,7 +25,7 @@ those tools instead of becoming another research provider.
   bootstrap packs, and memory guidance.
 - Make every command scriptable with stable JSON output before adding a TUI.
 - Keep private local manifests, ignored overlays, secrets, and run artifacts out
-  of tracked docs and commits.
+  of tracked artifacts and commits.
 
 ## Non-goals
 
@@ -85,6 +85,23 @@ are conventional but not machine contracts.
 `capsule.json` is the canonical state file. Other files provide human-readable
 or append-only evidence views.
 
+Required fields for `codex-dev.task-capsule.v1`:
+
+- `schema`
+- `id`
+- `title`
+- `status`
+- `objective`
+- `branch`
+- `base_branch`
+- `issues`
+- `pull_requests`
+- `created_at`
+- `updated_at`
+
+Keep the example in this section synchronized with the required-field list so
+implementation lanes cannot drift from the documented validation contract.
+
 ```json
 {
   "schema": "codex-dev.task-capsule.v1",
@@ -137,8 +154,9 @@ Allowed `kind` values:
 - `manual`
 
 Provider response dumps, secrets, private repository content, ignored overlay
-manifests, and raw local workstation paths must not be written to tracked docs.
-Capsules may include local paths only when they remain local.
+manifests, and raw local workstation paths must not be written to any tracked
+artifact, including docs and task-capsule evidence files. Capsules may include
+local paths only when they remain local and untracked.
 
 ### verification.json
 
