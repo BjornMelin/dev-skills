@@ -60,6 +60,7 @@ out of version control.
 - [Subagent Fanout](cookbooks/subagent-fanout.md)
 - [Evidence Ledgers and Reports](cookbooks/evidence-ledgers.md)
 - [Repo Bootstrap Packs](cookbooks/repo-bootstrap-packs.md)
+- [Memory Guidance Proposals](cookbooks/memory-guidance-proposals.md)
 
 ## Prompt Library
 
@@ -77,5 +78,5 @@ out of version control.
 
 ## Core Rule
 
-Search results are leads. Evidence is hydrated source material tied to claims,
-freshness, confidence, and a ledger.
+Search results and prior memory are leads. Evidence is hydrated source material
+tied to claims, freshness, confidence, and a ledger.
