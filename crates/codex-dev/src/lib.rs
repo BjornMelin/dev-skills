@@ -1,3 +1,4 @@
+use std::env;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::fs::{self, File, OpenOptions};
@@ -18,6 +19,7 @@ pub const VERIFICATION_SCHEMA: &str = "codex-dev.verification.v1";
 pub const SUBAGENTS_SCHEMA: &str = "codex-dev.subagents.v1";
 pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
+pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev")]
@@ -43,6 +45,10 @@ impl Cli {
                 CapsuleCommand::Status(_) => "capsule status",
                 CapsuleCommand::Render(_) => "capsule render",
             },
+            Commands::Policy { command } => match command {
+                PolicyCommand::Manifest(_) => "policy manifest",
+                PolicyCommand::Run(_) => "policy run",
+            },
         }
     }
 }
@@ -53,6 +59,11 @@ enum Commands {
     Capsule {
         #[command(subcommand)]
         command: CapsuleCommand,
+    },
+    /// Plan or run repo-native validation policy gates.
+    Policy {
+        #[command(subcommand)]
+        command: PolicyCommand,
     },
 }
 
@@ -66,6 +77,44 @@ enum CapsuleCommand {
     Status(PathArgs),
     /// Render a Markdown summary from capsule state.
     Render(PathArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum PolicyCommand {
+    /// Print a machine-readable gate manifest.
+    Manifest(PolicyManifestArgs),
+    /// Plan or execute gates and record capsule evidence.
+    Run(PolicyRunArgs),
+}
+
+#[derive(Args, Debug)]
+pub struct PolicyManifestArgs {
+    #[arg(long, value_enum, default_value_t = PolicyProfile::CodexDev)]
+    pub profile: PolicyProfile,
+    #[arg(long, value_name = "RFC3339")]
+    pub generated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Args, Debug)]
+pub struct PolicyRunArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root used when executing repo-native gates"
+    )]
+    pub repo_root: Option<PathBuf>,
+    #[arg(long, value_enum, default_value_t = PolicyProfile::CodexDev)]
+    pub profile: PolicyProfile,
+    #[arg(long, help = "Execute gates instead of recording a dry-run plan")]
+    pub execute: bool,
+    #[arg(long, help = "Permit gates marked as network-using")]
+    pub allow_network: bool,
+    #[arg(long, help = "Continue executing after a failed required gate")]
+    pub keep_going: bool,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Args, Debug)]
@@ -112,6 +161,13 @@ pub enum CapsuleStatus {
     InReview,
     Merged,
     Closed,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ValueEnum, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[value(rename_all = "snake_case")]
+pub enum PolicyProfile {
+    CodexDev,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -214,6 +270,63 @@ pub struct CheckRecord {
 pub struct ReviewThreadSummary {
     pub unresolved: u64,
     pub last_checked_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PolicyManifest {
+    pub schema: String,
+    pub profile: PolicyProfile,
+    pub generated_at: DateTime<Utc>,
+    pub gates: Vec<PolicyGate>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PolicyGate {
+    pub id: String,
+    pub name: String,
+    pub command: Vec<String>,
+    pub source: String,
+    pub required: bool,
+    pub network: bool,
+    pub secrets: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PolicyRunResult {
+    pub capsule: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_root: Option<PathBuf>,
+    pub profile: PolicyProfile,
+    pub dry_run: bool,
+    pub passed: bool,
+    pub gates: Vec<PolicyGateResult>,
+    pub verification_path: PathBuf,
+    pub evidence_path: PathBuf,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PolicyGateResult {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    pub required: bool,
+    pub status: GateStatus,
+    pub exit_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum GateStatus {
+    Planned,
+    Passed,
+    Failed,
+    Skipped,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -331,6 +444,56 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Policy { command } => match command {
+            PolicyCommand::Manifest(args) => {
+                let generated_at = args.generated_at.unwrap_or_else(Utc::now);
+                let result = policy_manifest(args.profile, generated_at);
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "policy manifest",
+                    human: format!(
+                        "generated {} policy gate(s) for {}",
+                        result.gates.len(),
+                        result.profile
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            PolicyCommand::Run(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = run_policy_gates(args, checked_at)?;
+                let failed = result
+                    .gates
+                    .iter()
+                    .filter(|gate| gate.required && gate.status == GateStatus::Failed)
+                    .count();
+                let human = if result.dry_run {
+                    format!(
+                        "planned {} policy gate(s) for {}",
+                        result.gates.len(),
+                        result.capsule.display()
+                    )
+                } else if failed == 0 {
+                    format!(
+                        "passed {} policy gate(s) for {}",
+                        result.gates.len(),
+                        result.capsule.display()
+                    )
+                } else {
+                    format!(
+                        "failed {} required policy gate(s) for {}",
+                        failed,
+                        result.capsule.display()
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: result.passed,
+                    command: "policy run",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
     }
 }
 
@@ -380,6 +543,78 @@ pub struct StatusResult {
 pub struct RenderResult {
     pub path: PathBuf,
     pub markdown: String,
+}
+
+pub fn policy_manifest(profile: PolicyProfile, generated_at: DateTime<Utc>) -> PolicyManifest {
+    PolicyManifest {
+        schema: POLICY_GATES_SCHEMA.to_string(),
+        profile,
+        generated_at,
+        gates: built_in_gates(profile),
+    }
+}
+
+pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Result<PolicyRunResult> {
+    let validation = validate_capsule(&args.capsule)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            args.capsule.display(),
+            validation.errors.join("; ")
+        );
+    }
+
+    let manifest = policy_manifest(args.profile, checked_at);
+    let dry_run = !args.execute;
+    let repo_root = if dry_run {
+        args.repo_root
+            .as_deref()
+            .map(canonicalize_repo_root)
+            .transpose()?
+    } else {
+        Some(resolve_repo_root(&args.capsule, args.repo_root.as_deref())?)
+    };
+    let mut results = Vec::new();
+
+    for (index, gate) in manifest.gates.iter().enumerate() {
+        let result = if dry_run {
+            plan_gate(gate)
+        } else if gate.network && !args.allow_network {
+            skip_gate(
+                gate,
+                "gate requires network and --allow-network was not set",
+            )
+        } else {
+            execute_gate(gate, repo_root.as_deref())
+        };
+        let should_stop = result.required
+            && result.status == GateStatus::Failed
+            && args.execute
+            && !args.keep_going;
+        results.push(result);
+        if should_stop {
+            for remaining in &manifest.gates[index + 1..] {
+                results.push(skip_gate(remaining, "previous required gate failed"));
+            }
+            break;
+        }
+    }
+
+    let passed = results.iter().all(|gate| {
+        !gate.required || matches!(gate.status, GateStatus::Planned | GateStatus::Passed)
+    });
+    record_policy_run(&args.capsule, &results, checked_at)?;
+
+    Ok(PolicyRunResult {
+        verification_path: args.capsule.join("verification.json"),
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        capsule: args.capsule,
+        repo_root,
+        profile: args.profile,
+        dry_run,
+        passed,
+        gates: results,
+    })
 }
 
 pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
@@ -640,6 +875,257 @@ pub fn render_capsule(path: &Path) -> Result<RenderResult> {
     })
 }
 
+fn resolve_repo_root(capsule_path: &Path, explicit: Option<&Path>) -> Result<PathBuf> {
+    if let Some(root) = explicit {
+        return canonicalize_repo_root(root);
+    }
+
+    let current_dir = env::current_dir().context("failed to read current directory")?;
+    if let Some(root) = find_repo_root(&current_dir) {
+        return Ok(root);
+    }
+
+    let capsule_path =
+        fs::canonicalize(capsule_path).unwrap_or_else(|_| capsule_path.to_path_buf());
+    if let Some(parent) = capsule_path.parent()
+        && let Some(root) = find_repo_root(parent)
+    {
+        return Ok(root);
+    }
+
+    bail!(
+        "failed to discover repository root from current directory or capsule path; run from the repo or pass --repo-root"
+    );
+}
+
+fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
+    let root = fs::canonicalize(root)
+        .with_context(|| format!("failed to canonicalize repo root {}", root.display()))?;
+    if !root.join("Cargo.toml").is_file() {
+        bail!("repo root must contain Cargo.toml: {}", root.display());
+    }
+    if !root.join("docs/runbooks/validation.md").is_file() {
+        bail!(
+            "repo root must contain docs/runbooks/validation.md: {}",
+            root.display()
+        );
+    }
+    Ok(root)
+}
+
+fn find_repo_root(start: &Path) -> Option<PathBuf> {
+    start
+        .ancestors()
+        .find(|path| {
+            path.join("Cargo.toml").is_file() && path.join("docs/runbooks/validation.md").is_file()
+        })
+        .and_then(|path| fs::canonicalize(path).ok())
+}
+
+fn built_in_gates(profile: PolicyProfile) -> Vec<PolicyGate> {
+    match profile {
+        PolicyProfile::CodexDev => vec![
+            policy_gate(
+                "cargo-fmt",
+                "Rust workspace formatting",
+                ["cargo", "fmt", "--all", "--check"],
+            ),
+            policy_gate(
+                "codex-dev-clippy",
+                "codex-dev Clippy",
+                [
+                    "cargo",
+                    "clippy",
+                    "-p",
+                    "codex-dev",
+                    "--all-targets",
+                    "--",
+                    "-D",
+                    "warnings",
+                ],
+            ),
+            policy_gate(
+                "codex-dev-check",
+                "codex-dev cargo check",
+                ["cargo", "check", "-p", "codex-dev"],
+            ),
+            policy_gate(
+                "codex-dev-test",
+                "codex-dev tests",
+                ["cargo", "test", "-p", "codex-dev"],
+            ),
+            policy_gate(
+                "codex-dev-help",
+                "codex-dev help smoke",
+                ["cargo", "run", "-q", "-p", "codex-dev", "--", "--help"],
+            ),
+            policy_gate(
+                "docs-links",
+                "documentation link check",
+                [
+                    "python3",
+                    "tools/docs/check_links.py",
+                    "docs",
+                    "README.md",
+                    "AGENTS.md",
+                ],
+            ),
+            policy_gate(
+                "diff-check",
+                "git whitespace check",
+                ["git", "diff", "--check"],
+            ),
+        ],
+    }
+}
+
+fn policy_gate<const N: usize>(id: &str, name: &str, command: [&str; N]) -> PolicyGate {
+    PolicyGate {
+        id: id.to_string(),
+        name: name.to_string(),
+        command: command.iter().map(|part| (*part).to_string()).collect(),
+        source: "docs/runbooks/validation.md#codex-dev-operating-layer".to_string(),
+        required: true,
+        network: false,
+        secrets: false,
+    }
+}
+
+fn plan_gate(gate: &PolicyGate) -> PolicyGateResult {
+    gate_result(gate, GateStatus::Planned, None, None, None, None)
+}
+
+fn skip_gate(gate: &PolicyGate, reason: &str) -> PolicyGateResult {
+    gate_result(
+        gate,
+        GateStatus::Skipped,
+        None,
+        Some(reason.to_string()),
+        None,
+        None,
+    )
+}
+
+fn execute_gate(gate: &PolicyGate, repo_root: Option<&Path>) -> PolicyGateResult {
+    let Some((program, args)) = gate.command.split_first() else {
+        return gate_result(
+            gate,
+            GateStatus::Failed,
+            None,
+            Some("gate command is empty".to_string()),
+            None,
+            None,
+        );
+    };
+
+    let mut command = Command::new(program);
+    command.args(args);
+    if let Some(repo_root) = repo_root {
+        command.current_dir(repo_root);
+    }
+
+    match command.output() {
+        Ok(output) => {
+            let code = output.status.code();
+            if output.status.success() {
+                gate_result(gate, GateStatus::Passed, code, None, None, None)
+            } else {
+                gate_result(
+                    gate,
+                    GateStatus::Failed,
+                    code,
+                    Some(match code {
+                        Some(code) => format!("command exited with status {code}"),
+                        None => "command terminated by signal".to_string(),
+                    }),
+                    output_excerpt(&output.stdout),
+                    output_excerpt(&output.stderr),
+                )
+            }
+        }
+        Err(error) => gate_result(
+            gate,
+            GateStatus::Failed,
+            None,
+            Some(format!("failed to start command: {error}")),
+            None,
+            None,
+        ),
+    }
+}
+
+fn gate_result(
+    gate: &PolicyGate,
+    status: GateStatus,
+    exit_code: Option<i32>,
+    error: Option<String>,
+    stdout: Option<String>,
+    stderr: Option<String>,
+) -> PolicyGateResult {
+    PolicyGateResult {
+        id: gate.id.clone(),
+        name: gate.name.clone(),
+        command: render_command(&gate.command),
+        required: gate.required,
+        status,
+        exit_code,
+        error,
+        stdout,
+        stderr,
+    }
+}
+
+fn record_policy_run(
+    capsule_path: &Path,
+    results: &[PolicyGateResult],
+    checked_at: DateTime<Utc>,
+) -> Result<()> {
+    let mut verification: Verification = read_json(&capsule_path.join("verification.json"))?;
+    verification.required = results
+        .iter()
+        .filter(|gate| gate.required)
+        .map(|gate| GateRecord {
+            name: gate.id.clone(),
+            command: gate.command.clone(),
+            status: gate.status.to_string(),
+        })
+        .collect();
+    verification.optional = results
+        .iter()
+        .filter(|gate| !gate.required)
+        .map(|gate| GateRecord {
+            name: gate.id.clone(),
+            command: gate.command.clone(),
+            status: gate.status.to_string(),
+        })
+        .collect();
+    verification.last_checked_at = checked_at;
+    write_json(capsule_path.join("verification.json"), &verification)?;
+
+    for gate in results {
+        append_jsonl(
+            capsule_path.join("evidence.jsonl"),
+            &EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: match gate.status {
+                    GateStatus::Planned | GateStatus::Skipped => EvidenceKind::Decision,
+                    GateStatus::Passed | GateStatus::Failed => EvidenceKind::Command,
+                },
+                at: checked_at,
+                summary: format!("Policy gate {} {}", gate.id, gate.status),
+                command: Some(gate.command.clone()),
+                exit_code: gate.exit_code,
+                artifacts: vec!["verification.json".to_string()],
+            },
+        )?;
+    }
+
+    let mut capsule: Capsule = read_json(&capsule_path.join("capsule.json"))?;
+    capsule.updated_at = checked_at;
+    write_json(capsule_path.join("capsule.json"), &capsule)?;
+    Ok(())
+}
+
 fn validate_schema_file<T, F>(
     path: &Path,
     expected_schema: &str,
@@ -787,6 +1273,47 @@ fn render_numbers(numbers: &[u64]) -> String {
     }
 }
 
+fn render_command(command: &[String]) -> String {
+    command
+        .iter()
+        .map(|arg| shell_quote(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn shell_quote(arg: &str) -> String {
+    if arg.is_empty() {
+        return "''".to_string();
+    }
+    if arg.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'_' | b'@' | b'%' | b'+' | b'=' | b':' | b',' | b'.' | b'/' | b'-'
+            )
+    }) {
+        return arg.to_string();
+    }
+
+    format!("'{}'", arg.replace('\'', "'\\''"))
+}
+
+fn output_excerpt(bytes: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(bytes).trim().to_string();
+    if text.is_empty() {
+        return None;
+    }
+
+    const MAX_CHARS: usize = 2000;
+    if text.chars().count() <= MAX_CHARS {
+        return Some(text);
+    }
+
+    let mut truncated = text.chars().take(MAX_CHARS).collect::<String>();
+    truncated.push_str("\n[truncated]");
+    Some(truncated)
+}
+
 impl std::fmt::Display for CapsuleStatus {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = match self {
@@ -796,6 +1323,26 @@ impl std::fmt::Display for CapsuleStatus {
             CapsuleStatus::InReview => "in_review",
             CapsuleStatus::Merged => "merged",
             CapsuleStatus::Closed => "closed",
+        };
+        formatter.write_str(value)
+    }
+}
+
+impl std::fmt::Display for PolicyProfile {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PolicyProfile::CodexDev => formatter.write_str("codex_dev"),
+        }
+    }
+}
+
+impl std::fmt::Display for GateStatus {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            GateStatus::Planned => "planned",
+            GateStatus::Passed => "passed",
+            GateStatus::Failed => "failed",
+            GateStatus::Skipped => "skipped",
         };
         formatter.write_str(value)
     }
@@ -972,6 +1519,148 @@ mod tests {
                 .as_str()
                 .expect("message")
                 .contains("already exists")
+        );
+    }
+
+    #[test]
+    fn policy_manifest_lists_repo_native_gates() {
+        let manifest = policy_manifest(
+            PolicyProfile::CodexDev,
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        );
+
+        assert_eq!(manifest.schema, POLICY_GATES_SCHEMA);
+        assert_eq!(manifest.profile, PolicyProfile::CodexDev);
+        assert!(
+            manifest
+                .gates
+                .iter()
+                .any(|gate| gate.id == "codex-dev-test")
+        );
+        assert!(manifest.gates.iter().all(|gate| gate.required));
+        assert!(manifest.gates.iter().all(|gate| !gate.network));
+        assert!(manifest.gates.iter().all(|gate| !gate.secrets));
+    }
+
+    #[test]
+    fn policy_dry_run_records_verification_and_evidence() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let result = run_policy_gates(
+            PolicyRunArgs {
+                capsule: capsule.clone(),
+                repo_root: None,
+                profile: PolicyProfile::CodexDev,
+                execute: false,
+                allow_network: false,
+                keep_going: false,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect("policy dry run");
+
+        assert!(result.passed);
+        assert!(result.dry_run);
+        assert!(
+            result
+                .gates
+                .iter()
+                .all(|gate| gate.status == GateStatus::Planned)
+        );
+
+        let verification: Verification =
+            read_json(&capsule.join("verification.json")).expect("verification");
+        assert_eq!(verification.required.len(), result.gates.len());
+        assert_eq!(verification.required[0].status, "planned");
+
+        let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
+        assert!(evidence.contains("Policy gate cargo-fmt planned"));
+    }
+
+    #[test]
+    fn policy_execution_reports_failed_gate() {
+        let missing = PolicyGate {
+            id: "missing-command".to_string(),
+            name: "missing command".to_string(),
+            command: vec!["codex-dev-command-that-does-not-exist".to_string()],
+            source: "test".to_string(),
+            required: true,
+            network: false,
+            secrets: false,
+        };
+
+        let result = execute_gate(&missing, None);
+
+        assert_eq!(result.status, GateStatus::Failed);
+        assert!(
+            result
+                .error
+                .expect("error")
+                .contains("failed to start command")
+        );
+    }
+
+    #[test]
+    fn policy_execution_uses_repo_root() {
+        let temp = tempdir().expect("tempdir");
+        fs::write(temp.path().join("marker.txt"), "ok").expect("marker");
+        let gate = PolicyGate {
+            id: "repo-root-marker".to_string(),
+            name: "repo root marker".to_string(),
+            command: vec![
+                "python3".to_string(),
+                "-c".to_string(),
+                "from pathlib import Path; raise SystemExit(0 if Path('marker.txt').is_file() else 7)"
+                    .to_string(),
+            ],
+            source: "test".to_string(),
+            required: true,
+            network: false,
+            secrets: false,
+        };
+
+        let result = execute_gate(&gate, Some(temp.path()));
+
+        assert_eq!(result.status, GateStatus::Passed);
+    }
+
+    #[test]
+    fn policy_failure_preserves_subprocess_output() {
+        let gate = PolicyGate {
+            id: "stderr-command".to_string(),
+            name: "stderr command".to_string(),
+            command: vec![
+                "python3".to_string(),
+                "-c".to_string(),
+                "import sys; sys.stderr.write('boom'); raise SystemExit(9)".to_string(),
+            ],
+            source: "test".to_string(),
+            required: true,
+            network: false,
+            secrets: false,
+        };
+
+        let result = execute_gate(&gate, None);
+
+        assert_eq!(result.status, GateStatus::Failed);
+        assert_eq!(result.exit_code, Some(9));
+        assert_eq!(result.stderr.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn command_rendering_preserves_argument_boundaries() {
+        let command = vec![
+            "python3".to_string(),
+            "-c".to_string(),
+            "print('hello world')".to_string(),
+        ];
+
+        assert_eq!(
+            render_command(&command),
+            "python3 -c 'print('\\''hello world'\\'')'"
         );
     }
 }

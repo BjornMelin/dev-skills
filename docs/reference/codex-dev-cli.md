@@ -3,9 +3,11 @@
 `codex-dev` is the development operating-layer CLI for local task capsules.
 It is separate from `codex-research`: research evidence stays research-owned,
 while `codex-dev` records the local task capsule for a development branch.
-Future lanes add policy, PR, bootstrap packs, and TUI surfaces.
+It also plans or executes repo-native policy gates and records the outcome in
+the task capsule. Future lanes add PR evidence, bootstrap packs, and TUI
+surfaces.
 
-Tracking: #20 and #22.
+Tracking: #20, #22, and #23.
 
 ## Installation
 
@@ -34,15 +36,25 @@ instead of committing local capsule directories.
 ## Commands
 
 ```text
-codex-dev [--json] capsule <command>
+codex-dev [--json] <command>
 ```
 
-Capsule commands:
+Top-level commands:
 
-- `init`
-- `validate`
-- `status`
-- `render`
+- `capsule`
+- `policy`
+
+Capsule subcommands:
+
+- `capsule init`
+- `capsule validate`
+- `capsule status`
+- `capsule render`
+
+Policy subcommands:
+
+- `policy manifest`
+- `policy run`
 
 ## capsule init
 
@@ -118,6 +130,48 @@ cargo run -q -p codex-dev -- capsule render .codex/tasks/<id>
 Automation should read the JSON contract files or `--json` output. Markdown
 files remain human notes.
 
+## policy manifest
+
+Print the built-in repo-native gate manifest:
+
+```bash
+cargo run -q -p codex-dev -- --json policy manifest
+```
+
+The default profile is `codex_dev`. The manifest is versioned as
+`codex-dev.policy-gates.v1` and ties each gate to its source in
+`docs/runbooks/validation.md`. The default profile contains only local gates
+that do not require secrets or network access.
+
+## policy run
+
+Plan or execute policy gates and record the result in a capsule:
+
+```bash
+cargo run -q -p codex-dev -- --json policy run --capsule .codex/tasks/<id>
+```
+
+By default, `policy run` is a dry run. It updates `verification.json`, appends
+planned gate evidence to `evidence.jsonl`, and updates `capsule.json`
+`updated_at`, but does not execute commands.
+
+Execute gates explicitly:
+
+```bash
+cargo run -q -p codex-dev -- --json policy run \
+  --capsule .codex/tasks/<id> \
+  --execute
+```
+
+Executed required-gate failures set `ok: false` and exit nonzero. Use
+`--keep-going` to continue after a failed required gate. Gates marked as
+network-using are skipped unless `--allow-network` is passed; the built-in
+`codex_dev` profile currently has no network or secret gates.
+
+Execution discovers the repository root from the current directory or capsule
+path before running repo-native commands. Pass `--repo-root <path>` for
+installed-binary workflows where discovery would be ambiguous.
+
 ## Validation
 
 Run after changing `crates/codex-dev/`:
@@ -128,6 +182,7 @@ cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- --json policy manifest
 ```
 
 Use [Validation](../runbooks/validation.md) for the canonical local matrix and

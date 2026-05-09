@@ -4,8 +4,9 @@ This directory documents the research, subagent, operating-layer, and
 skill-authoring systems added to this repository:
 
 - `codex-research`: Rust CLI for evidence-first research helpers.
-- `codex-dev`: current CLI for local task capsule lifecycle; future lanes add
-  policy gates, PR evidence, bootstrap composition, and optional TUI consumers.
+- `codex-dev`: current CLI for local task capsule lifecycle and repo-native
+  policy gates; future lanes add PR evidence, bootstrap composition, and
+  optional TUI consumers.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
@@ -31,7 +32,7 @@ out of version control.
   schema, ownership map, branch graph, and validation expectations for the
   development control plane.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
-  local task capsule lifecycle commands.
+  local task capsule lifecycle and policy-gate commands.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,

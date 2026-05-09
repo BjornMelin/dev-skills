@@ -53,7 +53,7 @@ skills/
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
 crates/
-  codex-dev/              # Rust CLI for local task capsules and development evidence
+  codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
   codex-research/         # Rust CLI for evidence-first research helpers
 docs/
   index.md                # documentation portal
@@ -75,9 +75,9 @@ operating layer:
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
-- `codex-dev`: current CLI for local task capsule lifecycle; future release
-  lanes add policy gates, PR evidence, bootstrap composition, and optional TUI
-  consumers.
+- `codex-dev`: current CLI for local task capsule lifecycle and repo-native
+  policy gates; future release lanes add PR evidence, bootstrap composition,
+  and optional TUI consumers.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
@@ -95,6 +95,7 @@ Build and smoke the development CLI:
 ```bash
 cargo build -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- --json policy manifest
 ```
 
 Install the deep research agents:
@@ -206,9 +207,11 @@ cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- --json policy manifest
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
