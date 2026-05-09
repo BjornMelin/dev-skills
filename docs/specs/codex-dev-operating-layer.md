@@ -229,7 +229,7 @@ The release is split into issue-backed lanes:
 | #24 | `feat/skill-subagent-eval-lab` | #21, #22 | #26 | eval fixtures/scripts | Add offline skill and subagent eval coverage. |
 | #25 | `feat/codex-dev-pr-control` | #21, #22, #23 | final release closeout | `crates/codex-dev` | Add PR state and review evidence adapters. |
 | #26 | `feat/repo-bootstrap-packs` | #21, #23, #24 | #27 | bootstrap templates/scripts | Add repo bootstrap packs and install smoke matrix. |
-| #27 | `docs/memory-guidance-proposals` | #21, #26 | final release closeout | docs/cookbook surface | Add memory proposal guidance. |
+| #27 | `docs/memory-guidance-proposals` | #21, #26 | final release closeout | `docs/cookbooks/` surface | Add memory proposal guidance. |
 | #28 | `feat/codex-dev-tui-workbench` | #21, #22 | optional release polish | `codex-dev` JSON contracts | Add optional Ratatui workbench after JSON contracts stabilize. |
 
 Each implementation PR must link its lane issue and #20, include validation
