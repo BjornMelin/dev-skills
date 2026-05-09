@@ -341,6 +341,8 @@ pub struct PrControlCommand {
     pub required: bool,
     pub network: bool,
     pub secrets: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manual_input: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -826,7 +828,7 @@ pub fn pr_control_plan(
                     "--fresh",
                 ],
             ),
-            pr_control_command(
+            pr_control_command_with_manual_input(
                 "review-pack-remaining",
                 "Unresolved review-thread count from bundle",
                 [
@@ -839,6 +841,7 @@ pub fn pr_control_plan(
                     "--previous",
                     "<bundle.json>",
                 ],
+                "replace <bundle.json> with the bundle path produced by review-pack start",
             ),
             pr_control_command(
                 "gh-pr-review-fix",
@@ -912,24 +915,15 @@ pub fn pr_status(capsule_path: &Path) -> Result<PrStatusResult> {
 }
 
 fn validate_capsule_for_pr_record(capsule_path: &Path) -> Result<()> {
-    let validation = validate_capsule(capsule_path)?;
-    if validation.valid {
-        return Ok(());
+    let validation = validate_capsule_files(capsule_path, true)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            capsule_path.display(),
+            validation.errors.join("; ")
+        );
     }
-
-    let allowed_missing_pr_json = validation
-        .errors
-        .iter()
-        .all(|error| error == "missing required file: pr.json");
-    if allowed_missing_pr_json {
-        return Ok(());
-    }
-
-    bail!(
-        "invalid capsule at {}: {}",
-        capsule_path.display(),
-        validation.errors.join("; ")
-    );
+    Ok(())
 }
 
 pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
@@ -1068,6 +1062,10 @@ const REQUIRED_FILES: &[&str] = &[
 ];
 
 pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
+    validate_capsule_files(path, false)
+}
+
+fn validate_capsule_files(path: &Path, allow_missing_pr_json: bool) -> Result<ValidationResult> {
     let mut errors = Vec::new();
     if !path.is_dir() {
         errors.push(format!(
@@ -1087,6 +1085,9 @@ pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
         .filter(|file| !path.join(file).is_file())
         .collect::<Vec<_>>();
     for file in &missing_files {
+        if allow_missing_pr_json && *file == "pr.json" {
+            continue;
+        }
         errors.push(format!("missing required file: {file}"));
     }
 
@@ -1319,6 +1320,20 @@ fn pr_control_command<const N: usize>(
         required: true,
         network: true,
         secrets: true,
+        manual_input: None,
+    }
+}
+
+fn pr_control_command_with_manual_input<const N: usize>(
+    id: &str,
+    name: &str,
+    command: [&str; N],
+    manual_input: &str,
+) -> PrControlCommand {
+    PrControlCommand {
+        required: false,
+        manual_input: Some(manual_input.to_string()),
+        ..pr_control_command(id, name, command)
     }
 }
 
@@ -1369,7 +1384,7 @@ fn render_pr_label(pr: &PrEvidence) -> String {
 }
 
 fn render_pr_record_command(capsule: &Path, source: &Path, checked_at: DateTime<Utc>) -> String {
-    let checked_at = checked_at.to_rfc3339_opts(SecondsFormat::Secs, true);
+    let checked_at = checked_at.to_rfc3339_opts(SecondsFormat::AutoSi, true);
     format!(
         "codex-dev pr record --capsule {} --source {} --checked-at {}",
         shell_quote(&capsule.display().to_string()),
@@ -2052,6 +2067,13 @@ mod tests {
         assert!(plan.commands.iter().any(|command| {
             command.id == "review-pack-start" && command.command[0] == "review-pack"
         }));
+        let remaining = plan
+            .commands
+            .iter()
+            .find(|command| command.id == "review-pack-remaining")
+            .expect("remaining command");
+        assert!(!remaining.required);
+        assert!(remaining.manual_input.is_some());
         assert!(plan.commands.iter().any(|command| {
             command.id == "gh-pr-review-fix" && command.command[0] == "gh-pr-review-fix"
         }));
@@ -2148,6 +2170,17 @@ mod tests {
 
         assert_eq!(result.pr.number, Some(25));
         assert!(capsule.join("pr.json").is_file());
+    }
+
+    #[test]
+    fn pr_record_command_preserves_timestamp_precision() {
+        let command = render_pr_record_command(
+            Path::new("/tmp/capsule"),
+            Path::new("/tmp/pr-snapshot.json"),
+            "2026-05-09T05:00:00.123456789Z".parse().unwrap(),
+        );
+
+        assert!(command.contains("--checked-at 2026-05-09T05:00:00.123456789Z"));
     }
 
     #[test]

@@ -267,9 +267,10 @@ replace this field with raw provider JSON.
 `codex-dev.pr-control-plan.v1` records the live-command plan for PR evidence
 capture. It may reference network- and auth-dependent `gh`, `review-pack`, and
 `gh-pr-review-fix` commands, but those tools remain the live source of truth for
-hosted review and CI state. `codex-dev pr record` accepts local normalized
-snapshots and writes only the typed `pr.json` evidence contract plus an
-`evidence.jsonl` summary.
+hosted review and CI state. Commands that need a caller-supplied artifact expose
+that requirement with `manual_input` and are not marked directly required.
+`codex-dev pr record` accepts local normalized snapshots and writes only the
+typed `pr.json` evidence contract plus an `evidence.jsonl` summary.
 
 ### Markdown Notes
 

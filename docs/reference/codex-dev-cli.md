@@ -193,7 +193,9 @@ The output schema is `codex-dev.pr-control-plan.v1`. Commands are intentionally
 network- and secrets-marked because they use live GitHub auth, `review-pack`,
 and `gh-pr-review-fix` surfaces. `codex-dev` does not reimplement review
 remediation; it records the command plan so agents can run the canonical tools
-and capture the normalized result.
+and capture the normalized result. Commands that need caller-supplied artifacts
+set `manual_input`; for example `review-pack remaining` requires the bundle path
+created by `review-pack start` and is not marked as directly executable.
 
 ## pr record
 
