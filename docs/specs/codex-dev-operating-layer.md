@@ -19,7 +19,7 @@ those tools instead of becoming another research provider.
 ## Goals
 
 - Create one canonical task capsule schema for goal, branch, PR, verification,
-  subagent, decision, and evidence state.
+  subagents, decision, and evidence state.
 - Keep policy gates as thin wrappers over repo-native validation commands.
 - Reuse existing owners for skills, subagents, review remediation, research,
   bootstrap packs, and memory guidance.
