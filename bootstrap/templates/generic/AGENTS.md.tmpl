@@ -1,0 +1,31 @@
+# AGENTS.md - $repo_name
+
+Goal: keep agent changes small, reviewable, and verified.
+
+## Workflow
+
+1. Read relevant code, docs, and tests before editing.
+2. Prefer repo-native libraries and existing helper APIs.
+3. Use focused branches and scoped Conventional Commits.
+4. Run the validation commands that match the touched surface.
+5. Report files changed, commands run, and residual risks.
+
+## Validation
+
+Start with:
+
+```bash
+git status --short
+git diff --check
+```
+
+Add language-specific gates from `docs/agent-bootstrap.md` and local project
+docs before opening a PR.
+
+## Subagents
+
+Use global hardened roles for bounded review, docs alignment, CI triage,
+security, dependency, and implementation work. Keep private repo overlays in
+ignored local files or trusted project `.codex/agents/` directories.
+
+Generated from pack `$pack_name` at `$generated_at`.

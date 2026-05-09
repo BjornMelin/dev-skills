@@ -1,0 +1,47 @@
+{
+  "schema": "dev-skills.bootstrap-pack.v1",
+  "name": "rust-cli-agent-repo",
+  "description": "Rust CLI/service/TUI repository bootstrap that layers Rust skills and cargo validation onto the generic Codex workflow.",
+  "composes": {
+    "skills": [
+      "rust-expert",
+      "rust-cli-clap",
+      "rust-tui-ratatui",
+      "rust-web-services",
+      "clean-code",
+      "subspawn"
+    ],
+    "subagent_sources": [
+      "subagents/hardened-codex/agents/global",
+      "subagents/hardened-codex/agents/overlays/tooling"
+    ]
+  },
+  "files": [
+    {
+      "target": "AGENTS.md",
+      "template": "generic/AGENTS.md.tmpl"
+    },
+    {
+      "target": "docs/agent-bootstrap.md",
+      "template": "generic/agent-bootstrap.md.tmpl"
+    },
+    {
+      "target": "docs/rust-agent-workflow.md",
+      "template": "rust-cli/rust-agent-workflow.md.tmpl"
+    },
+    {
+      "target": ".codex/agents/README.md",
+      "template": "generic/codex-agents-readme.md.tmpl"
+    },
+    {
+      "target": ".gitignore",
+      "template": "generic/gitignore.tmpl"
+    }
+  ],
+  "advisory_host_checks": [
+    "cargo fmt --all --check",
+    "cargo clippy --all-targets -- -D warnings",
+    "cargo test",
+    "git diff --check"
+  ]
+}

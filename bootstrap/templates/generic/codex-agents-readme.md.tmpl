@@ -1,0 +1,30 @@
+# Project Codex Agents
+
+This directory is for repository-scoped Codex custom agents that are safe to
+track with the project.
+
+Use it only for roles that encode durable project behavior. Keep private,
+workstation-specific, customer-specific, and secret-bearing role definitions in
+ignored local overlay files.
+
+## Install Pattern
+
+Preview first:
+
+```bash
+export DEV_SKILLS="$dev_skills_path"
+python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+  --overlay tooling \
+  --project-dir "$PWD" \
+  --dry-run
+```
+
+Apply only after reviewing the planned copy actions:
+
+```bash
+python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+  --overlay tooling \
+  --project-dir "$PWD"
+```
+
+Generated from `$pack_name` for `$repo_name`.

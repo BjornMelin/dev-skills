@@ -1,0 +1,38 @@
+# Rust Agent Workflow
+
+Repository: `$repo_name`
+
+Use the Rust skills as a stack:
+
+- `rust-expert` for ownership, traits, async, error handling, and idiomatic
+  Rust design.
+- `rust-cli-clap` for CLI contracts, Clap flags, config precedence, and
+  stdout/stderr behavior.
+- `rust-tui-ratatui` for terminal UI state, layouts, rendering, and event
+  loops.
+- `rust-web-services` for Axum/Tokio/Tower services, typed errors, tracing,
+  and graceful shutdown.
+
+## Default Gates
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+git diff --check
+```
+
+Use narrower package flags when this repository is a workspace and the change
+is scoped.
+
+## Review Pattern
+
+Before opening a PR, delegate read-only review to the hardened roles that match
+the change:
+
+- `rust` logic: `reviewer`, `runtime_bug_reviewer`, `performance_reviewer`.
+- CLI contract: `shallow_bug_reviewer`, `docs_aligner`.
+- CI failure: `ci_triager`, `test_runner`.
+
+Keep implementation roles scoped to explicit file ownership and do not let a
+worker rewrite unrelated code.

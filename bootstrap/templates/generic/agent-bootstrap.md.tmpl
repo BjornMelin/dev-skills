@@ -1,0 +1,55 @@
+# Agent Bootstrap
+
+Repository: `$repo_name`
+
+Pack: `$pack_name`
+
+Primary language: `$primary_language`
+
+Generated: `$generated_at`
+
+## Operating Rules
+
+- Keep durable project guidance in `AGENTS.md`.
+- Keep reusable agent roles in `.codex/agents/` only when they are safe to
+  share with the repository.
+- Keep private overlays, local manifests, tokens, and workstation paths out of
+  version control.
+- Run dry-run install commands before writing global or project agent files.
+- Keep validation commands narrow to the files changed.
+
+## Suggested Agent Roles
+
+Install global roles from the source dev-skills checkout. Set `DEV_SKILLS` to
+that checkout path first:
+
+```bash
+export DEV_SKILLS="$dev_skills_path"
+python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" --global --dry-run
+```
+
+Install a project overlay into this checkout only after reviewing the planned
+copy actions:
+
+```bash
+python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+  --overlay tooling \
+  --project-dir "$PWD" \
+  --dry-run
+```
+
+## Rollback
+
+The hardened installer creates timestamped backups below `.codex/agent-backups`
+for project installs and `~/.codex/agent-backups` for global installs. Restore
+from the newest backup directory if an agent role needs to be reverted.
+
+## Minimum Smoke
+
+```bash
+git status --short
+git diff --check
+```
+
+Add package, test, lint, build, docs, and security gates from this repository's
+native tooling before merging.

@@ -12,6 +12,8 @@ It intentionally separates:
 - `scripts/sync_agents.py`: timestamp-backup installer for global and project
   targets;
 - `ROLE_CATALOG.md`: generated routing matrix and workflow recipes.
+- `RELEASE_MANIFEST.json`: public/private boundary, dry-run/apply commands,
+  rollback notes, and install smoke matrix.
 
 The runtime policy is:
 
@@ -70,5 +72,15 @@ python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays
 
 ## Smoke
 
-Use the subagent creator validator/doctor plus representative Codex live spawns
-after installation.
+Use the release manifest and validation runbook as the source of truth. Minimum
+tracked-pack smoke:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
+```
+
+After installation, add representative Codex live spawns for the roles most
+likely to be used in the target workflow.
