@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -216,7 +216,7 @@ def report(checks: list[EvalCheck], root: Path) -> dict[str, Any]:
     results = [run_check(check, root) for check in checks]
     return {
         "schema": SCHEMA,
-        "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "repo_root": portable_repo_root(),
         "ok": all(result["status"] == "passed" for result in results),
         "checks": results,
