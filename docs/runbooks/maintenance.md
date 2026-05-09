@@ -84,6 +84,16 @@ command backs up deleted TOML files by default.
 4. Run Rust validation.
 5. Run CLI smoke commands.
 
+## Update codex-dev Operating Layer
+
+1. Keep [codex-dev Operating Layer](../specs/codex-dev-operating-layer.md) as
+   the architecture and capsule-contract source of truth.
+2. Do not move general development-control commands into `codex-research`.
+3. Update README, docs/index, and validation docs when the public command
+   surface or required gates change.
+4. Keep task capsules local by default; summarize evidence in PR bodies instead
+   of committing run artifacts.
+
 ## Update Docs
 
 When adding a new major doc:
@@ -127,4 +137,6 @@ Do not track:
 - `target/`;
 - `skills/dist/`;
 - `.codex/research/` run artifacts unless explicitly requested;
+- `.codex/tasks/` task capsules unless explicitly requested as tracked
+  fixtures;
 - credentials, tokens, provider response dumps with private data.

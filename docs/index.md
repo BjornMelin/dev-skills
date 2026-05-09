@@ -1,9 +1,11 @@
 # dev-skills Documentation
 
-This directory documents the research, subagent, and skill-authoring systems
-added to this repository:
+This directory documents the research, subagent, operating-layer, and
+skill-authoring systems added to this repository:
 
 - `codex-research`: Rust CLI for evidence-first research helpers.
+- `codex-dev`: planned control-plane family for local task capsules, policy
+  gates, PR evidence, bootstrap composition, and optional TUI consumers.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
@@ -25,6 +27,9 @@ out of version control.
   CLI work together.
 - [Research Architecture](architecture/research-system.md): provider routing,
   evidence ledgers, cache policy, and Firecrawl/GitHub/Context7 lanes.
+- [codex-dev Operating Layer](specs/codex-dev-operating-layer.md): task capsule
+  schema, ownership map, branch graph, and validation expectations for the
+  planned development control plane.
 - [CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,

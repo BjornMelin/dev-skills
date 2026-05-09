@@ -38,6 +38,19 @@ binary is installed locally. The embedded default eval suite is sourced from
 `crates/codex-research/evals/research/core.json` at build time and covers
 routing, privacy, budgets, cited claims, and report shape.
 
+## codex-dev Operating Layer
+
+Run after changing the `codex-dev` architecture/spec docs:
+
+```bash
+python3 tools/docs/check_links.py docs README.md AGENTS.md
+git diff --check
+```
+
+After `crates/codex-dev` exists, use the package-specific Rust gates documented
+in [codex-dev Operating Layer](../specs/codex-dev-operating-layer.md). Keep
+`codex-research` gates scoped to research changes.
+
 ## Skills
 
 Validate one skill:

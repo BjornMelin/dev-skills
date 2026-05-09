@@ -1,6 +1,6 @@
 # System Overview
 
-The new system has four layers.
+The system has five layers.
 
 ## 1. Runtime Skills
 
@@ -66,6 +66,19 @@ and bounded analysis.
 
 The CLI does not replace Codex-native tools. It complements them.
 
+## 5. Development Operating Layer
+
+`codex-dev` is the planned development control-plane family. It owns task
+capsules, thin policy-gate orchestration, PR/eval/bootstrap evidence appenders,
+and stable JSON contracts for optional consumers such as a Ratatui workbench.
+
+It does not replace `codex-research`, `subagent-creator`, `subspawn`, or
+`gh-pr-review-fix`. It records those tools' outputs as development evidence and
+keeps one canonical capsule per goal or branch lane.
+
+See [codex-dev Operating Layer](../specs/codex-dev-operating-layer.md) for the
+schema, branch graph, ownership map, and validation expectations.
+
 ## Dual-Plane Research
 
 Codex-native plane:
@@ -109,4 +122,3 @@ User asks for deep research
 
 Do not present search snippets as settled facts. Hydrate first, cite source IDs,
 and label uncertainty when provider coverage, freshness, or authority is weak.
-

@@ -62,7 +62,7 @@ If you add scripts, keep them runnable without external secrets and avoid networ
 - Keep README as a portal and catalog, not a full manual.
 - Keep AGENTS.md focused on contributor and agent operating rules.
 - Put command references in `docs/reference/`, workflows in `docs/cookbooks/`, prompts in `docs/prompts/`, and validation/troubleshooting in `docs/runbooks/`.
-- Do not track generated rustdoc, `target/`, provider dumps with private data, or run-specific `.codex/research/` artifacts unless explicitly requested.
+- Do not track generated rustdoc, `target/`, provider dumps with private data, run-specific `.codex/research/` artifacts, or local `.codex/tasks/` capsules unless explicitly requested.
 
 ## Research/Subagent Stack Rules
 
