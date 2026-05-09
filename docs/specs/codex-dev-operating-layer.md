@@ -270,6 +270,23 @@ the local capsule. They should render summaries that can be copied into issues
 or PRs, but automation must read contract JSON files instead of scraping
 Markdown.
 
+## Skill And Subagent Eval Lab
+
+`tools/eval/skill_subagent_eval.py` owns offline development eval orchestration
+for skill metadata and subagent contracts. It records a normalized
+`dev-skills.skill-subagent-eval.v1` report with bounded per-check timeouts and
+isolated Python bytecode caches while delegating the actual checks to existing
+owners:
+
+- `tools/skill/quick_validate.py`
+- `skills/subagent-creator/scripts/subagent_creator.py validate`
+- `skills/subspawn/scripts/subspawn_plan.py validate-roles`
+- `skills/subspawn/scripts/subspawn_plan.py plan`
+- `python3 -m compileall`
+
+The eval lab is not a research evaluator. `codex-research eval` remains the
+owner for research routing, privacy, budget, evidence, and report contracts.
+
 ## Branch And PR Graph
 
 The release is split into issue-backed lanes:

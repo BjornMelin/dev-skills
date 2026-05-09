@@ -99,7 +99,7 @@ python3 tools/skill/package_skill.py skills/subspawn skills/dist
 ## Python Helpers
 
 ```bash
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts
 ```
 
 ## Subagent Templates
@@ -109,13 +109,16 @@ Validate bundled templates:
 ```bash
 python3 skills/subagent-creator/scripts/subagent_creator.py validate \
   skills/deep-researcher/templates/agents \
-  skills/subagent-creator/templates/agents
+  skills/subagent-creator/templates/agents \
+  skills/subspawn/templates/agents \
+  subagents/hardened-codex/agents
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan \
   --preset research \
   --task "validation smoke" \
   --scope "docs and template metadata" \
   --json
+python3 tools/eval/skill_subagent_eval.py --json
 ```
 
 The validator also enforces evidence-return headings for research-oriented
@@ -181,11 +184,12 @@ cargo test -p codex-research
 cargo run -q -p codex-research -- --json doctor
 cargo run -q -p codex-research -- --json eval
 cargo run -q -p codex-research -- --json eval --task evidence-claims-cited --strict
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
+python3 tools/eval/skill_subagent_eval.py --json
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 git diff --check
 ```

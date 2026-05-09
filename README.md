@@ -63,6 +63,10 @@ docs/
   cookbooks/              # operator-grade workflows
   prompts/                # copy-paste Codex prompts
   runbooks/               # validation, troubleshooting, maintenance
+tools/
+  eval/                   # offline skill/subagent eval runner
+  docs/                   # documentation checks
+  skill/                  # skill validation and packaging helpers
 ```
 
 ## Research, Subagent, and Operating Stack
@@ -78,6 +82,8 @@ operating layer:
 - `codex-dev`: current CLI for local task capsule lifecycle and repo-native
   policy gates; future release lanes add PR evidence, bootstrap composition,
   and optional TUI consumers.
+- `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
+  templates, role contracts, and planner presets.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
@@ -218,11 +224,12 @@ cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
 codex-research eval --list
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts
+python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
+python3 tools/eval/skill_subagent_eval.py --json
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 git diff --check
 ```

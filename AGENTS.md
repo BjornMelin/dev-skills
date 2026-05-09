@@ -47,9 +47,10 @@ There is no single repo-wide test harness. Treat the following as the required g
 
 - Any skill: `python3 tools/skill/quick_validate.py skills/<skill-name>`
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
-- Python helpers: `python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts`
-- Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents`
+- Python helpers: `python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts`
+- Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
+- Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
 - Development CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy manifest`
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
