@@ -10,6 +10,7 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `skills/<skill-name>/assets/` / `templates/`: optional reusable artifacts.
 - `skills/<skill-name>/agents/`: optional agent-runtime metadata (for example OpenAI YAML).
 - `skills/dist/`: prebuilt `.skill` bundles (ZIP archives) for selected skills.
+- `crates/codex-dev/`: Rust CLI for local task capsules and development evidence.
 - `crates/codex-research/`: Rust CLI for evidence-first research helpers.
 - `docs/`: tracked documentation portal, references, cookbooks, prompts, and runbooks.
 
@@ -27,6 +28,8 @@ Example skill path: `skills/docker-architect/SKILL.md`.
   `python3 -m compileall -q skills`
 - Build/check the research CLI:
   `cargo check -p codex-research`
+- Build/check the development CLI:
+  `cargo check -p codex-dev`
 - Run the research CLI smoke checks:
   `codex-research --json doctor && codex-research --json eval`
 
@@ -36,7 +39,7 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 - `SKILL.md` frontmatter should only use allowed keys: `name`, `description`, `license`, `allowed-tools`, `metadata`.
 - Keep `SKILL.md` concise; put large content in `references/`. Prefer scripts over massive inline code blocks.
 - Custom subagent TOML names must be **snake_case** and must not shadow Codex built-ins (`default`, `worker`, `explorer`) unless explicitly requested.
-- Keep generated Rust docs and `target/` out of git; document Rust APIs by updating `docs/reference/codex-research-crate.md`.
+- Keep generated Rust docs and `target/` out of git; document Rust APIs by updating the relevant docs under `docs/reference/`.
 
 ## Testing Guidelines
 
@@ -47,7 +50,8 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Python helpers: `python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts`
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
-- Rust CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
+- Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
+- Development CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
 - Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
 - Docs links: `python3 tools/docs/check_links.py docs README.md AGENTS.md`

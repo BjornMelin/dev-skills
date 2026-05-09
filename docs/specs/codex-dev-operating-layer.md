@@ -1,15 +1,15 @@
 # codex-dev Operating Layer
 
-Status: proposed for implementation.
+Status: active implementation.
 
-Tracking: #20 and #21.
+Tracking: #20, #21, and #22.
 
 ## Purpose
 
-`codex-dev` is the development control-plane family for this repo. It records
-agent work as task capsules, runs repo-native policy gates, attaches evaluation
-and PR evidence, and exposes stable JSON contracts for optional consumers such
-as a terminal workbench.
+`codex-dev` is the development control-plane family for this repo. The current
+#22 CLI records agent work as local task capsules. Later lanes add repo-native
+policy gates, evaluation and PR evidence appenders, bootstrap composition, and
+stable JSON contracts for optional consumers such as a terminal workbench.
 
 `codex-dev` is deliberately separate from `codex-research`. The research CLI
 continues to own provider routing, source hydration, research ledgers, cache,
@@ -220,13 +220,25 @@ thread closure.
   "number": 29,
   "url": "https://github.com/BjornMelin/dev-skills/pull/29",
   "state": "open",
-  "checks": [],
+  "checks": [
+    {
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/BjornMelin/dev-skills/pull/29/checks",
+      "checked_at": "2026-05-09T03:45:00Z"
+    }
+  ],
   "review_threads": {
     "unresolved": 0,
     "last_checked_at": "2026-05-09T03:45:00Z"
   }
 }
 ```
+
+When `checks` entries are present, each entry must use the typed fields shown
+above. Later PR-control work may add more typed PR evidence, but it should not
+replace this field with raw provider JSON.
 
 ### Markdown Notes
 
@@ -286,15 +298,6 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
-Rust implementation lanes must add focused crate checks for the new package and
-keep the workspace check green:
-
-```bash
-cargo fmt --all --check
-cargo clippy -p codex-dev --all-targets -- -D warnings
-cargo test -p codex-dev
-cargo check --workspace
-```
-
-Later lanes should extend this list only when they add a new canonical surface.
-Do not duplicate the full validation matrix in multiple owners.
+Rust implementation lanes must use the canonical command matrix in
+[Validation](../runbooks/validation.md). Later lanes should extend that runbook
+only when they add a new canonical surface.

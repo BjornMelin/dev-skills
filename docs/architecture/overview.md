@@ -68,9 +68,10 @@ The CLI does not replace Codex-native tools. It complements them.
 
 ## 5. Development Operating Layer
 
-`codex-dev` is the planned development control-plane family. It owns task
-capsules, thin policy-gate orchestration, PR/eval/bootstrap evidence appenders,
-and stable JSON contracts for optional consumers such as a Ratatui workbench.
+`codex-dev` currently owns local task capsule lifecycle commands and their
+stable JSON contracts. Later release lanes add thin policy-gate orchestration,
+PR/eval/bootstrap evidence appenders, and optional consumers such as a Ratatui
+workbench.
 
 It does not replace `codex-research`, `subagent-creator`, `subspawn`, or
 `gh-pr-review-fix`. It records those tools' outputs as development evidence and

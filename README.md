@@ -9,9 +9,10 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 
 ## What Is In This Repo
 
-This repo now contains both skill packages and supporting tooling:
+This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
+- a Rust development CLI, `codex-dev`, under `crates/`;
 - a Rust research CLI, `codex-research`, under `crates/`;
 - tracked documentation under `docs/`;
 - skill validation and packaging helpers under `tools/skill/`.
@@ -24,6 +25,7 @@ Key docs:
 - [System overview](docs/architecture/overview.md)
 - [Research architecture](docs/architecture/research-system.md)
 - [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
+- [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -51,6 +53,7 @@ skills/
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
 crates/
+  codex-dev/              # Rust CLI for local task capsules and development evidence
   codex-research/         # Rust CLI for evidence-first research helpers
 docs/
   index.md                # documentation portal
@@ -64,25 +67,34 @@ docs/
 
 ## Research, Subagent, and Operating Stack
 
-The main new system is a research/subagent stack:
+The main system combines research helpers, reusable subagents, and a development
+operating layer:
 
 - `deep-researcher`: skill for deep cited research with a Focused Six subagent
   pack.
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
-- `codex-dev`: planned operating-layer CLI family for task capsules, policy
-  gates, PR evidence, bootstrap composition, and optional TUI consumers.
+- `codex-dev`: current CLI for local task capsule lifecycle; future release
+  lanes add policy gates, PR evidence, bootstrap composition, and optional TUI
+  consumers.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
 
-Build and install the CLI:
+Build and install the research CLI:
 
 ```bash
 cargo build -p codex-research
 cargo install --path crates/codex-research --force
 codex-research doctor
+```
+
+Build and smoke the development CLI:
+
+```bash
+cargo build -p codex-dev
+cargo run -q -p codex-dev -- --help
 ```
 
 Install the deep research agents:
@@ -179,9 +191,10 @@ Package a skill to `skills/dist/<skill-name>.skill`:
 python3 tools/skill/package_skill.py skills/<skill-name> skills/dist
 ```
 
-Build the research CLI:
+Build the Rust CLIs:
 
 ```bash
+cargo build -p codex-dev
 cargo build -p codex-research
 ```
 
@@ -189,6 +202,13 @@ Full local validation for the research/subagent stack:
 
 ```bash
 cargo fmt --all --check
+cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo check -p codex-dev
+cargo test -p codex-dev
+cargo run -q -p codex-dev -- --help
+tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
+cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
