@@ -79,9 +79,9 @@ operating layer:
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
-- `codex-dev`: current CLI for local task capsule lifecycle and repo-native
-  policy gates; future release lanes add PR evidence, bootstrap composition,
-  and optional TUI consumers.
+- `codex-dev`: current CLI for local task capsule lifecycle, repo-native
+  policy gates, and PR evidence capture; future release lanes add bootstrap
+  composition and optional TUI consumers.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
   templates, role contracts, and planner presets.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
@@ -102,6 +102,7 @@ Build and smoke the development CLI:
 cargo build -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 ```
 
 Install the deep research agents:
@@ -214,10 +215,25 @@ cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cat > "$tmp/pr-snapshot.json" <<'JSON'
+{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
+  "state": "OPEN",
+  "checks": [
+    {"name": "fixture", "status": "COMPLETED", "conclusion": "SUCCESS"}
+  ],
+  "review_threads": {"unresolved": 0}
+}
+JSON
+cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research

@@ -52,7 +52,7 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
 - Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
-- Development CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy manifest`
+- Development CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy manifest`, `cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25`; run the task capsule and PR fixture smoke in `docs/runbooks/validation.md` when capsule, policy, or PR recording behavior changes.
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
 - Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
 - Docs links: `python3 tools/docs/check_links.py docs README.md AGENTS.md`

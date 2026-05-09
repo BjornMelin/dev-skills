@@ -50,6 +50,7 @@ cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
@@ -63,6 +64,20 @@ cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cat > "$tmp/pr-snapshot.json" <<'JSON'
+{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
+  "state": "OPEN",
+  "checks": [
+    {"name": "fixture", "status": "COMPLETED", "conclusion": "SUCCESS"}
+  ],
+  "review_threads": {"unresolved": 0}
+}
+JSON
+cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 ```
 
 Policy gate execution is explicit. Use `--execute` only when you intend to run
@@ -172,12 +187,27 @@ cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cat > "$tmp/pr-snapshot.json" <<'JSON'
+{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
+  "state": "OPEN",
+  "checks": [
+    {"name": "fixture", "status": "COMPLETED", "conclusion": "SUCCESS"}
+  ],
+  "review_threads": {"unresolved": 0}
+}
+JSON
+cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
