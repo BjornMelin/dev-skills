@@ -20,6 +20,7 @@ use ratatui::{Frame, Terminal};
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev-tui")]
 #[command(about = "Terminal workbench for codex-dev task capsules")]
+/// Command-line options for the `codex-dev-tui` binary.
 pub struct Cli {
     #[arg(long, value_name = "CAPSULE_DIR")]
     capsule: PathBuf,
@@ -40,6 +41,7 @@ pub struct Cli {
     tick_ms: u64,
 }
 
+/// Parse CLI arguments and run either the interactive TUI or deterministic render mode.
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
     if cli.render_once {
@@ -55,6 +57,7 @@ pub fn run() -> Result<()> {
         .map_err(|error| sanitized_cli_error(error, &cli.capsule))
 }
 
+/// Open the interactive terminal UI for a local `codex-dev` capsule.
 pub fn run_interactive(capsule_path: &Path, tick_rate: Duration) -> Result<()> {
     let mut terminal = ratatui::init();
     let mut restore_guard = RestoreGuard::new(ratatui::restore);
@@ -68,6 +71,7 @@ pub fn run_interactive(capsule_path: &Path, tick_rate: Duration) -> Result<()> {
     result
 }
 
+/// Drive the render/event loop until the event source requests exit or errors.
 pub fn run_app<B, E>(
     terminal: &mut Terminal<B>,
     state: &mut WorkbenchState,
@@ -90,10 +94,13 @@ where
     }
 }
 
+/// Source of high-level workbench events for the application loop.
 pub trait EventSource {
+    /// Return the next event, or `None` when the loop should render again after a tick.
     fn next_event(&mut self) -> Result<Option<WorkbenchEvent>>;
 }
 
+/// Crossterm-backed event source for interactive terminal sessions.
 pub struct CrosstermEvents {
     tick_rate: Duration,
 }
@@ -127,6 +134,7 @@ fn map_key(key: KeyEvent) -> Option<WorkbenchEvent> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// High-level actions the workbench event loop understands.
 pub enum WorkbenchEvent {
     Quit,
     NextPanel,
@@ -135,6 +143,7 @@ pub enum WorkbenchEvent {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Top-level panel currently rendered in the workbench detail area.
 pub enum Panel {
     Overview,
     Validation,
@@ -172,6 +181,7 @@ impl Panel {
 }
 
 #[derive(Debug)]
+/// View model loaded from a local `codex-dev` capsule directory.
 pub struct WorkbenchState {
     pub capsule_path: PathBuf,
     pub validation: ValidationResult,
@@ -183,6 +193,7 @@ pub struct WorkbenchState {
 }
 
 impl WorkbenchState {
+    /// Validate and load the capsule contracts used by the TUI.
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let validation = validate_capsule(&path)?;
@@ -207,6 +218,7 @@ impl WorkbenchState {
         })
     }
 
+    /// Reload capsule contracts while preserving the active panel.
     pub fn refresh(&mut self) {
         let active_panel = self.active_panel;
         match Self::load(&self.capsule_path) {
@@ -220,10 +232,12 @@ impl WorkbenchState {
         }
     }
 
+    /// Advance to the next panel, wrapping at the end.
     pub fn next_panel(&mut self) {
         self.active_panel = self.active_panel.next();
     }
 
+    /// Move to the previous panel, wrapping at the beginning.
     pub fn previous_panel(&mut self) {
         self.active_panel = self.active_panel.previous();
     }
@@ -264,6 +278,7 @@ where
     read_required_json(path).map(Some)
 }
 
+/// Restores terminal state exactly once on explicit restore or drop.
 pub struct RestoreGuard<F>
 where
     F: FnMut(),
@@ -276,6 +291,7 @@ impl<F> RestoreGuard<F>
 where
     F: FnMut(),
 {
+    /// Create an armed restore guard from a cleanup callback.
     pub fn new(restore: F) -> Self {
         Self {
             restore,
@@ -283,6 +299,7 @@ where
         }
     }
 
+    /// Run the cleanup callback immediately if it has not already run.
     pub fn restore_now(&mut self) {
         if self.armed {
             (self.restore)();
@@ -300,6 +317,7 @@ where
     }
 }
 
+/// Render the full workbench frame for the supplied state.
 pub fn render(frame: &mut Frame<'_>, state: &WorkbenchState) {
     let root = Block::default()
         .title(" codex-dev workbench ")
@@ -557,6 +575,7 @@ fn join_numbers(values: &[u64]) -> String {
         .join(", ")
 }
 
+/// Render a workbench state into a deterministic string buffer.
 pub fn render_to_string(state: &WorkbenchState, width: u16, height: u16) -> Result<String> {
     let backend = TestBackend::new(width, height);
     let mut terminal = Terminal::new(backend)?;
@@ -565,11 +584,15 @@ pub fn render_to_string(state: &WorkbenchState, width: u16, height: u16) -> Resu
 }
 
 #[derive(Debug, PartialEq, Eq)]
+/// Result of deterministic single-frame rendering.
 pub struct RenderOnceResult {
+    /// Rendered terminal buffer as plain text.
     pub output: String,
+    /// Whether capsule validation succeeded for the rendered state.
     pub valid: bool,
 }
 
+/// Load a capsule and render one deterministic frame without opening a terminal.
 pub fn render_once(capsule_path: &Path, width: u16, height: u16) -> Result<RenderOnceResult> {
     let state = WorkbenchState::load(capsule_path)?;
     let valid = state.validation.valid;
@@ -577,6 +600,7 @@ pub fn render_once(capsule_path: &Path, width: u16, height: u16) -> Result<Rende
     Ok(RenderOnceResult { output, valid })
 }
 
+/// CLI-safe render-once wrapper that redacts the supplied capsule path from errors.
 pub fn render_once_for_cli(
     capsule_path: &Path,
     width: u16,
