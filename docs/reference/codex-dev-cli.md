@@ -16,7 +16,9 @@ cargo build -p codex-dev
 cargo run -q -p codex-dev -- --help
 ```
 
-The binary supports `--json` globally for machine-readable command output.
+The binary supports `--json` globally for machine-readable command output. With
+`--json`, command errors still print a `codex-dev.output.v1` envelope with
+`ok: false` and a structured `result.error.message`, then exit nonzero.
 
 ## Capsule Root
 

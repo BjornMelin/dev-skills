@@ -10,7 +10,7 @@ use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 pub const CAPSULE_SCHEMA: &str = "codex-dev.task-capsule.v1";
 pub const EVIDENCE_SCHEMA: &str = "codex-dev.evidence.v1";
@@ -32,6 +32,19 @@ pub struct Cli {
 
     #[command(subcommand)]
     command: Commands,
+}
+
+impl Cli {
+    fn command_name(&self) -> &'static str {
+        match &self.command {
+            Commands::Capsule { command } => match command {
+                CapsuleCommand::Init(_) => "capsule init",
+                CapsuleCommand::Validate(_) => "capsule validate",
+                CapsuleCommand::Status(_) => "capsule status",
+                CapsuleCommand::Render(_) => "capsule render",
+            },
+        }
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -219,10 +232,30 @@ struct CommandOutput {
     result: Value,
 }
 
+impl CommandOutput {
+    fn error(command: &'static str, message: String) -> Self {
+        Self {
+            ok: false,
+            command,
+            human: format!("error: {message}"),
+            result: json!({
+                "error": {
+                    "message": message,
+                },
+            }),
+        }
+    }
+}
+
 pub fn run() -> Result<ExitCode> {
     let cli = Cli::parse();
     let json = cli.json;
-    let output = handle_cli(cli)?;
+    let command = cli.command_name();
+    let output = match handle_cli(cli) {
+        Ok(output) => output,
+        Err(error) if json => CommandOutput::error(command, format!("{error:#}")),
+        Err(error) => return Err(error),
+    };
     let ok = output.ok;
     let rendered = render_output(output, json)?;
     print!("{rendered}");
@@ -240,7 +273,12 @@ where
 {
     let cli = Cli::parse_from(args);
     let json = cli.json;
-    let output = handle_cli(cli)?;
+    let command = cli.command_name();
+    let output = match handle_cli(cli) {
+        Ok(output) => output,
+        Err(error) if json => CommandOutput::error(command, format!("{error:#}")),
+        Err(error) => return Err(error),
+    };
     render_output(output, json)
 }
 
@@ -362,19 +400,24 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
         if !args.force {
             bail!("capsule already exists: {}", path.display());
         }
-        if path
+        let metadata = path
             .symlink_metadata()
-            .with_context(|| format!("failed to inspect {}", path.display()))?
-            .file_type()
-            .is_symlink()
-        {
+            .with_context(|| format!("failed to inspect {}", path.display()))?;
+        let file_type = metadata.file_type();
+        if file_type.is_symlink() {
             bail!(
                 "refusing to replace symlinked capsule path: {}",
                 path.display()
             );
         }
-        fs::remove_dir_all(&path)
-            .with_context(|| format!("failed to replace capsule directory {}", path.display()))?;
+        if file_type.is_dir() {
+            fs::remove_dir_all(&path).with_context(|| {
+                format!("failed to replace capsule directory {}", path.display())
+            })?;
+        } else {
+            fs::remove_file(&path)
+                .with_context(|| format!("failed to replace capsule file {}", path.display()))?;
+        }
     }
     fs::create_dir_all(&path)
         .with_context(|| format!("failed to create capsule directory {}", path.display()))?;
@@ -488,44 +531,57 @@ pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
         });
     }
 
-    for file in REQUIRED_FILES {
-        if !path.join(file).is_file() {
-            errors.push(format!("missing required file: {file}"));
-        }
+    let missing_files = REQUIRED_FILES
+        .iter()
+        .copied()
+        .filter(|file| !path.join(file).is_file())
+        .collect::<Vec<_>>();
+    for file in &missing_files {
+        errors.push(format!("missing required file: {file}"));
     }
 
-    match read_json::<Capsule>(&path.join("capsule.json")) {
-        Ok(capsule) => {
-            if capsule.schema != CAPSULE_SCHEMA {
-                errors.push(format!("capsule.json schema must be {CAPSULE_SCHEMA}"));
+    if !missing_files.contains(&"capsule.json") {
+        match read_json::<Capsule>(&path.join("capsule.json")) {
+            Ok(capsule) => {
+                if capsule.schema != CAPSULE_SCHEMA {
+                    errors.push(format!("capsule.json schema must be {CAPSULE_SCHEMA}"));
+                }
             }
+            Err(error) => errors.push(format!("invalid capsule.json: {error:#}")),
         }
-        Err(error) => errors.push(format!("invalid capsule.json: {error:#}")),
     }
 
-    match validate_evidence(&path.join("evidence.jsonl")) {
-        Ok(file_errors) => errors.extend(file_errors),
-        Err(error) => errors.push(format!("invalid evidence.jsonl: {error:#}")),
+    if !missing_files.contains(&"evidence.jsonl") {
+        match validate_evidence(&path.join("evidence.jsonl")) {
+            Ok(file_errors) => errors.extend(file_errors),
+            Err(error) => errors.push(format!("invalid evidence.jsonl: {error:#}")),
+        }
     }
 
-    validate_schema_file::<Verification, _>(
-        &path.join("verification.json"),
-        VERIFICATION_SCHEMA,
-        |value| &value.schema,
-        &mut errors,
-    );
-    validate_schema_file::<Subagents, _>(
-        &path.join("subagents.json"),
-        SUBAGENTS_SCHEMA,
-        |value| &value.schema,
-        &mut errors,
-    );
-    validate_schema_file::<PrEvidence, _>(
-        &path.join("pr.json"),
-        PR_SCHEMA,
-        |value| &value.schema,
-        &mut errors,
-    );
+    if !missing_files.contains(&"verification.json") {
+        validate_schema_file::<Verification, _>(
+            &path.join("verification.json"),
+            VERIFICATION_SCHEMA,
+            |value| &value.schema,
+            &mut errors,
+        );
+    }
+    if !missing_files.contains(&"subagents.json") {
+        validate_schema_file::<Subagents, _>(
+            &path.join("subagents.json"),
+            SUBAGENTS_SCHEMA,
+            |value| &value.schema,
+            &mut errors,
+        );
+    }
+    if !missing_files.contains(&"pr.json") {
+        validate_schema_file::<PrEvidence, _>(
+            &path.join("pr.json"),
+            PR_SCHEMA,
+            |value| &value.schema,
+            &mut errors,
+        );
+    }
 
     Ok(ValidationResult {
         path: path.to_path_buf(),
@@ -809,6 +865,20 @@ mod tests {
     }
 
     #[test]
+    fn force_replaces_file_at_capsule_path() {
+        let temp = tempdir().expect("tempdir");
+        let path = temp.path().join("20260509-040000-capsule-cli");
+        fs::write(&path, "old").expect("write stale file");
+
+        let mut replacement = init_args(temp.path().to_path_buf());
+        replacement.force = true;
+        let result = init_capsule(replacement).expect("replace file");
+
+        assert!(result.path.is_dir());
+        assert!(result.path.join("capsule.json").is_file());
+    }
+
+    #[test]
     fn status_and_render_use_capsule_contract() {
         let temp = tempdir().expect("tempdir");
         let result = init_capsule(init_args(temp.path().to_path_buf())).expect("init capsule");
@@ -833,6 +903,12 @@ mod tests {
                 .errors
                 .iter()
                 .any(|error| error.contains("capsule.json"))
+        );
+        assert!(
+            validation
+                .errors
+                .iter()
+                .all(|error| !error.contains("failed to open"))
         );
     }
 
@@ -865,5 +941,37 @@ mod tests {
         assert_eq!(value["ok"], true);
         assert_eq!(value["command"], "capsule init");
         assert_eq!(value["result"]["capsule"]["issues"][0], 22);
+    }
+
+    #[test]
+    fn run_from_emits_json_error_envelope() {
+        let temp = tempdir().expect("tempdir");
+        init_capsule(init_args(temp.path().to_path_buf())).expect("init capsule");
+
+        let output = run_from([
+            "codex-dev",
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Build capsule CLI",
+            "--root",
+            temp.path().to_str().expect("utf8 temp path"),
+            "--id",
+            "20260509-040000-capsule-cli",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .expect("json error envelope");
+        let value: Value = serde_json::from_str(&output).expect("json output");
+        assert_eq!(value["schema"], OUTPUT_SCHEMA);
+        assert_eq!(value["ok"], false);
+        assert_eq!(value["command"], "capsule init");
+        assert!(
+            value["result"]["error"]["message"]
+                .as_str()
+                .expect("message")
+                .contains("already exists")
+        );
     }
 }

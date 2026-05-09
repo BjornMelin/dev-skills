@@ -83,3 +83,38 @@ fn capsule_validate_fails_for_invalid_capsules() {
         .stdout(predicates::str::contains("\"ok\": false"))
         .stdout(predicates::str::contains("\"valid\": false"));
 }
+
+#[test]
+fn capsule_init_errors_keep_json_envelope() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let args = [
+        "--json",
+        "capsule",
+        "init",
+        "--title",
+        "Build capsule CLI",
+        "--root",
+        root.to_str().expect("utf8 temp path"),
+        "--id",
+        "test-capsule",
+        "--created-at",
+        "2026-05-09T04:00:00Z",
+    ];
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(args)
+        .assert()
+        .success();
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(args)
+        .assert()
+        .failure()
+        .stdout(predicates::str::contains("\"ok\": false"))
+        .stdout(predicates::str::contains("\"error\""))
+        .stdout(predicates::str::contains("already exists"));
+}
