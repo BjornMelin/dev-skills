@@ -32,6 +32,7 @@ Key docs:
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
 - [Rust skill suite](docs/reference/rust-skill-suite.md)
+- [Memory guidance proposals](docs/cookbooks/memory-guidance-proposals.md)
 - [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
 
 For local live-provider testing, copy `.env.example` to an untracked `.env` and

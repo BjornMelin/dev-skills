@@ -194,6 +194,10 @@ Manual checks:
 - README links docs/index.md and the main guides;
 - AGENTS.md lists the validation commands affected by the change;
 - command examples match current CLI help;
+- memory-derived guidance is verified against current tracked authority or
+  clearly labeled historical/`UNVERIFIED`;
+- stale smoke evidence from prior runs is rerun before it is used as acceptance
+  evidence;
 - docs do not include secrets, local tokens, or committed run ledgers.
 
 ## Full Local Gate
