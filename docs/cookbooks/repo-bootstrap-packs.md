@@ -63,8 +63,8 @@ The hardened pack release boundary is tracked in
 The public surface is:
 
 - global roles under `subagents/hardened-codex/agents/global`;
-- public overlays under `agents/overlays/docmind` and
-  `agents/overlays/tooling`;
+- public overlays under `subagents/hardened-codex/agents/overlays/docmind`
+  and `subagents/hardened-codex/agents/overlays/tooling`;
 - renderer and sync scripts;
 - example manifests for local overlays and local roles.
 
@@ -72,8 +72,8 @@ The private local surface is ignored:
 
 - `overlays.local.json` and `overlays.local.*.json`;
 - `roles.local.json` and `roles.local.*.json`;
-- overlay directories under `agents/overlays/*/` except the explicit public
-  allowlist.
+- overlay directories under `subagents/hardened-codex/agents/overlays/*/`
+  except the explicit public allowlist.
 
 ## Smoke Matrix
 
@@ -88,6 +88,7 @@ python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --ou
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
 PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
 git diff --check
 ```

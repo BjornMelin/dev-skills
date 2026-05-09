@@ -130,6 +130,7 @@ python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --ou
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
 PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
 git diff --check
 ```
@@ -229,7 +230,6 @@ python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp_bootstrap=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp_bootstrap/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
 python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp_bootstrap/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
@@ -241,6 +241,7 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json

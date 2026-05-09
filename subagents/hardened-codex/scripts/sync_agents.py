@@ -10,8 +10,11 @@ import subprocess
 import sys
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
+from pathlib import PureWindowsPath
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,7 +109,17 @@ def resolve_repo_manifest_path(value: str, *, manifest: Path) -> Path:
     """
 
     relative = Path(value)
-    if relative.is_absolute() or ".." in relative.parts:
+    windows_relative = PureWindowsPath(value)
+    if (
+        relative.is_absolute()
+        or relative.drive
+        or relative.anchor
+        or windows_relative.is_absolute()
+        or windows_relative.drive
+        or windows_relative.anchor
+        or ".." in relative.parts
+        or ".." in windows_relative.parts
+    ):
         raise SystemExit(
             f"release manifest path must be repo-relative: {manifest}: {value}"
         )
@@ -147,7 +160,9 @@ def load_local_targets(manifest: Path) -> dict[str, OverlayTarget]:
     try:
         payload = json.loads(manifest.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise SystemExit(f"invalid local overlay manifest {manifest}: {exc}") from exc
+        raise SystemExit(
+            f"invalid local overlay manifest {manifest}: {exc}"
+        ) from exc
     overlays = payload.get("overlays")
     if not isinstance(overlays, dict):
         raise SystemExit(
@@ -162,12 +177,19 @@ def load_local_targets(manifest: Path) -> dict[str, OverlayTarget]:
                 f"local overlay names must be non-empty strings: {manifest}"
             )
         if not isinstance(config, dict):
-            raise SystemExit(f"local overlay {name} must be an object: {manifest}")
+            raise SystemExit(
+                f"local overlay {name} must be an object: {manifest}"
+            )
         project_dir = config.get("project_dir")
         if not isinstance(project_dir, str) or not project_dir:
-            raise SystemExit(f"local overlay {name} requires project_dir: {manifest}")
+            raise SystemExit(
+                f"local overlay {name} requires project_dir: {manifest}"
+            )
         source_dir_value = config.get("source_dir")
-        if source_dir_value is not None and not isinstance(source_dir_value, str):
+        if (
+            source_dir_value is not None
+            and not isinstance(source_dir_value, str)
+        ):
             raise SystemExit(
                 f"local overlay {name} source_dir must be a string: {manifest}"
             )
@@ -261,6 +283,184 @@ def validate(files: Iterable[Path]) -> int:
     return subprocess.run(command, check=False).returncode
 
 
+def validate_public_overlay_allowlist(
+    payload: dict[str, Any],
+) -> tuple[set[str], list[str]]:
+    """Validate public overlays that are intentionally redistributable.
+
+    Args:
+        payload: Parsed release manifest payload.
+
+    Returns:
+        Tuple of valid allowlisted overlay names and validation errors.
+    """
+
+    errors: list[str] = []
+    allowlist = payload.get("explicit_public_overlay_allowlist")
+    if not isinstance(allowlist, list) or not allowlist:
+        return set(), [
+            "explicit_public_overlay_allowlist must be a non-empty array"
+        ]
+
+    public_overlay_allowlist: set[str] = set()
+    for item in allowlist:
+        if not isinstance(item, str) or not item:
+            errors.append(
+                "explicit_public_overlay_allowlist entries must be "
+                "non-empty strings"
+            )
+            continue
+        public_overlay_allowlist.add(item)
+        if item not in PUBLIC_OVERLAY_TARGETS:
+            errors.append(
+                f"public overlay is not configured in sync script: {item}"
+            )
+        if not (AGENTS_ROOT / "overlays" / item).is_dir():
+            errors.append(f"public overlay directory does not exist: {item}")
+    return public_overlay_allowlist, errors
+
+
+def validate_public_sources(
+    payload: dict[str, Any],
+    *,
+    manifest: Path,
+    public_overlay_allowlist: set[str],
+) -> list[str]:
+    """Validate tracked public release sources.
+
+    Args:
+        payload: Parsed release manifest payload.
+        manifest: Release manifest path for diagnostics.
+        public_overlay_allowlist: Overlay names allowed in public sources.
+
+    Returns:
+        Validation error messages.
+    """
+
+    errors: list[str] = []
+    public_sources = payload.get("public_sources")
+    if not isinstance(public_sources, list) or not public_sources:
+        return ["public_sources must be a non-empty array"]
+
+    for item in public_sources:
+        if not isinstance(item, str) or not item:
+            errors.append("public_sources entries must be non-empty strings")
+            continue
+        try:
+            path = resolve_repo_manifest_path(item, manifest=manifest)
+        except SystemExit as exc:
+            errors.append(str(exc))
+            continue
+        if not path.exists():
+            errors.append(f"public source does not exist: {item}")
+        overlay_name = overlay_name_for_path(path)
+        if (
+            overlay_name is not None
+            and overlay_name not in public_overlay_allowlist
+        ):
+            errors.append(
+                "public source references non-allowlisted overlay: "
+                f"{item}"
+            )
+    return errors
+
+
+def validate_private_local_only(
+    payload: dict[str, Any],
+    *,
+    manifest: Path,
+    public_overlay_allowlist: set[str],
+) -> list[str]:
+    """Validate private path patterns that must remain local-only.
+
+    Args:
+        payload: Parsed release manifest payload.
+        manifest: Release manifest path for diagnostics.
+        public_overlay_allowlist: Overlay names allowed in public sources.
+
+    Returns:
+        Validation error messages.
+    """
+
+    errors: list[str] = []
+    private_local_only = payload.get("private_local_only")
+    if not isinstance(private_local_only, list) or not private_local_only:
+        return ["private_local_only must be a non-empty array"]
+
+    for item in private_local_only:
+        if not isinstance(item, dict):
+            errors.append("private_local_only entries must be objects")
+            continue
+        if not isinstance(item.get("path"), str) or not item["path"]:
+            errors.append("private_local_only entries require path")
+        else:
+            try:
+                private_path = resolve_repo_manifest_path(
+                    item["path"],
+                    manifest=manifest,
+                )
+            except SystemExit as exc:
+                errors.append(str(exc))
+                private_path = None
+            if private_path is not None:
+                overlay_name = overlay_name_for_path(private_path)
+                if (
+                    overlay_name is not None
+                    and overlay_name in public_overlay_allowlist
+                ):
+                    errors.append(
+                        "private_local_only references public overlay "
+                        "allowlist: "
+                        f"{item['path']}"
+                    )
+        if not isinstance(item.get("reason"), str) or not item["reason"]:
+            errors.append("private_local_only entries require reason")
+    return errors
+
+
+def validate_release_action_lists(payload: dict[str, Any]) -> list[str]:
+    """Validate command-list sections in the release manifest.
+
+    Args:
+        payload: Parsed release manifest payload.
+
+    Returns:
+        Validation error messages.
+    """
+
+    errors: list[str] = []
+    for key in ("dry_run_first", "apply", "rollback", "smoke_matrix"):
+        value = payload.get(key)
+        if not isinstance(value, list) or not value:
+            errors.append(f"{key} must be a non-empty array")
+    return errors
+
+
+def validate_smoke_matrix(payload: dict[str, Any]) -> list[str]:
+    """Validate named smoke checks in the release manifest.
+
+    Args:
+        payload: Parsed release manifest payload.
+
+    Returns:
+        Validation error messages.
+    """
+
+    errors: list[str] = []
+    smoke_matrix = payload.get("smoke_matrix", [])
+    if not isinstance(smoke_matrix, list):
+        return errors
+    for item in smoke_matrix:
+        if not isinstance(item, dict):
+            errors.append("smoke_matrix entries must be objects")
+            continue
+        if not isinstance(item.get("name"), str) or not item["name"]:
+            errors.append("smoke_matrix entries require name")
+        if not isinstance(item.get("command"), str) or not item["command"]:
+            errors.append("smoke_matrix entries require command")
+    return errors
+
+
 def validate_sources(label: str, source: Path) -> int:
     """Validate all role TOML files in a source directory.
 
@@ -305,93 +505,26 @@ def validate_release_manifest(manifest: Path = RELEASE_MANIFEST) -> int:
     if payload.get("schema") != "dev-skills.hardened-codex-release.v1":
         errors.append("release manifest schema is invalid")
 
-    allowlist = payload.get("explicit_public_overlay_allowlist")
-    public_overlay_allowlist = (
-        {item for item in allowlist if isinstance(item, str)}
-        if isinstance(allowlist, list)
-        else set()
+    public_overlay_allowlist, allowlist_errors = (
+        validate_public_overlay_allowlist(payload)
     )
-    if not isinstance(allowlist, list) or not allowlist:
-        errors.append("explicit_public_overlay_allowlist must be a non-empty array")
-    else:
-        for item in allowlist:
-            if item not in PUBLIC_OVERLAY_TARGETS:
-                errors.append(f"public overlay is not configured in sync script: {item}")
-            if not (AGENTS_ROOT / "overlays" / str(item)).is_dir():
-                errors.append(f"public overlay directory does not exist: {item}")
-
-    public_sources = payload.get("public_sources")
-    if not isinstance(public_sources, list) or not public_sources:
-        errors.append("public_sources must be a non-empty array")
-    else:
-        for item in public_sources:
-            if not isinstance(item, str) or not item:
-                errors.append("public_sources entries must be non-empty strings")
-                continue
-            try:
-                path = resolve_repo_manifest_path(item, manifest=manifest)
-            except SystemExit as exc:
-                errors.append(str(exc))
-                continue
-            if not path.exists():
-                errors.append(f"public source does not exist: {item}")
-            overlay_name = overlay_name_for_path(path)
-            if (
-                overlay_name is not None
-                and overlay_name not in public_overlay_allowlist
-            ):
-                errors.append(
-                    "public source references non-allowlisted overlay: "
-                    f"{item}"
-                )
-
-    private_local_only = payload.get("private_local_only")
-    if not isinstance(private_local_only, list) or not private_local_only:
-        errors.append("private_local_only must be a non-empty array")
-    else:
-        for item in private_local_only:
-            if not isinstance(item, dict):
-                errors.append("private_local_only entries must be objects")
-                continue
-            if not isinstance(item.get("path"), str) or not item["path"]:
-                errors.append("private_local_only entries require path")
-            else:
-                try:
-                    private_path = resolve_repo_manifest_path(
-                        item["path"],
-                        manifest=manifest,
-                    )
-                except SystemExit as exc:
-                    errors.append(str(exc))
-                    private_path = None
-                if private_path is not None:
-                    overlay_name = overlay_name_for_path(private_path)
-                    if (
-                        overlay_name is not None
-                        and overlay_name in public_overlay_allowlist
-                    ):
-                        errors.append(
-                            "private_local_only references public overlay allowlist: "
-                            f"{item['path']}"
-                        )
-            if not isinstance(item.get("reason"), str) or not item["reason"]:
-                errors.append("private_local_only entries require reason")
-
-    for key in ("dry_run_first", "apply", "rollback", "smoke_matrix"):
-        value = payload.get(key)
-        if not isinstance(value, list) or not value:
-            errors.append(f"{key} must be a non-empty array")
-
-    smoke_matrix = payload.get("smoke_matrix", [])
-    if isinstance(smoke_matrix, list):
-        for item in smoke_matrix:
-            if not isinstance(item, dict):
-                errors.append("smoke_matrix entries must be objects")
-                continue
-            if not isinstance(item.get("name"), str) or not item["name"]:
-                errors.append("smoke_matrix entries require name")
-            if not isinstance(item.get("command"), str) or not item["command"]:
-                errors.append("smoke_matrix entries require command")
+    errors.extend(allowlist_errors)
+    errors.extend(
+        validate_public_sources(
+            payload,
+            manifest=manifest,
+            public_overlay_allowlist=public_overlay_allowlist,
+        )
+    )
+    errors.extend(
+        validate_private_local_only(
+            payload,
+            manifest=manifest,
+            public_overlay_allowlist=public_overlay_allowlist,
+        )
+    )
+    errors.extend(validate_release_action_lists(payload))
+    errors.extend(validate_smoke_matrix(payload))
 
     if errors:
         print("## release manifest")
@@ -413,7 +546,10 @@ def print_actions(label: str, actions: list[CopyAction]) -> None:
     print(f"## {label}")
     for action in actions:
         backup_note = f" backup={action.backup}" if action.backup else ""
-        print(f"{action.action}: {action.source.name} -> {action.target}{backup_note}")
+        print(
+            f"{action.action}: "
+            f"{action.source.name} -> {action.target}{backup_note}"
+        )
 
 
 def install_global(*, dry_run: bool) -> int:
@@ -509,7 +645,9 @@ def install_overlay_with_targets(
     )
     if project_dir is None and default_project is None:
         raise SystemExit(f"overlay {name} requires --project-dir")
-    explicit_project_target = project_dir is not None or local_target is not None
+    explicit_project_target = (
+        project_dir is not None or local_target is not None
+    )
     project = (project_dir or default_project).expanduser().resolve()
     if not project.is_dir() and (explicit_project_target or not dry_run):
         raise SystemExit(
@@ -536,7 +674,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--overlay", action="append", default=[])
     parser.add_argument("--all-overlays", action="store_true")
     parser.add_argument("--all-local-overlays", action="store_true")
-    parser.add_argument("--local-manifest", type=Path, default=DEFAULT_LOCAL_MANIFEST)
+    parser.add_argument(
+        "--local-manifest",
+        type=Path,
+        default=DEFAULT_LOCAL_MANIFEST,
+    )
     parser.add_argument("--project-dir", type=Path)
     parser.add_argument("--validate-sources", action="store_true")
     parser.add_argument("--validate-release-manifest", action="store_true")
@@ -573,7 +715,8 @@ def main(argv: list[str] | None = None) -> int:
     """
 
     args = build_parser().parse_args(argv)
-    local_targets = load_local_targets(args.local_manifest.expanduser().resolve())
+    local_manifest = args.local_manifest.expanduser().resolve()
+    local_targets = load_local_targets(local_manifest)
     overlays = list(args.overlay)
     status = 0
     if args.all_overlays:
@@ -621,10 +764,16 @@ def main(argv: list[str] | None = None) -> int:
             local_target = local_targets.get(overlay)
             source = (
                 local_target.source_dir
-                if local_target is not None and local_target.source_dir is not None
+                if (
+                    local_target is not None
+                    and local_target.source_dir is not None
+                )
                 else AGENTS_ROOT / "overlays" / overlay
             )
-            status = keep_first_failure(status, validate_sources(overlay, source))
+            status = keep_first_failure(
+                status,
+                validate_sources(overlay, source),
+            )
         else:
             status = keep_first_failure(
                 status,
