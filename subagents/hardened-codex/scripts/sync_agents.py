@@ -133,7 +133,15 @@ def resolve_repo_manifest_path(value: str, *, manifest: Path) -> Path:
 
 
 def overlay_name_for_path(path: Path) -> str | None:
-    """Return the public overlay name for a path under agents/overlays."""
+    """Return the public overlay name for a path under agents/overlays.
+
+    Args:
+        path: Path to compare against OVERLAY_ROOT.
+
+    Returns:
+        First path segment under OVERLAY_ROOT, or None when the path is
+        outside OVERLAY_ROOT.
+    """
 
     try:
         relative = path.resolve().relative_to(OVERLAY_ROOT.resolve())
