@@ -9,7 +9,7 @@ but it is not current authority. Current tracked docs, code, tests, GitHub
 issues, PR review state, and official upstream sources remain the authority for
 changes.
 
-## When To Use This
+## When to Use This
 
 Create a memory guidance proposal when a prior run contains reusable guidance
 that should affect future work, such as:
@@ -78,7 +78,7 @@ If a durable rule needs a path example, use a repo-relative path or a neutral
 placeholder. If a local-only overlay motivated the guidance, document the public
 shape of the rule without naming the private repo or role.
 
-## Where The Decision Belongs
+## Where the Decision Belongs
 
 Choose one durable owner:
 
