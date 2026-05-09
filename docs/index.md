@@ -50,6 +50,7 @@ out of version control.
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
 - [Subagent Templates](reference/subagent-templates.md)
+- [Skill and Subagent Eval Lab](reference/skill-subagent-eval-lab.md)
 
 ## Cookbooks
 
