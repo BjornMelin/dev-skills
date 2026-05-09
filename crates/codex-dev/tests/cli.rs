@@ -135,3 +135,75 @@ fn capsule_init_errors_keep_json_envelope() {
             .contains("already exists")
     );
 }
+
+#[test]
+fn policy_manifest_and_dry_run_update_capsule() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let manifest_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "manifest",
+            "--generated-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let manifest_json: Value = serde_json::from_slice(&manifest_output).expect("manifest json");
+    assert_eq!(manifest_json["command"], "policy manifest");
+    assert_eq!(
+        manifest_json["result"]["schema"],
+        "codex-dev.policy-gates.v1"
+    );
+    assert_eq!(manifest_json["result"]["gates"][0]["network"], false);
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Policy gate smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "policy-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let run_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "run",
+            "--capsule",
+            capsule,
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let run_json: Value = serde_json::from_slice(&run_output).expect("policy run json");
+    assert_eq!(run_json["command"], "policy run");
+    assert_eq!(run_json["result"]["dry_run"], true);
+    assert_eq!(run_json["result"]["gates"][0]["status"], "planned");
+}

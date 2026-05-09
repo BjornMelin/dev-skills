@@ -49,6 +49,7 @@ cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- --json policy manifest
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
@@ -61,7 +62,15 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 ```
+
+Policy gate execution is explicit. Use `--execute` only when you intend to run
+the repo-native commands from the manifest; the default dry run records the
+planned gate snapshot in the capsule without running commands.
+Execution discovers the repository root from the current directory or capsule
+path. Pass `--repo-root <path>` when running an installed binary from outside
+the repository.
 
 Keep `codex-research` gates scoped to research changes.
 
@@ -159,11 +168,13 @@ cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- --json policy manifest
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research

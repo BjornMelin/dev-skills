@@ -2,15 +2,16 @@
 
 Status: active implementation.
 
-Tracking: #20, #21, and #22.
+Tracking: #20, #21, #22, and #23.
 
 ## Purpose
 
 `codex-dev` is the development control-plane family for this repo. The CLI
-delivered by issue #22 records agent work as local task capsules. Later lanes
-add repo-native policy gates, evaluation evidence appenders, PR evidence
-appenders, bootstrap composition, and stable JSON contracts for optional
-consumers such as a terminal workbench.
+delivered by issue #22 records agent work as local task capsules. Issue #23
+adds a repo-native policy gate that can plan or execute local validation while
+recording the result in the capsule. Later lanes add evaluation evidence
+appenders, PR evidence appenders, bootstrap composition, and stable JSON
+contracts for optional consumers such as a terminal workbench.
 
 `codex-dev` is deliberately separate from `codex-research`. The research CLI
 continues to own provider routing, source hydration, research ledgers, cache,
@@ -180,6 +181,27 @@ local paths only when they remain local and untracked.
 
 The policy gate must reference repo-native commands. It may plan, execute, and
 record gates, but it is not a second source of truth for what the repo requires.
+
+`codex-dev.policy-gates.v1` is the machine-readable manifest for policy-gate
+planning. Each gate includes:
+
+- `id`
+- `name`
+- `command`
+- `source`
+- `required`
+- `network`
+- `secrets`
+
+The default `codex_dev` profile references the canonical `codex-dev` validation
+section in `docs/runbooks/validation.md`, marks every gate as local, and sets
+`network: false` and `secrets: false`. Dry-run policy checks record `planned`
+gate status in `verification.json`; executed gates record `passed`, `failed`,
+or `skipped`.
+
+Executed gates must run from a discovered or explicit repository root so
+repo-relative commands produce stable results whether invoked from the root, a
+subdirectory, or an installed binary with `--repo-root`.
 
 ### subagents.json
 
