@@ -35,6 +35,10 @@ Open a local task capsule:
 cargo run -q -p codex-dev-tui -- --capsule .codex/tasks/<id>
 ```
 
+Interactive mode polls for terminal input and refresh ticks every 250
+milliseconds by default. Use `--tick-ms <milliseconds>` to tune that interval;
+`0` is rejected so the TUI cannot busy-loop.
+
 Keys:
 
 - `tab`, right arrow, or `l`: next panel

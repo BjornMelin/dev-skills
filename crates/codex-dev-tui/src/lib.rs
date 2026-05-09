@@ -227,7 +227,8 @@ impl WorkbenchState {
                 *self = next;
             }
             Err(error) => {
-                self.last_error = Some(redact_path_text(&format!("{error:#}"), &self.capsule_path));
+                let message = redact_path_text(&format!("{error:#}"), &self.capsule_path);
+                self.replace_contracts_with_error(message);
             }
         }
     }
@@ -240,6 +241,18 @@ impl WorkbenchState {
     /// Move to the previous panel, wrapping at the beginning.
     pub fn previous_panel(&mut self) {
         self.active_panel = self.active_panel.previous();
+    }
+
+    fn replace_contracts_with_error(&mut self, message: String) {
+        self.validation = ValidationResult {
+            path: self.capsule_path.clone(),
+            valid: false,
+            errors: vec![message.clone()],
+        };
+        self.capsule = None;
+        self.verification = None;
+        self.pr = None;
+        self.last_error = Some(message);
     }
 }
 
@@ -750,6 +763,21 @@ mod tests {
             interactive_tick_rate(1).expect("positive tick"),
             Duration::from_millis(1)
         );
+    }
+
+    #[test]
+    fn refresh_error_replaces_visible_contract_state() {
+        let mut state = fixture_state();
+        let message = "failed to parse <capsule>/verification.json".to_string();
+
+        state.replace_contracts_with_error(message.clone());
+
+        assert!(!state.validation.valid);
+        assert_eq!(state.validation.errors, vec![message.clone()]);
+        assert!(state.capsule.is_none());
+        assert!(state.verification.is_none());
+        assert!(state.pr.is_none());
+        assert_eq!(state.last_error.as_deref(), Some(message.as_str()));
     }
 
     #[test]
