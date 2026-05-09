@@ -69,9 +69,9 @@ The CLI does not replace Codex-native tools. It complements them.
 ## 5. Development Operating Layer
 
 `codex-dev` currently owns local task capsule lifecycle commands, repo-native
-policy-gate orchestration, and their stable JSON contracts. Later release lanes
-add PR/eval/bootstrap evidence appenders and optional consumers such as a
-Ratatui workbench.
+policy-gate orchestration, PR evidence adapters, eval/bootstrap evidence
+surfaces, and their stable JSON contracts. `codex-dev-tui` is an optional
+Ratatui workbench that consumes those contracts without owning policy logic.
 
 It does not replace `codex-research`, `subagent-creator`, `subspawn`, or
 `gh-pr-review-fix`. It records those tools' outputs as development evidence and

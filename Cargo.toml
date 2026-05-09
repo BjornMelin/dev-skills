@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/codex-dev", "crates/codex-research"]
+members = [
+    "crates/codex-dev",
+    "crates/codex-dev-tui",
+    "crates/codex-research",
+]
 resolver = "2"
 
 [workspace.package]

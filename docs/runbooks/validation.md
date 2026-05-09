@@ -55,6 +55,15 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
+Run after changing `crates/codex-dev-tui/` or TUI docs:
+
+```bash
+cargo fmt --all --check
+cargo clippy -p codex-dev-tui --all-targets -- -D warnings
+cargo check -p codex-dev-tui
+cargo test -p codex-dev-tui
+```
+
 Task capsule smoke:
 
 ```bash
@@ -78,6 +87,7 @@ cat > "$tmp/pr-snapshot.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
+cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
 ```
 
 Policy gate execution is explicit. Use `--execute` only when you intend to run
@@ -86,6 +96,9 @@ planned gate snapshot in the capsule without running commands.
 Execution discovers the repository root from the current directory or capsule
 path. Pass `--repo-root <path>` when running an installed binary from outside
 the repository.
+The `codex_dev` policy profile covers core `codex-dev` CLI gates only. Use this
+runbook for the broader human validation matrix, including TUI render smoke,
+bootstrap packs, subagent templates, and research gates.
 
 Keep `codex-research` gates scoped to research changes.
 
@@ -210,6 +223,9 @@ cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+cargo clippy -p codex-dev-tui --all-targets -- -D warnings
+cargo check -p codex-dev-tui
+cargo test -p codex-dev-tui
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
@@ -230,6 +246,7 @@ cat > "$tmp/pr-snapshot.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
+cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp_bootstrap=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp_bootstrap/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z

@@ -11,6 +11,7 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `skills/<skill-name>/agents/`: optional agent-runtime metadata (for example OpenAI YAML).
 - `skills/dist/`: prebuilt `.skill` bundles (ZIP archives) for selected skills.
 - `crates/codex-dev/`: Rust CLI for local task capsules, policy gates, and development evidence.
+- `crates/codex-dev-tui/`: optional Ratatui workbench for local `codex-dev` task capsules.
 - `crates/codex-research/`: Rust CLI for evidence-first research helpers.
 - `docs/`: tracked documentation portal, references, cookbooks, prompts, and runbooks.
 
@@ -30,6 +31,8 @@ Example skill path: `skills/docker-architect/SKILL.md`.
   `cargo check -p codex-research`
 - Build/check the development CLI:
   `cargo check -p codex-dev`
+- Build/check the development TUI:
+  `cargo check -p codex-dev-tui`
 - Run the research CLI smoke checks:
   `codex-research --json doctor && codex-research --json eval`
 
@@ -54,6 +57,7 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Bootstrap packs: `python3 tools/bootstrap/render_bootstrap_pack.py --validate`, render changed packs into temp directories only, and run the hardened subagent smoke matrix in `docs/runbooks/validation.md`
 - Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
 - Development CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy manifest`, `cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25`; run the task capsule and PR fixture smoke in `docs/runbooks/validation.md` when capsule, policy, or PR recording behavior changes.
+- Development TUI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-tui --all-targets -- -D warnings`, `cargo check -p codex-dev-tui`, `cargo test -p codex-dev-tui`; run the render-once smoke in `docs/runbooks/validation.md` when TUI rendering or state loading changes.
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
 - Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
 - Docs links: `python3 tools/docs/check_links.py docs README.md AGENTS.md`
@@ -86,7 +90,7 @@ This repo may not have established git history conventions yet. Use clear, scope
 - Validation commands run (at minimum `python3 tools/skill/quick_validate.py skills/<skill-name>`)
 - If you add or rename a skill, update the catalog table in `README.md` (keep rows sorted by skill name)
 - If you add or materially change docs, update `docs/index.md`
-- If you change `codex-research`, update the CLI and crate references under `docs/reference/`
+- If you change `codex-dev`, `codex-dev-tui`, or `codex-research`, update the CLI/TUI and crate references under `docs/reference/`
 - If you built/published bundles, say where (release assets/registry)
 
 ## Security & Configuration Tips
