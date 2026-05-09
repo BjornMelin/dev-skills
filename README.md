@@ -12,10 +12,12 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
+- repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust development CLI, `codex-dev`, under `crates/`;
 - a Rust research CLI, `codex-research`, under `crates/`;
+- hardened Codex subagent source packs under `subagents/`;
 - tracked documentation under `docs/`;
-- skill validation and packaging helpers under `tools/skill/`.
+- skill, bootstrap, docs, and eval helpers under `tools/`.
 
 Start with [docs/index.md](docs/index.md) for the full guide set.
 
@@ -64,9 +66,12 @@ docs/
   prompts/                # copy-paste Codex prompts
   runbooks/               # validation, troubleshooting, maintenance
 tools/
+  bootstrap/              # repo bootstrap pack renderer
   eval/                   # offline skill/subagent eval runner
   docs/                   # documentation checks
   skill/                  # skill validation and packaging helpers
+subagents/
+  hardened-codex/         # tracked global roles, public overlays, and sync helpers
 ```
 
 ## Research, Subagent, and Operating Stack
@@ -84,6 +89,8 @@ operating layer:
   composition and optional TUI consumers.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
   templates, role contracts, and planner presets.
+- `render_bootstrap_pack.py`: manifest-backed bootstrap packs for seeding new
+  repos with agent guidance and validation docs.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
@@ -103,6 +110,14 @@ cargo build -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+```
+
+Preview a repo bootstrap pack:
+
+```bash
+tmp=$(mktemp -d)
+python3 tools/bootstrap/render_bootstrap_pack.py --list
+python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --dry-run
 ```
 
 Install the deep research agents:
@@ -234,6 +249,13 @@ cat > "$tmp/pr-snapshot.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
+python3 tools/bootstrap/render_bootstrap_pack.py --validate
+tmp_bootstrap=$(mktemp -d)
+python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp_bootstrap/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
+python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp_bootstrap/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research

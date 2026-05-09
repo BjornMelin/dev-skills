@@ -4,9 +4,9 @@ This directory documents the research, subagent, operating-layer, and
 skill-authoring systems added to this repository:
 
 - `codex-research`: Rust CLI for evidence-first research helpers.
-- `codex-dev`: current CLI for local task capsule lifecycle and repo-native
-  policy gates; future lanes add PR evidence, bootstrap composition, and
-  optional TUI consumers.
+- `codex-dev`: current CLI for local task capsule lifecycle, repo-native
+  policy gates, and PR evidence capture; future lanes add bootstrap
+  composition and optional TUI consumers.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
@@ -37,8 +37,8 @@ out of version control.
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
   data model, provider behavior, and extension points.
-- [Validation](runbooks/validation.md): local gates including the manifest-backed
-  research eval suite.
+- [Validation](runbooks/validation.md): local gates including research evals,
+  bootstrap pack rendering, and hardened subagent smoke checks.
 - [codex-research v0.2 Spec](specs/codex-research-v0.2.md): implemented
   follow-up plan covering config, budgets, GitHub hydration, source cache,
   privacy, evals, and research-agent contracts.
@@ -59,6 +59,7 @@ out of version control.
 - [Context7 and Source Validation](cookbooks/context7-source-validation.md)
 - [Subagent Fanout](cookbooks/subagent-fanout.md)
 - [Evidence Ledgers and Reports](cookbooks/evidence-ledgers.md)
+- [Repo Bootstrap Packs](cookbooks/repo-bootstrap-packs.md)
 
 ## Prompt Library
 

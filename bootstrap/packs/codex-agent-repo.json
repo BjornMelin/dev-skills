@@ -1,0 +1,39 @@
+{
+  "schema": "dev-skills.bootstrap-pack.v1",
+  "name": "codex-agent-repo",
+  "description": "Generic Codex-ready repository bootstrap with local guidance, validation, and subagent installation notes.",
+  "composes": {
+    "skills": [
+      "deep-researcher",
+      "subagent-creator",
+      "subspawn",
+      "agents-md-maintainer",
+      "repo-docs-align"
+    ],
+    "subagent_sources": [
+      "subagents/hardened-codex/agents/global",
+      "subagents/hardened-codex/agents/overlays/tooling"
+    ]
+  },
+  "files": [
+    {
+      "target": "AGENTS.md",
+      "template": "generic/AGENTS.md.tmpl"
+    },
+    {
+      "target": "docs/agent-bootstrap.md",
+      "template": "generic/agent-bootstrap.md.tmpl"
+    },
+    {
+      "target": ".codex/agents/README.md",
+      "template": "generic/codex-agents-readme.md.tmpl"
+    },
+    {
+      "target": ".gitignore",
+      "template": "generic/gitignore.tmpl"
+    }
+  ],
+  "advisory_host_checks": [
+    "git diff --check"
+  ]
+}
