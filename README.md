@@ -23,6 +23,7 @@ Key docs:
 - [Onboarding](docs/guides/onboarding.md)
 - [System overview](docs/architecture/overview.md)
 - [Research architecture](docs/architecture/research-system.md)
+- [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -61,7 +62,7 @@ docs/
   runbooks/               # validation, troubleshooting, maintenance
 ```
 
-## Research and Subagent Stack
+## Research, Subagent, and Operating Stack
 
 The main new system is a research/subagent stack:
 
@@ -70,6 +71,8 @@ The main new system is a research/subagent stack:
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
+- `codex-dev`: planned operating-layer CLI family for task capsules, policy
+  gates, PR evidence, bootstrap composition, and optional TUI consumers.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
