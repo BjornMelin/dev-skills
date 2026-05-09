@@ -40,16 +40,30 @@ routing, privacy, budgets, cited claims, and report shape.
 
 ## codex-dev Operating Layer
 
-Run after changing the `codex-dev` architecture/spec docs:
+Run after changing `crates/codex-dev/`, root Cargo files, or the `codex-dev`
+architecture/spec docs:
 
 ```bash
+cargo fmt --all --check
+cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo check -p codex-dev
+cargo test -p codex-dev
+cargo run -q -p codex-dev -- --help
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
-After `crates/codex-dev` exists, use the package-specific Rust gates documented
-in [codex-dev Operating Layer](../specs/codex-dev-operating-layer.md). Keep
-`codex-research` gates scoped to research changes.
+Task capsule smoke:
+
+```bash
+tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
+cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
+```
+
+Keep `codex-research` gates scoped to research changes.
 
 ## Skills
 
@@ -141,6 +155,15 @@ Manual checks:
 
 ```bash
 cargo fmt --all --check
+cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo check -p codex-dev
+cargo test -p codex-dev
+cargo run -q -p codex-dev -- --help
+tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
+cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
