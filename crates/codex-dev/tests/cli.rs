@@ -161,7 +161,14 @@ fn policy_manifest_and_dry_run_update_capsule() {
         manifest_json["result"]["schema"],
         "codex-dev.policy-gates.v1"
     );
-    assert_eq!(manifest_json["result"]["gates"][0]["network"], false);
+    let manifest_gates = manifest_json["result"]["gates"]
+        .as_array()
+        .expect("manifest gates");
+    let docs_gate = manifest_gates
+        .iter()
+        .find(|gate| gate["id"] == "docs-links")
+        .expect("docs-links gate");
+    assert_eq!(docs_gate["network"], false);
 
     let init_output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -205,5 +212,8 @@ fn policy_manifest_and_dry_run_update_capsule() {
     let run_json: Value = serde_json::from_slice(&run_output).expect("policy run json");
     assert_eq!(run_json["command"], "policy run");
     assert_eq!(run_json["result"]["dry_run"], true);
-    assert_eq!(run_json["result"]["gates"][0]["status"], "planned");
+    let run_gates = run_json["result"]["gates"]
+        .as_array()
+        .expect("policy run gates");
+    assert!(run_gates.iter().all(|gate| gate["status"] == "planned"));
 }

@@ -1274,7 +1274,28 @@ fn render_numbers(numbers: &[u64]) -> String {
 }
 
 fn render_command(command: &[String]) -> String {
-    command.join(" ")
+    command
+        .iter()
+        .map(|arg| shell_quote(arg))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn shell_quote(arg: &str) -> String {
+    if arg.is_empty() {
+        return "''".to_string();
+    }
+    if arg.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric()
+            || matches!(
+                byte,
+                b'_' | b'@' | b'%' | b'+' | b'=' | b':' | b',' | b'.' | b'/' | b'-'
+            )
+    }) {
+        return arg.to_string();
+    }
+
+    format!("'{}'", arg.replace('\'', "'\\''"))
 }
 
 fn output_excerpt(bytes: &[u8]) -> Option<String> {
@@ -1627,5 +1648,19 @@ mod tests {
         assert_eq!(result.status, GateStatus::Failed);
         assert_eq!(result.exit_code, Some(9));
         assert_eq!(result.stderr.as_deref(), Some("boom"));
+    }
+
+    #[test]
+    fn command_rendering_preserves_argument_boundaries() {
+        let command = vec![
+            "python3".to_string(),
+            "-c".to_string(),
+            "print('hello world')".to_string(),
+        ];
+
+        assert_eq!(
+            render_command(&command),
+            "python3 -c 'print('\\''hello world'\\'')'"
+        );
     }
 }
