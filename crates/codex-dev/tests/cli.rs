@@ -51,11 +51,15 @@ fn capsule_lifecycle_supports_json_and_markdown() {
     let path = init_json["result"]["path"].as_str().expect("capsule path");
 
     let mut validate = Command::cargo_bin("codex-dev").expect("binary");
-    validate
+    let validate_output = validate
         .args(["--json", "capsule", "validate", path])
         .assert()
         .success()
-        .stdout(predicates::str::contains("\"valid\": true"));
+        .get_output()
+        .stdout
+        .clone();
+    let validate_json: Value = serde_json::from_slice(&validate_output).expect("validate json");
+    assert_eq!(validate_json["result"]["valid"], true);
 
     let mut render = Command::cargo_bin("codex-dev").expect("binary");
     render
@@ -71,7 +75,7 @@ fn capsule_validate_fails_for_invalid_capsules() {
     let missing = temp.path().join("missing");
 
     let mut validate = Command::cargo_bin("codex-dev").expect("binary");
-    validate
+    let invalid_output = validate
         .args([
             "--json",
             "capsule",
@@ -80,8 +84,12 @@ fn capsule_validate_fails_for_invalid_capsules() {
         ])
         .assert()
         .failure()
-        .stdout(predicates::str::contains("\"ok\": false"))
-        .stdout(predicates::str::contains("\"valid\": false"));
+        .get_output()
+        .stdout
+        .clone();
+    let invalid_json: Value = serde_json::from_slice(&invalid_output).expect("invalid json");
+    assert_eq!(invalid_json["ok"], false);
+    assert_eq!(invalid_json["result"]["valid"], false);
 }
 
 #[test]
@@ -109,12 +117,21 @@ fn capsule_init_errors_keep_json_envelope() {
         .assert()
         .success();
 
-    Command::cargo_bin("codex-dev")
+    let duplicate_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args(args)
         .assert()
         .failure()
-        .stdout(predicates::str::contains("\"ok\": false"))
-        .stdout(predicates::str::contains("\"error\""))
-        .stdout(predicates::str::contains("already exists"));
+        .get_output()
+        .stdout
+        .clone();
+    let duplicate_json: Value =
+        serde_json::from_slice(&duplicate_output).expect("duplicate init json");
+    assert_eq!(duplicate_json["ok"], false);
+    assert!(
+        duplicate_json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("already exists")
+    );
 }

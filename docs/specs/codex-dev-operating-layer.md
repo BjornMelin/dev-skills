@@ -6,10 +6,11 @@ Tracking: #20, #21, and #22.
 
 ## Purpose
 
-`codex-dev` is the development control-plane family for this repo. The current
-#22 CLI records agent work as local task capsules. Later lanes add repo-native
-policy gates, evaluation and PR evidence appenders, bootstrap composition, and
-stable JSON contracts for optional consumers such as a terminal workbench.
+`codex-dev` is the development control-plane family for this repo. The CLI
+delivered by issue #22 records agent work as local task capsules. Later lanes
+add repo-native policy gates, evaluation evidence appenders, PR evidence
+appenders, bootstrap composition, and stable JSON contracts for optional
+consumers such as a terminal workbench.
 
 `codex-dev` is deliberately separate from `codex-research`. The research CLI
 continues to own provider routing, source hydration, research ledgers, cache,

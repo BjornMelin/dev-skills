@@ -3,7 +3,7 @@
 `codex-dev` is the development operating-layer CLI for local task capsules.
 It is separate from `codex-research`: research evidence stays research-owned,
 while `codex-dev` records the local task capsule for a development branch.
-Future lanes add policy, PR, bootstrap, and TUI surfaces.
+Future lanes add policy, PR, bootstrap packs, and TUI surfaces.
 
 Tracking: #20 and #22.
 
