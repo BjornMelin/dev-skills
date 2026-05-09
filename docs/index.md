@@ -5,8 +5,9 @@ skill-authoring systems added to this repository:
 
 - `codex-research`: Rust CLI for evidence-first research helpers.
 - `codex-dev`: current CLI for local task capsule lifecycle, repo-native
-  policy gates, and PR evidence capture; future lanes add bootstrap
-  composition and optional TUI consumers.
+  policy gates, and PR evidence capture.
+- `codex-dev-tui`: optional Ratatui workbench that consumes `codex-dev`
+  capsule JSON contracts without owning policy logic.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
@@ -33,6 +34,8 @@ out of version control.
   development control plane.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle and policy-gate commands.
+- [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
+  workbench for local capsule scanning.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,

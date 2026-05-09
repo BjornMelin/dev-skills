@@ -2,7 +2,7 @@
 
 Status: active implementation.
 
-Tracking: #20, #21, #22, #23, #24, and #25.
+Tracking: #20, #21, #22, #23, #24, #25, #26, #27, and #28.
 
 ## Purpose
 
@@ -10,9 +10,9 @@ Tracking: #20, #21, #22, #23, #24, and #25.
 delivered by issue #22 records agent work as local task capsules. Issue #23
 adds a repo-native policy gate that can plan or execute local validation while
 recording the result in the capsule. Issue #24 adds offline skill and subagent
-eval coverage, and issue #25 adds PR evidence planning plus local normalized
-snapshot recording. Later lanes add bootstrap composition and stable JSON
-contracts for optional consumers such as a terminal workbench.
+eval coverage, issue #25 adds PR evidence planning plus local normalized
+snapshot recording, issue #26 adds bootstrap packs, issue #27 adds memory
+proposal guidance, and issue #28 adds an optional terminal workbench.
 
 `codex-dev` is deliberately separate from `codex-research`. The research CLI
 continues to own provider routing, source hydration, research ledgers, cache,
@@ -52,7 +52,7 @@ those tools instead of becoming another research provider.
 | Hosted PR review remediation | `gh-pr-review-fix`, `review-remediation` | Captures review-pack/CI snapshots and links fixes. |
 | Hardened personal subagent pack | `subagents/hardened-codex` | Treats as a bootstrap input and smoke target. |
 | Memory and Codex runtime guidance | `codex-sdk` docs/skill | Links proposal docs; does not mutate runtime memory. |
-| Optional terminal UI | future `codex-dev-tui` | Reads `codex-dev --json`; never owns policy. |
+| Optional terminal UI | `codex-dev-tui` | Reads `codex-dev` JSON contracts; never owns policy. |
 
 ## Task Capsule Contract
 
@@ -194,11 +194,13 @@ planning. Each gate includes:
 - `network`
 - `secrets`
 
-The default `codex_dev` profile references the canonical `codex-dev` validation
-section in `docs/runbooks/validation.md`, marks every gate as local, and sets
-`network: false` and `secrets: false`. Dry-run policy checks record `planned`
-gate status in `verification.json`; executed gates record `passed`, `failed`,
-or `skipped`.
+The default `codex_dev` profile owns the executable core `codex-dev` gate
+manifest: formatting, `codex-dev` clippy/check/test, CLI help smoke, docs
+links, and whitespace checks. The broader validation runbook remains the
+canonical human matrix for TUI checks, render smoke, bootstrap packs, subagent
+templates, and research gates. Dry-run policy checks record `planned` gate
+status in `verification.json`; executed gates record `passed`, `failed`, or
+`skipped`.
 
 Executed gates must run from a discovered or explicit repository root so
 repo-relative commands produce stable results whether invoked from the root, a
@@ -310,6 +312,21 @@ The release is split into issue-backed lanes:
 | #26 | `feat/repo-bootstrap-packs` | #21, #23, #24 | #27 | bootstrap templates/scripts | Add repo bootstrap packs and install smoke matrix. |
 | #27 | `docs/memory-guidance-proposals` | #21, #26 | final release closeout | `docs/cookbooks/` surface | Add memory proposal guidance. |
 | #28 | `feat/codex-dev-tui-workbench` | #21, #22 | optional release polish | `codex-dev` JSON contracts | Add optional Ratatui workbench after JSON contracts stabilize. |
+
+## Optional TUI Consumer
+
+`codex-dev-tui` is a separate crate that renders a local operator view from the
+existing `codex-dev` JSON contracts:
+
+- capsule summary from `capsule.json`;
+- validation snapshot from `verification.json`;
+- hosted PR snapshot from `pr.json`;
+- validation errors from `codex_dev::validate_capsule`.
+
+The TUI owns only UI state, event handling, rendering, and terminal cleanup. It
+does not execute policy gates, mutate PR state, call hosted review tools, or
+scrape Markdown notes. Deterministic `--render-once` output uses Ratatui's
+`TestBackend` for review and CI smoke evidence.
 
 Each implementation PR must link its lane issue and #20, include validation
 evidence, document docs impact, and identify residual risks.

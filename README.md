@@ -14,6 +14,7 @@ This repo now contains skill packages and supporting tooling:
 - reusable skills under `skills/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust development CLI, `codex-dev`, under `crates/`;
+- an optional Rust terminal workbench, `codex-dev-tui`, under `crates/`;
 - a Rust research CLI, `codex-research`, under `crates/`;
 - hardened Codex subagent source packs under `subagents/`;
 - tracked documentation under `docs/`;
@@ -28,6 +29,7 @@ Key docs:
 - [Research architecture](docs/architecture/research-system.md)
 - [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
+- [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -57,6 +59,7 @@ skills/
   dist/                   # local .skill bundles (ZIP; gitignored)
 crates/
   codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
+  codex-dev-tui/          # Optional Ratatui workbench for codex-dev capsules
   codex-research/         # Rust CLI for evidence-first research helpers
 docs/
   index.md                # documentation portal
@@ -86,8 +89,9 @@ operating layer:
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
 - `codex-dev`: current CLI for local task capsule lifecycle, repo-native
-  policy gates, and PR evidence capture; future release lanes add bootstrap
-  composition and optional TUI consumers.
+  policy gates, and PR evidence capture.
+- `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
+  JSON contracts without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
   templates, role contracts, and planner presets.
 - `render_bootstrap_pack.py`: manifest-backed bootstrap packs for seeding new
@@ -108,6 +112,7 @@ Build and smoke the development CLI:
 
 ```bash
 cargo build -p codex-dev
+cargo build -p codex-dev-tui
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
@@ -219,59 +224,13 @@ Build the Rust CLIs:
 
 ```bash
 cargo build -p codex-dev
+cargo build -p codex-dev-tui
 cargo build -p codex-research
 ```
 
-Full local validation for the research/subagent stack:
-
-```bash
-cargo fmt --all --check
-cargo clippy -p codex-dev --all-targets -- -D warnings
-cargo check -p codex-dev
-cargo test -p codex-dev
-cargo run -q -p codex-dev -- --help
-cargo run -q -p codex-dev -- --json policy manifest
-cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
-tmp=$(mktemp -d)
-cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
-cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
-cat > "$tmp/pr-snapshot.json" <<'JSON'
-{
-  "repository": "BjornMelin/dev-skills",
-  "number": 25,
-  "url": "https://github.com/BjornMelin/dev-skills/pull/25",
-  "state": "OPEN",
-  "checks": [
-    {"name": "fixture", "status": "COMPLETED", "conclusion": "SUCCESS"}
-  ],
-  "review_threads": {"unresolved": 0}
-}
-JSON
-cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
-cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
-python3 tools/bootstrap/render_bootstrap_pack.py --validate
-tmp_bootstrap=$(mktemp -d)
-python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp_bootstrap/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
-python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp_bootstrap/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
-git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
-cargo clippy -p codex-research --all-targets -- -D warnings
-cargo check -p codex-research
-cargo test -p codex-research
-codex-research --json doctor
-codex-research --json eval
-codex-research eval --list
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts
-python3 tools/docs/check_links.py docs README.md AGENTS.md
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
-python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
-python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
-python3 tools/eval/skill_subagent_eval.py --json
-for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
-git diff --check
-```
+Use [docs/runbooks/validation.md](docs/runbooks/validation.md) for the
+canonical validation matrix. README intentionally stays a portal so command
+lists do not drift from the runbook.
 
 Rust skill suite validation:
 
