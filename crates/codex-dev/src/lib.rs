@@ -12,9 +12,9 @@ use codex_dev_core::{
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
     PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
     PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, Verification, append_evidence,
-    append_jsonl, capsule_status, init_capsule, pr_status, read_json, record_pr_snapshot,
-    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
-    write_json,
+    append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule, pr_status,
+    read_json, record_pr_snapshot, render_capsule, render_command, render_pr_label,
+    render_pr_status, validate_capsule, write_json,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -647,6 +647,7 @@ pub fn pr_control_plan(
 }
 
 pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Result<PolicyRunResult> {
+    ensure_regular_contract_files(&args.capsule)?;
     let validation = validate_capsule(&args.capsule)?;
     if !validation.valid {
         bail!(
@@ -998,6 +999,7 @@ fn record_policy_run(
     results: &[PolicyGateResult],
     checked_at: DateTime<Utc>,
 ) -> Result<()> {
+    ensure_regular_contract_files(capsule_path)?;
     let mut verification: Verification = read_json(&capsule_path.join("verification.json"))?;
     verification.required = results
         .iter()
@@ -1215,6 +1217,43 @@ mod tests {
         assert_eq!(
             capsule_state.updated_at,
             "2026-05-09T10:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn policy_run_rejects_symlinked_contract_file_before_writing() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let evidence_path = capsule.join("evidence.jsonl");
+        let outside_path = temp.path().join("outside-evidence.jsonl");
+        fs::write(&outside_path, "external evidence\n").expect("outside evidence");
+        fs::remove_file(&evidence_path).expect("remove evidence");
+        std::os::unix::fs::symlink(&outside_path, &evidence_path).expect("symlink evidence");
+
+        let error = run_policy_gates(
+            PolicyRunArgs {
+                capsule: capsule.clone(),
+                repo_root: None,
+                profile: PolicyProfile::CodexDev,
+                execute: false,
+                allow_network: false,
+                keep_going: false,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect_err("policy run rejects symlinked contract file");
+
+        assert!(
+            format!("{error:#}").contains("symlinked capsule contract file"),
+            "{error:#}"
+        );
+        assert_eq!(
+            fs::read_to_string(outside_path).expect("outside unchanged"),
+            "external evidence\n"
         );
     }
 

@@ -465,7 +465,7 @@ fn ensure_regular_contract_file(capsule_path: &Path, file: &str) -> Result<()> {
     Ok(())
 }
 
-fn ensure_regular_contract_files(capsule_path: &Path) -> Result<()> {
+pub fn ensure_regular_contract_files(capsule_path: &Path) -> Result<()> {
     for file in REQUIRED_FILES
         .iter()
         .copied()
@@ -793,13 +793,10 @@ pub fn render_capsule(path: &Path) -> Result<RenderResult> {
 }
 
 pub fn evidence_summary(capsule_path: &Path) -> Result<EvidenceSummary> {
-    let records = read_evidence_records(&capsule_path.join("evidence.jsonl"))?;
-    Ok(summarize_evidence(&records))
-}
-
-fn summarize_evidence(records: &[EvidenceRecord]) -> EvidenceSummary {
     let mut by_kind: BTreeMap<EvidenceKind, EvidenceKindSummary> = BTreeMap::new();
-    for record in records {
+    let mut total = 0;
+    for_each_evidence_record(&capsule_path.join("evidence.jsonl"), |_, record| {
+        total += 1;
         by_kind
             .entry(record.kind)
             .and_modify(|summary| {
@@ -815,12 +812,13 @@ fn summarize_evidence(records: &[EvidenceRecord]) -> EvidenceSummary {
                 latest_at: record.at,
                 latest_summary: record.summary.clone(),
             });
-    }
+        Ok(())
+    })?;
 
-    EvidenceSummary {
-        total: records.len() as u64,
+    Ok(EvidenceSummary {
+        total,
         by_kind: by_kind.into_values().collect(),
-    }
+    })
 }
 
 impl PrSnapshotInput {
@@ -899,20 +897,22 @@ fn validate_schema_file<T, F>(
 }
 
 fn validate_evidence(path: &Path) -> Result<Vec<String>> {
-    let records = read_evidence_records(path)?;
     let mut errors = Vec::new();
-    for (index, record) in records.iter().enumerate() {
-        for error in validate_evidence_record(record) {
-            errors.push(format!("evidence.jsonl line {} {error}", index + 1));
+    for_each_evidence_record(path, |line_number, record| {
+        for error in validate_evidence_record(&record) {
+            errors.push(format!("evidence.jsonl line {line_number} {error}"));
         }
-    }
+        Ok(())
+    })?;
     Ok(errors)
 }
 
-fn read_evidence_records(path: &Path) -> Result<Vec<EvidenceRecord>> {
+fn for_each_evidence_record(
+    path: &Path,
+    mut visit: impl FnMut(usize, EvidenceRecord) -> Result<()>,
+) -> Result<()> {
     let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let reader = BufReader::new(file);
-    let mut records = Vec::new();
     for (index, line) in reader.lines().enumerate() {
         let line = line?;
         if line.trim().is_empty() {
@@ -920,9 +920,9 @@ fn read_evidence_records(path: &Path) -> Result<Vec<EvidenceRecord>> {
         }
         let record: EvidenceRecord = serde_json::from_str(&line)
             .with_context(|| format!("line {} is not valid evidence JSON", index + 1))?;
-        records.push(record);
+        visit(index + 1, record)?;
     }
-    Ok(records)
+    Ok(())
 }
 
 fn validate_evidence_record(record: &EvidenceRecord) -> Vec<String> {

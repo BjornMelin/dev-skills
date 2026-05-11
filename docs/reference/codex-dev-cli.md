@@ -190,7 +190,7 @@ Fields:
 - `--actor <name>` and `--tool <name>` record who or what produced the
   evidence.
 - `--confidence <0..100>` records a bounded confidence score when useful.
-- `--residual-risk <text>` records known caveats or follow-up risk.
+- `--residual-risk <text>` records known risks or follow-up risk.
 - `--artifact <path-or-id>` may be repeated for local artifacts.
 
 The command validates the record before writing. Invalid records fail nonzero

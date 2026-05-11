@@ -195,7 +195,7 @@ Optional evidence metadata:
   fetch, ingest, or persist raw provider output.
 - `actor` and `tool` record who or what produced the evidence.
 - `confidence` is an integer from `0` to `100`.
-- `residual_risk` records known caveats.
+- `residual_risk` records known risks.
 - `artifacts` records local paths or stable artifact identifiers.
 
 Record validity rules:
