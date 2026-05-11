@@ -22,6 +22,7 @@ pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
 pub const PR_SOURCE_PARSER_VERSION: &str = "codex-dev.pr-source-parser.v1";
 pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const PR_AGENT_STATE_SCHEMA: &str = "codex-dev.pr-agent-state.v1";
+pub const PR_AGENT_HOSTED_ACTION_SCHEMA: &str = "codex-dev.pr-agent-hosted-action.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 
@@ -477,6 +478,67 @@ pub struct PrAgentStateReport {
     pub sources: Vec<PrAgentSourceRecord>,
     pub diagnostics: Vec<PrAgentDiagnostic>,
     pub actions: Vec<PrAgentAction>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentHostedActionReport {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub plan_id: String,
+    pub plan_hash: String,
+    pub generated_at: DateTime<Utc>,
+    pub dry_run: bool,
+    pub apply_requested: bool,
+    pub action_dir: String,
+    pub before_state_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_state_path: Option<String>,
+    pub action: PrAgentHostedActionSpec,
+    pub diagnostics: Vec<PrAgentDiagnostic>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<PrAgentHostedActionExecution>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentHostedActionSpec {
+    pub id: String,
+    pub kind: String,
+    pub summary: String,
+    pub reason: String,
+    pub target: String,
+    pub idempotency_key: String,
+    pub command: Vec<String>,
+    #[serde(default)]
+    pub duplicate_check_command: Vec<String>,
+    #[serde(default)]
+    pub state_check_command: Vec<String>,
+    pub requires_apply: bool,
+    pub network: bool,
+    pub secrets: bool,
+    pub permission_notes: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentHostedActionExecution {
+    pub status: PrAgentHostedActionStatus,
+    pub applied_at: DateTime<Utc>,
+    pub command: Vec<String>,
+    pub exit_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duplicate_of: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentHostedActionStatus {
+    Applied,
+    SkippedDuplicate,
+    Failed,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -2694,8 +2756,17 @@ fn subspawn_plan_to_batch(
     })
 }
 
+pub fn stable_json_hash<T: Serialize>(value: &T) -> Result<String> {
+    let bytes = serde_json::to_vec(value)?;
+    Ok(stable_sha256_hash(&bytes))
+}
+
 fn stable_prompt_hash(prompt: &str) -> String {
-    let digest = Sha256::digest(prompt.as_bytes());
+    stable_sha256_hash(prompt.as_bytes())
+}
+
+fn stable_sha256_hash(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
     format!("sha256:{digest:x}")
 }
 

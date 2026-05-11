@@ -33,6 +33,144 @@ fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
+fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String {
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            title,
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            id,
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("init json");
+    json["result"]["path"]
+        .as_str()
+        .expect("capsule path")
+        .to_string()
+}
+
+fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
+    std::fs::create_dir_all(source_dir).expect("source dir");
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        format!(
+            r#"{{
+  "number": {number},
+  "url": "https://github.com/BjornMelin/dev-skills/pull/{number}",
+  "state": "OPEN",
+  "isDraft": false,
+  "mergeable": "MERGEABLE",
+  "reviewDecision": "APPROVED",
+  "headRefOid": "abc123",
+  "statusCheckRollup": [],
+  "labels": [{{"name": "ready"}}]
+}}"#
+        ),
+    )
+    .expect("write pr view");
+    std::fs::write(
+        source_dir.join("gh-pr-checks.json"),
+        r#"[
+  {"bucket": "pass", "completedAt": "2026-05-09T05:01:00Z", "link": "https://example.test/ci", "name": "ci", "state": "SUCCESS"}
+]"#,
+    )
+    .expect("write checks");
+    std::fs::write(
+        source_dir.join("gh-reviews.json"),
+        r#"[
+  {"id": 1, "user": {"login": "coderabbitai"}, "state": "APPROVED", "submitted_at": "2026-05-09T05:00:00Z"}
+]"#,
+    )
+    .expect("write reviews");
+    std::fs::write(source_dir.join("gh-review-comments.json"), "[]").expect("write comments");
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {"id": "resolved", "isResolved": true, "isOutdated": false}
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write threads");
+    std::fs::write(
+        source_dir.join("gh-rate-limit.json"),
+        r#"{"resources":{"core":{"limit":5000,"remaining":4999,"reset":1770000000}}}"#,
+    )
+    .expect("write rate limit");
+}
+
+#[cfg(unix)]
+fn write_fake_gh(bin_dir: &std::path::Path) -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let script = bin_dir.join("gh");
+    std::fs::write(
+        &script,
+        r#"#!/bin/sh
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$*" in
+  pr\ view*) cat "$GH_FIXTURES/gh-pr-view.json" ;;
+  pr\ checks*) cat "$GH_FIXTURES/gh-pr-checks.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/reviews*) cat "$GH_FIXTURES/gh-reviews.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/comments*) cat "$GH_FIXTURES/gh-review-comments.json" ;;
+  api\ graphql*)
+    if [ -n "$FAIL_THREADS" ]; then
+      echo "thread capture failed" >&2
+      exit 2
+    fi
+    cat "$GH_FIXTURES/gh-review-threads.json"
+    ;;
+  api\ rate_limit*) cat "$GH_FIXTURES/gh-rate-limit.json" ;;
+  api\ --paginate\ --slurp\ repos/*/issues/*/comments*)
+    if [ -n "$DUPLICATE_MARKER" ]; then
+      printf '[{"id":99,"html_url":"https://example.test/duplicate","body":"<!-- %s -->"}]\n' "$DUPLICATE_MARKER"
+    else
+      echo '[]'
+    fi
+    ;;
+  api\ --method\ POST\ repos/*/issues/*/comments*) echo '{"id":123,"html_url":"https://example.test/comment"}' ;;
+  api\ repos/*/actions/runs/*)
+    conclusion="${RUN_CONCLUSION:-success}"
+    status="${RUN_STATUS:-completed}"
+    printf '{"id":456,"head_sha":"abc123","status":"%s","conclusion":"%s"}\n' "$status" "$conclusion"
+    ;;
+  issue\ edit*) echo '{"ok":true}' ;;
+  *) echo "unexpected gh args: $*" >&2; exit 2 ;;
+esac
+"#,
+    )
+    .expect("fake gh");
+    let mut permissions = std::fs::metadata(&script)
+        .expect("fake gh metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&script, permissions).expect("fake gh executable");
+    script
+}
+
 #[test]
 fn help_mentions_capsule_commands() {
     let mut command = Command::cargo_bin("codex-dev").expect("binary");
@@ -636,6 +774,521 @@ fn pr_agent_replays_sources_records_state_and_recommendations() {
             .iter()
             .any(|action| action["id"] == "refresh_review_threads")
     );
+}
+
+#[test]
+fn pr_agent_action_dry_run_plans_hosted_write_without_apply() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    let capsule = init_capsule_fixture(&root, "pr-agent-action", "PR hosted action");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "reply-cr-001",
+            "--action",
+            "reply-review-comment",
+            "--review-comment-id",
+            "12345",
+            "--body",
+            "Verified against current code; this is stale.",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("action json");
+    assert_eq!(json["command"], "pr agent-action");
+    assert_eq!(
+        json["result"]["schema"],
+        "codex-dev.pr-agent-hosted-action.v1"
+    );
+    assert_eq!(json["result"]["dry_run"], true);
+    assert_eq!(json["result"]["apply_requested"], false);
+    assert_eq!(json["result"]["action"]["kind"], "reply-review-comment");
+    assert!(
+        json["result"]["action"]["command"]
+            .as_array()
+            .expect("command")
+            .iter()
+            .any(|arg| {
+                arg.as_str()
+                    .is_some_and(|arg| arg.contains("codex-dev-pr-agent:sha256:"))
+            })
+    );
+
+    let action_dir =
+        std::path::Path::new(json["result"]["action_dir"].as_str().expect("action dir"));
+    assert!(action_dir.join("plan.json").is_file());
+    assert!(action_dir.join("before-state.json").is_file());
+    assert!(!action_dir.join("after-state.json").exists());
+    let evidence = std::fs::read_to_string(std::path::Path::new(&capsule).join("evidence.jsonl"))
+        .expect("evidence");
+    assert!(evidence.contains("PR agent hosted action reply-cr-001"));
+}
+
+#[test]
+fn pr_agent_action_rejects_apply_with_replay_sources() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-apply-replay", "PR hosted action");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "unsafe-replay",
+            "--action",
+            "post-issue-comment",
+            "--body",
+            "This must not post from replayed state.",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("error json");
+    assert_eq!(json["command"], "pr agent-action");
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("--apply must capture live state")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_uses_live_gh_and_records_before_after_state() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-apply", "PR hosted action apply");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "issue-comment-001",
+            "--action",
+            "post-issue-comment",
+            "--body",
+            "Posting verified evidence.",
+            "--checked-at",
+            "2026-05-09T05:06:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("action json");
+    assert_eq!(json["result"]["dry_run"], false);
+    assert_eq!(json["result"]["execution"]["status"], "applied");
+    let action_dir =
+        std::path::Path::new(json["result"]["action_dir"].as_str().expect("action dir"));
+    assert!(action_dir.join("plan.json").is_file());
+    assert!(action_dir.join("before-state.json").is_file());
+    assert!(action_dir.join("after-state.json").is_file());
+
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("pr view 48 --repo BjornMelin/dev-skills"));
+    assert!(gh_log.contains(
+        "api --paginate --slurp repos/BjornMelin/dev-skills/issues/48/comments?per_page=100"
+    ));
+    assert!(gh_log.contains("api --method POST repos/BjornMelin/dev-skills/issues/48/comments"));
+    let evidence = std::fs::read_to_string(std::path::Path::new(&capsule).join("evidence.jsonl"))
+        .expect("evidence");
+    assert!(evidence.contains("PR agent hosted action issue-comment-001"));
+    assert!(evidence.contains("Applied"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_skips_duplicate_comment_marker() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let source_dir = temp.path().join("sources");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-agent-action-duplicate",
+        "PR hosted action duplicate",
+    );
+
+    let dry_run = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "issue-comment-dup",
+            "--action",
+            "post-issue-comment",
+            "--body",
+            "Posting verified evidence.",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_run_json: Value = serde_json::from_slice(&dry_run).expect("dry run json");
+    let marker = dry_run_json["result"]["action"]["idempotency_key"]
+        .as_str()
+        .expect("idempotency key");
+
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+    let apply = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("DUPLICATE_MARKER", marker)
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "issue-comment-dup",
+            "--action",
+            "post-issue-comment",
+            "--body",
+            "Posting verified evidence.",
+            "--checked-at",
+            "2026-05-09T05:06:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let apply_json: Value = serde_json::from_slice(&apply).expect("apply json");
+    assert_eq!(
+        apply_json["result"]["execution"]["status"],
+        "skipped_duplicate"
+    );
+    assert_eq!(
+        apply_json["result"]["execution"]["duplicate_of"],
+        "https://example.test/duplicate"
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains(
+        "api --paginate --slurp repos/BjornMelin/dev-skills/issues/48/comments?per_page=100"
+    ));
+    assert!(!gh_log.contains("api --method POST repos/BjornMelin/dev-skills/issues/48/comments"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_blocks_failed_before_state_capture() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-blocked", "PR hosted action block");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("FAIL_THREADS", "1")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "issue-comment-blocked",
+            "--action",
+            "post-issue-comment",
+            "--body",
+            "This must not post when state capture fails.",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("blocked json");
+    assert_eq!(json["result"]["execution"]["status"], "failed");
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| {
+                diagnostic["source"] == "pr-agent-preflight"
+                    && diagnostic["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("before-state capture"))
+            })
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(!gh_log.contains("api --method POST repos/BjornMelin/dev-skills/issues/48/comments"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_skips_already_resolved_thread() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-thread", "PR hosted action thread");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "resolve-thread-001",
+            "--action",
+            "resolve-review-thread",
+            "--thread-id",
+            "resolved",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("thread json");
+    assert_eq!(json["result"]["execution"]["status"], "skipped_duplicate");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(!gh_log.contains("resolveReviewThread"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_skips_existing_label() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-label", "PR hosted action label");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "label-ready-001",
+            "--action",
+            "add-labels",
+            "--label",
+            "ready",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("label json");
+    assert_eq!(json["result"]["execution"]["status"], "skipped_duplicate");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(!gh_log.contains("issue edit"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_skips_non_failed_workflow_rerun() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-rerun", "PR hosted action rerun");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("RUN_CONCLUSION", "success")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "rerun-001",
+            "--action",
+            "rerun-failed-jobs",
+            "--run-id",
+            "456",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("rerun json");
+    assert_eq!(json["result"]["execution"]["status"], "skipped_duplicate");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api repos/BjornMelin/dev-skills/actions/runs/456"));
+    assert!(!gh_log.contains("rerun-failed-jobs"));
 }
 
 #[test]

@@ -443,6 +443,30 @@ converted into `pr record` source kinds. This command has no hosted-write mode;
 future hosted-action and TUI lanes should consume the typed report instead of
 rediscovering PR state ad hoc.
 
+`codex-dev.pr-agent-hosted-action.v1` records the first apply-gated hosted PR
+action contract. The command captures fresh PR state before every plan, writes
+`pr-agent-actions/<plan-id>/before-state.json`, writes
+`pr-agent-actions/<plan-id>/plan.json`, and requires explicit repository, PR
+number, plan ID, action kind, and `--apply` before any hosted mutation runs.
+Replay sources are allowed only for dry-run planning; `--source-dir` is rejected
+with `--apply` so write execution is always based on live state capture. Apply
+mode fails closed when required live source capture or normalization emits error
+diagnostics. Comment and review-reply actions include a stable hidden
+idempotency marker derived from the plan hash and run a duplicate check before
+posting. Thread and label actions check current PR state and skip if the target
+is already in the desired state. Failed-job reruns fetch the workflow run,
+require its `head_sha` to match the captured PR head SHA, and skip non-failed or
+still-running runs. Applied or duplicate skipped actions append evidence and
+capture after-state when possible.
+
+The hosted action layer may plan or apply issue comments, review-comment
+replies, review-thread resolve/unresolve mutations, label edits, and rerun
+failed workflow-job requests. Permission diagnostics are advisory: the report
+records token-environment posture and expected GitHub permission classes, while
+GitHub remains authoritative for actual write authorization. Failed hosted
+commands must be recorded with command, exit code, stderr excerpt, and residual
+risk rather than being treated as successful review cleanup.
+
 ### Markdown Notes
 
 `plan.md`, `decisions.md`, `output.md`, and `retrospective.md` are durable

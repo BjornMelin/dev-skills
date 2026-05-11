@@ -77,6 +77,7 @@ Policy subcommands:
 PR subcommands:
 
 - `pr agent`
+- `pr agent-action`
 - `pr plan`
 - `pr record`
 - `pr status`
@@ -415,7 +416,7 @@ or merge the PR. It records:
 
 Live collection uses these read-only sources:
 
-- `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`
+- `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt,labels`
 - `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`
 - `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/reviews?per_page=100`
 - `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/comments?per_page=100`
@@ -438,6 +439,57 @@ cargo run -q -p codex-dev -- --json pr agent \
 The replay directory uses the same filenames written by live mode:
 `gh-pr-view.json`, `gh-pr-checks.json`, `gh-reviews.json`,
 `gh-review-comments.json`, `gh-review-threads.json`, and `gh-rate-limit.json`.
+
+## pr agent-action
+
+Plan or apply one explicit hosted PR action:
+
+```bash
+cargo run -q -p codex-dev -- --json pr agent-action \
+  --capsule .codex/tasks/<id> \
+  --repo BjornMelin/dev-skills \
+  --number 25 \
+  --plan-id reply-coderabbit-stale-thread \
+  --action reply-review-comment \
+  --review-comment-id 123456789 \
+  --body "@coderabbitai Verified against current code; this thread is stale."
+```
+
+The output schema is `codex-dev.pr-agent-hosted-action.v1`. Without `--apply`,
+the command captures fresh PR state, writes
+`pr-agent-actions/<plan-id>/before-state.json`, writes
+`pr-agent-actions/<plan-id>/plan.json`, appends a `decision` evidence row, and
+does not perform a hosted mutation. With `--apply`, the command rejects
+`--source-dir`, captures live state, executes the planned hosted command, writes
+after-state evidence when the command applies or is skipped as a duplicate, and
+appends a `review` evidence row.
+
+Supported actions:
+
+- `post-issue-comment`: requires `--body` or `--body-file`.
+- `reply-review-comment`: requires `--review-comment-id` plus `--body` or
+  `--body-file`. GitHub only supports replies to top-level review comments.
+- `resolve-review-thread`: requires `--thread-id`.
+- `unresolve-review-thread`: requires `--thread-id`.
+- `add-labels`: requires one or more `--label`.
+- `remove-labels`: requires one or more `--label`.
+- `rerun-failed-jobs`: requires `--run-id`.
+
+Every action requires explicit `--repo`, `--number`, and `--plan-id`. Hosted
+writes require `--apply`; dry-run mode may use `--source-dir` with the same
+source filenames as `pr agent`. Apply mode fails closed when required live
+state capture has error diagnostics. Comment and review-reply actions append a
+hidden `codex-dev-pr-agent:<plan-hash>` marker and perform a duplicate check
+before applying so re-running the same plan does not post duplicate comments.
+Thread and label actions verify the requested target is present in current PR
+state and skip if it is already in the desired state. Failed-job reruns fetch
+the workflow run first, require its `head_sha` to match the captured PR head
+SHA, and skip non-failed or still-running runs instead of rerunning them.
+
+Permission diagnostics are advisory and local. The report records whether
+`GITHUB_TOKEN` or `GH_TOKEN` is visible to the process and lists the GitHub
+permission class expected by the selected action. Actual authorization remains
+with GitHub and failed hosted commands are recorded with stderr excerpts.
 
 ## pr record
 
@@ -538,6 +590,7 @@ cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
+cargo run -q -p codex-dev -- --json pr agent-action --help
 cargo run -q -p codex-dev -- --json pr record --help
 ```
 
