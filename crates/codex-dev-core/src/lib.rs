@@ -23,6 +23,7 @@ pub const PR_SOURCE_PARSER_VERSION: &str = "codex-dev.pr-source-parser.v1";
 pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const PR_AGENT_STATE_SCHEMA: &str = "codex-dev.pr-agent-state.v1";
 pub const PR_AGENT_HOSTED_ACTION_SCHEMA: &str = "codex-dev.pr-agent-hosted-action.v1";
+pub const PR_AGENT_READINESS_SCHEMA: &str = "codex-dev.pr-agent-readiness.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 
@@ -210,7 +211,7 @@ pub struct SubagentSynthesisRecord {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrEvidence {
     pub schema: String,
     pub repository: Option<String>,
@@ -218,18 +219,28 @@ pub struct PrEvidence {
     pub url: Option<String>,
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_draft: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mergeable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge_state_status: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub review_decision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_ref_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_ref_oid: Option<String>,
     pub checks: Vec<CheckRecord>,
     pub review_threads: ReviewThreadSummary,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sources: Vec<PrEvidenceSource>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrEvidenceSource {
     pub kind: String,
     pub parser_version: String,
@@ -240,7 +251,7 @@ pub struct PrEvidenceSource {
     pub path: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CheckRecord {
     pub name: String,
     pub status: String,
@@ -249,7 +260,7 @@ pub struct CheckRecord {
     pub checked_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReviewThreadSummary {
     pub unresolved: u64,
     #[serde(default)]
@@ -541,6 +552,86 @@ pub enum PrAgentHostedActionStatus {
     Failed,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentReadinessReport {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub generated_at: DateTime<Utc>,
+    pub apply_requested: bool,
+    pub rerun_failed_requested: bool,
+    pub merge_requested: bool,
+    pub ready: bool,
+    pub final_status: PrAgentReadinessStatus,
+    pub attempts: Vec<PrAgentReadinessAttempt>,
+    pub actions: Vec<PrAgentReadinessAction>,
+    pub markdown_path: String,
+    pub report_path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentReadinessAttempt {
+    pub attempt: u64,
+    pub checked_at: DateTime<Utc>,
+    pub status: PrAgentReadinessStatus,
+    pub pr: PrEvidence,
+    pub blockers: Vec<String>,
+    pub wait_reasons: Vec<String>,
+    pub warnings: Vec<String>,
+    pub failing_checks: Vec<PrAgentReadinessCheck>,
+    pub pending_checks: Vec<PrAgentReadinessCheck>,
+    pub active_review_comments: u64,
+    pub outdated_review_comments: u64,
+    pub diagnostics: Vec<PrAgentDiagnostic>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentReadinessStatus {
+    Ready,
+    Waiting,
+    Blocked,
+    Merged,
+    Stopped,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentReadinessCheck {
+    pub name: String,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conclusion: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<u64>,
+    pub diagnostic_command: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentReadinessAction {
+    pub id: String,
+    pub kind: String,
+    pub status: PrAgentReadinessActionStatus,
+    pub reason: String,
+    pub command: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stdout: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stderr: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentReadinessActionStatus {
+    Planned,
+    Applied,
+    Skipped,
+    Failed,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrAgentSourceRecord {
     pub id: String,
@@ -607,11 +698,21 @@ struct PrSnapshotInput {
     url: Option<String>,
     state: String,
     #[serde(default)]
+    is_draft: Option<bool>,
+    #[serde(default)]
     mergeable: Option<String>,
+    #[serde(default)]
+    merge_state_status: Option<String>,
     #[serde(default)]
     review_decision: Option<String>,
     #[serde(default)]
     head_sha: Option<String>,
+    #[serde(default)]
+    head_ref_name: Option<String>,
+    #[serde(default)]
+    base_ref_name: Option<String>,
+    #[serde(default)]
+    base_ref_oid: Option<String>,
     #[serde(default)]
     checks: Vec<CheckSnapshotInput>,
     review_threads: ReviewThreadSnapshotInput,
@@ -1245,9 +1346,14 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
             number: None,
             url: None,
             state: "not_created".to_string(),
+            is_draft: None,
             mergeable: None,
+            merge_state_status: None,
             review_decision: None,
             head_sha: None,
+            head_ref_name: None,
+            base_ref_name: None,
+            base_ref_oid: None,
             checks: Vec::new(),
             review_threads: ReviewThreadSummary {
                 unresolved: 0,
@@ -1675,7 +1781,8 @@ fn normalize_gh_pr_view(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvid
     let number = optional_u64(&value, "number");
     let url = optional_string(&value, "url");
     let repository = url.as_deref().and_then(repository_from_pr_url);
-    let state = if optional_bool(&value, "isDraft").unwrap_or(false) {
+    let is_draft = optional_bool(&value, "isDraft");
+    let state = if is_draft.unwrap_or(false) {
         "draft".to_string()
     } else {
         optional_string(&value, "state")
@@ -1683,9 +1790,14 @@ fn normalize_gh_pr_view(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvid
             .to_ascii_lowercase()
     };
     let mergeable = optional_string(&value, "mergeable").map(|value| value.to_ascii_lowercase());
+    let merge_state_status =
+        optional_string(&value, "mergeStateStatus").map(|value| value.to_ascii_lowercase());
     let review_decision =
         optional_string(&value, "reviewDecision").map(|value| value.to_ascii_lowercase());
     let head_sha = optional_string(&value, "headRefOid");
+    let head_ref_name = optional_string(&value, "headRefName");
+    let base_ref_name = optional_string(&value, "baseRefName");
+    let base_ref_oid = optional_string(&value, "baseRefOid");
     let checks = value
         .get("statusCheckRollup")
         .map(|rollup| checks_from_status_rollup(rollup, checked_at))
@@ -1703,9 +1815,14 @@ fn normalize_gh_pr_view(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvid
         number,
         url,
         state,
+        is_draft,
         mergeable,
+        merge_state_status,
         review_decision,
         head_sha,
+        head_ref_name,
+        base_ref_name,
+        base_ref_oid,
         checks,
         review_threads,
         sources: Vec::new(),
@@ -1876,9 +1993,14 @@ fn partial_pr_evidence(
         number: None,
         url: None,
         state: state.to_string(),
+        is_draft: None,
         mergeable: None,
+        merge_state_status: None,
         review_decision: None,
         head_sha: None,
+        head_ref_name: None,
+        base_ref_name: None,
+        base_ref_oid: None,
         checks,
         review_threads,
         sources: Vec::new(),
@@ -1910,6 +2032,12 @@ fn merge_provider_pr_evidence(
     if incoming.mergeable.is_some() {
         existing.mergeable = incoming.mergeable;
     }
+    if incoming.is_draft.is_some() {
+        existing.is_draft = incoming.is_draft;
+    }
+    if incoming.merge_state_status.is_some() {
+        existing.merge_state_status = incoming.merge_state_status;
+    }
     if incoming.review_decision.is_some()
         && (source_kind != PrRecordSourceKind::GhReviews || existing.review_decision.is_none())
     {
@@ -1917,6 +2045,15 @@ fn merge_provider_pr_evidence(
     }
     if incoming.head_sha.is_some() {
         existing.head_sha = incoming.head_sha;
+    }
+    if incoming.head_ref_name.is_some() {
+        existing.head_ref_name = incoming.head_ref_name;
+    }
+    if incoming.base_ref_name.is_some() {
+        existing.base_ref_name = incoming.base_ref_name;
+    }
+    if incoming.base_ref_oid.is_some() {
+        existing.base_ref_oid = incoming.base_ref_oid;
     }
 
     match source_kind {
@@ -2211,9 +2348,16 @@ impl PrSnapshotInput {
             number: self.number,
             url: self.url,
             state: self.state.to_ascii_lowercase(),
+            is_draft: self.is_draft,
             mergeable: self.mergeable.map(|value| value.to_ascii_lowercase()),
+            merge_state_status: self
+                .merge_state_status
+                .map(|value| value.to_ascii_lowercase()),
             review_decision: self.review_decision.map(|value| value.to_ascii_lowercase()),
             head_sha: self.head_sha,
+            head_ref_name: self.head_ref_name,
+            base_ref_name: self.base_ref_name,
+            base_ref_oid: self.base_ref_oid,
             checks: self
                 .checks
                 .into_iter()
@@ -4088,11 +4232,15 @@ mod tests {
                     "number": 46,
                     "url": "https://github.com/BjornMelin/dev-skills/pull/46",
                     "state": "OPEN",
-                    "isDraft": is_draft,
-                    "mergeable": mergeable,
-                    "reviewDecision": review_decision,
-                    "headRefOid": "abc123",
-                    "statusCheckRollup": [{
+                        "isDraft": is_draft,
+                        "mergeable": mergeable,
+                        "mergeStateStatus": "CLEAN",
+                        "reviewDecision": review_decision,
+                        "headRefOid": "abc123",
+                        "headRefName": "feature",
+                        "baseRefName": "main",
+                        "baseRefOid": "base123",
+                        "statusCheckRollup": [{
                         "__typename": "CheckRun",
                         "name": "GitGuardian Security Checks",
                         "status": "COMPLETED",
@@ -4127,6 +4275,10 @@ mod tests {
                 Some(expected_review_decision.as_str())
             );
             assert_eq!(result.pr.head_sha.as_deref(), Some("abc123"));
+            assert_eq!(result.pr.merge_state_status.as_deref(), Some("clean"));
+            assert_eq!(result.pr.head_ref_name.as_deref(), Some("feature"));
+            assert_eq!(result.pr.base_ref_name.as_deref(), Some("main"));
+            assert_eq!(result.pr.base_ref_oid.as_deref(), Some("base123"));
             assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("success"));
             assert!(!result.pr.review_threads.authoritative);
             assert_eq!(result.pr.sources[0].kind, "gh-pr-view");
@@ -4468,9 +4620,14 @@ mod tests {
             number: Some(46),
             url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
             state: "open".to_string(),
+            is_draft: Some(false),
             mergeable: Some("mergeable".to_string()),
+            merge_state_status: Some("unstable".to_string()),
             review_decision: Some("changes_requested".to_string()),
             head_sha: Some("abc123".to_string()),
+            head_ref_name: Some("feature".to_string()),
+            base_ref_name: Some("main".to_string()),
+            base_ref_oid: Some("base123".to_string()),
             checks: vec![CheckRecord {
                 name: "ci".to_string(),
                 status: "completed".to_string(),
@@ -4517,9 +4674,14 @@ mod tests {
             number: Some(46),
             url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
             state: "open".to_string(),
+            is_draft: Some(false),
             mergeable: Some("mergeable".to_string()),
+            merge_state_status: Some("clean".to_string()),
             review_decision: Some("approved".to_string()),
             head_sha: Some("abc123".to_string()),
+            head_ref_name: Some("feature".to_string()),
+            base_ref_name: Some("main".to_string()),
+            base_ref_oid: Some("base123".to_string()),
             checks: vec![CheckRecord {
                 name: "ci".to_string(),
                 status: "completed".to_string(),
@@ -4553,9 +4715,14 @@ mod tests {
             number: Some(46),
             url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
             state: "open".to_string(),
+            is_draft: Some(false),
             mergeable: Some("unknown".to_string()),
+            merge_state_status: Some("unknown".to_string()),
             review_decision: Some("review_required".to_string()),
             head_sha: Some("abc123".to_string()),
+            head_ref_name: Some("feature".to_string()),
+            base_ref_name: Some("main".to_string()),
+            base_ref_oid: Some("base123".to_string()),
             checks: vec![CheckRecord {
                 name: "ci".to_string(),
                 status: "completed".to_string(),
@@ -4613,9 +4780,14 @@ mod tests {
             number: Some(46),
             url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
             state: "open".to_string(),
+            is_draft: Some(false),
             mergeable: Some("mergeable".to_string()),
+            merge_state_status: Some("clean".to_string()),
             review_decision: Some("approved".to_string()),
             head_sha: Some("abc123".to_string()),
+            head_ref_name: Some("feature".to_string()),
+            base_ref_name: Some("main".to_string()),
+            base_ref_oid: Some("base123".to_string()),
             checks: vec![CheckRecord {
                 name: "ci".to_string(),
                 status: "completed".to_string(),
@@ -4751,11 +4923,15 @@ mod tests {
                 "number": 46,
                 "url": "https://github.com/BjornMelin/dev-skills/pull/46",
                 "state": "OPEN",
-                "isDraft": false,
-                "mergeable": "MERGEABLE",
-                "reviewDecision": "APPROVED",
-                "headRefOid": "abc123",
-                "statusCheckRollup": [{
+                    "isDraft": false,
+                    "mergeable": "MERGEABLE",
+                    "mergeStateStatus": "CLEAN",
+                    "reviewDecision": "APPROVED",
+                    "headRefOid": "abc123",
+                    "headRefName": "feature",
+                    "baseRefName": "main",
+                    "baseRefOid": "base123",
+                    "statusCheckRollup": [{
                     "name": "lint",
                     "status": "COMPLETED",
                     "conclusion": "SUCCESS"
@@ -4839,8 +5015,12 @@ mod tests {
         assert_eq!(result.pr.number, Some(46));
         assert_eq!(result.pr.state, "open");
         assert_eq!(result.pr.mergeable.as_deref(), Some("mergeable"));
+        assert_eq!(result.pr.merge_state_status.as_deref(), Some("clean"));
         assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
         assert_eq!(result.pr.head_sha.as_deref(), Some("abc123"));
+        assert_eq!(result.pr.head_ref_name.as_deref(), Some("feature"));
+        assert_eq!(result.pr.base_ref_name.as_deref(), Some("main"));
+        assert_eq!(result.pr.base_ref_oid.as_deref(), Some("base123"));
         assert_eq!(result.pr.checks.len(), 1);
         assert_eq!(result.pr.checks[0].name, "lint");
         assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("failure"));
@@ -4879,10 +5059,16 @@ mod tests {
             serde_json::to_string_pretty(&json!({
                 "number": 46,
                 "url": "https://github.com/BjornMelin/dev-skills/pull/46",
-                "state": "OPEN",
-                "isDraft": false,
-                "reviewDecision": "APPROVED",
-                "statusCheckRollup": [{
+                    "state": "OPEN",
+                    "isDraft": false,
+                    "mergeable": "MERGEABLE",
+                    "mergeStateStatus": "CLEAN",
+                    "reviewDecision": "APPROVED",
+                    "headRefOid": "abc123",
+                    "headRefName": "feature",
+                    "baseRefName": "main",
+                    "baseRefOid": "base123",
+                    "statusCheckRollup": [{
                     "name": "lint",
                     "status": "COMPLETED",
                     "conclusion": "FAILURE"

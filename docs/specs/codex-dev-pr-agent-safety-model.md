@@ -1,6 +1,7 @@
 # codex-dev PR-Agent Safety Model
 
-Status: active design; first apply-gated hosted action command shipped in #48.
+Status: active design; apply-gated hosted actions and readiness loop shipped in
+#48 and #49.
 
 Tracking: #41, parent epic #37, and implementation issues #46 through #49.
 
@@ -34,7 +35,7 @@ The model is intentionally conservative:
 
 ## Source Authorities
 
-Use current official docs when implementing the future PR-agent:
+Use current official docs when implementing or extending the PR-agent:
 
 - GitHub REST authentication:
   <https://docs.github.com/en/rest/authentication>
@@ -155,13 +156,13 @@ identity class, not the token value.
 
 | Identity | Intended use | Minimum policy |
 | --- | --- | --- |
-| GitHub App installation token | Preferred automation identity for future hosted write flows. | Restrict installation access to the target repo when possible. Request only the permissions needed by the selected action. Refresh on expiration. |
+| GitHub App installation token | Preferred automation identity for hosted write flows. | Restrict installation access to the target repo when possible. Request only the permissions needed by the selected action. Refresh on expiration. |
 | `GITHUB_TOKEN` | GitHub Actions workflow identity for CI-hosted checks or dry-run evidence capture. | Use workflow/job `permissions` with least privilege. Do not rely on default broad write access. Never expose write-scoped tokens or repository secrets to untrusted PR-head code. |
 | `gh` CLI user token | Local interactive operator identity. | Treat as high-blast-radius unless scopes are inspected. Use only with explicit target and dry-run default. Do not persist `gh auth token` output. |
 | Fine-grained personal access token | Fallback for local workflows that cannot use a GitHub App. | Restrict to the resource owner, selected repositories, expiration, and endpoint-specific permissions. |
 | Classic personal access token | Last resort for unsupported endpoint gaps. | Require an explicit warning in the plan. Never recommend for long-lived automation when a GitHub App or fine-grained token works. |
 
-Permission mapping for future write actions:
+Permission mapping for write actions:
 
 | Action family | Likely GitHub permission | Notes |
 | --- | --- | --- |
@@ -175,7 +176,7 @@ Permission mapping for future write actions:
 
 ## Operation Policy
 
-The future PR-agent must classify every planned action before execution:
+The PR-agent must classify every planned action before execution:
 
 | Class | Default | Examples | Requirements |
 | --- | --- | --- | --- |
@@ -316,7 +317,7 @@ Do not record:
 - local workstation secrets;
 - raw prompt or model output that includes sensitive context.
 
-## Future Implementation Checklist
+## Shipped Implementation Checklist
 
 Issue #46, PR evidence normalizers:
 
@@ -339,19 +340,25 @@ Issue #48, apply-gated hosted actions:
   reruns.
 - Require `--apply`, explicit target, current head SHA revalidation, and
   idempotency checks before every hosted mutation.
-- Keep merge operations disabled until #49 readiness logic exists.
+- Keep merge operations disabled outside the #49 readiness gate.
 
 Issue #49, readiness and merge loop:
 
-- Compute readiness from current checks, statuses, workflow runs, review
-  decision, unresolved verified comments, and issue linkage.
-- Allow merge only as a clean-state gated action.
-- Require a final re-fetch immediately before merge.
-- Update linked issues only after merge success and local `main` sync.
+- Compute readiness from current checks, allowlisted check conclusions,
+  same-repository workflow runs, review decision, authoritative review-thread
+  state, stale review comments, draft state, mergeability, `mergeStateStatus`,
+  and branch refs.
+- Allow merge only as a clean-state gated action with explicit
+  `--apply --merge` and `--match-head-commit`.
+- Reuse the read-only state engine for every bounded polling attempt and reject
+  replayed sources in apply mode.
+- Leave linked issue updates and local `main` sync to the outer
+  goal-to-release loop after merge success.
 
-## Acceptance Checklist
+## Extension Acceptance Checklist
 
-Future PR-agent branches must satisfy this checklist before PR creation:
+Future PR-agent branches and extensions must satisfy this checklist before PR
+creation:
 
 - [ ] All hosted operations require explicit `--repo OWNER/REPO --number N`.
 - [ ] All write-capable commands default to dry-run planning.

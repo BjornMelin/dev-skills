@@ -73,6 +73,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr readiness --help
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
@@ -200,13 +201,19 @@ cargo run -q -p codex-dev -- --json pr agent-action \
   --plan-id live-smoke-comment-plan \
   --action post-issue-comment \
   --body "dry-run hosted action smoke"
+cargo run -q -p codex-dev -- --json pr readiness \
+  --capsule "$tmp/pr-agent-live-smoke" \
+  --repo BjornMelin/dev-skills \
+  --number <pr-number> \
+  --poll-attempts 1 \
+  --poll-interval-seconds 0
 cargo run -q -p codex-dev -- --json pr status --capsule "$tmp/pr-agent-live-smoke"
 ```
 
 This smoke performs read-only hosted collection plus local capsule writes. The
-`pr agent-action` command is intentionally run without `--apply`; it must not be
-used as evidence that hosted review comments were resolved or that a PR was
-merged.
+`pr agent-action` and `pr readiness` commands are intentionally run without
+`--apply`; they must not be used as evidence that hosted review comments were
+resolved, failed jobs were rerun, or a PR was merged.
 
 Policy gate execution is explicit. Use `--execute` only when you intend to run
 the repo-native commands from the manifest; the default dry run records the
@@ -378,6 +385,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr readiness --help
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui
 cargo test -p codex-dev-tui

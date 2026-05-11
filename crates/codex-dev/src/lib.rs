@@ -4,6 +4,8 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
@@ -11,17 +13,20 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
-    PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate,
-    PolicyGateResult, PolicyManifest, PolicyProfile, PolicyRunResult, PrAgentDiagnostic,
-    PrAgentHostedActionExecution, PrAgentHostedActionReport, PrAgentHostedActionSpec,
-    PrAgentHostedActionStatus, PrAgentSeverity, PrAgentSourceRecord, PrAgentSourceStatus,
-    PrAgentStateReport, PrControlCommand, PrControlPlan, PrRecordArgs, PrRecordSourceKind,
-    RecordSubagentOutcomeArgs, RecordSubagentPlanArgs, RecordSubagentSynthesisArgs,
-    SubagentDisposition, SubagentOutcomeStatus, SubagentSynthesisStatus, Verification,
-    append_evidence, append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule,
-    pr_status, read_json, recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome,
-    record_subagent_plan, record_subagent_synthesis, render_capsule, render_command,
-    render_pr_label, render_pr_status, stable_json_hash, validate_capsule, write_json,
+    PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA,
+    PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
+    PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution, PrAgentHostedActionReport,
+    PrAgentHostedActionSpec, PrAgentHostedActionStatus, PrAgentReadinessAction,
+    PrAgentReadinessActionStatus, PrAgentReadinessAttempt, PrAgentReadinessCheck,
+    PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity, PrAgentSourceRecord,
+    PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrEvidence,
+    PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
+    RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
+    SubagentSynthesisStatus, Verification, append_evidence, append_jsonl, capsule_status,
+    ensure_regular_contract_files, init_capsule, pr_status, read_json, recommend_pr_agent_actions,
+    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
+    render_capsule, render_command, render_pr_label, render_pr_status, stable_json_hash,
+    validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -29,6 +34,7 @@ use serde_json::{Value, json};
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+const GH_PR_VIEW_JSON_FIELDS: &str = "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels";
 const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
 const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
 const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){unresolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
@@ -69,6 +75,7 @@ impl Cli {
                 PrCommand::Agent(_) => "pr agent",
                 PrCommand::AgentAction(_) => "pr agent-action",
                 PrCommand::Plan(_) => "pr plan",
+                PrCommand::Readiness(_) => "pr readiness",
                 PrCommand::Record(_) => "pr record",
                 PrCommand::Status(_) => "pr status",
             },
@@ -146,6 +153,8 @@ enum PrCommand {
     /// Plan or apply one explicit hosted PR action.
     #[command(name = "agent-action")]
     AgentAction(PrAgentActionArgs),
+    /// Evaluate CI, review, and merge readiness with a bounded closeout loop.
+    Readiness(PrReadinessArgs),
     /// Print the live-command plan for PR evidence capture.
     Plan(PrPlanArgs),
     /// Normalize and record a PR evidence source into a task capsule.
@@ -234,6 +243,42 @@ pub struct PrAgentActionArgs {
     pub source_dir: Option<PathBuf>,
 }
 
+#[derive(Args, Clone, Debug)]
+pub struct PrReadinessArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long, value_name = "OWNER/REPO")]
+    pub repo: String,
+    #[arg(long, value_name = "PR_NUMBER")]
+    pub number: u64,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+    #[arg(
+        long,
+        value_name = "SOURCE_DIR",
+        help = "Replay captured source JSON files instead of running gh; rejected with --apply"
+    )]
+    pub source_dir: Option<PathBuf>,
+    #[arg(long, default_value_t = 1, value_name = "COUNT")]
+    pub poll_attempts: u64,
+    #[arg(long, default_value_t = 60, value_name = "SECONDS")]
+    pub poll_interval_seconds: u64,
+    #[arg(long, help = "Allow requested hosted actions to execute")]
+    pub apply: bool,
+    #[arg(long, help = "Plan or apply reruns for failed GitHub Actions runs")]
+    pub rerun_failed: bool,
+    #[arg(long, help = "Plan or apply a PR merge when the final state is ready")]
+    pub merge: bool,
+    #[arg(long, value_enum, default_value_t = PrMergeMethod::Squash)]
+    pub merge_method: PrMergeMethod,
+    #[arg(long, help = "Delete the PR head branch after an applied merge")]
+    pub delete_branch: bool,
+    #[arg(long, value_name = "TEXT")]
+    pub merge_subject: Option<String>,
+    #[arg(long, value_name = "TEXT")]
+    pub merge_body: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[value(rename_all = "kebab-case")]
@@ -257,6 +302,33 @@ impl PrAgentHostedActionKind {
             Self::AddLabels => "add-labels",
             Self::RemoveLabels => "remove-labels",
             Self::RerunFailedJobs => "rerun-failed-jobs",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[value(rename_all = "kebab-case")]
+pub enum PrMergeMethod {
+    Merge,
+    Squash,
+    Rebase,
+}
+
+impl PrMergeMethod {
+    fn flag(self) -> &'static str {
+        match self {
+            Self::Merge => "--merge",
+            Self::Squash => "--squash",
+            Self::Rebase => "--rebase",
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Merge => "merge",
+            Self::Squash => "squash",
+            Self::Rebase => "rebase",
         }
     }
 }
@@ -906,6 +978,26 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            PrCommand::Readiness(args) => {
+                let generated_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = run_pr_readiness_loop(args, generated_at)?;
+                let human = format!(
+                    "PR readiness for {}#{} is {:?} after {} attempt(s)",
+                    result.repository,
+                    result.number,
+                    result.final_status,
+                    result.attempts.len()
+                );
+                Ok(CommandOutput {
+                    ok: result
+                        .actions
+                        .iter()
+                        .all(|action| action.status != PrAgentReadinessActionStatus::Failed),
+                    command: "pr readiness",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             PrCommand::Plan(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
                 let result = pr_control_plan(args.repo, args.number, generated_at)?;
@@ -1168,7 +1260,7 @@ pub fn pr_control_plan(
                     "--repo",
                     &repository,
                     "--json",
-                    "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
+                    GH_PR_VIEW_JSON_FIELDS,
                 ],
             ),
             pr_control_command(
@@ -1347,7 +1439,7 @@ pub fn run_pr_agent_state(
     write_json(report_path, &report)?;
 
     append_evidence(AppendEvidenceArgs {
-        capsule: args.capsule,
+        capsule: args.capsule.clone(),
         record: EvidenceRecord {
             schema: EVIDENCE_SCHEMA.to_string(),
             kind: EvidenceKind::Decision,
@@ -1388,6 +1480,850 @@ pub fn run_pr_agent_state(
     })?;
 
     Ok(report)
+}
+
+pub fn run_pr_readiness_loop(
+    args: PrReadinessArgs,
+    generated_at: DateTime<Utc>,
+) -> Result<PrAgentReadinessReport> {
+    if args.poll_attempts == 0 {
+        bail!("--poll-attempts must be at least 1");
+    }
+    if args.apply && args.source_dir.is_some() {
+        bail!(
+            "--source-dir is only allowed for dry-run readiness evaluation; --apply must capture live state"
+        );
+    }
+    parse_github_repository(&args.repo)?;
+    ensure_regular_contract_files(&args.capsule)?;
+    let validation = validate_capsule(&args.capsule)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            args.capsule.display(),
+            validation.errors.join("; ")
+        );
+    }
+
+    let mut attempts = Vec::new();
+    let mut last_state = None;
+    for attempt in 1..=args.poll_attempts {
+        if attempt > 1 && args.poll_interval_seconds > 0 {
+            sleep(Duration::from_secs(args.poll_interval_seconds));
+        }
+        let checked_at = generated_at + TimeDelta::seconds((attempt - 1) as i64);
+        let state = run_pr_agent_state(
+            PrAgentArgs {
+                capsule: args.capsule.clone(),
+                repo: args.repo.clone(),
+                number: args.number,
+                checked_at: Some(checked_at),
+                source_dir: args.source_dir.clone(),
+            },
+            checked_at,
+        )?;
+        let attempt_report = evaluate_pr_readiness_attempt(attempt, &state)?;
+        let terminal = !matches!(attempt_report.status, PrAgentReadinessStatus::Waiting);
+        attempts.push(attempt_report);
+        last_state = Some(state);
+        if terminal {
+            break;
+        }
+    }
+
+    let final_attempt = attempts
+        .last()
+        .context("readiness loop did not record any attempts")?;
+    let state = last_state
+        .as_ref()
+        .context("readiness loop did not retain the latest PR state")?;
+    let mut actions = Vec::new();
+
+    if args.rerun_failed {
+        actions.extend(plan_or_apply_failed_check_reruns(
+            &args,
+            state,
+            final_attempt,
+        )?);
+    }
+    if args.merge {
+        actions.push(plan_or_apply_merge(
+            &args,
+            state,
+            final_attempt,
+            generated_at,
+        )?);
+    }
+
+    let final_status = if actions
+        .iter()
+        .any(|action| action.status == PrAgentReadinessActionStatus::Failed)
+    {
+        PrAgentReadinessStatus::Blocked
+    } else if actions.iter().any(|action| {
+        action.kind == "merge" && action.status == PrAgentReadinessActionStatus::Applied
+    }) {
+        PrAgentReadinessStatus::Merged
+    } else {
+        final_attempt.status
+    };
+    let report_path = args.capsule.join("pr-readiness.json");
+    let markdown_path = args.capsule.join("pr-readiness.md");
+    ensure_pr_agent_report_path_safe(&report_path)?;
+    ensure_pr_agent_report_path_safe(&markdown_path)?;
+    let mut report = PrAgentReadinessReport {
+        schema: PR_AGENT_READINESS_SCHEMA.to_string(),
+        repository: args.repo.clone(),
+        number: args.number,
+        generated_at,
+        apply_requested: args.apply,
+        rerun_failed_requested: args.rerun_failed,
+        merge_requested: args.merge,
+        ready: matches!(
+            final_status,
+            PrAgentReadinessStatus::Ready | PrAgentReadinessStatus::Merged
+        ),
+        final_status,
+        attempts,
+        actions,
+        markdown_path: markdown_path.display().to_string(),
+        report_path: report_path.display().to_string(),
+    };
+    let markdown = render_pr_readiness_markdown(&report);
+    write_json(report_path.clone(), &report)?;
+    fs::write(&markdown_path, markdown)
+        .with_context(|| format!("failed to write {}", markdown_path.display()))?;
+
+    append_evidence(AppendEvidenceArgs {
+        capsule: args.capsule.clone(),
+        record: EvidenceRecord {
+            schema: EVIDENCE_SCHEMA.to_string(),
+            kind: EvidenceKind::Decision,
+            at: generated_at,
+            summary: format!(
+                "PR readiness for {}#{} finished as {:?} after {} attempt(s)",
+                report.repository,
+                report.number,
+                report.final_status,
+                report.attempts.len()
+            ),
+            command: Some(render_pr_readiness_command(&args)),
+            exit_code: Some(
+                if report
+                    .actions
+                    .iter()
+                    .any(|action| action.status == PrAgentReadinessActionStatus::Failed)
+                {
+                    1
+                } else {
+                    0
+                },
+            ),
+            source_ids: Vec::new(),
+            actor: None,
+            tool: Some("codex-dev".to_string()),
+            confidence: None,
+            residual_risk: readiness_residual_risk(&report),
+            artifacts: vec![
+                "pr.json".to_string(),
+                "pr-agent-state.json".to_string(),
+                "pr-readiness.json".to_string(),
+                "pr-readiness.md".to_string(),
+            ],
+        },
+    })?;
+
+    report.report_path = report_path.display().to_string();
+    report.markdown_path = markdown_path.display().to_string();
+    Ok(report)
+}
+
+fn evaluate_pr_readiness_attempt(
+    attempt: u64,
+    state: &PrAgentStateReport,
+) -> Result<PrAgentReadinessAttempt> {
+    let mut blockers = Vec::new();
+    let mut wait_reasons = Vec::new();
+    let mut warnings = Vec::new();
+    let mut failing_checks = Vec::new();
+    let mut pending_checks = Vec::new();
+
+    for diagnostic in &state.diagnostics {
+        if diagnostic.severity == PrAgentSeverity::Error {
+            blockers.push(format!(
+                "state source {} failed: {}",
+                diagnostic.source, diagnostic.message
+            ));
+        }
+    }
+
+    let pr = &state.pr;
+    match pr.state.as_str() {
+        "merged" => {
+            return readiness_attempt(
+                attempt,
+                state,
+                ReadinessAttemptParts {
+                    status: PrAgentReadinessStatus::Merged,
+                    blockers,
+                    wait_reasons,
+                    warnings,
+                    failing_checks,
+                    pending_checks,
+                },
+            );
+        }
+        "closed" => {
+            blockers.push("pull request is closed without a merge".to_string());
+            return readiness_attempt(
+                attempt,
+                state,
+                ReadinessAttemptParts {
+                    status: PrAgentReadinessStatus::Stopped,
+                    blockers,
+                    wait_reasons,
+                    warnings,
+                    failing_checks,
+                    pending_checks,
+                },
+            );
+        }
+        "open" | "draft" => {}
+        other => wait_reasons.push(format!("pull request state is {other}; expected open")),
+    }
+
+    if pr.is_draft.unwrap_or(pr.state == "draft") {
+        blockers.push("pull request is still draft".to_string());
+    }
+    if missing_text(pr.head_sha.as_deref()) {
+        blockers.push("PR head SHA was not captured".to_string());
+    }
+    if missing_text(pr.head_ref_name.as_deref()) {
+        blockers.push("PR head branch name was not captured".to_string());
+    }
+    if missing_text(pr.base_ref_name.as_deref()) {
+        blockers.push("PR base branch name was not captured".to_string());
+    }
+    if missing_text(pr.base_ref_oid.as_deref()) {
+        blockers.push("PR base branch OID was not captured".to_string());
+    }
+
+    match pr.mergeable.as_deref() {
+        Some("mergeable" | "clean") => {}
+        Some("conflicting" | "dirty") => {
+            blockers.push("GitHub reports merge conflicts".to_string());
+        }
+        Some("unknown") | None => {
+            wait_reasons.push("GitHub mergeability is not known yet".to_string());
+        }
+        Some(other) => blockers.push(format!("GitHub mergeability is {other}")),
+    }
+
+    match pr.merge_state_status.as_deref() {
+        Some("clean" | "has_hooks") | None => {}
+        Some("behind") => blockers.push("head branch is behind the base branch".to_string()),
+        Some("blocked" | "dirty" | "draft") => {
+            blockers.push(format!(
+                "GitHub merge state is {}",
+                pr.merge_state_status.as_deref().unwrap()
+            ));
+        }
+        Some("unknown") => wait_reasons.push("GitHub merge state is not known yet".to_string()),
+        Some("unstable") => warnings.push(
+            "GitHub merge state is unstable; check-level evidence determines the blocker"
+                .to_string(),
+        ),
+        Some(other) => blockers.push(format!("GitHub merge state is {other}")),
+    }
+
+    for check in &pr.checks {
+        let status = check.status.to_ascii_lowercase();
+        let conclusion = check.conclusion.as_deref().map(str::to_ascii_lowercase);
+        if check_is_failure(status.as_str(), conclusion.as_deref()) {
+            let readiness_check = readiness_check_from_check(check, &state.repository);
+            blockers.push(format!(
+                "check {} failed; inspect {}",
+                check.name, readiness_check.diagnostic_command
+            ));
+            failing_checks.push(readiness_check);
+        } else if check_is_pending(status.as_str()) {
+            let readiness_check = readiness_check_from_check(check, &state.repository);
+            wait_reasons.push(format!("check {} is still {}", check.name, check.status));
+            pending_checks.push(readiness_check);
+        } else if status == "completed" && conclusion.is_none() {
+            let readiness_check = readiness_check_from_check(check, &state.repository);
+            wait_reasons.push(format!(
+                "check {} completed without an explicit conclusion",
+                check.name
+            ));
+            pending_checks.push(readiness_check);
+        } else if status == "completed" && !check_is_success(status.as_str(), conclusion.as_deref())
+        {
+            let readiness_check = readiness_check_from_check(check, &state.repository);
+            blockers.push(format!(
+                "check {} completed with unsupported conclusion {}; inspect {}",
+                check.name,
+                conclusion.as_deref().unwrap_or("none"),
+                readiness_check.diagnostic_command
+            ));
+            failing_checks.push(readiness_check);
+        } else if !check_is_success(status.as_str(), conclusion.as_deref()) {
+            let readiness_check = readiness_check_from_check(check, &state.repository);
+            wait_reasons.push(format!(
+                "check {} has unrecognized status {}",
+                check.name, check.status
+            ));
+            pending_checks.push(readiness_check);
+        }
+    }
+    if pr.checks.is_empty() {
+        blockers.push("no PR checks were captured; cannot prove CI passed".to_string());
+    }
+
+    if !pr.review_threads.authoritative {
+        blockers.push("hosted review-thread state is not authoritative".to_string());
+    } else if pr.review_threads.unresolved > 0 {
+        blockers.push(format!(
+            "{} hosted review thread(s) remain unresolved",
+            pr.review_threads.unresolved
+        ));
+    }
+
+    match pr.review_decision.as_deref() {
+        Some("approved") => {}
+        Some("changes_requested")
+            if pr.review_threads.authoritative && pr.review_threads.unresolved == 0 =>
+        {
+            warnings.push(
+                "reviewDecision is changes_requested but thread-level state is clean; treating reviewDecision as stale"
+                    .to_string(),
+            );
+        }
+        Some("changes_requested") => {
+            blockers.push("latest review decision is changes_requested".to_string());
+        }
+        Some("review_required") => {
+            wait_reasons.push("required approving review has not landed yet".to_string());
+        }
+        Some("commented") => warnings.push(
+            "latest review decision is commented; thread-level state determines readiness"
+                .to_string(),
+        ),
+        None => warnings.push(
+            "GitHub did not report a reviewDecision; branch protection may not require one"
+                .to_string(),
+        ),
+        Some(other) => warnings.push(format!("GitHub reviewDecision is {other}")),
+    }
+
+    let status = if !blockers.is_empty() {
+        PrAgentReadinessStatus::Blocked
+    } else if !wait_reasons.is_empty() {
+        PrAgentReadinessStatus::Waiting
+    } else {
+        PrAgentReadinessStatus::Ready
+    };
+
+    readiness_attempt(
+        attempt,
+        state,
+        ReadinessAttemptParts {
+            status,
+            blockers,
+            wait_reasons,
+            warnings,
+            failing_checks,
+            pending_checks,
+        },
+    )
+}
+
+struct ReadinessAttemptParts {
+    status: PrAgentReadinessStatus,
+    blockers: Vec<String>,
+    wait_reasons: Vec<String>,
+    warnings: Vec<String>,
+    failing_checks: Vec<PrAgentReadinessCheck>,
+    pending_checks: Vec<PrAgentReadinessCheck>,
+}
+
+fn readiness_attempt(
+    attempt: u64,
+    state: &PrAgentStateReport,
+    parts: ReadinessAttemptParts,
+) -> Result<PrAgentReadinessAttempt> {
+    let (active_review_comments, outdated_review_comments) = review_comment_counts(state)?;
+    Ok(PrAgentReadinessAttempt {
+        attempt,
+        checked_at: state.checked_at,
+        status: parts.status,
+        pr: state.pr.clone(),
+        blockers: parts.blockers,
+        wait_reasons: parts.wait_reasons,
+        warnings: parts.warnings,
+        failing_checks: parts.failing_checks,
+        pending_checks: parts.pending_checks,
+        active_review_comments,
+        outdated_review_comments,
+        diagnostics: state.diagnostics.clone(),
+    })
+}
+
+fn check_is_failure(status: &str, conclusion: Option<&str>) -> bool {
+    matches!(
+        conclusion,
+        Some("failure" | "error" | "cancelled" | "canceled" | "timed_out" | "action_required")
+    ) || matches!(
+        status,
+        "failure" | "failed" | "error" | "cancelled" | "canceled" | "timed_out"
+    )
+}
+
+fn check_is_success(status: &str, conclusion: Option<&str>) -> bool {
+    status == "completed" && matches!(conclusion, Some("success" | "neutral" | "skipped"))
+}
+
+fn check_is_pending(status: &str) -> bool {
+    matches!(
+        status,
+        "pending" | "queued" | "in_progress" | "requested" | "waiting" | "expected"
+    )
+}
+
+fn missing_text(value: Option<&str>) -> bool {
+    value.map(str::trim).unwrap_or_default().is_empty()
+}
+
+fn readiness_check_from_check(
+    check: &codex_dev_core::CheckRecord,
+    repository: &str,
+) -> PrAgentReadinessCheck {
+    let run_id = check
+        .url
+        .as_deref()
+        .and_then(|url| extract_github_actions_run_id_for_repo(url, repository));
+    let diagnostic_command = if let Some(run_id) = run_id {
+        format!("gh run view {run_id} --log-failed")
+    } else if let Some(url) = &check.url {
+        format!("open {url}")
+    } else {
+        format!(
+            "gh pr checks --json name,state,link --jq '.[] | select(.name == {:?})'",
+            check.name
+        )
+    };
+    PrAgentReadinessCheck {
+        name: check.name.clone(),
+        status: check.status.clone(),
+        conclusion: check.conclusion.clone(),
+        url: check.url.clone(),
+        run_id,
+        diagnostic_command,
+    }
+}
+
+fn extract_github_actions_run_id_for_repo(url: &str, repository: &str) -> Option<u64> {
+    let lower_url = url.to_ascii_lowercase();
+    let lower_repository = repository.to_ascii_lowercase();
+    let html_marker = format!("github.com/{lower_repository}/actions/runs/");
+    let api_marker = format!("api.github.com/repos/{lower_repository}/actions/runs/");
+    let marker = if let Some(start) = lower_url.find(&html_marker) {
+        Some((start, html_marker))
+    } else {
+        lower_url.find(&api_marker).map(|start| (start, api_marker))
+    }?;
+    let start = marker.0 + marker.1.len();
+    let digits = lower_url[start..]
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect::<String>();
+    digits.parse().ok()
+}
+
+fn review_comment_counts(state: &PrAgentStateReport) -> Result<(u64, u64)> {
+    let Some(path) = source_path(state, "gh-review-comments") else {
+        return Ok((0, 0));
+    };
+    let value = read_json::<Value>(&path)?;
+    let mut active = 0;
+    let mut outdated = 0;
+    count_review_comments(&value, &mut active, &mut outdated);
+    Ok((active, outdated))
+}
+
+fn count_review_comments(value: &Value, active: &mut u64, outdated: &mut u64) {
+    match value {
+        Value::Array(values) => {
+            for value in values {
+                count_review_comments(value, active, outdated);
+            }
+        }
+        Value::Object(map) if map.get("body").is_some() || map.get("id").is_some() => {
+            if map
+                .get("outdated")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                *outdated += 1;
+            } else {
+                *active += 1;
+            }
+        }
+        Value::Object(map) => {
+            for value in map.values() {
+                count_review_comments(value, active, outdated);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn plan_or_apply_failed_check_reruns(
+    args: &PrReadinessArgs,
+    state: &PrAgentStateReport,
+    attempt: &PrAgentReadinessAttempt,
+) -> Result<Vec<PrAgentReadinessAction>> {
+    let mut actions = Vec::new();
+    if attempt.failing_checks.is_empty() {
+        actions.push(PrAgentReadinessAction {
+            id: "rerun-failed-checks".to_string(),
+            kind: "rerun_failed_jobs".to_string(),
+            status: PrAgentReadinessActionStatus::Skipped,
+            reason: "no failed checks were present in the final readiness attempt".to_string(),
+            command: Vec::new(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        });
+        return Ok(actions);
+    }
+    let mut run_ids = BTreeSet::new();
+    for check in &attempt.failing_checks {
+        if let Some(run_id) = check.run_id {
+            run_ids.insert(run_id);
+        }
+    }
+    if run_ids.is_empty() {
+        actions.push(PrAgentReadinessAction {
+            id: "rerun-failed-checks".to_string(),
+            kind: "rerun_failed_jobs".to_string(),
+            status: PrAgentReadinessActionStatus::Skipped,
+            reason: "failed checks did not expose GitHub Actions run ids in their URLs".to_string(),
+            command: Vec::new(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        });
+        return Ok(actions);
+    }
+
+    for run_id in run_ids {
+        let action_args = PrAgentActionArgs {
+            capsule: args.capsule.clone(),
+            repo: args.repo.clone(),
+            number: args.number,
+            plan_id: format!("readiness-rerun-{run_id}"),
+            action: PrAgentHostedActionKind::RerunFailedJobs,
+            apply: args.apply,
+            body: None,
+            body_file: None,
+            review_comment_id: None,
+            thread_id: None,
+            labels: Vec::new(),
+            run_id: Some(run_id),
+            checked_at: Some(next_state_timestamp(state.checked_at)),
+            source_dir: None,
+        };
+        if args.apply {
+            let action_checked_at = action_args
+                .checked_at
+                .expect("readiness rerun checked_at should be set");
+            let action_report = run_pr_agent_hosted_action(action_args, action_checked_at)?;
+            let execution = action_report.execution.as_ref();
+            actions.push(PrAgentReadinessAction {
+                id: action_report.plan_id,
+                kind: "rerun_failed_jobs".to_string(),
+                status: execution
+                    .map(|execution| readiness_action_status(execution.status))
+                    .unwrap_or(PrAgentReadinessActionStatus::Failed),
+                reason: "apply-gated rerun of failed GitHub Actions jobs".to_string(),
+                command: execution
+                    .map(|execution| execution.command.clone())
+                    .unwrap_or(action_report.action.command),
+                exit_code: execution.and_then(|execution| execution.exit_code),
+                stdout: execution.and_then(|execution| execution.stdout.clone()),
+                stderr: execution.and_then(|execution| execution.stderr.clone()),
+            });
+        } else {
+            let (owner, name) = parse_github_repository(&args.repo)?;
+            actions.push(PrAgentReadinessAction {
+                id: format!("readiness-rerun-{run_id}"),
+                kind: "rerun_failed_jobs".to_string(),
+                status: PrAgentReadinessActionStatus::Planned,
+                reason:
+                    "rerun requires --apply; workflow run head SHA is rechecked before execution"
+                        .to_string(),
+                command: vec![
+                    "gh".to_string(),
+                    "api".to_string(),
+                    "--method".to_string(),
+                    "POST".to_string(),
+                    format!("repos/{owner}/{name}/actions/runs/{run_id}/rerun-failed-jobs"),
+                ],
+                exit_code: None,
+                stdout: None,
+                stderr: None,
+            });
+        }
+    }
+    Ok(actions)
+}
+
+fn readiness_action_status(status: PrAgentHostedActionStatus) -> PrAgentReadinessActionStatus {
+    match status {
+        PrAgentHostedActionStatus::Applied => PrAgentReadinessActionStatus::Applied,
+        PrAgentHostedActionStatus::SkippedDuplicate => PrAgentReadinessActionStatus::Skipped,
+        PrAgentHostedActionStatus::Failed => PrAgentReadinessActionStatus::Failed,
+    }
+}
+
+fn plan_or_apply_merge(
+    args: &PrReadinessArgs,
+    state: &PrAgentStateReport,
+    attempt: &PrAgentReadinessAttempt,
+    generated_at: DateTime<Utc>,
+) -> Result<PrAgentReadinessAction> {
+    if attempt.status != PrAgentReadinessStatus::Ready {
+        return Ok(PrAgentReadinessAction {
+            id: "merge-pr".to_string(),
+            kind: "merge".to_string(),
+            status: PrAgentReadinessActionStatus::Skipped,
+            reason: format!(
+                "merge requested but final readiness status is {:?}",
+                attempt.status
+            ),
+            command: merge_command(args, &state.pr).unwrap_or_default(),
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        });
+    }
+    let command = merge_command(args, &state.pr)?;
+    if !args.apply {
+        return Ok(PrAgentReadinessAction {
+            id: "merge-pr".to_string(),
+            kind: "merge".to_string(),
+            status: PrAgentReadinessActionStatus::Planned,
+            reason: "merge requires --apply and a ready final state".to_string(),
+            command,
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        });
+    }
+    let output = run_hosted_command(&command)?;
+    Ok(PrAgentReadinessAction {
+        id: "merge-pr".to_string(),
+        kind: "merge".to_string(),
+        status: if output.exit_code == Some(0) {
+            PrAgentReadinessActionStatus::Applied
+        } else {
+            PrAgentReadinessActionStatus::Failed
+        },
+        reason: format!(
+            "apply-gated {} merge executed at {}",
+            args.merge_method.as_str(),
+            generated_at.to_rfc3339_opts(SecondsFormat::Secs, true)
+        ),
+        command,
+        exit_code: output.exit_code,
+        stdout: output.stdout,
+        stderr: output.stderr,
+    })
+}
+
+fn merge_command(args: &PrReadinessArgs, pr: &PrEvidence) -> Result<Vec<String>> {
+    let Some(head_sha) = pr.head_sha.as_deref() else {
+        bail!("cannot plan merge because PR head SHA was not captured");
+    };
+    let mut command = vec![
+        "gh".to_string(),
+        "pr".to_string(),
+        "merge".to_string(),
+        args.number.to_string(),
+        "--repo".to_string(),
+        args.repo.clone(),
+        args.merge_method.flag().to_string(),
+        "--match-head-commit".to_string(),
+        head_sha.to_string(),
+    ];
+    if args.delete_branch {
+        command.push("--delete-branch".to_string());
+    }
+    if let Some(subject) = &args.merge_subject {
+        command.push("--subject".to_string());
+        command.push(subject.clone());
+    }
+    if let Some(body) = &args.merge_body {
+        command.push("--body".to_string());
+        command.push(body.clone());
+    }
+    Ok(command)
+}
+
+fn render_pr_readiness_markdown(report: &PrAgentReadinessReport) -> String {
+    let mut markdown = String::new();
+    markdown.push_str(&format!(
+        "# PR Readiness: {}#{}\n\n",
+        report.repository, report.number
+    ));
+    markdown.push_str(&format!("- Status: {:?}\n", report.final_status));
+    markdown.push_str(&format!("- Ready: {}\n", report.ready));
+    markdown.push_str(&format!("- Attempts: {}\n", report.attempts.len()));
+    markdown.push_str(&format!("- Apply requested: {}\n", report.apply_requested));
+    markdown.push_str(&format!(
+        "- Rerun failed requested: {}\n",
+        report.rerun_failed_requested
+    ));
+    markdown.push_str(&format!(
+        "- Merge requested: {}\n\n",
+        report.merge_requested
+    ));
+    if let Some(final_attempt) = report.attempts.last() {
+        markdown.push_str("## Final Attempt\n\n");
+        markdown.push_str(&format!("- Checked at: {}\n", final_attempt.checked_at));
+        markdown.push_str(&format!("- PR state: {}\n", final_attempt.pr.state));
+        markdown.push_str(&format!(
+            "- Mergeable: {}\n",
+            final_attempt.pr.mergeable.as_deref().unwrap_or("unknown")
+        ));
+        markdown.push_str(&format!(
+            "- Merge state: {}\n",
+            final_attempt
+                .pr
+                .merge_state_status
+                .as_deref()
+                .unwrap_or("unknown")
+        ));
+        markdown.push_str(&format!(
+            "- Review threads: {} unresolved, authoritative={}\n",
+            final_attempt.pr.review_threads.unresolved,
+            final_attempt.pr.review_threads.authoritative
+        ));
+        markdown.push_str(&format!(
+            "- Review comments: {} active, {} outdated\n\n",
+            final_attempt.active_review_comments, final_attempt.outdated_review_comments
+        ));
+        markdown.push_str(&markdown_list("Blockers", &final_attempt.blockers));
+        markdown.push_str(&markdown_list("Wait Reasons", &final_attempt.wait_reasons));
+        markdown.push_str(&markdown_list("Warnings", &final_attempt.warnings));
+        if !final_attempt.failing_checks.is_empty() {
+            markdown.push_str("## Failing Checks\n\n");
+            for check in &final_attempt.failing_checks {
+                markdown.push_str(&format!(
+                    "- {}: {} / {}; inspect with `{}`\n",
+                    check.name,
+                    check.status,
+                    check.conclusion.as_deref().unwrap_or("none"),
+                    check.diagnostic_command
+                ));
+            }
+            markdown.push('\n');
+        }
+    }
+    if !report.actions.is_empty() {
+        markdown.push_str("## Actions\n\n");
+        for action in &report.actions {
+            markdown.push_str(&format!(
+                "- {} ({:?}): `{}`\n",
+                action.id,
+                action.status,
+                render_command(&action.command)
+            ));
+        }
+        markdown.push('\n');
+    }
+    markdown
+}
+
+fn markdown_list(title: &str, values: &[String]) -> String {
+    if values.is_empty() {
+        return String::new();
+    }
+    let mut markdown = format!("## {title}\n\n");
+    for value in values {
+        markdown.push_str(&format!("- {value}\n"));
+    }
+    markdown.push('\n');
+    markdown
+}
+
+fn readiness_residual_risk(report: &PrAgentReadinessReport) -> Option<String> {
+    report
+        .attempts
+        .last()
+        .and_then(|attempt| match report.final_status {
+            PrAgentReadinessStatus::Ready | PrAgentReadinessStatus::Merged => None,
+            PrAgentReadinessStatus::Blocked => {
+                Some(format!("{} blocker(s) remain", attempt.blockers.len()))
+            }
+            PrAgentReadinessStatus::Waiting => Some(format!(
+                "{} wait reason(s) remain",
+                attempt.wait_reasons.len()
+            )),
+            PrAgentReadinessStatus::Stopped => {
+                Some("pull request is closed or stopped".to_string())
+            }
+        })
+}
+
+fn render_pr_readiness_command(args: &PrReadinessArgs) -> String {
+    let mut parts = vec![
+        "codex-dev".to_string(),
+        "pr".to_string(),
+        "readiness".to_string(),
+        "--capsule".to_string(),
+        args.capsule.display().to_string(),
+        "--repo".to_string(),
+        args.repo.clone(),
+        "--number".to_string(),
+        args.number.to_string(),
+        "--poll-attempts".to_string(),
+        args.poll_attempts.to_string(),
+        "--poll-interval-seconds".to_string(),
+        args.poll_interval_seconds.to_string(),
+    ];
+    if let Some(checked_at) = args.checked_at {
+        parts.push("--checked-at".to_string());
+        parts.push(checked_at.to_rfc3339_opts(SecondsFormat::Nanos, true));
+    }
+    if let Some(source_dir) = &args.source_dir {
+        parts.push("--source-dir".to_string());
+        parts.push(source_dir.display().to_string());
+    }
+    if args.apply {
+        parts.push("--apply".to_string());
+    }
+    if args.rerun_failed {
+        parts.push("--rerun-failed".to_string());
+    }
+    if args.merge {
+        parts.push("--merge".to_string());
+        parts.push("--merge-method".to_string());
+        parts.push(args.merge_method.as_str().to_string());
+    }
+    if args.delete_branch {
+        parts.push("--delete-branch".to_string());
+    }
+    if let Some(subject) = &args.merge_subject {
+        parts.push("--merge-subject".to_string());
+        parts.push(subject.clone());
+    }
+    if let Some(body) = &args.merge_body {
+        parts.push("--merge-body".to_string());
+        parts.push(body.clone());
+    }
+    render_command(&parts)
 }
 
 pub fn run_pr_agent_hosted_action(
@@ -1807,13 +2743,14 @@ fn preflight_hosted_action(
         }
         PrAgentHostedActionKind::RerunFailedJobs => {
             let execution =
-                preflight_workflow_rerun(action, before_state, checked_at, diagnostics)?;
+                preflight_workflow_rerun(args, action, before_state, checked_at, diagnostics)?;
             Ok(execution)
         }
     }
 }
 
 fn preflight_workflow_rerun(
+    args: &PrAgentActionArgs,
     action: &PrAgentHostedActionSpec,
     before_state: &PrAgentStateReport,
     checked_at: DateTime<Utc>,
@@ -1877,6 +2814,19 @@ fn preflight_workflow_rerun(
     };
     let value = serde_json::from_slice::<Value>(&output.raw_stdout)
         .context("workflow run state check did not return valid JSON")?;
+    if let Some(message) = workflow_run_identity_error(args, before_state, &value) {
+        diagnostics.push(PrAgentDiagnostic {
+            source: "pr-agent-preflight".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: message.clone(),
+            command: Some(render_command(&action.state_check_command)),
+            exit_code: output.exit_code,
+            at: checked_at,
+        });
+        return Ok(Some(failed_preflight_execution(
+            action, checked_at, message,
+        )));
+    }
     let run_head_sha = value.get("head_sha").and_then(Value::as_str);
     let Some(pr_head_sha) = before_state.pr.head_sha.as_deref() else {
         let message =
@@ -1963,6 +2913,141 @@ fn preflight_workflow_rerun(
     Ok(Some(failed_preflight_execution(
         action, checked_at, message,
     )))
+}
+
+fn workflow_run_identity_error(
+    args: &PrAgentActionArgs,
+    before_state: &PrAgentStateReport,
+    value: &Value,
+) -> Option<String> {
+    let expected_run_id = args.run_id?;
+    let actual_run_id = value.get("id").and_then(Value::as_u64);
+    if actual_run_id != Some(expected_run_id) {
+        return Some(format!(
+            "refusing hosted write because workflow run id {:?} does not match requested run id {expected_run_id}",
+            actual_run_id
+        ));
+    }
+    let repository = json_pointer_string(value, "/repository/full_name");
+    if !repository
+        .as_deref()
+        .is_some_and(|repository| same_repository_name(repository, &args.repo))
+    {
+        return Some(format!(
+            "refusing hosted write because workflow run repository {:?} does not match {}",
+            repository, args.repo
+        ));
+    }
+    let head_repository = json_pointer_string(value, "/head_repository/full_name");
+    if !head_repository
+        .as_deref()
+        .is_some_and(|repository| same_repository_name(repository, &args.repo))
+    {
+        return Some(format!(
+            "refusing hosted write because workflow run head repository {:?} does not match {}",
+            head_repository, args.repo
+        ));
+    }
+    if value
+        .pointer("/head_repository/fork")
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+    {
+        return Some(
+            "refusing hosted write because workflow run head repository is a fork or fork status was not captured"
+                .to_string(),
+        );
+    }
+    let event = value.get("event").and_then(Value::as_str);
+    match event {
+        Some("pull_request" | "push") => {}
+        Some("pull_request_target" | "workflow_run") => {
+            return Some(format!(
+                "refusing hosted write because workflow run event {event:?} is privileged"
+            ));
+        }
+        Some(other) => {
+            return Some(format!(
+                "refusing hosted write because workflow run event {other:?} is not allowed for PR readiness reruns"
+            ));
+        }
+        None => {
+            return Some(
+                "refusing hosted write because workflow run event was not captured".to_string(),
+            );
+        }
+    }
+    let Some(expected_head_ref) = before_state.pr.head_ref_name.as_deref() else {
+        return Some(
+            "refusing hosted write because current PR head branch was not captured".to_string(),
+        );
+    };
+    let actual_head_ref = value.get("head_branch").and_then(Value::as_str);
+    if actual_head_ref != Some(expected_head_ref) {
+        return Some(format!(
+            "refusing hosted write because workflow run head branch {:?} does not match PR head branch {expected_head_ref}",
+            actual_head_ref
+        ));
+    }
+    let Some(pull_requests) = value.get("pull_requests").and_then(Value::as_array) else {
+        return Some(
+            "refusing hosted write because workflow run pull_requests were not captured"
+                .to_string(),
+        );
+    };
+    if pull_requests.is_empty() {
+        if event != Some("push") {
+            return Some(format!(
+                "refusing hosted write because workflow run event {event:?} did not bind to PR {}",
+                args.number
+            ));
+        }
+    } else if !pull_requests.iter().any(|pull_request| {
+        json_number_field(pull_request, "number")
+            .or_else(|| json_pointer_u64(pull_request, "/pull_request/number"))
+            == Some(args.number)
+    }) {
+        return Some(format!(
+            "refusing hosted write because workflow run pull_requests do not include PR {}",
+            args.number
+        ));
+    }
+    let run_url = value
+        .get("html_url")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("url").and_then(Value::as_str));
+    if !run_url.is_some_and(|url| {
+        extract_github_actions_run_id_for_repo(url, &args.repo) == Some(expected_run_id)
+    }) {
+        return Some(format!(
+            "refusing hosted write because workflow run URL {:?} does not bind to {} run {expected_run_id}",
+            run_url, args.repo
+        ));
+    }
+    None
+}
+
+fn json_pointer_string(value: &Value, pointer: &str) -> Option<String> {
+    value
+        .pointer(pointer)
+        .and_then(Value::as_str)
+        .map(str::to_string)
+}
+
+fn json_pointer_u64(value: &Value, pointer: &str) -> Option<u64> {
+    value
+        .pointer(pointer)
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn json_number_field(value: &Value, field: &str) -> Option<u64> {
+    value
+        .get(field)
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+}
+
+fn same_repository_name(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
 }
 
 fn failed_preflight_execution(
@@ -2322,7 +3407,7 @@ fn permission_failure_diagnostic(
 ) -> PrAgentDiagnostic {
     let stderr_suffix = stderr
         .filter(|stderr| !stderr.is_empty())
-        .map(|stderr| format!(": {stderr}"))
+        .map(|stderr| format!(": {}", redact_sensitive_text(stderr)))
         .unwrap_or_default();
     PrAgentDiagnostic {
         source: source.to_string(),
@@ -2714,7 +3799,7 @@ fn pr_agent_source_specs(
                 "--repo",
                 repository,
                 "--json",
-                "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt,labels",
+                GH_PR_VIEW_JSON_FIELDS,
             ],
             Some(PrRecordSourceKind::GhPrView),
         ),
@@ -3077,7 +4162,7 @@ fn render_pr_agent_command(args: &PrAgentArgs, checked_at: DateTime<Utc>) -> Str
 }
 
 fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
-    let text = String::from_utf8_lossy(bytes).trim().to_string();
+    let text = redact_sensitive_text(String::from_utf8_lossy(bytes).trim());
     if text.is_empty() {
         return None;
     }
@@ -3088,6 +4173,96 @@ fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
     let mut truncated = text.chars().take(MAX_CHARS).collect::<String>();
     truncated.push_str("\n[truncated]");
     Some(truncated)
+}
+
+fn redact_sensitive_text(text: impl AsRef<str>) -> String {
+    let text = redact_authorization_lines(text.as_ref());
+    let text = redact_key_assignments(&text, &["GH_TOKEN", "GITHUB_TOKEN"]);
+    redact_prefixed_tokens(
+        &text,
+        &[
+            "github_pat_",
+            "ghp_",
+            "gho_",
+            "ghu_",
+            "ghs_",
+            "ghr_",
+            "Bearer ",
+            "bearer ",
+        ],
+    )
+}
+
+fn redact_authorization_lines(text: &str) -> String {
+    text.lines()
+        .map(|line| {
+            let lower = line.to_ascii_lowercase();
+            if let Some(index) = lower.find("authorization:") {
+                format!("{}authorization: [redacted]", &line[..index])
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn redact_key_assignments(text: &str, keys: &[&str]) -> String {
+    let mut redacted = text.to_string();
+    for key in keys {
+        redacted = redact_assignment_values(&redacted, key);
+    }
+    redacted
+}
+
+fn redact_assignment_values(text: &str, key: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut index = 0;
+    while index < text.len() {
+        let rest = &text[index..];
+        if rest.starts_with(key) && rest[key.len()..].starts_with('=') {
+            output.push_str(key);
+            output.push_str("=[redacted]");
+            index += key.len() + 1;
+            while index < text.len() {
+                let ch = text[index..].chars().next().expect("character");
+                if ch.is_whitespace() || matches!(ch, ',' | ';') {
+                    break;
+                }
+                index += ch.len_utf8();
+            }
+        } else {
+            let ch = rest.chars().next().expect("character");
+            output.push(ch);
+            index += ch.len_utf8();
+        }
+    }
+    output
+}
+
+fn redact_prefixed_tokens(text: &str, prefixes: &[&str]) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut index = 0;
+    while index < text.len() {
+        let rest = &text[index..];
+        if let Some(prefix) = prefixes.iter().find(|prefix| rest.starts_with(**prefix)) {
+            output.push_str("[redacted]");
+            index += prefix.len();
+            while index < text.len() {
+                let ch = text[index..].chars().next().expect("character");
+                if ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.') {
+                    index += ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+        } else {
+            let ch = rest.chars().next().expect("character");
+            output.push(ch);
+            index += ch.len_utf8();
+        }
+    }
+    output
 }
 
 fn parse_github_repository(repository: &str) -> Result<(&str, &str)> {
@@ -4197,6 +5372,19 @@ mod tests {
             policy_manifest: policy_manifest(PolicyProfile::CodexDev, created_at),
             force: false,
         }
+    }
+
+    #[test]
+    fn hosted_diagnostics_redact_token_like_values() {
+        let excerpt = diagnostic_excerpt(
+            b"Authorization: Bearer ghp_secret123\nGH_TOKEN=plain-secret github_pat_abc123",
+        )
+        .expect("excerpt");
+
+        assert!(!excerpt.contains("ghp_secret123"));
+        assert!(!excerpt.contains("plain-secret"));
+        assert!(!excerpt.contains("github_pat_abc123"));
+        assert!(excerpt.contains("[redacted]"));
     }
 
     #[cfg(unix)]
