@@ -164,6 +164,19 @@ fn policy_manifest_and_dry_run_update_capsule() {
     let manifest_gates = manifest_json["result"]["gates"]
         .as_array()
         .expect("manifest gates");
+    let core_test_gate = manifest_gates
+        .iter()
+        .find(|gate| gate["id"] == "codex-dev-core-test")
+        .expect("codex-dev-core-test gate");
+    assert_eq!(
+        core_test_gate["command"]
+            .as_array()
+            .expect("core test command")
+            .iter()
+            .map(|value| value.as_str().expect("command token must be a string"))
+            .collect::<Vec<_>>(),
+        vec!["cargo", "test", "-p", "codex-dev-core"]
+    );
     let docs_gate = manifest_gates
         .iter()
         .find(|gate| gate["id"] == "docs-links")
@@ -202,7 +215,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
             "--capsule",
             capsule,
             "--checked-at",
-            "2026-05-09T05:00:00Z",
+            "2026-05-09T05:00:00.123456789Z",
         ])
         .assert()
         .success()
@@ -297,7 +310,7 @@ fn pr_plan_and_record_support_fixture_mode() {
             "--source",
             source.to_str().expect("utf8 fixture path"),
             "--checked-at",
-            "2026-05-09T05:00:00Z",
+            "2026-05-09T05:00:00.123456789Z",
         ])
         .assert()
         .success()
@@ -311,6 +324,22 @@ fn pr_plan_and_record_support_fixture_mode() {
         record_json["result"]["pr"]["review_threads"]["unresolved"],
         0
     );
+    let evidence = std::fs::read_to_string(std::path::Path::new(capsule).join("evidence.jsonl"))
+        .expect("evidence");
+    let pr_record_entry: Value = serde_json::from_str(
+        evidence
+            .lines()
+            .last()
+            .expect("at least one evidence entry"),
+    )
+    .expect("valid evidence jsonl line");
+    assert_eq!(pr_record_entry["schema"], "codex-dev.evidence.v1");
+    assert_eq!(pr_record_entry["kind"], "review");
+    assert_eq!(pr_record_entry["at"], "2026-05-09T05:00:00.123456789Z");
+    let command = pr_record_entry["command"].as_str().expect("command string");
+    assert!(command.contains("codex-dev pr record --capsule"));
+    assert!(command.contains("--source"));
+    assert!(command.contains("--checked-at 2026-05-09T05:00:00.123456789Z"));
 
     Command::cargo_bin("codex-dev")
         .expect("binary")

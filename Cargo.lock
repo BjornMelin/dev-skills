@@ -279,7 +279,19 @@ dependencies = [
  "assert_cmd",
  "chrono",
  "clap",
+ "codex-dev-core",
  "predicates",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "codex-dev-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
  "serde",
  "serde_json",
  "tempfile",
@@ -292,7 +304,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "codex-dev",
+ "codex-dev-core",
  "crossterm",
  "ratatui",
  "serde",
