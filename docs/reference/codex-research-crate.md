@@ -248,12 +248,13 @@ supports task filtering, listing, strict warning handling, and JSON output.
 - source freshness counts resolved through the cache when possible;
 - report path status, artifact paths, warnings, and closeout failures.
 
-The bundle status is `failed` when uncited claims, missing source references, or
-unresolved provider errors remain. Non-strict command execution still exits zero
-after writing output for inspection; strict mode exits nonzero for those
-failures plus missing report/ledger evidence. Bundle generation records metadata
-only, sanitizes free-form handoff text, and does not embed raw provider
-payloads.
+The bundle status is `failed` when closeout evidence is incomplete: uncited
+claims, missing source references, unresolved provider errors, missing
+ledger/report artifacts, or missing source freshness records in strict mode.
+Non-strict command execution still exits zero after writing output for
+inspection; strict mode exits nonzero for recorded failures. Bundle generation
+records metadata only, sanitizes free-form handoff text, and does not embed raw
+provider payloads.
 
 ## Provider Implementations
 

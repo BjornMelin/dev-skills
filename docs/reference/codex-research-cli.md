@@ -409,13 +409,13 @@ The output schema is `codex-research.evidence-bundle.v1`. It summarizes:
 - source freshness counts from the cache when source IDs are present there;
 - the report path and whether the Markdown report exists.
 
-The bundle status is `failed` when uncited claims, missing claim source
-references, or unresolved provider errors remain. Without `--strict`, the
-command still writes JSON/Markdown and exits zero so agents can inspect the
-artifact. With `--strict`, those failures and strict-only report/ledger evidence
-gaps exit nonzero after output. Bundle output records metadata only; it sanitizes
-query/debit/error text and does not embed raw provider payloads or cached page
-bodies.
+The bundle status is `failed` when closeout evidence is incomplete: uncited
+claims, missing claim source references, unresolved provider errors, missing
+ledger/report artifacts, or missing source freshness records in strict mode.
+Without `--strict`, the command still writes JSON/Markdown and exits zero so
+agents can inspect the artifact. With `--strict`, recorded failures exit nonzero
+after output. Bundle output records metadata only; it sanitizes query/debit/error
+text and does not embed raw provider payloads or cached page bodies.
 
 ## cache
 

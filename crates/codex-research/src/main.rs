@@ -1978,28 +1978,16 @@ fn build_evidence_bundle(
     let mut failures = Vec::new();
 
     if !ledger_exists {
-        let message = format!("ledger path does not exist: {}", args.ledger.display());
-        if args.strict {
-            failures.push(message);
-        } else {
-            warnings.push(message);
-        }
+        failures.push(format!(
+            "ledger path does not exist: {}",
+            args.ledger.display()
+        ));
     }
     if claims.is_empty() {
-        let message = "ledger has no claims".to_string();
-        if args.strict {
-            failures.push(message);
-        } else {
-            warnings.push(message);
-        }
+        failures.push("ledger has no claims".to_string());
     }
     if sources.is_empty() {
-        let message = "ledger has no sources".to_string();
-        if args.strict {
-            failures.push(message);
-        } else {
-            warnings.push(message);
-        }
+        failures.push("ledger has no sources".to_string());
     }
     if !citation_coverage.uncited_claim_ids.is_empty() {
         failures.push(format!(
@@ -2020,12 +2008,10 @@ fn build_evidence_bundle(
         ));
     }
     if !args.report.exists() {
-        let message = format!("report path does not exist: {}", args.report.display());
-        if args.strict {
-            failures.push(message);
-        } else {
-            warnings.push(message);
-        }
+        failures.push(format!(
+            "report path does not exist: {}",
+            args.report.display()
+        ));
     }
     for source_id in &run.source_ids {
         if !source_id_set.contains(source_id) {
@@ -2034,11 +2020,16 @@ fn build_evidence_bundle(
             ));
         }
     }
-    if args.strict && !source_freshness.unknown_source_ids.is_empty() {
-        warnings.push(format!(
+    if !source_freshness.unknown_source_ids.is_empty() {
+        let message = format!(
             "{} source(s) have no cache freshness record",
             source_freshness.unknown_source_ids.len()
-        ));
+        );
+        if args.strict {
+            failures.push(message);
+        } else {
+            warnings.push(message);
+        }
     }
 
     let mut artifacts = Vec::new();
@@ -5463,7 +5454,7 @@ mod tests {
             out: Some(bundle_path),
             markdown_out: Some(markdown_path),
             generated_at: Some(generated_at),
-            strict: true,
+            strict: false,
         };
         let (bundle, markdown) = build_evidence_bundle(&args, generated_at)?;
         fs::remove_dir_all(&dir)?;
@@ -5603,6 +5594,74 @@ mod tests {
     }
 
     #[test]
+    fn evidence_bundle_strict_fails_unknown_source_freshness() -> Result<()> {
+        let dir = temp_path("evidence-bundle-unknown-freshness");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let ledger_path = dir.join("ledger.jsonl");
+        let report_path = dir.join("report.md");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let source_id = format!("src-{}", short_hash(format!("{}-fresh", dir.display())));
+        let state = ResearchRunState {
+            query: "verify freshness evidence".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::General,
+            status: RunStatus::Closed,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets: standard_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: Vec::new(),
+            source_ids: vec![source_id.clone()],
+        };
+        write_run_state(&run_path, &state)?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Source(SourceRecord {
+                id: source_id.clone(),
+                provider: "direct".to_string(),
+                url: "https://example.com/doc".to_string(),
+                title: Some("example docs".to_string()),
+                route: Some("direct".to_string()),
+                fetched_at: generated_at,
+            }),
+        )?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Claim(ClaimRecord {
+                id: "claim-cited".to_string(),
+                text: "The claim is cited.".to_string(),
+                confidence: 0.9,
+                sources: vec![source_id],
+                note: None,
+                created_at: generated_at,
+            }),
+        )?;
+        fs::write(&report_path, "# Research Report\n")?;
+        let args = BundleArgs {
+            run: run_path,
+            ledger: ledger_path,
+            report: report_path,
+            out: None,
+            markdown_out: None,
+            generated_at: Some(generated_at),
+            strict: true,
+        };
+        let (bundle, _) = build_evidence_bundle(&args, generated_at)?;
+        fs::remove_dir_all(&dir)?;
+
+        assert_eq!(bundle.status, "failed");
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("cache freshness record"))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn evidence_bundle_command_non_strict_reports_failures_without_error() -> Result<()> {
         let dir = temp_path("evidence-bundle-nonstrict");
         fs::create_dir_all(&dir)?;
@@ -5644,9 +5703,17 @@ mod tests {
             generated_at: Some(generated_at),
             strict: false,
         };
+        let (bundle, _) = build_evidence_bundle(&args, generated_at)?;
         let result = build_evidence_bundle_command(args, false);
         fs::remove_dir_all(&dir)?;
 
+        assert_eq!(bundle.status, "failed");
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("report path"))
+        );
         assert!(result.is_ok(), "{result:?}");
         Ok(())
     }
