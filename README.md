@@ -30,6 +30,7 @@ Key docs:
 - [Research architecture](docs/architecture/research-system.md)
 - [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
 - [dev-skills v0.3/v1 roadmap](docs/specs/dev-skills-v0.3-roadmap.md)
+- [Future local app surfaces](docs/specs/future-local-surfaces.md)
 - [codex-dev core reference](docs/reference/codex-dev-core.md)
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)

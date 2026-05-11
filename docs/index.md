@@ -40,6 +40,8 @@ out of version control.
 - [dev-skills v0.3/v1 Roadmap](specs/dev-skills-v0.3-roadmap.md): canonical
   issue ledger and execution order for the next local CLI/TUI, PR-agent,
   release, and future-surface wave.
+- [Future Local App Surfaces](specs/future-local-surfaces.md): gated decision
+  record for deferred Tauri desktop and Axum local web service options.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle, evidence appenders, subspawn
   plan/outcome/synthesis capture, policy gates, PR evidence capture, and
