@@ -1,15 +1,16 @@
 # codex-dev PR-Agent Safety Model
 
-Status: active design.
+Status: active design; first apply-gated hosted action command shipped in #48.
 
 Tracking: #41, parent epic #37, and implementation issues #46 through #49.
 
 ## Purpose
 
-The `codex-dev` PR-agent is the planned hosted GitHub control loop for
+The `codex-dev` PR-agent is the hosted GitHub control loop for
 capturing PR state, verifying review feedback, planning remediation, and
-eventually applying narrowly scoped PR actions. This document defines the
-security and write-safety contract before any hosted mutation code exists.
+applying narrowly scoped PR actions. This document defines the security and
+write-safety contract for both read-only state capture and apply-gated hosted
+mutations.
 
 The model is intentionally conservative:
 
@@ -23,14 +24,13 @@ The model is intentionally conservative:
 
 ## Non-goals
 
-- No hosted write implementation belongs in this issue.
 - No new token, credential, key, secret, or local credential file belongs in
   the repository.
 - No default autonomous write mode is allowed.
 - No daemon, webhook listener, or long-running hosted service is introduced by
   this design.
 - No compatibility layer for older draft PR-agent shapes is required before a
-  first implementation ships.
+  stable public release.
 
 ## Source Authorities
 
@@ -64,6 +64,10 @@ Use current official docs when implementing the future PR-agent:
   <https://docs.github.com/en/rest/pulls/comments>
 - GitHub pull request reviews:
   <https://docs.github.com/en/rest/pulls/reviews>
+- GitHub issue comments:
+  <https://docs.github.com/en/rest/issues/comments>
+- GitHub issue labels:
+  <https://docs.github.com/en/rest/issues/labels>
 - GitHub Actions workflow runs:
   <https://docs.github.com/en/rest/actions/workflow-runs>
 - GitHub check runs:

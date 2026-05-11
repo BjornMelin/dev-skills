@@ -6,29 +6,32 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
 use anyhow::{Context, Result, bail};
-use chrono::{DateTime, SecondsFormat, Utc};
-use clap::{Args, Parser, Subcommand};
+use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
-    PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest,
-    PolicyProfile, PolicyRunResult, PrAgentDiagnostic, PrAgentSeverity, PrAgentSourceRecord,
-    PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrRecordArgs,
-    PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
-    RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
-    SubagentSynthesisStatus, Verification, append_evidence, append_jsonl, capsule_status,
-    ensure_regular_contract_files, init_capsule, pr_status, read_json, recommend_pr_agent_actions,
-    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
-    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
-    write_json,
+    PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate,
+    PolicyGateResult, PolicyManifest, PolicyProfile, PolicyRunResult, PrAgentDiagnostic,
+    PrAgentHostedActionExecution, PrAgentHostedActionReport, PrAgentHostedActionSpec,
+    PrAgentHostedActionStatus, PrAgentSeverity, PrAgentSourceRecord, PrAgentSourceStatus,
+    PrAgentStateReport, PrControlCommand, PrControlPlan, PrRecordArgs, PrRecordSourceKind,
+    RecordSubagentOutcomeArgs, RecordSubagentPlanArgs, RecordSubagentSynthesisArgs,
+    SubagentDisposition, SubagentOutcomeStatus, SubagentSynthesisStatus, Verification,
+    append_evidence, append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule,
+    pr_status, read_json, recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome,
+    record_subagent_plan, record_subagent_synthesis, render_capsule, render_command,
+    render_pr_label, render_pr_status, stable_json_hash, validate_capsule, write_json,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
 const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
+const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
+const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){unresolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
 
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev")]
@@ -64,6 +67,7 @@ impl Cli {
             },
             Commands::Pr { command } => match command {
                 PrCommand::Agent(_) => "pr agent",
+                PrCommand::AgentAction(_) => "pr agent-action",
                 PrCommand::Plan(_) => "pr plan",
                 PrCommand::Record(_) => "pr record",
                 PrCommand::Status(_) => "pr status",
@@ -139,6 +143,9 @@ enum PolicyCommand {
 enum PrCommand {
     /// Gather live PR state into the capsule and recommend next dry-run actions.
     Agent(PrAgentArgs),
+    /// Plan or apply one explicit hosted PR action.
+    #[command(name = "agent-action")]
+    AgentAction(PrAgentActionArgs),
     /// Print the live-command plan for PR evidence capture.
     Plan(PrPlanArgs),
     /// Normalize and record a PR evidence source into a task capsule.
@@ -186,6 +193,72 @@ pub struct PrAgentArgs {
         help = "Replay captured source JSON files instead of running gh"
     )]
     pub source_dir: Option<PathBuf>,
+}
+
+#[derive(Args, Clone, Debug)]
+pub struct PrAgentActionArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long, value_name = "OWNER/REPO")]
+    pub repo: String,
+    #[arg(long, value_name = "PR_NUMBER")]
+    pub number: u64,
+    #[arg(long, value_name = "PLAN_ID")]
+    pub plan_id: String,
+    #[arg(long, value_enum, value_name = "ACTION")]
+    pub action: PrAgentHostedActionKind,
+    #[arg(
+        long,
+        help = "Execute the hosted mutation after writing the dry-run plan"
+    )]
+    pub apply: bool,
+    #[arg(long, value_name = "TEXT")]
+    pub body: Option<String>,
+    #[arg(long, value_name = "MARKDOWN_FILE")]
+    pub body_file: Option<PathBuf>,
+    #[arg(long, value_name = "COMMENT_ID")]
+    pub review_comment_id: Option<u64>,
+    #[arg(long, value_name = "THREAD_ID")]
+    pub thread_id: Option<String>,
+    #[arg(long = "label", value_name = "LABEL")]
+    pub labels: Vec<String>,
+    #[arg(long, value_name = "RUN_ID")]
+    pub run_id: Option<u64>,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+    #[arg(
+        long,
+        value_name = "SOURCE_DIR",
+        help = "Replay captured source JSON files for dry-run planning; rejected with --apply"
+    )]
+    pub source_dir: Option<PathBuf>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[value(rename_all = "kebab-case")]
+pub enum PrAgentHostedActionKind {
+    PostIssueComment,
+    ReplyReviewComment,
+    ResolveReviewThread,
+    UnresolveReviewThread,
+    AddLabels,
+    RemoveLabels,
+    RerunFailedJobs,
+}
+
+impl PrAgentHostedActionKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::PostIssueComment => "post-issue-comment",
+            Self::ReplyReviewComment => "reply-review-comment",
+            Self::ResolveReviewThread => "resolve-review-thread",
+            Self::UnresolveReviewThread => "unresolve-review-thread",
+            Self::AddLabels => "add-labels",
+            Self::RemoveLabels => "remove-labels",
+            Self::RerunFailedJobs => "rerun-failed-jobs",
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -803,6 +876,36 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            PrCommand::AgentAction(args) => {
+                let generated_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = run_pr_agent_hosted_action(args, generated_at)?;
+                let failed = result
+                    .execution
+                    .as_ref()
+                    .is_some_and(|execution| execution.status == PrAgentHostedActionStatus::Failed);
+                let human = if result.dry_run {
+                    format!(
+                        "planned hosted PR action {} for {}#{}; rerun with --apply to execute",
+                        result.plan_id, result.repository, result.number
+                    )
+                } else if let Some(execution) = &result.execution {
+                    format!(
+                        "hosted PR action {} for {}#{} finished with {:?}",
+                        result.plan_id, result.repository, result.number, execution.status
+                    )
+                } else {
+                    format!(
+                        "hosted PR action {} for {}#{} did not execute",
+                        result.plan_id, result.repository, result.number
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: !failed,
+                    command: "pr agent-action",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             PrCommand::Plan(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
                 let result = pr_control_plan(args.repo, args.number, generated_at)?;
@@ -1287,6 +1390,1189 @@ pub fn run_pr_agent_state(
     Ok(report)
 }
 
+pub fn run_pr_agent_hosted_action(
+    args: PrAgentActionArgs,
+    generated_at: DateTime<Utc>,
+) -> Result<PrAgentHostedActionReport> {
+    if args.apply && args.source_dir.is_some() {
+        bail!("--source-dir is only allowed for dry-run planning; --apply must capture live state");
+    }
+    let (owner, name) = parse_github_repository(&args.repo)?;
+    validate_plan_id(&args.plan_id)?;
+    validate_hosted_action_args(&args)?;
+    let body = read_hosted_action_body(&args)?;
+    ensure_regular_contract_files(&args.capsule)?;
+    let validation = validate_capsule(&args.capsule)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            args.capsule.display(),
+            validation.errors.join("; ")
+        );
+    }
+
+    let action_dir = prepare_pr_agent_action_dir(&args.capsule, &args.plan_id)?;
+    let before_state = run_pr_agent_state(
+        PrAgentArgs {
+            capsule: args.capsule.clone(),
+            repo: args.repo.clone(),
+            number: args.number,
+            checked_at: Some(generated_at),
+            source_dir: args.source_dir.clone(),
+        },
+        generated_at,
+    )?;
+    let before_state_path = action_dir.join("before-state.json");
+    ensure_pr_agent_report_path_safe(&before_state_path)?;
+    write_json(before_state_path.clone(), &before_state)?;
+
+    let intent = PrAgentHostedActionIntent {
+        repository: args.repo.clone(),
+        number: args.number,
+        plan_id: args.plan_id.clone(),
+        action: args.action,
+        body: body.clone(),
+        review_comment_id: args.review_comment_id,
+        thread_id: args.thread_id.clone(),
+        labels: args.labels.clone(),
+        run_id: args.run_id,
+    };
+    let plan_hash = stable_json_hash(&intent)?;
+    let idempotency_key = format!("codex-dev-pr-agent:{plan_hash}");
+    let action = build_hosted_action_spec(&args, owner, name, &idempotency_key, body)?;
+    let mut diagnostics = before_state.diagnostics.clone();
+    diagnostics.extend(permission_diagnostics(&args, generated_at));
+    let mut report = PrAgentHostedActionReport {
+        schema: PR_AGENT_HOSTED_ACTION_SCHEMA.to_string(),
+        repository: args.repo.clone(),
+        number: args.number,
+        plan_id: args.plan_id.clone(),
+        plan_hash,
+        generated_at,
+        dry_run: !args.apply,
+        apply_requested: args.apply,
+        action_dir: action_dir.display().to_string(),
+        before_state_path: before_state_path.display().to_string(),
+        after_state_path: None,
+        action,
+        diagnostics: diagnostics.clone(),
+        execution: None,
+    };
+    let report_path = action_dir.join("plan.json");
+    ensure_pr_agent_report_path_safe(&report_path)?;
+    write_json(report_path.clone(), &report)?;
+
+    if !args.apply {
+        append_pr_agent_action_evidence(&args, &report, &report_path, None)?;
+        return Ok(report);
+    }
+
+    if let Some(preflight_execution) = preflight_hosted_action(
+        &args,
+        &report.action,
+        &before_state,
+        generated_at,
+        &mut diagnostics,
+    )? {
+        report.diagnostics = diagnostics;
+        report.execution = Some(preflight_execution);
+        write_json(report_path.clone(), &report)?;
+        append_pr_agent_action_evidence(&args, &report, &report_path, report.execution.as_ref())?;
+        return Ok(report);
+    }
+
+    let execution = execute_hosted_action(&report.action, generated_at, &mut diagnostics);
+    report.diagnostics = diagnostics;
+    report.execution = Some(execution);
+
+    if matches!(
+        report.execution.as_ref().map(|execution| execution.status),
+        Some(PrAgentHostedActionStatus::Applied | PrAgentHostedActionStatus::SkippedDuplicate)
+    ) {
+        let after_checked_at = next_state_timestamp(generated_at);
+        match run_pr_agent_state(
+            PrAgentArgs {
+                capsule: args.capsule.clone(),
+                repo: args.repo.clone(),
+                number: args.number,
+                checked_at: Some(after_checked_at),
+                source_dir: None,
+            },
+            after_checked_at,
+        ) {
+            Ok(after_state) => {
+                let after_state_path = action_dir.join("after-state.json");
+                ensure_pr_agent_report_path_safe(&after_state_path)?;
+                write_json(after_state_path.clone(), &after_state)?;
+                report.after_state_path = Some(after_state_path.display().to_string());
+            }
+            Err(error) => report.diagnostics.push(PrAgentDiagnostic {
+                source: "pr-agent-after-state".to_string(),
+                severity: PrAgentSeverity::Error,
+                message: format!(
+                    "hosted action finished but after-state capture failed: {error:#}"
+                ),
+                command: None,
+                exit_code: None,
+                at: after_checked_at,
+            }),
+        }
+    }
+
+    write_json(report_path.clone(), &report)?;
+    append_pr_agent_action_evidence(&args, &report, &report_path, report.execution.as_ref())?;
+    Ok(report)
+}
+
+#[derive(Debug, Serialize)]
+struct PrAgentHostedActionIntent {
+    repository: String,
+    number: u64,
+    plan_id: String,
+    action: PrAgentHostedActionKind,
+    body: Option<String>,
+    review_comment_id: Option<u64>,
+    thread_id: Option<String>,
+    labels: Vec<String>,
+    run_id: Option<u64>,
+}
+
+#[derive(Debug)]
+struct HostedCommandOutput {
+    exit_code: Option<i32>,
+    raw_stdout: Vec<u8>,
+    stdout: Option<String>,
+    stderr: Option<String>,
+}
+
+fn build_hosted_action_spec(
+    args: &PrAgentActionArgs,
+    owner: &str,
+    name: &str,
+    idempotency_key: &str,
+    body: Option<String>,
+) -> Result<PrAgentHostedActionSpec> {
+    let mut duplicate_check_command = Vec::new();
+    let mut state_check_command = Vec::new();
+    let (target, command, summary, reason) = match args.action {
+        PrAgentHostedActionKind::PostIssueComment => {
+            let body = append_idempotency_marker(
+                body.as_deref()
+                    .expect("validated post issue comment body should exist"),
+                idempotency_key,
+            );
+            duplicate_check_command = vec![
+                "gh".to_string(),
+                "api".to_string(),
+                "--paginate".to_string(),
+                "--slurp".to_string(),
+                format!(
+                    "repos/{owner}/{name}/issues/{}/comments?per_page=100",
+                    args.number
+                ),
+            ];
+            (
+                format!("issue-comment:{}", args.number),
+                vec![
+                    "gh".to_string(),
+                    "api".to_string(),
+                    "--method".to_string(),
+                    "POST".to_string(),
+                    format!("repos/{owner}/{name}/issues/{}/comments", args.number),
+                    "-f".to_string(),
+                    format!("body={body}"),
+                ],
+                "Post PR conversation comment".to_string(),
+                "reply to hosted PR discussion with explicit evidence".to_string(),
+            )
+        }
+        PrAgentHostedActionKind::ReplyReviewComment => {
+            let comment_id = args
+                .review_comment_id
+                .expect("validated review comment id should exist");
+            let body = append_idempotency_marker(
+                body.as_deref()
+                    .expect("validated review reply body should exist"),
+                idempotency_key,
+            );
+            duplicate_check_command = vec![
+                "gh".to_string(),
+                "api".to_string(),
+                "--paginate".to_string(),
+                "--slurp".to_string(),
+                format!(
+                    "repos/{owner}/{name}/pulls/{}/comments?per_page=100",
+                    args.number
+                ),
+            ];
+            (
+                format!("review-comment:{comment_id}"),
+                vec![
+                    "gh".to_string(),
+                    "api".to_string(),
+                    "--method".to_string(),
+                    "POST".to_string(),
+                    format!(
+                        "repos/{owner}/{name}/pulls/{}/comments/{comment_id}/replies",
+                        args.number
+                    ),
+                    "-f".to_string(),
+                    format!("body={body}"),
+                ],
+                "Reply to review comment".to_string(),
+                "answer a specific top-level PR review comment with evidence".to_string(),
+            )
+        }
+        PrAgentHostedActionKind::ResolveReviewThread => {
+            let thread_id = args
+                .thread_id
+                .clone()
+                .expect("validated review thread id should exist");
+            (
+                format!("review-thread:{thread_id}"),
+                graph_ql_thread_command(&thread_id, RESOLVE_REVIEW_THREAD_MUTATION),
+                "Resolve review thread".to_string(),
+                "mark an addressed hosted review thread resolved".to_string(),
+            )
+        }
+        PrAgentHostedActionKind::UnresolveReviewThread => {
+            let thread_id = args
+                .thread_id
+                .clone()
+                .expect("validated review thread id should exist");
+            (
+                format!("review-thread:{thread_id}"),
+                graph_ql_thread_command(&thread_id, UNRESOLVE_REVIEW_THREAD_MUTATION),
+                "Unresolve review thread".to_string(),
+                "reopen a hosted review thread when it still needs work".to_string(),
+            )
+        }
+        PrAgentHostedActionKind::AddLabels => (
+            format!("labels:{}", args.labels.join(",")),
+            issue_edit_label_command(&args.repo, args.number, "--add-label", &args.labels),
+            "Add PR labels".to_string(),
+            "apply explicit PR labels through the issue-backed PR surface".to_string(),
+        ),
+        PrAgentHostedActionKind::RemoveLabels => (
+            format!("labels:{}", args.labels.join(",")),
+            issue_edit_label_command(&args.repo, args.number, "--remove-label", &args.labels),
+            "Remove PR labels".to_string(),
+            "remove explicit PR labels through the issue-backed PR surface".to_string(),
+        ),
+        PrAgentHostedActionKind::RerunFailedJobs => {
+            let run_id = args.run_id.expect("validated workflow run id should exist");
+            state_check_command = vec![
+                "gh".to_string(),
+                "api".to_string(),
+                format!("repos/{owner}/{name}/actions/runs/{run_id}"),
+            ];
+            (
+                format!("workflow-run:{run_id}"),
+                vec![
+                    "gh".to_string(),
+                    "api".to_string(),
+                    "--method".to_string(),
+                    "POST".to_string(),
+                    format!("repos/{owner}/{name}/actions/runs/{run_id}/rerun-failed-jobs"),
+                ],
+                "Rerun failed workflow jobs".to_string(),
+                "request a GitHub Actions retry for failed jobs in one workflow run".to_string(),
+            )
+        }
+    };
+
+    Ok(PrAgentHostedActionSpec {
+        id: args.plan_id.clone(),
+        kind: args.action.as_str().to_string(),
+        summary,
+        reason,
+        target,
+        idempotency_key: idempotency_key.to_string(),
+        command,
+        duplicate_check_command,
+        state_check_command,
+        requires_apply: true,
+        network: true,
+        secrets: true,
+        permission_notes: permission_notes_for_action(args.action),
+    })
+}
+
+fn preflight_hosted_action(
+    args: &PrAgentActionArgs,
+    action: &PrAgentHostedActionSpec,
+    before_state: &PrAgentStateReport,
+    checked_at: DateTime<Utc>,
+    diagnostics: &mut Vec<PrAgentDiagnostic>,
+) -> Result<Option<PrAgentHostedActionExecution>> {
+    if before_state
+        .diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+    {
+        let message =
+            "refusing hosted write because live before-state capture has error diagnostics"
+                .to_string();
+        diagnostics.push(PrAgentDiagnostic {
+            source: "pr-agent-preflight".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: message.clone(),
+            command: None,
+            exit_code: None,
+            at: checked_at,
+        });
+        return Ok(Some(failed_preflight_execution(
+            action, checked_at, message,
+        )));
+    }
+
+    match args.action {
+        PrAgentHostedActionKind::PostIssueComment | PrAgentHostedActionKind::ReplyReviewComment => {
+            Ok(None)
+        }
+        PrAgentHostedActionKind::ResolveReviewThread
+        | PrAgentHostedActionKind::UnresolveReviewThread => {
+            let thread_id = args
+                .thread_id
+                .as_deref()
+                .expect("validated review thread id should exist");
+            let Some(is_resolved) = review_thread_resolution(before_state, thread_id)? else {
+                let message = format!(
+                    "refusing hosted write because review thread {thread_id} was not found in current PR state"
+                );
+                diagnostics.push(PrAgentDiagnostic {
+                    source: "pr-agent-preflight".to_string(),
+                    severity: PrAgentSeverity::Error,
+                    message: message.clone(),
+                    command: None,
+                    exit_code: None,
+                    at: checked_at,
+                });
+                return Ok(Some(failed_preflight_execution(
+                    action, checked_at, message,
+                )));
+            };
+            let already_desired = match args.action {
+                PrAgentHostedActionKind::ResolveReviewThread => is_resolved,
+                PrAgentHostedActionKind::UnresolveReviewThread => !is_resolved,
+                _ => unreachable!("thread actions handled only"),
+            };
+            if already_desired {
+                return Ok(Some(skipped_preflight_execution(
+                    action,
+                    checked_at,
+                    format!("review-thread:{thread_id}:already-desired"),
+                )));
+            }
+            Ok(None)
+        }
+        PrAgentHostedActionKind::AddLabels | PrAgentHostedActionKind::RemoveLabels => {
+            let Some(current_labels) = current_pr_labels(before_state)? else {
+                let message =
+                    "refusing hosted write because current PR labels were not captured".to_string();
+                diagnostics.push(PrAgentDiagnostic {
+                    source: "pr-agent-preflight".to_string(),
+                    severity: PrAgentSeverity::Error,
+                    message: message.clone(),
+                    command: None,
+                    exit_code: None,
+                    at: checked_at,
+                });
+                return Ok(Some(failed_preflight_execution(
+                    action, checked_at, message,
+                )));
+            };
+            let requested = args
+                .labels
+                .iter()
+                .map(|label| label.to_ascii_lowercase())
+                .collect::<BTreeSet<_>>();
+            let already_desired = match args.action {
+                PrAgentHostedActionKind::AddLabels => {
+                    requested.iter().all(|label| current_labels.contains(label))
+                }
+                PrAgentHostedActionKind::RemoveLabels => requested
+                    .iter()
+                    .all(|label| !current_labels.contains(label)),
+                _ => unreachable!("label actions handled only"),
+            };
+            if already_desired {
+                return Ok(Some(skipped_preflight_execution(
+                    action,
+                    checked_at,
+                    format!("labels:{}:already-desired", args.labels.join(",")),
+                )));
+            }
+            Ok(None)
+        }
+        PrAgentHostedActionKind::RerunFailedJobs => {
+            let execution =
+                preflight_workflow_rerun(action, before_state, checked_at, diagnostics)?;
+            Ok(execution)
+        }
+    }
+}
+
+fn preflight_workflow_rerun(
+    action: &PrAgentHostedActionSpec,
+    before_state: &PrAgentStateReport,
+    checked_at: DateTime<Utc>,
+    diagnostics: &mut Vec<PrAgentDiagnostic>,
+) -> Result<Option<PrAgentHostedActionExecution>> {
+    if action.state_check_command.is_empty() {
+        let message =
+            "refusing hosted write because workflow run state check command is missing".to_string();
+        diagnostics.push(PrAgentDiagnostic {
+            source: "pr-agent-preflight".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: message.clone(),
+            command: None,
+            exit_code: None,
+            at: checked_at,
+        });
+        return Ok(Some(failed_preflight_execution(
+            action, checked_at, message,
+        )));
+    }
+    let output = match run_hosted_command(&action.state_check_command) {
+        Ok(output) if output.exit_code == Some(0) => output,
+        Ok(output) => {
+            diagnostics.push(permission_failure_diagnostic(
+                "pr-agent-state-check",
+                &action.state_check_command,
+                output.exit_code,
+                output.stderr.as_deref(),
+                checked_at,
+            ));
+            return Ok(Some(PrAgentHostedActionExecution {
+                status: PrAgentHostedActionStatus::Failed,
+                applied_at: checked_at,
+                command: action.state_check_command.clone(),
+                exit_code: output.exit_code,
+                stdout: output.stdout,
+                stderr: output.stderr,
+                duplicate_of: None,
+            }));
+        }
+        Err(error) => {
+            let message = format!("{error:#}");
+            diagnostics.push(PrAgentDiagnostic {
+                source: "pr-agent-state-check".to_string(),
+                severity: PrAgentSeverity::Error,
+                message: message.clone(),
+                command: Some(render_command(&action.state_check_command)),
+                exit_code: None,
+                at: checked_at,
+            });
+            return Ok(Some(PrAgentHostedActionExecution {
+                status: PrAgentHostedActionStatus::Failed,
+                applied_at: checked_at,
+                command: action.state_check_command.clone(),
+                exit_code: None,
+                stdout: None,
+                stderr: Some(message),
+                duplicate_of: None,
+            }));
+        }
+    };
+    let value = serde_json::from_slice::<Value>(&output.raw_stdout)
+        .context("workflow run state check did not return valid JSON")?;
+    let run_head_sha = value.get("head_sha").and_then(Value::as_str);
+    let Some(pr_head_sha) = before_state.pr.head_sha.as_deref() else {
+        let message =
+            "refusing hosted write because current PR head SHA was not captured".to_string();
+        diagnostics.push(PrAgentDiagnostic {
+            source: "pr-agent-preflight".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: message.clone(),
+            command: Some(render_command(&action.state_check_command)),
+            exit_code: output.exit_code,
+            at: checked_at,
+        });
+        return Ok(Some(failed_preflight_execution(
+            action, checked_at, message,
+        )));
+    };
+    if run_head_sha != Some(pr_head_sha) {
+        let message = format!(
+            "refusing hosted write because workflow run head_sha {:?} does not match PR head_sha {pr_head_sha}",
+            run_head_sha
+        );
+        diagnostics.push(PrAgentDiagnostic {
+            source: "pr-agent-preflight".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: message.clone(),
+            command: Some(render_command(&action.state_check_command)),
+            exit_code: output.exit_code,
+            at: checked_at,
+        });
+        return Ok(Some(failed_preflight_execution(
+            action, checked_at, message,
+        )));
+    }
+    let status = value
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let conclusion = value
+        .get("conclusion")
+        .and_then(Value::as_str)
+        .map(str::to_ascii_lowercase);
+    if status == "completed"
+        && matches!(
+            conclusion.as_deref(),
+            Some("failure" | "cancelled" | "canceled" | "timed_out" | "action_required")
+        )
+    {
+        return Ok(None);
+    }
+    if matches!(
+        status.as_str(),
+        "queued" | "in_progress" | "pending" | "requested" | "waiting"
+    ) || matches!(
+        conclusion.as_deref(),
+        Some("success" | "neutral" | "skipped")
+    ) {
+        return Ok(Some(PrAgentHostedActionExecution {
+            status: PrAgentHostedActionStatus::SkippedDuplicate,
+            applied_at: checked_at,
+            command: action.state_check_command.clone(),
+            exit_code: output.exit_code,
+            stdout: output.stdout,
+            stderr: output.stderr,
+            duplicate_of: Some(format!(
+                "workflow-run:{}:{}",
+                status,
+                conclusion.as_deref().unwrap_or("none")
+            )),
+        }));
+    }
+    let message = format!(
+        "refusing hosted write because workflow run is not in a failed completed state: status={status}, conclusion={}",
+        conclusion.as_deref().unwrap_or("none")
+    );
+    diagnostics.push(PrAgentDiagnostic {
+        source: "pr-agent-preflight".to_string(),
+        severity: PrAgentSeverity::Error,
+        message: message.clone(),
+        command: Some(render_command(&action.state_check_command)),
+        exit_code: output.exit_code,
+        at: checked_at,
+    });
+    Ok(Some(failed_preflight_execution(
+        action, checked_at, message,
+    )))
+}
+
+fn failed_preflight_execution(
+    action: &PrAgentHostedActionSpec,
+    applied_at: DateTime<Utc>,
+    message: String,
+) -> PrAgentHostedActionExecution {
+    PrAgentHostedActionExecution {
+        status: PrAgentHostedActionStatus::Failed,
+        applied_at,
+        command: action.command.clone(),
+        exit_code: None,
+        stdout: None,
+        stderr: Some(message),
+        duplicate_of: None,
+    }
+}
+
+fn skipped_preflight_execution(
+    action: &PrAgentHostedActionSpec,
+    applied_at: DateTime<Utc>,
+    duplicate_of: String,
+) -> PrAgentHostedActionExecution {
+    PrAgentHostedActionExecution {
+        status: PrAgentHostedActionStatus::SkippedDuplicate,
+        applied_at,
+        command: if action.state_check_command.is_empty() {
+            action.command.clone()
+        } else {
+            action.state_check_command.clone()
+        },
+        exit_code: Some(0),
+        stdout: None,
+        stderr: None,
+        duplicate_of: Some(duplicate_of),
+    }
+}
+
+fn review_thread_resolution(
+    before_state: &PrAgentStateReport,
+    thread_id: &str,
+) -> Result<Option<bool>> {
+    let Some(path) = source_path(before_state, "gh-review-threads") else {
+        return Ok(None);
+    };
+    let value = read_json::<Value>(&path)?;
+    Ok(find_review_thread_resolution(&value, thread_id))
+}
+
+fn find_review_thread_resolution(value: &Value, thread_id: &str) -> Option<bool> {
+    match value {
+        Value::Array(values) => values
+            .iter()
+            .find_map(|value| find_review_thread_resolution(value, thread_id)),
+        Value::Object(map) => {
+            if map.get("id").and_then(Value::as_str) == Some(thread_id) {
+                return map.get("isResolved").and_then(Value::as_bool);
+            }
+            map.values()
+                .find_map(|value| find_review_thread_resolution(value, thread_id))
+        }
+        _ => None,
+    }
+}
+
+fn current_pr_labels(before_state: &PrAgentStateReport) -> Result<Option<BTreeSet<String>>> {
+    let Some(path) = source_path(before_state, "gh-pr-view") else {
+        return Ok(None);
+    };
+    let value = read_json::<Value>(&path)?;
+    let Some(labels) = value.get("labels").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    Ok(Some(
+        labels
+            .iter()
+            .filter_map(|label| {
+                label
+                    .as_str()
+                    .or_else(|| label.get("name").and_then(Value::as_str))
+                    .map(str::to_ascii_lowercase)
+            })
+            .collect(),
+    ))
+}
+
+fn source_path(before_state: &PrAgentStateReport, id: &str) -> Option<PathBuf> {
+    before_state
+        .sources
+        .iter()
+        .find(|source| source.id == id && source.status == PrAgentSourceStatus::Captured)
+        .map(|source| PathBuf::from(&source.path))
+}
+
+fn execute_hosted_action(
+    action: &PrAgentHostedActionSpec,
+    applied_at: DateTime<Utc>,
+    diagnostics: &mut Vec<PrAgentDiagnostic>,
+) -> PrAgentHostedActionExecution {
+    if !action.duplicate_check_command.is_empty() {
+        match run_hosted_command(&action.duplicate_check_command) {
+            Ok(output) if output.exit_code == Some(0) => {
+                if let Some(duplicate_of) =
+                    duplicate_comment_reference(&output.raw_stdout, &action.idempotency_key)
+                {
+                    return PrAgentHostedActionExecution {
+                        status: PrAgentHostedActionStatus::SkippedDuplicate,
+                        applied_at,
+                        command: action.duplicate_check_command.clone(),
+                        exit_code: Some(0),
+                        stdout: output.stdout,
+                        stderr: output.stderr,
+                        duplicate_of: Some(duplicate_of),
+                    };
+                }
+            }
+            Ok(output) => {
+                diagnostics.push(permission_failure_diagnostic(
+                    "pr-agent-duplicate-check",
+                    &action.duplicate_check_command,
+                    output.exit_code,
+                    output.stderr.as_deref(),
+                    applied_at,
+                ));
+                return PrAgentHostedActionExecution {
+                    status: PrAgentHostedActionStatus::Failed,
+                    applied_at,
+                    command: action.duplicate_check_command.clone(),
+                    exit_code: output.exit_code,
+                    stdout: output.stdout,
+                    stderr: output.stderr,
+                    duplicate_of: None,
+                };
+            }
+            Err(error) => {
+                let message = format!("{error:#}");
+                diagnostics.push(PrAgentDiagnostic {
+                    source: "pr-agent-duplicate-check".to_string(),
+                    severity: PrAgentSeverity::Error,
+                    message: message.clone(),
+                    command: Some(render_command(&action.duplicate_check_command)),
+                    exit_code: None,
+                    at: applied_at,
+                });
+                return PrAgentHostedActionExecution {
+                    status: PrAgentHostedActionStatus::Failed,
+                    applied_at,
+                    command: action.duplicate_check_command.clone(),
+                    exit_code: None,
+                    stdout: None,
+                    stderr: Some(message),
+                    duplicate_of: None,
+                };
+            }
+        }
+    }
+
+    match run_hosted_command(&action.command) {
+        Ok(output) => {
+            let status = if output.exit_code == Some(0) {
+                PrAgentHostedActionStatus::Applied
+            } else {
+                diagnostics.push(permission_failure_diagnostic(
+                    "pr-agent-apply",
+                    &action.command,
+                    output.exit_code,
+                    output.stderr.as_deref(),
+                    applied_at,
+                ));
+                PrAgentHostedActionStatus::Failed
+            };
+            PrAgentHostedActionExecution {
+                status,
+                applied_at,
+                command: action.command.clone(),
+                exit_code: output.exit_code,
+                stdout: output.stdout,
+                stderr: output.stderr,
+                duplicate_of: None,
+            }
+        }
+        Err(error) => {
+            let message = format!("{error:#}");
+            diagnostics.push(PrAgentDiagnostic {
+                source: "pr-agent-apply".to_string(),
+                severity: PrAgentSeverity::Error,
+                message: message.clone(),
+                command: Some(render_command(&action.command)),
+                exit_code: None,
+                at: applied_at,
+            });
+            PrAgentHostedActionExecution {
+                status: PrAgentHostedActionStatus::Failed,
+                applied_at,
+                command: action.command.clone(),
+                exit_code: None,
+                stdout: None,
+                stderr: Some(message),
+                duplicate_of: None,
+            }
+        }
+    }
+}
+
+fn run_hosted_command(command: &[String]) -> Result<HostedCommandOutput> {
+    let Some((program, arguments)) = command.split_first() else {
+        bail!("hosted action command is empty");
+    };
+    let output = Command::new(program)
+        .args(arguments)
+        .output()
+        .with_context(|| {
+            format!(
+                "failed to start hosted action command {}",
+                render_command(command)
+            )
+        })?;
+    Ok(HostedCommandOutput {
+        exit_code: output.status.code(),
+        raw_stdout: output.stdout.clone(),
+        stdout: diagnostic_excerpt(&output.stdout),
+        stderr: diagnostic_excerpt(&output.stderr),
+    })
+}
+
+fn duplicate_comment_reference(stdout: &[u8], idempotency_key: &str) -> Option<String> {
+    let value = serde_json::from_slice::<Value>(stdout).ok()?;
+    find_comment_marker(&value, idempotency_key)
+}
+
+fn find_comment_marker(value: &Value, idempotency_key: &str) -> Option<String> {
+    match value {
+        Value::Array(items) => items
+            .iter()
+            .find_map(|item| find_comment_marker(item, idempotency_key)),
+        Value::Object(map) => {
+            if map
+                .get("body")
+                .and_then(Value::as_str)
+                .is_some_and(|body| body.contains(idempotency_key))
+            {
+                return map
+                    .get("html_url")
+                    .or_else(|| map.get("url"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+                    .or_else(|| map.get("id").map(Value::to_string));
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn append_idempotency_marker(body: &str, idempotency_key: &str) -> String {
+    format!("{}\n\n<!-- {idempotency_key} -->", body.trim_end())
+}
+
+fn graph_ql_thread_command(thread_id: &str, mutation: &str) -> Vec<String> {
+    vec![
+        "gh".to_string(),
+        "api".to_string(),
+        "graphql".to_string(),
+        "-f".to_string(),
+        format!("threadId={thread_id}"),
+        "-f".to_string(),
+        format!("query={mutation}"),
+    ]
+}
+
+fn issue_edit_label_command(
+    repository: &str,
+    number: u64,
+    flag: &str,
+    labels: &[String],
+) -> Vec<String> {
+    let mut command = vec![
+        "gh".to_string(),
+        "issue".to_string(),
+        "edit".to_string(),
+        number.to_string(),
+        "--repo".to_string(),
+        repository.to_string(),
+    ];
+    for label in labels {
+        command.push(flag.to_string());
+        command.push(label.clone());
+    }
+    command
+}
+
+fn permission_notes_for_action(action: PrAgentHostedActionKind) -> Vec<String> {
+    match action {
+        PrAgentHostedActionKind::PostIssueComment => vec![
+            "GitHub REST issue comments require Issues write or Pull requests write permissions"
+                .to_string(),
+            "PR conversation comments trigger notifications and may hit secondary rate limits"
+                .to_string(),
+        ],
+        PrAgentHostedActionKind::ReplyReviewComment => vec![
+            "GitHub REST review-comment replies require Pull requests write permissions"
+                .to_string(),
+            "GitHub only supports replies to top-level review comments, not replies to replies"
+                .to_string(),
+        ],
+        PrAgentHostedActionKind::ResolveReviewThread
+        | PrAgentHostedActionKind::UnresolveReviewThread => vec![
+            "GitHub GraphQL review-thread mutations require Pull requests write permissions"
+                .to_string(),
+        ],
+        PrAgentHostedActionKind::AddLabels | PrAgentHostedActionKind::RemoveLabels => vec![
+            "PR labels are issue-backed and require Issues write or Pull requests write permissions"
+                .to_string(),
+        ],
+        PrAgentHostedActionKind::RerunFailedJobs => vec![
+            "Rerunning failed workflow jobs requires Actions write permissions".to_string(),
+            "GitHub reruns use the privileges of the actor that triggered the original workflow"
+                .to_string(),
+        ],
+    }
+}
+
+fn permission_diagnostics(
+    args: &PrAgentActionArgs,
+    generated_at: DateTime<Utc>,
+) -> Vec<PrAgentDiagnostic> {
+    let message = if env::var_os("GITHUB_TOKEN").is_some() {
+        "GITHUB_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
+    } else if env::var_os("GH_TOKEN").is_some() {
+        "GH_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
+    } else {
+        "no GH_TOKEN or GITHUB_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
+    };
+    vec![PrAgentDiagnostic {
+        source: "github-auth".to_string(),
+        severity: PrAgentSeverity::Info,
+        message,
+        command: Some(format!(
+            "codex-dev pr agent-action --repo {} --number {} --plan-id {} --action {}{}",
+            args.repo,
+            args.number,
+            args.plan_id,
+            args.action.as_str(),
+            if args.apply { " --apply" } else { "" }
+        )),
+        exit_code: None,
+        at: generated_at,
+    }]
+}
+
+fn permission_failure_diagnostic(
+    source: &str,
+    command: &[String],
+    exit_code: Option<i32>,
+    stderr: Option<&str>,
+    at: DateTime<Utc>,
+) -> PrAgentDiagnostic {
+    let stderr_suffix = stderr
+        .filter(|stderr| !stderr.is_empty())
+        .map(|stderr| format!(": {stderr}"))
+        .unwrap_or_default();
+    PrAgentDiagnostic {
+        source: source.to_string(),
+        severity: PrAgentSeverity::Error,
+        message: format!(
+            "hosted GitHub command failed; verify token type and repository permissions for this action{stderr_suffix}"
+        ),
+        command: Some(render_command(command)),
+        exit_code,
+        at,
+    }
+}
+
+fn append_pr_agent_action_evidence(
+    args: &PrAgentActionArgs,
+    report: &PrAgentHostedActionReport,
+    report_path: &Path,
+    execution: Option<&PrAgentHostedActionExecution>,
+) -> Result<()> {
+    let status = execution
+        .map(|execution| format!("{:?}", execution.status))
+        .unwrap_or_else(|| "planned".to_string());
+    append_evidence(AppendEvidenceArgs {
+        capsule: args.capsule.clone(),
+        record: EvidenceRecord {
+            schema: EVIDENCE_SCHEMA.to_string(),
+            kind: if args.apply {
+                EvidenceKind::Review
+            } else {
+                EvidenceKind::Decision
+            },
+            at: execution
+                .map(|execution| execution.applied_at)
+                .unwrap_or(report.generated_at),
+            summary: format!(
+                "PR agent hosted action {} for {}#{}: {status}",
+                report.plan_id, report.repository, report.number
+            ),
+            command: Some(render_pr_agent_action_invocation(args)),
+            exit_code: execution.and_then(|execution| execution.exit_code),
+            source_ids: vec![
+                format!("pr-agent-action:{}", report.plan_id),
+                report.plan_hash.clone(),
+            ],
+            actor: None,
+            tool: Some("codex-dev".to_string()),
+            confidence: None,
+            residual_risk: report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+                .then(|| "one or more hosted action diagnostics are errors".to_string()),
+            artifacts: action_artifacts(report, report_path),
+        },
+    })?;
+    Ok(())
+}
+
+fn render_pr_agent_action_invocation(args: &PrAgentActionArgs) -> String {
+    let mut command = vec![
+        "codex-dev".to_string(),
+        "pr".to_string(),
+        "agent-action".to_string(),
+        "--capsule".to_string(),
+        args.capsule.display().to_string(),
+        "--repo".to_string(),
+        args.repo.clone(),
+        "--number".to_string(),
+        args.number.to_string(),
+        "--plan-id".to_string(),
+        args.plan_id.clone(),
+        "--action".to_string(),
+        args.action.as_str().to_string(),
+    ];
+    if args.apply {
+        command.push("--apply".to_string());
+    }
+    render_command(&command)
+}
+
+fn action_artifacts(report: &PrAgentHostedActionReport, report_path: &Path) -> Vec<String> {
+    let mut artifacts = vec![
+        report_path.display().to_string(),
+        report.before_state_path.clone(),
+    ];
+    if let Some(after_state_path) = &report.after_state_path {
+        artifacts.push(after_state_path.clone());
+    }
+    artifacts
+}
+
+fn prepare_pr_agent_action_dir(capsule: &Path, plan_id: &str) -> Result<PathBuf> {
+    let actions_root = capsule.join("pr-agent-actions");
+    create_pr_agent_dir_without_symlink(&actions_root, true)?;
+    let action_dir = actions_root.join(plan_id);
+    create_pr_agent_dir_without_symlink(&action_dir, true)?;
+    Ok(action_dir)
+}
+
+fn validate_plan_id(plan_id: &str) -> Result<()> {
+    if plan_id.is_empty() {
+        bail!("--plan-id must not be empty");
+    }
+    if !plan_id
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
+    {
+        bail!("--plan-id must contain only ASCII letters, numbers, '-' or '_': {plan_id}");
+    }
+    if plan_id.contains('/') || plan_id.contains('\\') {
+        bail!("--plan-id must be a single safe path segment: {plan_id}");
+    }
+    Ok(())
+}
+
+fn validate_hosted_action_args(args: &PrAgentActionArgs) -> Result<()> {
+    let has_body = args.body.is_some() || args.body_file.is_some();
+    match args.action {
+        PrAgentHostedActionKind::PostIssueComment => {
+            require_body(args, "post-issue-comment")?;
+            reject_targets(args, true, false, false, false)?;
+        }
+        PrAgentHostedActionKind::ReplyReviewComment => {
+            require_body(args, "reply-review-comment")?;
+            if args.review_comment_id.is_none() {
+                bail!("reply-review-comment requires --review-comment-id");
+            }
+            reject_targets(args, true, true, false, false)?;
+        }
+        PrAgentHostedActionKind::ResolveReviewThread
+        | PrAgentHostedActionKind::UnresolveReviewThread => {
+            if has_body {
+                bail!(
+                    "{} does not accept --body or --body-file",
+                    args.action.as_str()
+                );
+            }
+            if args.thread_id.as_deref().is_none_or(str::is_empty) {
+                bail!("{} requires --thread-id", args.action.as_str());
+            }
+            reject_targets(args, false, false, true, false)?;
+        }
+        PrAgentHostedActionKind::AddLabels | PrAgentHostedActionKind::RemoveLabels => {
+            if has_body {
+                bail!(
+                    "{} does not accept --body or --body-file",
+                    args.action.as_str()
+                );
+            }
+            if args.labels.is_empty() {
+                bail!("{} requires at least one --label", args.action.as_str());
+            }
+            for label in &args.labels {
+                validate_simple_text("--label", label)?;
+            }
+            reject_targets(args, false, false, false, false)?;
+        }
+        PrAgentHostedActionKind::RerunFailedJobs => {
+            if has_body {
+                bail!("rerun-failed-jobs does not accept --body or --body-file");
+            }
+            if args.run_id.is_none() {
+                bail!("rerun-failed-jobs requires --run-id");
+            }
+            reject_targets(args, false, false, false, true)?;
+        }
+    }
+    Ok(())
+}
+
+fn require_body(args: &PrAgentActionArgs, action: &str) -> Result<()> {
+    match (&args.body, &args.body_file) {
+        (Some(_), Some(_)) => bail!("{action} accepts only one of --body or --body-file"),
+        (None, None) => bail!("{action} requires --body or --body-file"),
+        _ => Ok(()),
+    }
+}
+
+fn reject_targets(
+    args: &PrAgentActionArgs,
+    allow_body: bool,
+    allow_review_comment_id: bool,
+    allow_thread_id: bool,
+    allow_run_id: bool,
+) -> Result<()> {
+    if !allow_body && (args.body.is_some() || args.body_file.is_some()) {
+        bail!("{} does not accept body input", args.action.as_str());
+    }
+    if !allow_review_comment_id && args.review_comment_id.is_some() {
+        bail!(
+            "{} does not accept --review-comment-id",
+            args.action.as_str()
+        );
+    }
+    if !allow_thread_id && args.thread_id.is_some() {
+        bail!("{} does not accept --thread-id", args.action.as_str());
+    }
+    if !allow_run_id && args.run_id.is_some() {
+        bail!("{} does not accept --run-id", args.action.as_str());
+    }
+    Ok(())
+}
+
+fn read_hosted_action_body(args: &PrAgentActionArgs) -> Result<Option<String>> {
+    let body = match (&args.body, &args.body_file) {
+        (Some(body), None) => Some(body.clone()),
+        (None, Some(path)) => Some(
+            fs::read_to_string(path)
+                .with_context(|| format!("failed to read --body-file {}", path.display()))?,
+        ),
+        _ => None,
+    };
+    if let Some(body) = &body {
+        validate_body_text(body)?;
+    }
+    Ok(body)
+}
+
+fn validate_body_text(body: &str) -> Result<()> {
+    if body.trim().is_empty() {
+        bail!("body must not be empty");
+    }
+    if body
+        .chars()
+        .any(|ch| ch.is_control() && !matches!(ch, '\n' | '\r' | '\t'))
+    {
+        bail!("body must not contain control characters other than tab or newline");
+    }
+    Ok(())
+}
+
+fn validate_simple_text(field: &str, value: &str) -> Result<()> {
+    if value.trim().is_empty() {
+        bail!("{field} must not be empty");
+    }
+    if value.chars().any(char::is_control) {
+        bail!("{field} must not contain control characters");
+    }
+    Ok(())
+}
+
+fn next_state_timestamp(generated_at: DateTime<Utc>) -> DateTime<Utc> {
+    let now = Utc::now();
+    if now.timestamp_millis() <= generated_at.timestamp_millis() {
+        generated_at + TimeDelta::milliseconds(1)
+    } else {
+        now
+    }
+}
+
 #[derive(Clone, Debug)]
 struct PrAgentSourceSpec {
     id: String,
@@ -1428,7 +2714,7 @@ fn pr_agent_source_specs(
                 "--repo",
                 repository,
                 "--json",
-                "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
+                "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt,labels",
             ],
             Some(PrRecordSourceKind::GhPrView),
         ),
