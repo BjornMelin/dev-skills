@@ -428,6 +428,21 @@ summary. It updates
 `capsule.json.updated_at` monotonically, matching the evidence appender
 freshness rule.
 
+`codex-dev.pr-agent-state.v1` records the dry-run state engine output. The CLI
+executes read-only `gh` sources, writes captured provider JSON under
+`pr-agent-sources/<timestamp>/`, records PR-state-bearing sources through the
+existing `pr record` normalizers, and writes `pr-agent-state.json` with explicit
+repository, PR number, timestamp, source records, diagnostics, and recommended
+next actions. Diagnostics must surface command failures, malformed JSON, missing
+permissions, non-final pagination, and GitHub rate-limit state instead of
+silently treating stale or partial evidence as clean. Diagnostic-only sources
+such as `gh-rate-limit`, failed commands, malformed JSON, and incomplete
+pagination are stored raw or as failure artifacts under
+`pr-agent-sources/<timestamp>/` and referenced from diagnostics rather than
+converted into `pr record` source kinds. This command has no hosted-write mode;
+future hosted-action and TUI lanes should consume the typed report instead of
+rediscovering PR state ad hoc.
+
 ### Markdown Notes
 
 `plan.md`, `decisions.md`, `output.md`, and `retrospective.md` are durable

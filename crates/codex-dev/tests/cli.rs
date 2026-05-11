@@ -300,7 +300,21 @@ fn pr_plan_and_record_support_fixture_mode() {
                 .as_array()
                 .expect("command argv")
                 .iter()
-                .any(|part| part == "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}")
+                .any(|part| part == "--paginate")
+            && command["command"]
+                .as_array()
+                .expect("command argv")
+                .iter()
+                .any(|part| part == "--slurp")
+            && command["command"]
+                .as_array()
+                .expect("command argv")
+                .iter()
+                .any(|part| {
+                    part.as_str().is_some_and(|part| {
+                        part.contains("endCursor") && part.contains("after:$endCursor")
+                    })
+                })
     }));
     assert!(plan_commands.iter().any(|command| {
         command["id"] == "gh-pr-checks"
@@ -407,6 +421,221 @@ fn pr_plan_and_record_support_fixture_mode() {
         .assert()
         .success()
         .stdout(predicates::str::contains("BjornMelin/dev-skills#25 open"));
+}
+
+#[test]
+fn pr_agent_replays_sources_records_state_and_recommendations() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    std::fs::create_dir_all(&source_dir).expect("source dir");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "PR agent state",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "pr-agent-state",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        r#"{
+  "number": 47,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/47",
+  "state": "OPEN",
+  "isDraft": false,
+  "mergeable": "MERGEABLE",
+  "reviewDecision": "APPROVED",
+  "headRefOid": "abc123",
+  "statusCheckRollup": []
+}"#,
+    )
+    .expect("write pr view");
+    std::fs::write(
+        source_dir.join("gh-pr-checks.json"),
+        r#"[
+  {"bucket": "pass", "completedAt": "2026-05-09T05:01:00Z", "link": "https://example.test/ci", "name": "ci", "state": "SUCCESS"}
+]"#,
+    )
+    .expect("write checks");
+    std::fs::write(
+        source_dir.join("gh-reviews.json"),
+        r#"[
+  {"id": 1, "user": {"login": "coderabbitai"}, "state": "APPROVED", "submitted_at": "2026-05-09T05:00:00Z"}
+]"#,
+    )
+    .expect("write reviews");
+    std::fs::write(source_dir.join("gh-review-comments.json"), "[]").expect("write comments");
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {"id": "resolved", "isResolved": true, "isOutdated": false}
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write threads");
+    std::fs::write(
+        source_dir.join("gh-rate-limit.json"),
+        r#"{"resources":{"core":{"limit":5000,"remaining":4999,"reset":1770000000}}}"#,
+    )
+    .expect("write rate limit");
+
+    let agent_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "agent",
+            "--capsule",
+            capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "47",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let agent_json: Value = serde_json::from_slice(&agent_output).expect("agent json");
+    assert_eq!(agent_json["command"], "pr agent");
+    assert_eq!(
+        agent_json["result"]["schema"],
+        "codex-dev.pr-agent-state.v1"
+    );
+    assert_eq!(agent_json["result"]["dry_run"], true);
+    assert_eq!(agent_json["result"]["pr"]["number"], 47);
+    assert_eq!(
+        agent_json["result"]["pr"]["review_threads"]["authoritative"],
+        true
+    );
+    assert!(
+        agent_json["result"]["actions"]
+            .as_array()
+            .expect("actions")
+            .iter()
+            .any(|action| action["id"] == "merge_when_policy_allows")
+    );
+    assert!(
+        agent_json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["source"] == "gh-rate-limit")
+    );
+
+    let capsule_path = std::path::Path::new(capsule);
+    assert!(capsule_path.join("pr-agent-state.json").is_file());
+    let pr_json: Value = serde_json::from_str(
+        &std::fs::read_to_string(capsule_path.join("pr.json")).expect("pr json"),
+    )
+    .expect("pr json parse");
+    assert!(
+        pr_json["sources"]
+            .as_array()
+            .expect("sources")
+            .iter()
+            .any(|source| source["kind"] == "gh-review-threads")
+    );
+    let evidence = std::fs::read_to_string(capsule_path.join("evidence.jsonl")).expect("evidence");
+    assert!(evidence.contains("PR agent dry-run state recorded"));
+
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {"id": "current", "isResolved": false, "isOutdated": false}
+            ],
+            "pageInfo": {"hasNextPage": true, "endCursor": "next"}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write incomplete threads");
+    let incomplete_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "agent",
+            "--capsule",
+            capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "47",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--checked-at",
+            "2026-05-09T05:06:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let incomplete_json: Value =
+        serde_json::from_slice(&incomplete_output).expect("incomplete json");
+    assert!(
+        incomplete_json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| {
+                diagnostic["source"] == "gh-review-threads"
+                    && diagnostic["message"]
+                        .as_str()
+                        .is_some_and(|message| message.contains("pagination"))
+            })
+    );
+    assert!(
+        incomplete_json["result"]["actions"]
+            .as_array()
+            .expect("actions")
+            .iter()
+            .any(|action| action["id"] == "refresh_review_threads")
+    );
 }
 
 #[test]

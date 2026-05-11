@@ -11,14 +11,16 @@ use clap::{Args, Parser, Subcommand};
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
-    PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
-    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, PrRecordSourceKind,
-    RecordSubagentOutcomeArgs, RecordSubagentPlanArgs, RecordSubagentSynthesisArgs,
-    SubagentDisposition, SubagentOutcomeStatus, SubagentSynthesisStatus, Verification,
-    append_evidence, append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule,
-    pr_status, read_json, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
-    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
-    validate_capsule, write_json,
+    PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest,
+    PolicyProfile, PolicyRunResult, PrAgentDiagnostic, PrAgentSeverity, PrAgentSourceRecord,
+    PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrRecordArgs,
+    PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
+    RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
+    SubagentSynthesisStatus, Verification, append_evidence, append_jsonl, capsule_status,
+    ensure_regular_contract_files, init_capsule, pr_status, read_json, recommend_pr_agent_actions,
+    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
+    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
+    write_json,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -26,6 +28,7 @@ use serde_json::{Value, json};
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
 
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev")]
@@ -60,6 +63,7 @@ impl Cli {
                 PolicyCommand::Run(_) => "policy run",
             },
             Commands::Pr { command } => match command {
+                PrCommand::Agent(_) => "pr agent",
                 PrCommand::Plan(_) => "pr plan",
                 PrCommand::Record(_) => "pr record",
                 PrCommand::Status(_) => "pr status",
@@ -133,6 +137,8 @@ enum PolicyCommand {
 
 #[derive(Subcommand, Debug)]
 enum PrCommand {
+    /// Gather live PR state into the capsule and recommend next dry-run actions.
+    Agent(PrAgentArgs),
     /// Print the live-command plan for PR evidence capture.
     Plan(PrPlanArgs),
     /// Normalize and record a PR evidence source into a task capsule.
@@ -162,6 +168,24 @@ pub struct PrPlanArgs {
     pub number: u64,
     #[arg(long, value_name = "RFC3339")]
     pub generated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Args, Debug)]
+pub struct PrAgentArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long, value_name = "OWNER/REPO")]
+    pub repo: String,
+    #[arg(long, value_name = "PR_NUMBER")]
+    pub number: u64,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+    #[arg(
+        long,
+        value_name = "SOURCE_DIR",
+        help = "Replay captured source JSON files instead of running gh"
+    )]
+    pub source_dir: Option<PathBuf>,
 }
 
 #[derive(Args, Debug)]
@@ -751,6 +775,34 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
         },
         Commands::Pr { command } => match command {
+            PrCommand::Agent(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = run_pr_agent_state(args, checked_at)?;
+                let blocking = result
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+                    .count();
+                let human = if blocking == 0 {
+                    format!(
+                        "recorded dry-run PR agent state for {}#{}; {} recommended action(s)",
+                        result.repository,
+                        result.number,
+                        result.actions.len()
+                    )
+                } else {
+                    format!(
+                        "recorded partial dry-run PR agent state for {}#{} with {blocking} error(s)",
+                        result.repository, result.number
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: blocking == 0,
+                    command: "pr agent",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             PrCommand::Plan(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
                 let result = pr_control_plan(args.repo, args.number, generated_at)?;
@@ -992,10 +1044,9 @@ pub fn pr_control_plan(
     let owner_arg = format!("owner={owner}");
     let name_arg = format!("name={name}");
     let number_arg = format!("number={number}");
-    let reviews_path = format!("repos/{owner}/{name}/pulls/{number}/reviews");
-    let review_comments_path = format!("repos/{owner}/{name}/pulls/{number}/comments");
-    let review_threads_query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
-    let review_threads_query_arg = format!("query={review_threads_query}");
+    let reviews_path = format!("repos/{owner}/{name}/pulls/{number}/reviews?per_page=100");
+    let review_comments_path = format!("repos/{owner}/{name}/pulls/{number}/comments?per_page=100");
+    let review_threads_query_arg = format!("query={PR_REVIEW_THREADS_QUERY}");
 
     Ok(PrControlPlan {
         schema: PR_CONTROL_PLAN_SCHEMA.to_string(),
@@ -1034,12 +1085,12 @@ pub fn pr_control_plan(
             pr_control_command(
                 "gh-reviews",
                 "GitHub REST review submissions",
-                ["gh", "api", &reviews_path],
+                ["gh", "api", "--paginate", "--slurp", &reviews_path],
             ),
             pr_control_command(
                 "gh-review-comments",
                 "GitHub REST review comments",
-                ["gh", "api", &review_comments_path],
+                ["gh", "api", "--paginate", "--slurp", &review_comments_path],
             ),
             pr_control_command(
                 "gh-review-threads",
@@ -1048,6 +1099,8 @@ pub fn pr_control_plan(
                     "gh",
                     "api",
                     "graphql",
+                    "--paginate",
+                    "--slurp",
                     "-f",
                     &owner_arg,
                     "-f",
@@ -1093,6 +1146,662 @@ pub fn pr_control_plan(
             ),
         ],
     })
+}
+
+pub fn run_pr_agent_state(
+    args: PrAgentArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<PrAgentStateReport> {
+    let (owner, name) = parse_github_repository(&args.repo)?;
+    ensure_regular_contract_files(&args.capsule)?;
+    let validation = validate_capsule(&args.capsule)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            args.capsule.display(),
+            validation.errors.join("; ")
+        );
+    }
+
+    let output_dir = prepare_pr_agent_output_dir(&args.capsule, checked_at)?;
+
+    let agent_command = render_pr_agent_command(&args, checked_at);
+    let mut diagnostics = Vec::new();
+    let mut sources = Vec::new();
+
+    for spec in pr_agent_source_specs(&args.repo, owner, name, args.number) {
+        let capture = capture_pr_agent_source(&args, &spec, &output_dir, checked_at)?;
+        sources.push(capture.source.clone());
+        diagnostics.extend(capture.diagnostics);
+
+        if capture.source.status != PrAgentSourceStatus::Captured {
+            continue;
+        }
+
+        if let Some(source_kind) = spec.source_kind {
+            let record_result = record_pr_snapshot(
+                PrRecordArgs {
+                    capsule: args.capsule.clone(),
+                    source: capture.path.clone(),
+                    source_kind,
+                    repository: Some(args.repo.clone()),
+                    number: Some(args.number),
+                    retrieved_at: Some(capture.source.retrieved_at),
+                    source_command: Some(render_command(&spec.command)),
+                    command: Some(agent_command.clone()),
+                },
+                checked_at,
+            );
+            if let Err(error) = record_result {
+                diagnostics.push(PrAgentDiagnostic {
+                    source: spec.id.clone(),
+                    severity: PrAgentSeverity::Error,
+                    message: format!("failed to normalize captured PR source: {error:#}"),
+                    command: Some(render_command(&spec.command)),
+                    exit_code: capture.source.exit_code,
+                    at: checked_at,
+                });
+            }
+        } else if spec.id == "gh-rate-limit" {
+            diagnostics.extend(rate_limit_diagnostics(&capture.path, &spec, checked_at)?);
+        }
+    }
+
+    let pr = pr_status(&args.capsule)?.pr;
+    if sources.iter().any(|source| {
+        source.id == "gh-review-threads" && source.status == PrAgentSourceStatus::Captured
+    }) && !pr.review_threads.authoritative
+    {
+        diagnostics.push(PrAgentDiagnostic {
+            source: "gh-review-threads".to_string(),
+            severity: PrAgentSeverity::Warning,
+            message: "GitHub review-thread pagination did not reach a final page; review-thread state is not authoritative".to_string(),
+            command: sources
+                .iter()
+                .find(|source| source.id == "gh-review-threads")
+                .map(|source| source.command.clone()),
+            exit_code: sources
+                .iter()
+                .find(|source| source.id == "gh-review-threads")
+                .and_then(|source| source.exit_code),
+            at: checked_at,
+        });
+    }
+    let actions = recommend_pr_agent_actions(&pr, &diagnostics);
+    let report = PrAgentStateReport {
+        schema: PR_AGENT_STATE_SCHEMA.to_string(),
+        repository: args.repo.clone(),
+        number: args.number,
+        checked_at,
+        dry_run: true,
+        pr,
+        sources,
+        diagnostics,
+        actions,
+    };
+    let report_path = args.capsule.join("pr-agent-state.json");
+    ensure_pr_agent_report_path_safe(&report_path)?;
+    write_json(report_path, &report)?;
+
+    append_evidence(AppendEvidenceArgs {
+        capsule: args.capsule,
+        record: EvidenceRecord {
+            schema: EVIDENCE_SCHEMA.to_string(),
+            kind: EvidenceKind::Decision,
+            at: checked_at,
+            summary: format!(
+                "PR agent dry-run state recorded for {}#{}; {} source(s), {} diagnostic(s), {} action(s)",
+                report.repository,
+                report.number,
+                report.sources.len(),
+                report.diagnostics.len(),
+                report.actions.len()
+            ),
+            command: Some(agent_command),
+            exit_code: Some(
+                if report
+                    .diagnostics
+                    .iter()
+                    .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+                {
+                    1
+                } else {
+                    0
+                },
+            ),
+            source_ids: Vec::new(),
+            actor: None,
+            tool: Some("codex-dev".to_string()),
+            confidence: None,
+            residual_risk: report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+                .then(|| {
+                    "one or more hosted-state sources failed to capture or normalize".to_string()
+                }),
+            artifacts: vec!["pr.json".to_string(), "pr-agent-state.json".to_string()],
+        },
+    })?;
+
+    Ok(report)
+}
+
+#[derive(Clone, Debug)]
+struct PrAgentSourceSpec {
+    id: String,
+    kind: String,
+    file_name: String,
+    command: Vec<String>,
+    source_kind: Option<PrRecordSourceKind>,
+    required: bool,
+    flatten_paginated_arrays: bool,
+}
+
+#[derive(Debug)]
+struct CapturedPrAgentSource {
+    source: PrAgentSourceRecord,
+    path: PathBuf,
+    diagnostics: Vec<PrAgentDiagnostic>,
+}
+
+fn prepare_pr_agent_output_dir(capsule: &Path, checked_at: DateTime<Utc>) -> Result<PathBuf> {
+    let sources_root = capsule.join("pr-agent-sources");
+    create_pr_agent_dir_without_symlink(&sources_root, true)?;
+
+    let output_dir = sources_root.join(format!("{}", checked_at.timestamp_millis()));
+    create_pr_agent_dir_without_symlink(&output_dir, false)?;
+    Ok(output_dir)
+}
+
+fn create_pr_agent_dir_without_symlink(path: &Path, allow_existing_empty_dir: bool) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() {
+                bail!(
+                    "refusing to use symlinked PR agent source directory {}",
+                    path.display()
+                );
+            }
+            if !metadata.is_dir() {
+                bail!(
+                    "refusing to use non-directory PR agent source path {}",
+                    path.display()
+                );
+            }
+            if !allow_existing_empty_dir
+                && fs::read_dir(path)
+                    .with_context(|| {
+                        format!(
+                            "failed to inspect PR agent source directory {}",
+                            path.display()
+                        )
+                    })?
+                    .next()
+                    .is_some()
+            {
+                bail!(
+                    "PR agent source directory already exists and is not empty: {}; choose a different --checked-at or remove the directory",
+                    path.display()
+                );
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            fs::create_dir(path).with_context(|| {
+                format!(
+                    "failed to create PR agent source directory {}",
+                    path.display()
+                )
+            })?;
+            let metadata = fs::symlink_metadata(path).with_context(|| {
+                format!(
+                    "failed to inspect PR agent source directory {}",
+                    path.display()
+                )
+            })?;
+            if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                bail!(
+                    "refusing to use unsafe PR agent source directory {}",
+                    path.display()
+                );
+            }
+        }
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "failed to inspect PR agent source directory {}",
+                    path.display()
+                )
+            });
+        }
+    }
+    Ok(())
+}
+
+fn ensure_pr_agent_report_path_safe(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() {
+                bail!(
+                    "refusing to write symlinked PR agent state report {}",
+                    path.display()
+                );
+            }
+            if !metadata.is_file() {
+                bail!(
+                    "refusing to overwrite non-file PR agent state report path {}",
+                    path.display()
+                );
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "failed to inspect PR agent state report path {}",
+                    path.display()
+                )
+            });
+        }
+    }
+    Ok(())
+}
+
+fn pr_agent_source_specs(
+    repository: &str,
+    owner: &str,
+    name: &str,
+    number: u64,
+) -> Vec<PrAgentSourceSpec> {
+    let reviews_path = format!("repos/{owner}/{name}/pulls/{number}/reviews?per_page=100");
+    let review_comments_path = format!("repos/{owner}/{name}/pulls/{number}/comments?per_page=100");
+    vec![
+        pr_agent_source_spec(
+            "gh-pr-view",
+            "github-pr-view",
+            "gh-pr-view.json",
+            vec![
+                "gh",
+                "pr",
+                "view",
+                &number.to_string(),
+                "--repo",
+                repository,
+                "--json",
+                "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
+            ],
+            Some(PrRecordSourceKind::GhPrView),
+        ),
+        pr_agent_source_spec(
+            "gh-pr-checks",
+            "github-pr-checks",
+            "gh-pr-checks.json",
+            vec![
+                "gh",
+                "pr",
+                "checks",
+                &number.to_string(),
+                "--repo",
+                repository,
+                "--json",
+                "bucket,completedAt,description,event,link,name,startedAt,state,workflow",
+            ],
+            Some(PrRecordSourceKind::GhPrChecks),
+        ),
+        pr_agent_source_spec(
+            "gh-reviews",
+            "github-rest-reviews",
+            "gh-reviews.json",
+            vec!["gh", "api", "--paginate", "--slurp", &reviews_path],
+            Some(PrRecordSourceKind::GhReviews),
+        )
+        .flatten_paginated_arrays(),
+        pr_agent_source_spec(
+            "gh-review-comments",
+            "github-rest-review-comments",
+            "gh-review-comments.json",
+            vec!["gh", "api", "--paginate", "--slurp", &review_comments_path],
+            Some(PrRecordSourceKind::GhReviewComments),
+        )
+        .flatten_paginated_arrays(),
+        pr_agent_source_spec(
+            "gh-review-threads",
+            "github-graphql-review-threads",
+            "gh-review-threads.json",
+            vec![
+                "gh",
+                "api",
+                "graphql",
+                "--paginate",
+                "--slurp",
+                "-f",
+                &format!("owner={owner}"),
+                "-f",
+                &format!("name={name}"),
+                "-F",
+                &format!("number={number}"),
+                "-f",
+                &format!("query={PR_REVIEW_THREADS_QUERY}"),
+            ],
+            Some(PrRecordSourceKind::GhReviewThreads),
+        ),
+        pr_agent_source_spec(
+            "gh-rate-limit",
+            "github-rate-limit",
+            "gh-rate-limit.json",
+            vec!["gh", "api", "rate_limit"],
+            None,
+        )
+        .optional(),
+    ]
+}
+
+fn pr_agent_source_spec(
+    id: &str,
+    kind: &str,
+    file_name: &str,
+    command: Vec<&str>,
+    source_kind: Option<PrRecordSourceKind>,
+) -> PrAgentSourceSpec {
+    PrAgentSourceSpec {
+        id: id.to_string(),
+        kind: kind.to_string(),
+        file_name: file_name.to_string(),
+        command: command.into_iter().map(str::to_string).collect(),
+        source_kind,
+        required: true,
+        flatten_paginated_arrays: false,
+    }
+}
+
+impl PrAgentSourceSpec {
+    fn flatten_paginated_arrays(mut self) -> Self {
+        self.flatten_paginated_arrays = true;
+        self
+    }
+
+    fn optional(mut self) -> Self {
+        self.required = false;
+        self
+    }
+}
+
+fn capture_pr_agent_source(
+    args: &PrAgentArgs,
+    spec: &PrAgentSourceSpec,
+    output_dir: &Path,
+    checked_at: DateTime<Utc>,
+) -> Result<CapturedPrAgentSource> {
+    let output_path = output_dir.join(&spec.file_name);
+    let mut diagnostics = Vec::new();
+    let command = render_command(&spec.command);
+
+    let raw_result = if let Some(source_dir) = &args.source_dir {
+        let fixture_path = source_dir.join(&spec.file_name);
+        fs::read(&fixture_path)
+            .map(|bytes| (bytes, Some(0)))
+            .with_context(|| {
+                format!(
+                    "failed to read replay source {} for {}",
+                    fixture_path.display(),
+                    spec.id
+                )
+            })
+    } else {
+        run_pr_agent_source_command(spec)
+    };
+
+    let (raw_bytes, exit_code) = match raw_result {
+        Ok(result) => result,
+        Err(error) => {
+            let message = format!("{error:#}");
+            diagnostics.push(PrAgentDiagnostic {
+                source: spec.id.clone(),
+                severity: if spec.required {
+                    PrAgentSeverity::Error
+                } else {
+                    PrAgentSeverity::Warning
+                },
+                message: message.clone(),
+                command: Some(command.clone()),
+                exit_code: None,
+                at: checked_at,
+            });
+            write_pr_agent_failure_artifact(&output_path, spec, checked_at, &message, None)?;
+            return Ok(CapturedPrAgentSource {
+                source: PrAgentSourceRecord {
+                    id: spec.id.clone(),
+                    kind: spec.kind.clone(),
+                    command,
+                    path: output_path.display().to_string(),
+                    retrieved_at: checked_at,
+                    exit_code: None,
+                    status: PrAgentSourceStatus::Failed,
+                },
+                path: output_path,
+                diagnostics,
+            });
+        }
+    };
+
+    let parsed = serde_json::from_slice::<Value>(&raw_bytes).with_context(|| {
+        format!(
+            "captured source {} was not valid JSON for command: {command}",
+            spec.id
+        )
+    });
+
+    let command_failed = exit_code.is_some_and(|code| code != 0);
+    let status = if parsed.is_ok() && !(spec.required && command_failed) {
+        PrAgentSourceStatus::Captured
+    } else {
+        PrAgentSourceStatus::Failed
+    };
+
+    if let Err(error) = parsed.as_ref() {
+        let message = format!("{error:#}");
+        diagnostics.push(PrAgentDiagnostic {
+            source: spec.id.clone(),
+            severity: if spec.required {
+                PrAgentSeverity::Error
+            } else {
+                PrAgentSeverity::Warning
+            },
+            message: message.clone(),
+            command: Some(command.clone()),
+            exit_code,
+            at: checked_at,
+        });
+        write_pr_agent_failure_artifact(&output_path, spec, checked_at, &message, exit_code)?;
+    }
+
+    if let Some(code) = exit_code
+        && code != 0
+        && parsed.is_ok()
+    {
+        diagnostics.push(PrAgentDiagnostic {
+            source: spec.id.clone(),
+            severity: if spec.required {
+                PrAgentSeverity::Error
+            } else {
+                PrAgentSeverity::Info
+            },
+            message: if spec.required {
+                format!(
+                    "source command exited with status {code}; JSON output was captured but required failed sources are not normalized"
+                )
+            } else {
+                format!("optional source command exited with status {code}; JSON output was captured")
+            },
+            command: Some(command.clone()),
+            exit_code,
+            at: checked_at,
+        });
+    }
+
+    if let Ok(value) = parsed {
+        let value = if spec.flatten_paginated_arrays {
+            flatten_paginated_arrays(value)
+        } else {
+            value
+        };
+        write_json(output_path.clone(), &value)?;
+    }
+
+    Ok(CapturedPrAgentSource {
+        source: PrAgentSourceRecord {
+            id: spec.id.clone(),
+            kind: spec.kind.clone(),
+            command,
+            path: output_path.display().to_string(),
+            retrieved_at: checked_at,
+            exit_code,
+            status,
+        },
+        path: output_path,
+        diagnostics,
+    })
+}
+
+fn write_pr_agent_failure_artifact(
+    output_path: &Path,
+    spec: &PrAgentSourceSpec,
+    checked_at: DateTime<Utc>,
+    message: &str,
+    exit_code: Option<i32>,
+) -> Result<()> {
+    write_json(
+        output_path.to_path_buf(),
+        &json!({
+            "schema": "codex-dev.pr-agent-source-failure.v1",
+            "source": spec.id,
+            "kind": spec.kind,
+            "status": "failed",
+            "message": message,
+            "exit_code": exit_code,
+            "captured_at": checked_at,
+        }),
+    )
+}
+
+fn run_pr_agent_source_command(spec: &PrAgentSourceSpec) -> Result<(Vec<u8>, Option<i32>)> {
+    let Some((program, arguments)) = spec.command.split_first() else {
+        bail!("source command {} is empty", spec.id);
+    };
+    let output = Command::new(program)
+        .args(arguments)
+        .output()
+        .with_context(|| {
+            format!(
+                "failed to start source command {}",
+                render_command(&spec.command)
+            )
+        })?;
+    if !output.status.success() && output.stdout.is_empty() {
+        let stderr = diagnostic_excerpt(&output.stderr);
+        bail!(
+            "source command {} failed with status {:?}: {}",
+            render_command(&spec.command),
+            output.status.code(),
+            stderr.unwrap_or_else(|| "no stderr".to_string())
+        );
+    }
+    Ok((output.stdout, output.status.code()))
+}
+
+fn flatten_paginated_arrays(value: Value) -> Value {
+    let Some(pages) = value.as_array() else {
+        return value;
+    };
+    if !pages.iter().all(Value::is_array) {
+        return value;
+    }
+    let flattened = pages
+        .iter()
+        .flat_map(|page| page.as_array().into_iter().flatten().cloned())
+        .collect::<Vec<_>>();
+    Value::Array(flattened)
+}
+
+fn rate_limit_diagnostics(
+    path: &Path,
+    spec: &PrAgentSourceSpec,
+    checked_at: DateTime<Utc>,
+) -> Result<Vec<PrAgentDiagnostic>> {
+    let value = read_json::<Value>(path)?;
+    let remaining = value
+        .pointer("/resources/core/remaining")
+        .or_else(|| value.pointer("/rate/remaining"))
+        .and_then(Value::as_u64);
+    let limit = value
+        .pointer("/resources/core/limit")
+        .or_else(|| value.pointer("/rate/limit"))
+        .and_then(Value::as_u64);
+
+    let Some(remaining) = remaining else {
+        return Ok(vec![PrAgentDiagnostic {
+            source: spec.id.clone(),
+            severity: PrAgentSeverity::Warning,
+            message: "rate-limit source did not include core remaining count".to_string(),
+            command: Some(render_command(&spec.command)),
+            exit_code: Some(0),
+            at: checked_at,
+        }]);
+    };
+
+    let severity = if remaining == 0 {
+        PrAgentSeverity::Error
+    } else if remaining < 20 {
+        PrAgentSeverity::Warning
+    } else {
+        PrAgentSeverity::Info
+    };
+    let limit_suffix = limit
+        .map(|limit| format!(" of {limit}"))
+        .unwrap_or_else(String::new);
+    Ok(vec![PrAgentDiagnostic {
+        source: spec.id.clone(),
+        severity,
+        message: format!("GitHub core rate limit remaining: {remaining}{limit_suffix}"),
+        command: Some(render_command(&spec.command)),
+        exit_code: Some(0),
+        at: checked_at,
+    }])
+}
+
+fn render_pr_agent_command(args: &PrAgentArgs, checked_at: DateTime<Utc>) -> String {
+    let mut command = vec![
+        "codex-dev".to_string(),
+        "pr".to_string(),
+        "agent".to_string(),
+        "--capsule".to_string(),
+        args.capsule.display().to_string(),
+        "--repo".to_string(),
+        args.repo.clone(),
+        "--number".to_string(),
+        args.number.to_string(),
+        "--checked-at".to_string(),
+        checked_at.to_rfc3339_opts(SecondsFormat::AutoSi, true),
+    ];
+    if let Some(source_dir) = &args.source_dir {
+        command.push("--source-dir".to_string());
+        command.push(source_dir.display().to_string());
+    }
+    render_command(&command)
+}
+
+fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
+    let text = String::from_utf8_lossy(bytes).trim().to_string();
+    if text.is_empty() {
+        return None;
+    }
+    const MAX_CHARS: usize = 2000;
+    if text.chars().count() <= MAX_CHARS {
+        return Some(text);
+    }
+    let mut truncated = text.chars().take(MAX_CHARS).collect::<String>();
+    truncated.push_str("\n[truncated]");
+    Some(truncated)
 }
 
 fn parse_github_repository(repository: &str) -> Result<(&str, &str)> {
@@ -2202,6 +2911,117 @@ mod tests {
             policy_manifest: policy_manifest(PolicyProfile::CodexDev, created_at),
             force: false,
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pr_agent_output_dir_rejects_symlinked_source_root() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = temp.path().join("capsule");
+        let target = temp.path().join("target");
+        fs::create_dir_all(&capsule).expect("capsule dir");
+        fs::create_dir_all(&target).expect("target dir");
+        std::os::unix::fs::symlink(&target, capsule.join("pr-agent-sources"))
+            .expect("symlink source root");
+
+        let error = prepare_pr_agent_output_dir(
+            &capsule,
+            "2026-05-09T05:00:00Z".parse().expect("timestamp"),
+        )
+        .expect_err("symlink rejected");
+
+        assert!(error.to_string().contains("symlinked PR agent source"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pr_agent_state_report_rejects_symlinked_path() {
+        let temp = tempdir().expect("tempdir");
+        let report = temp.path().join("pr-agent-state.json");
+        let target = temp.path().join("target.json");
+        fs::write(&target, "{}").expect("target");
+        std::os::unix::fs::symlink(&target, &report).expect("symlink report");
+
+        let error =
+            ensure_pr_agent_report_path_safe(&report).expect_err("symlinked report rejected");
+
+        assert!(error.to_string().contains("symlinked PR agent state"));
+    }
+
+    #[test]
+    fn pr_agent_required_nonzero_json_source_is_failed() {
+        let temp = tempdir().expect("tempdir");
+        let args = PrAgentArgs {
+            capsule: temp.path().join("capsule"),
+            repo: "BjornMelin/dev-skills".to_string(),
+            number: 47,
+            checked_at: None,
+            source_dir: None,
+        };
+        let output_dir = temp.path().join("sources");
+        fs::create_dir_all(&output_dir).expect("source dir");
+        let spec = pr_agent_source_spec(
+            "gh-pr-view",
+            "github-pr-view",
+            "gh-pr-view.json",
+            vec![
+                "sh",
+                "-c",
+                "printf '{\"number\":47,\"url\":\"https://github.com/BjornMelin/dev-skills/pull/47\",\"state\":\"OPEN\"}'; exit 2",
+            ],
+            Some(PrRecordSourceKind::GhPrView),
+        );
+
+        let capture = capture_pr_agent_source(
+            &args,
+            &spec,
+            &output_dir,
+            "2026-05-09T05:00:00Z".parse().expect("timestamp"),
+        )
+        .expect("capture source");
+
+        assert_eq!(capture.source.status, PrAgentSourceStatus::Failed);
+        assert!(capture.diagnostics.iter().any(|diagnostic| {
+            diagnostic.severity == PrAgentSeverity::Error
+                && diagnostic.message.contains("exited with status 2")
+        }));
+    }
+
+    #[test]
+    fn pr_agent_failed_capture_writes_failure_artifact() {
+        let temp = tempdir().expect("tempdir");
+        let source_dir = temp.path().join("fixtures");
+        let output_dir = temp.path().join("sources");
+        fs::create_dir_all(&source_dir).expect("fixture dir");
+        fs::create_dir_all(&output_dir).expect("source dir");
+        let args = PrAgentArgs {
+            capsule: temp.path().join("capsule"),
+            repo: "BjornMelin/dev-skills".to_string(),
+            number: 47,
+            checked_at: None,
+            source_dir: Some(source_dir),
+        };
+        let spec = pr_agent_source_spec(
+            "gh-pr-view",
+            "github-pr-view",
+            "gh-pr-view.json",
+            vec!["gh", "pr", "view", "47"],
+            Some(PrRecordSourceKind::GhPrView),
+        );
+
+        let capture = capture_pr_agent_source(
+            &args,
+            &spec,
+            &output_dir,
+            "2026-05-09T05:00:00Z".parse().expect("timestamp"),
+        )
+        .expect("capture source");
+
+        assert_eq!(capture.source.status, PrAgentSourceStatus::Failed);
+        assert!(capture.path.is_file());
+        let failure: Value =
+            read_json(&capture.path).expect("failure artifact should be valid json");
+        assert_eq!(failure["schema"], "codex-dev.pr-agent-source-failure.v1");
     }
 
     #[test]

@@ -76,6 +76,7 @@ Policy subcommands:
 
 PR subcommands:
 
+- `pr agent`
 - `pr plan`
 - `pr record`
 - `pr status`
@@ -385,7 +386,58 @@ set `manual_input`; for example `review-pack remaining` requires the bundle path
 created by `review-pack start` and is not marked as directly executable.
 The plan includes JSON-producing `gh pr view`, `gh pr checks`, REST review,
 REST review-comment, and GraphQL review-thread commands whose saved outputs can
-be passed to `pr record` with the matching `--source-kind`.
+be passed to `pr record` with the matching `--source-kind`. The GraphQL
+review-thread command uses `--paginate --slurp` with an `$endCursor` query, so
+complete multi-page thread sets can be recorded from one saved JSON artifact.
+
+## pr agent
+
+Gather live hosted PR state, normalize it into the capsule, and print a
+deterministic dry-run action plan:
+
+```bash
+cargo run -q -p codex-dev -- --json pr agent \
+  --capsule .codex/tasks/<id> \
+  --repo BjornMelin/dev-skills \
+  --number 25
+```
+
+The output schema is `codex-dev.pr-agent-state.v1`. The command is always a
+hosted-write dry run: it can run `gh` read commands and write local capsule
+evidence, but it does not resolve threads, comment, retry CI, enable auto-merge,
+or merge the PR. It records:
+
+- normalized PR state in `pr.json`;
+- raw captured provider JSON under `pr-agent-sources/<timestamp>/`;
+- a `pr-agent-state.json` report with source records, diagnostics, and
+  recommended next actions;
+- a `decision` evidence row in `evidence.jsonl`.
+
+Live collection uses these read-only sources:
+
+- `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`
+- `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`
+- `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/reviews?per_page=100`
+- `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/comments?per_page=100`
+- `gh api graphql --paginate --slurp` for `reviewThreads(first:100, after:$endCursor)`
+- `gh api rate_limit`
+
+Command failures, malformed JSON, missing permissions, non-authoritative
+pagination, and low rate-limit state are surfaced as diagnostics. A failed
+source does not make the agent infer clean review or CI state from stale data.
+Use replay mode for deterministic tests or manual evidence review:
+
+```bash
+cargo run -q -p codex-dev -- --json pr agent \
+  --capsule .codex/tasks/<id> \
+  --repo BjornMelin/dev-skills \
+  --number 25 \
+  --source-dir /tmp/captured-pr-sources
+```
+
+The replay directory uses the same filenames written by live mode:
+`gh-pr-view.json`, `gh-pr-checks.json`, `gh-reviews.json`,
+`gh-review-comments.json`, `gh-review-threads.json`, and `gh-rate-limit.json`.
 
 ## pr record
 
@@ -435,9 +487,9 @@ Supported `--source-kind` values:
 - `normalized`: existing local `pr.json` fixture shape.
 - `gh-pr-view`: `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`.
 - `gh-pr-checks`: `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`.
-- `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; collapses to each reviewer's latest active state before deriving `review_decision`.
-- `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; counts resolved, current unresolved, and outdated threads separately, and is authoritative only when `pageInfo.hasNextPage` is false.
-- `gh-review-comments`: REST review-comment arrays; groups comments by thread root (`in_reply_to_id` or `id`) and counts threads whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
+- `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; supports single arrays and `--paginate --slurp` page arrays, then collapses to each reviewer's latest active state before deriving `review_decision`.
+- `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; supports single-page objects and `--paginate --slurp` page arrays, counts resolved, current unresolved, and outdated threads separately, and is authoritative only when the final `pageInfo.hasNextPage` is false.
+- `gh-review-comments`: REST review-comment arrays; supports single arrays and `--paginate --slurp` page arrays, groups comments by thread root (`in_reply_to_id` or `id`) and counts threads whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
 - `review-pack-remaining`: JSON or text output from `review-pack remaining`; records the unresolved count.
 
 All non-`normalized` source kinds require explicit PR identity unless it can be
@@ -485,6 +537,7 @@ cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> 
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr record --help
 ```
 
