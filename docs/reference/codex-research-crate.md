@@ -14,7 +14,32 @@ cargo doc -p codex-research --no-deps --open
 ```text
 crates/codex-research/
   Cargo.toml
-  src/main.rs
+  evals/research/core.json
+  src/
+    main.rs
+    bundle.rs
+    cache.rs
+    cache_store.rs
+    cli.rs
+    config.rs
+    context7.rs
+    doctor.rs
+    eval.rs
+    fetch.rs
+    firecrawl.rs
+    github.rs
+    ledger.rs
+    ledger_store.rs
+    settings.rs
+    models.rs
+    plan.rs
+    privacy.rs
+    provider_http.rs
+    routing.rs
+    run.rs
+    run_state.rs
+    tests.rs
+    utils.rs
 ```
 
 The crate currently ships one binary:
@@ -24,6 +49,34 @@ The crate currently ships one binary:
 name = "codex-research"
 path = "src/main.rs"
 ```
+
+`main.rs` is intentionally thin: it owns process startup, `Cli::parse()`,
+configuration loading, and top-level dispatch only. Command behavior, storage,
+provider calls, evals, and artifact rendering live in focused sibling modules.
+
+## Module Ownership
+
+| Module | Owns |
+| --- | --- |
+| `cli.rs` | Clap parser, command enums, and argument structs. |
+| `models.rs` | Shared route/profile/provider enums plus small cross-module output models. |
+| `settings.rs` | Config file models, defaults, profile budgets, and config-path discovery. |
+| `run_state.rs` | Research run state, budget debits, provider error recording, locks, and budget helpers. |
+| `cache_store.rs` | Cache paths, SQLite schema, source cache records, blob storage, route memory, and pruning. |
+| `provider_http.rs` | Shared HTTP client, GitHub REST metadata helpers, token lookup, `gh` command-version probing, and common provider response normalization. |
+| `github.rs` | GitHub command handling and endpoint-specific hydration. |
+| `context7.rs` | Context7 command handling and REST calls. |
+| `fetch.rs` | Fetch command handling and direct fetch output. |
+| `routing.rs` | Route-plan construction, URL probing, body classification, and route-memory application. |
+| `firecrawl.rs` | Firecrawl scrape request/response handling. |
+| `ledger_store.rs` | JSONL ledger record types and append/read persistence. |
+| `ledger.rs` | Ledger command handling and Markdown report rendering. |
+| `bundle.rs` | Evidence bundle schema, closeout checks, source freshness, redaction, and Markdown rendering. |
+| `eval.rs` | Eval suite/task models, offline assertions, task selection, and task-kind evaluators. |
+| `doctor.rs`, `plan.rs`, `cache.rs`, `config.rs`, `run.rs` | Command handlers for their named CLI surfaces. |
+| `privacy.rs` | URL/privacy classification, parent-directory creation, HTML/tag stripping, provider naming, metadata redaction, and query-secret redaction. |
+| `utils.rs` | Route/path formatting, JSON output, hashing, route-name, and metadata-merge helpers. |
+| `tests.rs` | Existing regression tests kept as crate-private module tests against the same binary internals. |
 
 ## Dependencies
 
@@ -45,7 +98,7 @@ path = "src/main.rs"
 
 ### CLI Command Types
 
-`Cli` is the root parser:
+`cli.rs` defines `Cli`, the root parser:
 
 - global `--json`
 - global `--config <path>`
@@ -157,7 +210,8 @@ Returned by `fetch probe`:
 
 ### ResearchConfig
 
-Loaded from `--config`, `CODEX_RESEARCH_CONFIG`, nearest
+`settings.rs` owns the config models and defaults. Config is loaded from
+`--config`, `CODEX_RESEARCH_CONFIG`, nearest
 `.codex/research/config.toml`, `$XDG_CONFIG_HOME/codex-research/config.toml`,
 or built-in defaults.
 
@@ -172,7 +226,7 @@ Config sections:
 
 ### ResearchRunState
 
-JSON run state created by `run init`:
+`run_state.rs` owns JSON run state created by `run init`:
 
 - `query`
 - `profile`
@@ -186,7 +240,8 @@ JSON run state created by `run init`:
 
 ### LedgerRecord
 
-Tagged enum:
+`ledger_store.rs` owns the JSONL ledger record types and persistence helpers.
+`LedgerRecord` is a tagged enum:
 
 - `source`
 - `claim`
@@ -211,7 +266,7 @@ Tagged enum:
 
 ## Execution Flow
 
-`main` parses CLI arguments and dispatches to:
+`main.rs` parses CLI arguments, loads config once, and dispatches to:
 
 - `doctor`
 - `output_plan`
@@ -351,7 +406,7 @@ The command supports:
 
 ## Cache
 
-`research_paths` resolves:
+`cache_store.rs` owns cache persistence. `research_paths` resolves:
 
 - `CODEX_RESEARCH_HOME`, when set;
 - otherwise `~/.cache/codex-research`.
@@ -382,7 +437,6 @@ Ledger helpers:
 
 - `append_ledger_record`
 - `read_ledger_records`
-- `ensure_parent`
 
 Reports are intentionally simple Markdown:
 
@@ -400,12 +454,13 @@ Good next additions:
 - add richer live eval cost caps if optional live checks expand;
 - add more manifest task kinds only when they can stay deterministic in
   provider-disabled CI;
-- split provider implementations into modules once the single-binary shape
-  stops being reviewable.
+- promote high-churn module contracts into a library crate only after at least
+  one real downstream caller needs them.
 
 ## Validation
 
-Required checks after crate changes:
+Run the full Rust CLI gate set from [Validation](../runbooks/validation.md)
+after crate changes. The minimum branch-local checks are:
 
 ```bash
 cargo fmt --all --check
@@ -414,10 +469,20 @@ cargo check -p codex-research
 cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
+codex-research eval --list
 codex-research --json eval --task evidence-claims-cited --strict
 codex-research --json eval --task evidence-bundle-closeout-shape --strict
+codex-research --json plan "validation smoke" --profile quick
+tmp=$(mktemp -d)
+codex-research --json run init validation-smoke --profile quick --topic github --out "$tmp/run.json"
+codex-research --json run debit --run "$tmp/run.json" --provider github --count 1 --note validation
+codex-research --json run status --run "$tmp/run.json"
+python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
+
+Use `cargo run -q -p codex-research -- ...` for CLI smoke checks before
+installing the branch binary.
 
 Optional live readiness check:
 
