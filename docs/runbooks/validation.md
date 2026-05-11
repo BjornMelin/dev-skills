@@ -178,6 +178,7 @@ cat > "$tmp/pr-snapshot.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
+cargo run -q -p codex-dev-tui -- --root "$tmp" --render-once --width 100 --height 24
 cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
 ```
 
@@ -413,6 +414,7 @@ cat > "$tmp/pr-snapshot.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" --source "$tmp/pr-snapshot.json" --checked-at 2026-05-09T05:00:00Z
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
+cargo run -q -p codex-dev-tui -- --root "$tmp" --render-once --width 100 --height 24
 cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp_bootstrap=$(mktemp -d)
