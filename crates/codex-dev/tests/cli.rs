@@ -326,9 +326,20 @@ fn pr_plan_and_record_support_fixture_mode() {
     );
     let evidence = std::fs::read_to_string(std::path::Path::new(capsule).join("evidence.jsonl"))
         .expect("evidence");
-    assert!(evidence.contains("codex-dev pr record --capsule"));
-    assert!(evidence.contains("--source"));
-    assert!(evidence.contains("--checked-at 2026-05-09T05:00:00.123456789Z"));
+    let pr_record_entry: Value = serde_json::from_str(
+        evidence
+            .lines()
+            .last()
+            .expect("at least one evidence entry"),
+    )
+    .expect("valid evidence jsonl line");
+    assert_eq!(pr_record_entry["schema"], "codex-dev.evidence.v1");
+    assert_eq!(pr_record_entry["kind"], "review");
+    assert_eq!(pr_record_entry["at"], "2026-05-09T05:00:00.123456789Z");
+    let command = pr_record_entry["command"].as_str().expect("command string");
+    assert!(command.contains("codex-dev pr record --capsule"));
+    assert!(command.contains("--source"));
+    assert!(command.contains("--checked-at 2026-05-09T05:00:00.123456789Z"));
 
     Command::cargo_bin("codex-dev")
         .expect("binary")
