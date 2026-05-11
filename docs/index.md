@@ -32,6 +32,9 @@ out of version control.
 - [codex-dev Operating Layer](specs/codex-dev-operating-layer.md): task capsule
   schema, ownership map, branch graph, and validation expectations for the
   development control plane.
+- [dev-skills v0.3/v1 Roadmap](specs/dev-skills-v0.3-roadmap.md): canonical
+  issue ledger and execution order for the next local CLI/TUI, PR-agent,
+  release, and future-surface wave.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle and policy-gate commands.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
