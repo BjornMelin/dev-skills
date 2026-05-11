@@ -943,7 +943,8 @@ fn extract_policy_doc_commands(contents: &str, marker: &str) -> Result<Vec<Strin
 }
 
 fn policy_doc_marker_line(line: &str, marker: &str) -> bool {
-    line.trim().trim_start_matches('#').trim() == marker
+    let line = line.trim();
+    line == marker || line.strip_prefix('#').map(str::trim) == Some(marker)
 }
 
 fn policy_doc_marker(marker: &str, side: &str) -> String {
@@ -2290,11 +2291,13 @@ mod tests {
         let command = policy_manifest_command(PolicyProfile::CodexDev);
         let contents = format!(
             "Prose can mention codex-dev:policy-manifest-smoke:start without opening a block.\n\
+             ## codex-dev:policy-manifest-smoke:start\n\
              # codex-dev:policy-manifest-smoke:start\n\
              ```bash\n\
              {command}\n\
              ```\n\
              # codex-dev:policy-manifest-smoke:end\n\
+             ## codex-dev:policy-manifest-smoke:end\n\
              Prose can mention codex-dev:policy-manifest-smoke:end too.\n"
         );
 
