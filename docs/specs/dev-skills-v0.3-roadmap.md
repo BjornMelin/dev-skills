@@ -23,9 +23,10 @@ The v0.3/v1 roadmap turns the repo into a local agent development platform:
 - Skill, subagent, validation, release, and install workflows become explicit
   enough for agents to run without guessing.
 
-The first execution wave remains local CLI/TUI first. Tauri desktop and Axum
-local web service surfaces are design-only until contract, security, release,
-and PR-agent prerequisites are stable.
+The first execution wave remains local CLI/TUI first. The
+[Future Local App Surfaces](future-local-surfaces.md) decision record keeps
+Tauri desktop and Axum local web service surfaces design-only until contract,
+security, release, and PR-agent prerequisites are stable.
 
 ## Approved Decisions
 
