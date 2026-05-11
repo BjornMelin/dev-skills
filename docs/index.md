@@ -8,8 +8,8 @@ skill-authoring systems added to this repository:
   evidence, subspawn plan/outcome/synthesis capture, repo-native policy gates,
   profile-aware validation manifests, PR evidence capture, and apply-gated PR
   agent actions.
-- `codex-dev-tui`: optional Ratatui workbench that consumes `codex-dev`
-  capsule JSON contracts without owning policy logic.
+- `codex-dev-tui`: optional Ratatui workbench for `codex-dev` capsules with
+  Overview, Evidence, Subagents, PR, PR Agent, Validation, and Help panels.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
@@ -48,7 +48,8 @@ out of version control.
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
-  workbench for local capsule scanning.
+  workbench for local capsule scanning across Overview, Evidence, Subagents,
+  PR, PR Agent, Validation, and Help panels.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
