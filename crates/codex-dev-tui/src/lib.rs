@@ -402,6 +402,7 @@ fn fallback_dashboard_title(path: &Path) -> String {
 pub struct DashboardState {
     pub root: PathBuf,
     pub capsules: Vec<DashboardCapsule>,
+    pub filtered_indices: Vec<usize>,
     pub selected: usize,
     pub filter: DashboardFilter,
     pub sort: DashboardSort,
@@ -458,6 +459,7 @@ impl DashboardState {
         let mut state = Self {
             root,
             capsules,
+            filtered_indices: Vec::new(),
             selected: 0,
             filter,
             sort,
@@ -478,21 +480,22 @@ impl DashboardState {
     }
 
     fn selected_capsule(&self) -> Option<&DashboardCapsule> {
-        self.filtered_indices()
+        self.filtered_indices
             .get(self.selected)
             .and_then(|index| self.capsules.get(*index))
     }
 
-    fn filtered_indices(&self) -> Vec<usize> {
-        self.capsules
+    fn refresh_filtered_indices(&mut self) {
+        self.filtered_indices = self
+            .capsules
             .iter()
             .enumerate()
             .filter_map(|(index, capsule)| capsule.matches_filter(self.filter).then_some(index))
-            .collect()
+            .collect();
     }
 
     fn next_item(&mut self) {
-        let len = self.filtered_indices().len();
+        let len = self.filtered_indices.len();
         if len > 0 {
             self.selected = (self.selected + 1).min(len - 1);
         }
@@ -506,6 +509,7 @@ impl DashboardState {
 
     fn cycle_filter(&mut self) {
         self.filter = self.filter.next();
+        self.refresh_filtered_indices();
         self.selected = 0;
         self.clamp_selection();
     }
@@ -514,13 +518,15 @@ impl DashboardState {
         let selected_path = self.selected_capsule().map(|capsule| capsule.path.clone());
         self.sort = self.sort.next();
         sort_dashboard_capsules(&mut self.capsules, self.sort);
+        self.refresh_filtered_indices();
         self.restore_selection(selected_path.as_deref());
     }
 
     fn restore_selection(&mut self, selected_path: Option<&Path>) {
+        self.refresh_filtered_indices();
         self.selected = selected_path
             .and_then(|path| {
-                self.filtered_indices()
+                self.filtered_indices
                     .iter()
                     .position(|index| self.capsules[*index].path == path)
             })
@@ -529,7 +535,7 @@ impl DashboardState {
     }
 
     fn clamp_selection(&mut self) {
-        let len = self.filtered_indices().len();
+        let len = self.filtered_indices.len();
         if len == 0 {
             self.selected = 0;
         } else if self.selected >= len {
@@ -810,7 +816,7 @@ pub fn render_dashboard(frame: &mut Frame<'_>, state: &DashboardState) {
 }
 
 fn render_dashboard_header(frame: &mut Frame<'_>, area: Rect, state: &DashboardState) {
-    let visible = state.filtered_indices().len();
+    let visible = state.filtered_indices.len();
     let line = Line::from(vec![
         Span::styled(
             format!("root: {}", state.root.display()),
@@ -872,7 +878,7 @@ fn render_dashboard_footer(frame: &mut Frame<'_>, area: Rect, state: &DashboardS
 }
 
 fn dashboard_items(state: &DashboardState, visible_rows: usize) -> Vec<ListItem<'static>> {
-    let indices = state.filtered_indices();
+    let indices = &state.filtered_indices;
     if indices.is_empty() {
         return vec![ListItem::new("no capsules match current filter")];
     }
