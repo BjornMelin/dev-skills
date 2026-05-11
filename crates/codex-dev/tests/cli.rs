@@ -52,6 +52,7 @@ fn codex_dev_generates_manpage() {
         .assert()
         .success()
         .stdout(predicates::str::contains("codex-dev"))
+        // The roff renderer escapes hyphens in command names as `\-`.
         .stdout(predicates::str::contains("codex\\-dev\\-capsule"));
 }
 

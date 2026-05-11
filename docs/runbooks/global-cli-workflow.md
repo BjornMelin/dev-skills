@@ -95,17 +95,17 @@ repo=$(pwd)
 root="$repo/target/codex-dev-install-smoke/codex-research"
 rm -rf "$root"
 cargo install --path crates/codex-research --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-research" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-research" --help >/dev/null && "$root/bin/codex-research" completions zsh >/dev/null && "$root/bin/codex-research" manpage >/dev/null)
 
 root="$repo/target/codex-dev-install-smoke/codex-dev"
 rm -rf "$root"
 cargo install --path crates/codex-dev --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev" --help >/dev/null && "$root/bin/codex-dev" completions zsh >/dev/null && "$root/bin/codex-dev" manpage >/dev/null)
 
 root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
 ```
 
 These are included in the `full_local` policy profile because they are heavier

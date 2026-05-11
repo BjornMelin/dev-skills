@@ -234,15 +234,15 @@ repo=$(pwd)
 root="$repo/target/codex-dev-install-smoke/codex-research"
 rm -rf "$root"
 cargo install --path crates/codex-research --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-research" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-research" --help >/dev/null && "$root/bin/codex-research" completions zsh >/dev/null && "$root/bin/codex-research" manpage >/dev/null)
 root="$repo/target/codex-dev-install-smoke/codex-dev"
 rm -rf "$root"
 cargo install --path crates/codex-dev --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev" --help >/dev/null && "$root/bin/codex-dev" completions zsh >/dev/null && "$root/bin/codex-dev" manpage >/dev/null)
 root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
 ```
 
 Optional live PR-agent smoke, for branches with a GitHub PR and valid `gh`
@@ -500,15 +500,15 @@ repo=$(pwd)
 root="$repo/target/codex-dev-install-smoke/codex-research"
 rm -rf "$root"
 cargo install --path crates/codex-research --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-research" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-research" --help >/dev/null && "$root/bin/codex-research" completions zsh >/dev/null && "$root/bin/codex-research" manpage >/dev/null)
 root="$repo/target/codex-dev-install-smoke/codex-dev"
 rm -rf "$root"
 cargo install --path crates/codex-dev --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev" --help >/dev/null && "$root/bin/codex-dev" completions zsh >/dev/null && "$root/bin/codex-dev" manpage >/dev/null)
 root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
-(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null)
+(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts tools/bootstrap
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents

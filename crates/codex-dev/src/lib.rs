@@ -5302,7 +5302,7 @@ fn local_cli_install_smoke_gates() -> Vec<PolicyGate> {
 
 fn local_cli_install_smoke_gate(binary: &'static str, crate_path: &'static str) -> PolicyGate {
     let command = format!(
-        "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null)"
+        "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null && \"$root/bin/{binary}\" completions zsh >/dev/null && \"$root/bin/{binary}\" manpage >/dev/null)"
     );
     PolicyGate {
         id: format!("cargo-install-{binary}-smoke"),
