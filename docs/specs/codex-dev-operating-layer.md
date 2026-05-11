@@ -24,6 +24,10 @@ The next release sequence is tracked by the
 canonical issue ledger for parent epic #37 and child issues #38 through #57:
 strict contracts, local CLI/TUI-first work, apply-gated PR-agent behavior,
 audited local release, and future-surface design.
+The [codex-dev PR-Agent Safety Model](codex-dev-pr-agent-safety-model.md)
+defines the token, hosted-write, trust-boundary, idempotency, and
+verify-before-fix rules that all future PR-agent implementation lanes must
+preserve.
 
 ## Goals
 
@@ -41,8 +45,10 @@ audited local release, and future-surface design.
 - Do not add general development commands to `codex-research`.
 - Do not reimplement subagent validation outside `subagent-creator`.
 - Do not reimplement delegation policy outside `subspawn`.
-- Do not reimplement hosted review remediation outside `gh-pr-review-fix` and
-  `review-remediation`.
+- Do not duplicate today's hosted review remediation flow outside
+  `gh-pr-review-fix` and `review-remediation`; future PR-agent write lanes that
+  orchestrate those tools must still preserve the dedicated PR-agent safety
+  model.
 - Do not make the optional TUI own business logic.
 - Do not support compatibility shims for pre-1.0 draft capsule shapes.
 
@@ -57,6 +63,7 @@ audited local release, and future-surface design.
 | Custom subagent template validation and installs | `subagent-creator` | Reuses validation/install commands. |
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
 | Hosted PR review remediation | `gh-pr-review-fix`, `review-remediation` | Captures review-pack/CI snapshots and links fixes. |
+| PR-agent hosted write safety | `docs/specs/codex-dev-pr-agent-safety-model.md` | Defines explicit target, dry-run, `--apply`, stale-thread, idempotency, token, and prompt-injection rules before hosted mutations exist. |
 | Hardened personal subagent pack | `subagents/hardened-codex` | Treats as a bootstrap input and smoke target. |
 | Memory and Codex runtime guidance | `codex-sdk` docs/skill | Links proposal docs; does not mutate runtime memory. |
 | Optional terminal UI | `codex-dev-tui` | Reads `codex-dev-core` JSON contracts; never owns policy. |
@@ -251,9 +258,12 @@ wait behavior, and synthesis rules.
 ### pr.json
 
 `pr.json` records hosted PR and review evidence. `codex-dev` owns the evidence
-shape only. `gh-pr-review-fix`, `review-remediation`, the GitHub app, `gh`, and
-review-pack tooling remain the authorities for live review remediation and
-thread closure.
+shape only. Today, `gh-pr-review-fix`, `review-remediation`, the GitHub app,
+`gh`, and review-pack tooling remain the live remediation and thread-closure
+authorities. Future PR-agent write lanes may orchestrate hosted actions only
+when they preserve the explicit-target, dry-run, `--apply`, idempotency, and
+verify-before-fix rules in the
+[codex-dev PR-Agent Safety Model](codex-dev-pr-agent-safety-model.md).
 
 ```json
 {
