@@ -1511,17 +1511,21 @@ fn apply_pr_record_identity(
     repository: Option<&str>,
     number: Option<u64>,
 ) -> Result<()> {
-    if pr.repository.is_none() {
-        pr.repository = pr.url.as_deref().and_then(repository_from_pr_url);
+    if let Some(repository) = pr.url.as_deref().and_then(repository_from_pr_url) {
+        merge_pr_string_field(&mut pr.repository, Some(repository), "repository")?;
     }
-    if pr.number.is_none() {
-        pr.number = pr.url.as_deref().and_then(number_from_pr_url);
+    if let Some(number) = pr.url.as_deref().and_then(number_from_pr_url) {
+        merge_pr_number_field(&mut pr.number, Some(number), "number")?;
     }
     if let Some(repository) = repository {
-        pr.repository = Some(repository.to_string());
+        merge_pr_string_field(
+            &mut pr.repository,
+            Some(repository.to_string()),
+            "repository",
+        )?;
     }
     if let Some(number) = number {
-        pr.number = Some(number);
+        merge_pr_number_field(&mut pr.number, Some(number), "number")?;
     }
     if source_kind != PrRecordSourceKind::Normalized
         && (pr.repository.is_none() || pr.number.is_none())
@@ -1860,14 +1864,11 @@ fn check_from_github_value(value: &Value, checked_at: DateTime<Utc>) -> Result<C
     let name = optional_string(value, "name")
         .or_else(|| optional_string(value, "context"))
         .with_context(|| format!("GitHub check is missing name/context: {value}"))?;
-    let status = optional_string(value, "status")
-        .or_else(|| optional_string(value, "state"))
-        .or_else(|| optional_string(value, "bucket"))
-        .with_context(|| format!("GitHub check {name} is missing status/state/bucket"))?
-        .to_ascii_lowercase();
+    let status = check_lifecycle_status(value)
+        .with_context(|| format!("GitHub check {name} is missing status/state/bucket"))?;
     let conclusion = optional_string(value, "conclusion")
+        .or_else(|| optional_string(value, "state").and_then(state_to_conclusion))
         .or_else(|| optional_string(value, "bucket").and_then(bucket_to_conclusion))
-        .or_else(|| status_to_conclusion(&status))
         .map(|conclusion| conclusion.to_ascii_lowercase());
     let url = optional_string(value, "detailsUrl")
         .or_else(|| optional_string(value, "targetUrl"))
@@ -1887,6 +1888,46 @@ fn check_from_github_value(value: &Value, checked_at: DateTime<Utc>) -> Result<C
         url,
         checked_at,
     })
+}
+
+fn check_lifecycle_status(value: &Value) -> Option<String> {
+    if let Some(status) = optional_string(value, "status") {
+        return Some(normalize_lifecycle_status(&status));
+    }
+    if let Some(state) = optional_string(value, "state") {
+        return Some(lifecycle_status_from_state(&state));
+    }
+    optional_string(value, "bucket").map(|bucket| lifecycle_status_from_bucket(&bucket))
+}
+
+fn normalize_lifecycle_status(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "completed" | "complete" => "completed".to_string(),
+        "in_progress" | "in progress" | "running" => "in_progress".to_string(),
+        "queued" => "queued".to_string(),
+        "pending" => "pending".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn lifecycle_status_from_state(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "success" | "failure" | "error" | "cancelled" | "canceled" | "skipped" => {
+            "completed".to_string()
+        }
+        "pending" => "pending".to_string(),
+        "queued" => "queued".to_string(),
+        "in_progress" | "in progress" | "running" => "in_progress".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn lifecycle_status_from_bucket(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "pass" | "fail" | "cancel" | "skipping" => "completed".to_string(),
+        "pending" => "pending".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn review_thread_summary_from_graphql(
@@ -2071,9 +2112,11 @@ fn bucket_to_conclusion(value: String) -> Option<String> {
     }
 }
 
-fn status_to_conclusion(value: &str) -> Option<String> {
-    match value {
-        "success" | "failure" | "error" | "cancelled" | "skipped" => Some(value.to_string()),
+fn state_to_conclusion(value: String) -> Option<String> {
+    match value.to_ascii_lowercase().as_str() {
+        "success" | "failure" | "error" | "cancelled" | "canceled" | "skipped" => {
+            Some(value.to_ascii_lowercase())
+        }
         _ => None,
     }
 }
@@ -3661,8 +3704,9 @@ mod tests {
 
         assert_eq!(result.pr.state, "unknown");
         assert_eq!(result.pr.checks.len(), 2);
-        assert_eq!(result.pr.checks[0].status, "failure");
+        assert_eq!(result.pr.checks[0].status, "completed");
         assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("failure"));
+        assert_eq!(result.pr.checks[1].status, "pending");
         assert!(!result.pr.review_threads.authoritative);
         assert_eq!(
             result.pr.checks[1].checked_at,
@@ -3821,6 +3865,43 @@ mod tests {
         .expect_err("identity required");
 
         assert!(error.to_string().contains("requires explicit PR identity"));
+    }
+
+    #[test]
+    fn pr_record_rejects_explicit_identity_that_conflicts_with_source_url() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-pr-view.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "number": 46,
+                "url": "https://github.com/BjornMelin/dev-skills/pull/46",
+                "state": "OPEN"
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(
+            capsule.clone(),
+            source.clone(),
+            PrRecordSourceKind::GhPrView,
+        );
+        args.repository = Some("Other/repo".to_string());
+        args.number = Some(46);
+        let error = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect_err("repository mismatch rejected");
+        assert!(error.to_string().contains("conflicting PR repository"));
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhPrView);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(47);
+        let error = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect_err("number mismatch rejected");
+        assert!(error.to_string().contains("conflicting PR number"));
     }
 
     #[test]

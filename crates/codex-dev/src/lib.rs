@@ -753,7 +753,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
         Commands::Pr { command } => match command {
             PrCommand::Plan(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
-                let result = pr_control_plan(args.repo, args.number, generated_at);
+                let result = pr_control_plan(args.repo, args.number, generated_at)?;
                 Ok(CommandOutput {
                     ok: true,
                     command: "pr plan",
@@ -987,8 +987,8 @@ pub fn pr_control_plan(
     repository: String,
     number: u64,
     generated_at: DateTime<Utc>,
-) -> PrControlPlan {
-    let (owner, name) = repository.split_once('/').unwrap_or((&repository, ""));
+) -> Result<PrControlPlan> {
+    let (owner, name) = parse_github_repository(&repository)?;
     let owner_arg = format!("owner={owner}");
     let name_arg = format!("name={name}");
     let number_arg = format!("number={number}");
@@ -997,7 +997,7 @@ pub fn pr_control_plan(
     let review_threads_query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
     let review_threads_query_arg = format!("query={review_threads_query}");
 
-    PrControlPlan {
+    Ok(PrControlPlan {
         schema: PR_CONTROL_PLAN_SCHEMA.to_string(),
         repository: repository.clone(),
         number,
@@ -1092,7 +1092,17 @@ pub fn pr_control_plan(
                 ["gh-pr-review-fix", "pr", &number.to_string()],
             ),
         ],
+    })
+}
+
+fn parse_github_repository(repository: &str) -> Result<(&str, &str)> {
+    let Some((owner, name)) = repository.split_once('/') else {
+        bail!("repository must be in OWNER/REPO form: {repository}");
+    };
+    if owner.is_empty() || name.is_empty() || name.contains('/') {
+        bail!("repository must be in OWNER/REPO form: {repository}");
     }
+    Ok((owner, name))
 }
 
 pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Result<PolicyRunResult> {

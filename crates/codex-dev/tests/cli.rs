@@ -410,6 +410,34 @@ fn pr_plan_and_record_support_fixture_mode() {
 }
 
 #[test]
+fn pr_plan_rejects_invalid_repository_names() {
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "plan",
+            "--repo",
+            "BjornMelin",
+            "--number",
+            "25",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let error_json: Value = serde_json::from_slice(&output).expect("error json");
+    assert_eq!(error_json["command"], "pr plan");
+    assert!(
+        error_json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("OWNER/REPO")
+    );
+}
+
+#[test]
 fn pr_record_cli_normalizes_github_checks_sources() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("tasks");
@@ -480,6 +508,10 @@ fn pr_record_cli_normalizes_github_checks_sources() {
         "BjornMelin/dev-skills"
     );
     assert_eq!(record_json["result"]["pr"]["number"], 46);
+    assert_eq!(
+        record_json["result"]["pr"]["checks"][0]["status"],
+        "completed"
+    );
     assert_eq!(
         record_json["result"]["pr"]["checks"][0]["conclusion"],
         "failure"
