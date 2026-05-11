@@ -2,6 +2,37 @@ use assert_cmd::Command;
 use serde_json::Value;
 use tempfile::tempdir;
 
+fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
+    let path = root.join("subspawn-plan.json");
+    std::fs::write(
+        &path,
+        r#"{
+  "task": "pre-PR review",
+  "mode": "read-only",
+  "scope": "branch diff",
+  "wait_policy": "strict",
+  "rendezvous_required": true,
+  "roles": [
+    {"name": "reviewer"},
+    {"name": "test_runner"}
+  ],
+  "prompts": [
+    {"role": "reviewer", "prompt": "Task: review diff\nRole: reviewer\nReturn format:\n- Status\n- Risks/blockers"},
+    {"role": "test_runner", "prompt": "Task: validate diff\nRole: test_runner\nReturn format:\n- Status\n- Risks/blockers"}
+  ],
+  "registry_issues": [],
+  "duplicate_roles_ignored": {
+    "test_runner": [
+      "skills/subagent-creator/templates/agents/test_runner.toml",
+      "skills/subspawn/templates/agents/test_runner.toml"
+    ]
+  }
+}"#,
+    )
+    .expect("write subspawn fixture");
+    path
+}
+
 #[test]
 fn help_mentions_capsule_commands() {
     let mut command = Command::cargo_bin("codex-dev").expect("binary");
@@ -525,6 +556,170 @@ fn evidence_append_records_typed_entries_and_status_counts() {
         .find(|kind| kind["kind"] == "decision")
         .expect("decision summary");
     assert_eq!(decision["latest_summary"], "Use one typed append command");
+}
+
+#[test]
+fn subagents_record_plan_outcome_and_synthesis() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let plan = write_subspawn_plan_fixture(temp.path());
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Subagent evidence smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "subagent-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let plan_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "subagents",
+            "record-plan",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--source",
+            plan.to_str().expect("utf8 plan path"),
+            "--command",
+            "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json",
+            "--recorded-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let plan_json: Value = serde_json::from_slice(&plan_output).expect("plan json");
+    assert_eq!(plan_json["command"], "subagents record-plan");
+    assert_eq!(
+        plan_json["result"]["batch"]["agents"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        plan_json["result"]["batch"]["prompts"][0]["prompt_hash"]
+            .as_str()
+            .expect("prompt hash")
+            .starts_with("sha256:")
+    );
+    assert!(
+        plan_json["result"]["batch"]["prompts"][0]
+            .get("prompt")
+            .is_none(),
+        "raw prompt text must not be returned in batch records"
+    );
+    assert_eq!(
+        plan_json["result"]["batch"]["duplicate_roles_ignored"]["test_runner"]
+            .as_array()
+            .expect("duplicate paths")
+            .len(),
+        2
+    );
+
+    let outcome_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "subagents",
+            "record-outcome",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--role",
+            "reviewer",
+            "--status",
+            "completed",
+            "--summary",
+            "no blocking findings",
+            "--disposition",
+            "accepted",
+            "--human-verified",
+            "--source-id",
+            "reviewer:1",
+            "--artifact",
+            "review-notes.md",
+            "--recorded-at",
+            "2026-05-09T05:10:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let outcome_json: Value = serde_json::from_slice(&outcome_output).expect("outcome json");
+    assert_eq!(outcome_json["command"], "subagents record-outcome");
+    assert_eq!(outcome_json["result"]["agent"]["status"], "completed");
+    assert_eq!(outcome_json["result"]["agent"]["disposition"], "accepted");
+    assert_eq!(outcome_json["result"]["agent"]["human_verified"], true);
+
+    let synthesis_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "subagents",
+            "record-synthesis",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--status",
+            "partial",
+            "--summary",
+            "reviewer completed; test_runner still pending",
+            "--human-verified",
+            "--source-id",
+            "synthesis:pre-pr-review",
+            "--artifact",
+            "review-summary.md",
+            "--recorded-at",
+            "2026-05-09T05:20:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let synthesis_json: Value = serde_json::from_slice(&synthesis_output).expect("synthesis json");
+    assert_eq!(synthesis_json["command"], "subagents record-synthesis");
+    assert_eq!(synthesis_json["result"]["synthesis"]["status"], "partial");
+    assert_eq!(synthesis_json["result"]["evidence"]["total"], 4);
+
+    let subagents: Value = serde_json::from_str(
+        &std::fs::read_to_string(std::path::Path::new(capsule).join("subagents.json"))
+            .expect("subagents"),
+    )
+    .expect("subagents json");
+    assert_eq!(subagents["batches"][0]["id"], "pre-pr-review");
+    assert_eq!(subagents["batches"][0]["synthesis"]["status"], "partial");
+    assert!(
+        subagents["batches"][0]["prompts"][0]
+            .get("prompt")
+            .is_none(),
+        "raw prompt text must not be persisted in subagents.json"
+    );
 }
 
 #[test]

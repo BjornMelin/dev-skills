@@ -200,3 +200,62 @@ If a role/model override is rejected:
 1. retry with a fresh prompt and no full-context fork;
 2. omit per-call model/effort if a custom role pins them;
 3. fall back to built-in `explorer`, `worker`, or `default` when needed.
+
+## codex-dev Capsule Bridge
+
+`subspawn` remains the planning and delegation-policy owner. `codex-dev`
+records local capsule evidence only; it must not spawn, wait on, retry, or
+semantically interpret agent output on its own. It may derive mechanical batch
+status from recorded agent statuses so the capsule can be scanned quickly.
+
+Record a planned batch after generating planner JSON:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset review \
+  --task "pre-PR branch review" \
+  --scope "current branch diff" \
+  --json > /tmp/pre-pr-review-plan.json
+
+cargo run -q -p codex-dev -- --json subagents record-plan \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --source /tmp/pre-pr-review-plan.json \
+  --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json"
+```
+
+Then record agent outcomes as the parent session verifies them:
+
+```bash
+cargo run -q -p codex-dev -- --json subagents record-outcome \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --role reviewer \
+  --status completed \
+  --summary "no blocking findings" \
+  --disposition accepted \
+  --human-verified \
+  --source-id reviewer:1 \
+  --artifact review-notes.md
+```
+
+Finally record the parent synthesis:
+
+```bash
+cargo run -q -p codex-dev -- --json subagents record-synthesis \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --status completed \
+  --summary "review batch clean after follow-up fixes" \
+  --human-verified \
+  --source-id synthesis:pre-pr-review \
+  --artifact review-summary.md
+```
+
+The bridge stores role names, duplicate-template warnings, registry issues,
+stable prompt IDs, SHA-256 prompt hashes, human-verified dispositions, and
+short summaries. Completed synthesis requires every planned role to have a
+terminal status, `human_verified: true`, and a final disposition of `accepted`,
+`rejected`, `mixed`, or `informational`; `pending` is not final. The bridge does
+not store raw prompt text in `subagents.json` and does not store raw long
+transcripts by default.

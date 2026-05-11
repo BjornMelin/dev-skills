@@ -1,7 +1,9 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Write};
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -9,6 +11,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const CAPSULE_SCHEMA: &str = "codex-dev.task-capsule.v1";
 pub const EVIDENCE_SCHEMA: &str = "codex-dev.evidence.v1";
@@ -18,6 +21,10 @@ pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
 pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -116,25 +123,80 @@ pub struct GateRecord {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Subagents {
     pub schema: String,
     pub batches: Vec<SubagentBatch>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubagentBatch {
     pub id: String,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wait_policy: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rendezvous_required: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub registry_issues: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub duplicate_roles_ignored: BTreeMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub prompts: Vec<SubagentPromptRecord>,
     pub agents: Vec<SubagentRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synthesis: Option<SubagentSynthesisRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recorded_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubagentPromptRecord {
+    pub role: String,
+    pub prompt_id: String,
+    pub prompt_hash: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubagentRecord {
     pub role: String,
     pub task: String,
     pub status: String,
     pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disposition: Option<String>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub human_verified: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SubagentSynthesisRecord {
+    pub status: String,
+    pub summary: String,
+    pub human_verified: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<String>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -198,11 +260,102 @@ pub struct AppendEvidenceArgs {
     pub record: EvidenceRecord,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordSubagentPlanArgs {
+    pub capsule: PathBuf,
+    pub batch_id: String,
+    pub source: PathBuf,
+    pub command: Option<String>,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubagentOutcomeStatus {
+    Planned,
+    Running,
+    Completed,
+    Failed,
+    TimedOut,
+    Closed,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubagentDisposition {
+    Accepted,
+    Rejected,
+    Mixed,
+    Informational,
+    Pending,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubagentSynthesisStatus {
+    Completed,
+    Partial,
+    Blocked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordSubagentOutcomeArgs {
+    pub capsule: PathBuf,
+    pub batch_id: String,
+    pub role: String,
+    pub status: SubagentOutcomeStatus,
+    pub summary: String,
+    pub disposition: SubagentDisposition,
+    pub human_verified: bool,
+    pub source_ids: Vec<String>,
+    pub artifacts: Vec<String>,
+    pub recorded_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecordSubagentSynthesisArgs {
+    pub capsule: PathBuf,
+    pub batch_id: String,
+    pub status: SubagentSynthesisStatus,
+    pub summary: String,
+    pub human_verified: bool,
+    pub source_ids: Vec<String>,
+    pub artifacts: Vec<String>,
+    pub recorded_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AppendEvidenceResult {
     pub capsule: PathBuf,
     pub evidence_path: PathBuf,
     pub record: EvidenceRecord,
+    pub evidence: EvidenceSummary,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecordSubagentPlanResult {
+    pub capsule: PathBuf,
+    pub subagents_path: PathBuf,
+    pub evidence_path: PathBuf,
+    pub batch: SubagentBatch,
+    pub evidence: EvidenceSummary,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecordSubagentOutcomeResult {
+    pub capsule: PathBuf,
+    pub subagents_path: PathBuf,
+    pub evidence_path: PathBuf,
+    pub batch: SubagentBatch,
+    pub agent: SubagentRecord,
+    pub evidence: EvidenceSummary,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RecordSubagentSynthesisResult {
+    pub capsule: PathBuf,
+    pub subagents_path: PathBuf,
+    pub evidence_path: PathBuf,
+    pub batch: SubagentBatch,
+    pub synthesis: SubagentSynthesisRecord,
     pub evidence: EvidenceSummary,
 }
 
@@ -231,6 +384,59 @@ struct PrSnapshotInput {
     #[serde(default)]
     checks: Vec<CheckSnapshotInput>,
     review_threads: ReviewThreadSnapshotInput,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SubspawnPlanInput {
+    task: String,
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    scope: Option<String>,
+    #[serde(default)]
+    scope_items: Vec<String>,
+    #[serde(default)]
+    wait_policy: Option<String>,
+    #[serde(default)]
+    rendezvous_required: Option<bool>,
+    #[serde(default)]
+    roles: Vec<SubspawnPlanRole>,
+    #[serde(default)]
+    prompts: Vec<SubspawnPlanPrompt>,
+    #[serde(default)]
+    registry_issues: Vec<String>,
+    #[serde(default)]
+    duplicate_roles_ignored: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    synthesis_checklist: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SubspawnPlanRole {
+    name: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    reasoning: Option<String>,
+    #[serde(default)]
+    return_headings: Vec<String>,
+    #[serde(default)]
+    sandbox: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SubspawnPlanPrompt {
+    role: String,
+    prompt: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -438,6 +644,199 @@ pub fn append_evidence(args: AppendEvidenceArgs) -> Result<AppendEvidenceResult>
         evidence_path: args.capsule.join("evidence.jsonl"),
         capsule: args.capsule,
         record: args.record,
+        evidence,
+    })
+}
+
+pub fn record_subagent_plan(args: RecordSubagentPlanArgs) -> Result<RecordSubagentPlanResult> {
+    validate_capsule_for_subagent_record(&args.capsule)?;
+    validate_stable_id("batch_id", &args.batch_id)?;
+    let plan: SubspawnPlanInput = read_json(&args.source)
+        .with_context(|| format!("failed to read subspawn plan {}", args.source.display()))?;
+    let batch = subspawn_plan_to_batch(plan, &args.batch_id, args.recorded_at)?;
+
+    let mut subagents: Subagents = read_json(&args.capsule.join("subagents.json"))?;
+    if subagents
+        .batches
+        .iter()
+        .any(|batch| batch.id == args.batch_id)
+    {
+        bail!("subagent batch already exists: {}", args.batch_id);
+    }
+    let evidence_record = EvidenceRecord {
+        schema: EVIDENCE_SCHEMA.to_string(),
+        kind: EvidenceKind::Subagent,
+        at: args.recorded_at,
+        summary: format!(
+            "Recorded subspawn plan {} with {} role(s)",
+            batch.id,
+            batch.agents.len()
+        ),
+        command: args.command,
+        exit_code: None,
+        source_ids: vec![format!("subagents:{}", batch.id)],
+        actor: None,
+        tool: Some("subspawn".to_string()),
+        confidence: None,
+        residual_risk: None,
+        artifacts: vec![
+            "subagents.json".to_string(),
+            args.source.display().to_string(),
+        ],
+    };
+    validate_subagent_evidence_record(&evidence_record)?;
+    subagents.batches.push(batch.clone());
+    ensure_valid_subagents_value(&subagents)?;
+    write_json(args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, evidence_record)?;
+    touch_capsule(&args.capsule, args.recorded_at)?;
+
+    let evidence = evidence_summary(&args.capsule)?;
+    Ok(RecordSubagentPlanResult {
+        capsule: args.capsule.clone(),
+        subagents_path: args.capsule.join("subagents.json"),
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        batch,
+        evidence,
+    })
+}
+
+pub fn record_subagent_outcome(
+    args: RecordSubagentOutcomeArgs,
+) -> Result<RecordSubagentOutcomeResult> {
+    validate_capsule_for_subagent_record(&args.capsule)?;
+    validate_stable_id("batch_id", &args.batch_id)?;
+    validate_role_name(&args.role)?;
+    validate_human_verified(args.human_verified)?;
+    validate_outcome_disposition(args.status, args.disposition)?;
+    let mut errors = Vec::new();
+    validate_non_empty_text("summary", &args.summary, &mut errors);
+    validate_required_repeated_text("source_ids", &args.source_ids, &mut errors);
+    validate_required_repeated_text("artifacts", &args.artifacts, &mut errors);
+    if !errors.is_empty() {
+        bail!("invalid subagent outcome: {}", errors.join("; "));
+    }
+
+    let mut subagents: Subagents = read_json(&args.capsule.join("subagents.json"))?;
+    let batch = subagents
+        .batches
+        .iter_mut()
+        .find(|batch| batch.id == args.batch_id)
+        .with_context(|| format!("unknown subagent batch: {}", args.batch_id))?;
+    let agent = batch
+        .agents
+        .iter_mut()
+        .find(|agent| agent.role == args.role)
+        .with_context(|| {
+            format!(
+                "role {} is not recorded in subagent batch {}",
+                args.role, args.batch_id
+            )
+        })?;
+    agent.status = args.status.to_string();
+    agent.summary = args.summary.clone();
+    agent.disposition = Some(args.disposition.to_string());
+    agent.human_verified = args.human_verified;
+    agent.source_ids = args.source_ids.clone();
+    agent.artifacts = args.artifacts.clone();
+    agent.updated_at = Some(args.recorded_at);
+    let agent_result = agent.clone();
+    batch.updated_at = Some(args.recorded_at);
+    refresh_batch_status(batch);
+    let batch_result = batch.clone();
+    let evidence_record = EvidenceRecord {
+        schema: EVIDENCE_SCHEMA.to_string(),
+        kind: EvidenceKind::Subagent,
+        at: args.recorded_at,
+        summary: format!("Subagent {} {}: {}", args.role, args.status, args.summary),
+        command: None,
+        exit_code: None,
+        source_ids: subagent_source_ids(&args.batch_id, &args.role, &args.source_ids),
+        actor: Some(args.role),
+        tool: Some("subspawn".to_string()),
+        confidence: None,
+        residual_risk: None,
+        artifacts: subagent_artifacts(&args.artifacts),
+    };
+    validate_subagent_evidence_record(&evidence_record)?;
+    ensure_valid_subagents_value(&subagents)?;
+    write_json(args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, evidence_record)?;
+    touch_capsule(&args.capsule, args.recorded_at)?;
+
+    let evidence = evidence_summary(&args.capsule)?;
+    Ok(RecordSubagentOutcomeResult {
+        capsule: args.capsule.clone(),
+        subagents_path: args.capsule.join("subagents.json"),
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        batch: batch_result,
+        agent: agent_result,
+        evidence,
+    })
+}
+
+pub fn record_subagent_synthesis(
+    args: RecordSubagentSynthesisArgs,
+) -> Result<RecordSubagentSynthesisResult> {
+    validate_capsule_for_subagent_record(&args.capsule)?;
+    validate_stable_id("batch_id", &args.batch_id)?;
+    validate_human_verified(args.human_verified)?;
+    let mut errors = Vec::new();
+    validate_non_empty_text("summary", &args.summary, &mut errors);
+    validate_required_repeated_text("source_ids", &args.source_ids, &mut errors);
+    validate_required_repeated_text("artifacts", &args.artifacts, &mut errors);
+    if !errors.is_empty() {
+        bail!("invalid subagent synthesis: {}", errors.join("; "));
+    }
+
+    let mut subagents: Subagents = read_json(&args.capsule.join("subagents.json"))?;
+    let batch = subagents
+        .batches
+        .iter_mut()
+        .find(|batch| batch.id == args.batch_id)
+        .with_context(|| format!("unknown subagent batch: {}", args.batch_id))?;
+    if args.status == SubagentSynthesisStatus::Completed {
+        ensure_completed_synthesis_ready(batch)?;
+    }
+    let synthesis = SubagentSynthesisRecord {
+        status: args.status.to_string(),
+        summary: args.summary.clone(),
+        human_verified: args.human_verified,
+        source_ids: args.source_ids.clone(),
+        artifacts: args.artifacts.clone(),
+        updated_at: args.recorded_at,
+    };
+    batch.synthesis = Some(synthesis.clone());
+    batch.updated_at = Some(args.recorded_at);
+    apply_synthesis_status(batch, args.status);
+    let batch_result = batch.clone();
+    let evidence_record = EvidenceRecord {
+        schema: EVIDENCE_SCHEMA.to_string(),
+        kind: EvidenceKind::Subagent,
+        at: args.recorded_at,
+        summary: format!("Subagent synthesis {}: {}", args.status, args.summary),
+        command: None,
+        exit_code: None,
+        source_ids: synthesis_source_ids(&args.batch_id, &args.source_ids),
+        actor: None,
+        tool: Some("subspawn".to_string()),
+        confidence: None,
+        residual_risk: None,
+        artifacts: subagent_artifacts(&args.artifacts),
+    };
+    validate_subagent_evidence_record(&evidence_record)?;
+    ensure_valid_subagents_value(&subagents)?;
+    write_json(args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, evidence_record)?;
+    touch_capsule(&args.capsule, args.recorded_at)?;
+
+    let evidence = evidence_summary(&args.capsule)?;
+    Ok(RecordSubagentSynthesisResult {
+        capsule: args.capsule.clone(),
+        subagents_path: args.capsule.join("subagents.json"),
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        batch: batch_result,
+        synthesis,
         evidence,
     })
 }
@@ -670,8 +1069,9 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
     for file in &missing_files {
         errors.push(format!("missing required file: {file}"));
     }
+    let invalid_contract_files = validate_contract_file_paths(path, &mut errors);
 
-    if !missing_files.contains(&"capsule.json") {
+    if can_validate_contract_file("capsule.json", &missing_files, &invalid_contract_files) {
         match read_json::<Capsule>(&path.join("capsule.json")) {
             Ok(capsule) => {
                 if capsule.schema != CAPSULE_SCHEMA {
@@ -682,14 +1082,14 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         }
     }
 
-    if !missing_files.contains(&"evidence.jsonl") {
+    if can_validate_contract_file("evidence.jsonl", &missing_files, &invalid_contract_files) {
         match validate_evidence(&path.join("evidence.jsonl")) {
             Ok(file_errors) => errors.extend(file_errors),
             Err(error) => errors.push(format!("invalid evidence.jsonl: {error:#}")),
         }
     }
 
-    if !missing_files.contains(&"verification.json") {
+    if can_validate_contract_file("verification.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<Verification, _>(
             &path.join("verification.json"),
             VERIFICATION_SCHEMA,
@@ -697,15 +1097,13 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
             &mut errors,
         );
     }
-    if !missing_files.contains(&"subagents.json") {
-        validate_schema_file::<Subagents, _>(
-            &path.join("subagents.json"),
-            SUBAGENTS_SCHEMA,
-            |value| &value.schema,
-            &mut errors,
-        );
+    if can_validate_contract_file("subagents.json", &missing_files, &invalid_contract_files) {
+        match validate_subagents(&path.join("subagents.json")) {
+            Ok(file_errors) => errors.extend(file_errors),
+            Err(error) => errors.push(format!("invalid subagents.json: {error:#}")),
+        }
     }
-    if !missing_files.contains(&"pr.json") {
+    if can_validate_contract_file("pr.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<PrEvidence, _>(
             &path.join("pr.json"),
             PR_SCHEMA,
@@ -713,7 +1111,7 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
             &mut errors,
         );
     }
-    if !missing_files.contains(&"policy.json") {
+    if can_validate_contract_file("policy.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<PolicyManifest, _>(
             &path.join("policy.json"),
             POLICY_GATES_SCHEMA,
@@ -727,6 +1125,51 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         valid: errors.is_empty(),
         errors,
     })
+}
+
+fn can_validate_contract_file(
+    file: &str,
+    missing_files: &[&str],
+    invalid_contract_files: &BTreeSet<String>,
+) -> bool {
+    !missing_files.contains(&file) && !invalid_contract_files.contains(file)
+}
+
+fn validate_contract_file_paths(path: &Path, errors: &mut Vec<String>) -> BTreeSet<String> {
+    let mut invalid = BTreeSet::new();
+    for file in REQUIRED_FILES
+        .iter()
+        .copied()
+        .filter(|file| file.ends_with(".json") || file.ends_with(".jsonl"))
+    {
+        let file_path = path.join(file);
+        let metadata = match file_path.symlink_metadata() {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == ErrorKind::NotFound => continue,
+            Err(error) => {
+                errors.push(format!(
+                    "failed to inspect {}: {error}",
+                    file_path.display()
+                ));
+                invalid.insert(file.to_string());
+                continue;
+            }
+        };
+        if metadata.file_type().is_symlink() {
+            errors.push(format!(
+                "refusing to validate symlinked capsule contract file: {}",
+                file_path.display()
+            ));
+            invalid.insert(file.to_string());
+        } else if !metadata.is_file() {
+            errors.push(format!(
+                "capsule contract path is not a file: {}",
+                file_path.display()
+            ));
+            invalid.insert(file.to_string());
+        }
+    }
+    invalid
 }
 
 pub fn capsule_status(path: &Path) -> Result<StatusResult> {
@@ -867,6 +1310,325 @@ pub fn render_pr_label(pr: &PrEvidence) -> String {
     }
 }
 
+fn subspawn_plan_to_batch(
+    plan: SubspawnPlanInput,
+    batch_id: &str,
+    recorded_at: DateTime<Utc>,
+) -> Result<SubagentBatch> {
+    let mut errors = Vec::new();
+    validate_non_empty_text("task", &plan.task, &mut errors);
+    validate_optional_text("mode", plan.mode.as_deref(), &mut errors);
+    validate_optional_text("scope", plan.scope.as_deref(), &mut errors);
+    validate_repeated_text("scope_items", &plan.scope_items, &mut errors);
+    validate_optional_text("wait_policy", plan.wait_policy.as_deref(), &mut errors);
+    validate_repeated_text("registry_issues", &plan.registry_issues, &mut errors);
+    validate_repeated_text(
+        "synthesis_checklist",
+        &plan.synthesis_checklist,
+        &mut errors,
+    );
+    if plan.roles.is_empty() {
+        errors.push("roles must not be empty".to_string());
+    }
+
+    let mut seen = BTreeSet::new();
+    for role in &plan.roles {
+        if let Err(error) = validate_role_name(&role.name) {
+            errors.push(error.to_string());
+        }
+        validate_optional_text("role.description", role.description.as_deref(), &mut errors);
+        validate_optional_text("role.model", role.model.as_deref(), &mut errors);
+        validate_optional_text("role.path", role.path.as_deref(), &mut errors);
+        validate_optional_text("role.reasoning", role.reasoning.as_deref(), &mut errors);
+        validate_repeated_text("role.return_headings", &role.return_headings, &mut errors);
+        validate_optional_text("role.sandbox", role.sandbox.as_deref(), &mut errors);
+        validate_optional_text("role.source", role.source.as_deref(), &mut errors);
+        if !seen.insert(role.name.clone()) {
+            errors.push(format!("duplicate role in plan: {}", role.name));
+        }
+    }
+    let role_names = seen.clone();
+    let mut prompt_roles = BTreeSet::new();
+    for prompt in &plan.prompts {
+        if let Err(error) = validate_role_name(&prompt.role) {
+            errors.push(error.to_string());
+        }
+        validate_multiline_text("prompt", &prompt.prompt, &mut errors);
+        if !role_names.contains(&prompt.role) {
+            errors.push(format!(
+                "prompt role {} is not present in plan roles",
+                prompt.role
+            ));
+        }
+        if !prompt_roles.insert(prompt.role.clone()) {
+            errors.push(format!("duplicate prompt for role {}", prompt.role));
+        }
+    }
+    for (role, paths) in &plan.duplicate_roles_ignored {
+        if let Err(error) = validate_role_name(role) {
+            errors.push(format!("duplicate_roles_ignored {error}"));
+        }
+        if paths.is_empty() {
+            errors.push(format!("duplicate_roles_ignored[{role}] must not be empty"));
+        }
+        validate_repeated_text("duplicate_roles_ignored", paths, &mut errors);
+    }
+    if !errors.is_empty() {
+        bail!("invalid subspawn plan: {}", errors.join("; "));
+    }
+
+    let prompts_by_role = plan
+        .prompts
+        .into_iter()
+        .map(|prompt| (prompt.role, prompt.prompt))
+        .collect::<BTreeMap<_, _>>();
+    let mut prompts = Vec::new();
+    let mut agents = Vec::new();
+    for role in plan.roles {
+        let prompt = prompts_by_role
+            .get(&role.name)
+            .with_context(|| format!("missing prompt for role {}", role.name))?;
+        let prompt_id = format!("{batch_id}:{}", role.name);
+        let prompt_hash = stable_prompt_hash(prompt);
+        prompts.push(SubagentPromptRecord {
+            role: role.name.clone(),
+            prompt_id: prompt_id.clone(),
+            prompt_hash: prompt_hash.clone(),
+        });
+        agents.push(SubagentRecord {
+            role: role.name,
+            task: plan.task.clone(),
+            status: "planned".to_string(),
+            summary: "planned by subspawn".to_string(),
+            prompt_id: Some(prompt_id),
+            prompt_hash: Some(prompt_hash),
+            disposition: None,
+            human_verified: false,
+            source_ids: Vec::new(),
+            artifacts: Vec::new(),
+            updated_at: None,
+        });
+    }
+
+    Ok(SubagentBatch {
+        id: batch_id.to_string(),
+        status: "planned".to_string(),
+        task: Some(plan.task),
+        mode: plan.mode,
+        scope: plan.scope,
+        wait_policy: plan.wait_policy,
+        rendezvous_required: plan.rendezvous_required,
+        registry_issues: plan.registry_issues,
+        duplicate_roles_ignored: plan.duplicate_roles_ignored,
+        prompts,
+        agents,
+        synthesis: None,
+        recorded_at: Some(recorded_at),
+        updated_at: Some(recorded_at),
+    })
+}
+
+fn stable_prompt_hash(prompt: &str) -> String {
+    let digest = Sha256::digest(prompt.as_bytes());
+    format!("sha256:{digest:x}")
+}
+
+fn refresh_batch_status(batch: &mut SubagentBatch) {
+    if batch
+        .agents
+        .iter()
+        .any(|agent| agent.status.as_str() == "blocked")
+    {
+        batch.status = "blocked".to_string();
+    } else if batch
+        .agents
+        .iter()
+        .any(|agent| matches!(agent.status.as_str(), "planned" | "running"))
+    {
+        batch.status = "active".to_string();
+    } else if !batch.agents.is_empty()
+        && batch.agents.iter().all(|agent| agent.status == "completed")
+    {
+        batch.status = "completed".to_string();
+    } else {
+        batch.status = "partial".to_string();
+    }
+}
+
+fn apply_synthesis_status(batch: &mut SubagentBatch, status: SubagentSynthesisStatus) {
+    refresh_batch_status(batch);
+    match status {
+        SubagentSynthesisStatus::Blocked => {
+            batch.status = "blocked".to_string();
+        }
+        SubagentSynthesisStatus::Partial if batch.status == "completed" => {
+            batch.status = "partial".to_string();
+        }
+        SubagentSynthesisStatus::Partial | SubagentSynthesisStatus::Completed => {}
+    }
+}
+
+fn validate_outcome_disposition(
+    status: SubagentOutcomeStatus,
+    disposition: SubagentDisposition,
+) -> Result<()> {
+    if matches!(
+        status,
+        SubagentOutcomeStatus::Completed
+            | SubagentOutcomeStatus::Failed
+            | SubagentOutcomeStatus::TimedOut
+            | SubagentOutcomeStatus::Closed
+    ) && disposition == SubagentDisposition::Pending
+    {
+        bail!("terminal subagent outcomes require a final disposition");
+    }
+    Ok(())
+}
+
+fn ensure_completed_synthesis_ready(batch: &SubagentBatch) -> Result<()> {
+    if batch.agents.is_empty() {
+        bail!("completed synthesis requires at least one planned agent");
+    }
+    let incomplete = batch
+        .agents
+        .iter()
+        .filter(|agent| !subagent_has_final_verified_outcome(agent))
+        .map(|agent| agent.role.as_str())
+        .collect::<Vec<_>>();
+    if !incomplete.is_empty() {
+        bail!(
+            "completed synthesis requires terminal human-verified outcomes for every agent; incomplete roles: {}",
+            incomplete.join(", ")
+        );
+    }
+    Ok(())
+}
+
+fn subagent_has_final_verified_outcome(agent: &SubagentRecord) -> bool {
+    is_terminal_subagent_status(&agent.status)
+        && agent.human_verified
+        && matches!(
+            agent.disposition.as_deref(),
+            Some("accepted" | "rejected" | "mixed" | "informational")
+        )
+}
+
+fn is_terminal_subagent_status(value: &str) -> bool {
+    matches!(value, "completed" | "failed" | "timed_out" | "closed")
+}
+
+fn is_batch_status(value: &str) -> bool {
+    matches!(
+        value,
+        "planned" | "active" | "completed" | "partial" | "blocked"
+    )
+}
+
+fn subagent_source_ids(batch_id: &str, role: &str, extra: &[String]) -> Vec<String> {
+    let mut source_ids = vec![
+        format!("subagents:{batch_id}"),
+        format!("subagent:{batch_id}:{role}"),
+    ];
+    source_ids.extend(extra.iter().cloned());
+    source_ids
+}
+
+fn synthesis_source_ids(batch_id: &str, extra: &[String]) -> Vec<String> {
+    let mut source_ids = vec![format!("subagents:{batch_id}:synthesis")];
+    source_ids.extend(extra.iter().cloned());
+    source_ids
+}
+
+fn subagent_artifacts(extra: &[String]) -> Vec<String> {
+    let mut artifacts = vec!["subagents.json".to_string()];
+    artifacts.extend(extra.iter().cloned());
+    artifacts
+}
+
+fn append_subagent_evidence(capsule_path: &Path, record: EvidenceRecord) -> Result<()> {
+    validate_subagent_evidence_record(&record)?;
+    append_jsonl(capsule_path.join("evidence.jsonl"), &record)
+}
+
+fn validate_subagent_evidence_record(record: &EvidenceRecord) -> Result<()> {
+    let errors = validate_evidence_record(record);
+    if !errors.is_empty() {
+        bail!("invalid subagent evidence record: {}", errors.join("; "));
+    }
+    Ok(())
+}
+
+fn touch_capsule(capsule_path: &Path, updated_at: DateTime<Utc>) -> Result<()> {
+    let mut capsule: Capsule = read_json(&capsule_path.join("capsule.json"))?;
+    capsule.updated_at = std::cmp::max(capsule.updated_at, updated_at);
+    write_json(capsule_path.join("capsule.json"), &capsule)
+}
+
+fn validate_capsule_for_subagent_record(capsule_path: &Path) -> Result<()> {
+    ensure_regular_contract_files(capsule_path)?;
+    let validation = validate_capsule(capsule_path)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            capsule_path.display(),
+            validation.errors.join("; ")
+        );
+    }
+    Ok(())
+}
+
+fn validate_stable_id(field: &str, value: &str) -> Result<()> {
+    let mut errors = Vec::new();
+    validate_non_empty_text(field, value, &mut errors);
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':'))
+    {
+        errors.push(format!(
+            "{field} may contain only ASCII letters, numbers, '.', ':', '_' or '-'"
+        ));
+    }
+    if !errors.is_empty() {
+        bail!("{}", errors.join("; "));
+    }
+    Ok(())
+}
+
+fn validate_role_name(value: &str) -> Result<()> {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        bail!("role must not be empty");
+    };
+    if !first.is_ascii_lowercase() {
+        bail!("role {value:?} must start with a lowercase ASCII letter");
+    }
+    if !chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_') {
+        bail!("role {value:?} must be snake_case");
+    }
+    Ok(())
+}
+
+fn validate_human_verified(value: bool) -> Result<()> {
+    if !value {
+        bail!("human_verified must be set for subagent outcome and synthesis records");
+    }
+    Ok(())
+}
+
+fn validate_multiline_text(field: &str, value: &str, errors: &mut Vec<String>) {
+    if value.trim().is_empty() {
+        errors.push(format!("{field} must not be empty"));
+    }
+    if value
+        .chars()
+        .any(|ch| ch.is_control() && !matches!(ch, '\n' | '\r' | '\t'))
+    {
+        errors.push(format!(
+            "{field} must not contain control characters other than tabs or newlines"
+        ));
+    }
+}
+
 fn validate_schema_file<T, F>(
     path: &Path,
     expected_schema: &str,
@@ -893,6 +1655,260 @@ fn validate_schema_file<T, F>(
                 .and_then(|file| file.to_str())
                 .unwrap_or("json file")
         )),
+    }
+}
+
+fn validate_subagents(path: &Path) -> Result<Vec<String>> {
+    let subagents: Subagents = read_json(path)?;
+    Ok(validate_subagents_value(&subagents))
+}
+
+fn ensure_valid_subagents_value(subagents: &Subagents) -> Result<()> {
+    let errors = validate_subagents_value(subagents);
+    if !errors.is_empty() {
+        bail!("invalid subagents contract: {}", errors.join("; "));
+    }
+    Ok(())
+}
+
+fn validate_subagents_value(subagents: &Subagents) -> Vec<String> {
+    let mut errors = Vec::new();
+    if subagents.schema != SUBAGENTS_SCHEMA {
+        errors.push(format!("subagents.json schema must be {SUBAGENTS_SCHEMA}"));
+    }
+
+    let mut batch_ids = BTreeSet::new();
+    for (batch_index, batch) in subagents.batches.iter().enumerate() {
+        let prefix = format!("subagents.json batches[{batch_index}]");
+        if let Err(error) = validate_stable_id("batch id", &batch.id) {
+            errors.push(format!("{prefix} {error}"));
+        }
+        if !batch_ids.insert(batch.id.clone()) {
+            errors.push(format!("{prefix} duplicate batch id {}", batch.id));
+        }
+        if !is_batch_status(&batch.status) {
+            errors.push(format!(
+                "{prefix} status {:?} must be planned, active, completed, partial, or blocked",
+                batch.status
+            ));
+        }
+        if batch.prompts.is_empty() {
+            errors.push(format!("{prefix} prompts must not be empty"));
+        }
+        if batch.agents.is_empty() {
+            errors.push(format!("{prefix} agents must not be empty"));
+        }
+        validate_optional_text(
+            &format!("{prefix} task"),
+            batch.task.as_deref(),
+            &mut errors,
+        );
+        validate_optional_text(
+            &format!("{prefix} mode"),
+            batch.mode.as_deref(),
+            &mut errors,
+        );
+        validate_optional_text(
+            &format!("{prefix} scope"),
+            batch.scope.as_deref(),
+            &mut errors,
+        );
+        validate_optional_text(
+            &format!("{prefix} wait_policy"),
+            batch.wait_policy.as_deref(),
+            &mut errors,
+        );
+        validate_repeated_text(
+            &format!("{prefix} registry_issues"),
+            &batch.registry_issues,
+            &mut errors,
+        );
+        for (role, paths) in &batch.duplicate_roles_ignored {
+            if let Err(error) = validate_role_name(role) {
+                errors.push(format!("{prefix} duplicate_roles_ignored {error}"));
+            }
+            if paths.is_empty() {
+                errors.push(format!(
+                    "{prefix} duplicate_roles_ignored[{role}] must not be empty"
+                ));
+            }
+            validate_repeated_text(
+                &format!("{prefix} duplicate_roles_ignored[{role}]"),
+                paths,
+                &mut errors,
+            );
+        }
+
+        let mut prompt_roles = BTreeMap::new();
+        for (prompt_index, prompt) in batch.prompts.iter().enumerate() {
+            let prompt_prefix = format!("{prefix} prompts[{prompt_index}]");
+            if let Err(error) = validate_role_name(&prompt.role) {
+                errors.push(format!("{prompt_prefix} {error}"));
+            }
+            if let Err(error) = validate_stable_id("prompt_id", &prompt.prompt_id) {
+                errors.push(format!("{prompt_prefix} {error}"));
+            }
+            validate_prompt_hash(&prompt_prefix, &prompt.prompt_hash, &mut errors);
+            if prompt_roles.insert(prompt.role.clone(), prompt).is_some() {
+                errors.push(format!(
+                    "{prompt_prefix} duplicate prompt for {}",
+                    prompt.role
+                ));
+            }
+        }
+
+        let mut agent_roles = BTreeSet::new();
+        for (agent_index, agent) in batch.agents.iter().enumerate() {
+            let agent_prefix = format!("{prefix} agents[{agent_index}]");
+            if let Err(error) = validate_role_name(&agent.role) {
+                errors.push(format!("{agent_prefix} {error}"));
+            }
+            if !agent_roles.insert(agent.role.clone()) {
+                errors.push(format!("{agent_prefix} duplicate agent for {}", agent.role));
+            }
+            if let Err(error) = SubagentOutcomeStatus::from_str(&agent.status) {
+                errors.push(format!("{agent_prefix} {error}"));
+            }
+            validate_non_empty_text(&format!("{agent_prefix} task"), &agent.task, &mut errors);
+            validate_non_empty_text(
+                &format!("{agent_prefix} summary"),
+                &agent.summary,
+                &mut errors,
+            );
+            match agent.prompt_id.as_deref() {
+                Some(prompt_id) => {
+                    if let Err(error) = validate_stable_id("prompt_id", prompt_id) {
+                        errors.push(format!("{agent_prefix} {error}"));
+                    }
+                }
+                None => errors.push(format!("{agent_prefix} prompt_id is required")),
+            }
+            match agent.prompt_hash.as_deref() {
+                Some(prompt_hash) => validate_prompt_hash(&agent_prefix, prompt_hash, &mut errors),
+                None => errors.push(format!("{agent_prefix} prompt_hash is required")),
+            }
+            if let Some(disposition) = agent.disposition.as_deref()
+                && let Err(error) = SubagentDisposition::from_str(disposition)
+            {
+                errors.push(format!("{agent_prefix} {error}"));
+            }
+            if agent.disposition.is_some() && !agent.human_verified {
+                errors.push(format!(
+                    "{agent_prefix} disposition requires human_verified=true"
+                ));
+            }
+            if agent.human_verified && agent.disposition.is_none() {
+                errors.push(format!(
+                    "{agent_prefix} human_verified=true requires disposition"
+                ));
+            }
+            if is_terminal_subagent_status(&agent.status)
+                && !subagent_has_final_verified_outcome(agent)
+            {
+                errors.push(format!(
+                    "{agent_prefix} terminal status requires a final human-verified disposition"
+                ));
+            }
+            validate_repeated_text(
+                &format!("{agent_prefix} source_ids"),
+                &agent.source_ids,
+                &mut errors,
+            );
+            validate_repeated_text(
+                &format!("{agent_prefix} artifacts"),
+                &agent.artifacts,
+                &mut errors,
+            );
+            if let Some(prompt) = prompt_roles.get(&agent.role) {
+                let expected_prompt_id = format!("{}:{}", batch.id, agent.role);
+                if agent.prompt_id.as_deref() != Some(expected_prompt_id.as_str()) {
+                    errors.push(format!(
+                        "{agent_prefix} prompt_id must match {expected_prompt_id}"
+                    ));
+                }
+                if agent.prompt_hash.as_deref() != Some(prompt.prompt_hash.as_str()) {
+                    errors.push(format!(
+                        "{agent_prefix} prompt_hash must match prompt record"
+                    ));
+                }
+            }
+        }
+        for role in prompt_roles.keys() {
+            if !agent_roles.contains(role) {
+                errors.push(format!("{prefix} prompt role {role} has no matching agent"));
+            }
+        }
+        for role in &agent_roles {
+            if !prompt_roles.contains_key(role) {
+                errors.push(format!("{prefix} agent role {role} has no matching prompt"));
+            }
+        }
+        if batch.status == "completed" {
+            for agent in batch
+                .agents
+                .iter()
+                .filter(|agent| !subagent_has_final_verified_outcome(agent))
+            {
+                errors.push(format!(
+                    "{prefix} completed batch has incomplete agent {}",
+                    agent.role
+                ));
+            }
+        }
+        if let Some(synthesis) = &batch.synthesis {
+            let synthesis_prefix = format!("{prefix} synthesis");
+            if let Err(error) = SubagentSynthesisStatus::from_str(&synthesis.status) {
+                errors.push(format!("{synthesis_prefix} {error}"));
+            }
+            validate_non_empty_text(
+                &format!("{synthesis_prefix} summary"),
+                &synthesis.summary,
+                &mut errors,
+            );
+            if !synthesis.human_verified {
+                errors.push(format!("{synthesis_prefix} requires human_verified=true"));
+            }
+            validate_required_repeated_text(
+                &format!("{synthesis_prefix} source_ids"),
+                &synthesis.source_ids,
+                &mut errors,
+            );
+            validate_required_repeated_text(
+                &format!("{synthesis_prefix} artifacts"),
+                &synthesis.artifacts,
+                &mut errors,
+            );
+            if synthesis.status == "completed" {
+                for agent in batch
+                    .agents
+                    .iter()
+                    .filter(|agent| !subagent_has_final_verified_outcome(agent))
+                {
+                    errors.push(format!(
+                        "{synthesis_prefix} completed with incomplete agent {}",
+                        agent.role
+                    ));
+                }
+            }
+        }
+    }
+
+    errors
+}
+
+fn validate_prompt_hash(field: &str, value: &str, errors: &mut Vec<String>) {
+    let Some(hex) = value.strip_prefix("sha256:") else {
+        errors.push(format!("{field} prompt_hash must start with sha256:"));
+        return;
+    };
+    if hex.len() != 64
+        || !hex
+            .chars()
+            .all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
+    {
+        errors.push(format!(
+            "{field} prompt_hash must be sha256: followed by 64 lowercase hex characters"
+        ));
     }
 }
 
@@ -965,6 +1981,13 @@ fn validate_repeated_text(field: &str, values: &[String], errors: &mut Vec<Strin
     }
 }
 
+fn validate_required_repeated_text(field: &str, values: &[String], errors: &mut Vec<String>) {
+    if values.is_empty() {
+        errors.push(format!("{field} must include at least one value"));
+    }
+    validate_repeated_text(field, values, errors);
+}
+
 fn validate_non_empty_text(field: &str, value: &str, errors: &mut Vec<String>) {
     if value.trim().is_empty() {
         errors.push(format!("{field} must not be empty"));
@@ -976,23 +1999,36 @@ fn validate_non_empty_text(field: &str, value: &str, errors: &mut Vec<String>) {
 }
 
 pub fn write_json<T: Serialize>(path: PathBuf, value: &T) -> Result<()> {
-    let mut file =
-        File::create(&path).with_context(|| format!("failed to create {}", path.display()))?;
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    configure_no_follow(&mut options);
+    let mut file = options
+        .open(&path)
+        .with_context(|| format!("failed to create {}", path.display()))?;
     serde_json::to_writer_pretty(&mut file, value)?;
     writeln!(file)?;
     Ok(())
 }
 
 pub fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) -> Result<()> {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
+    let mut options = OpenOptions::new();
+    options.create(true).append(true);
+    configure_no_follow(&mut options);
+    let mut file = options
         .open(&path)
         .with_context(|| format!("failed to open {}", path.display()))?;
     serde_json::to_writer(&mut file, value)?;
     writeln!(file)?;
     Ok(())
 }
+
+#[cfg(unix)]
+fn configure_no_follow(options: &mut OpenOptions) {
+    options.custom_flags(libc::O_NOFOLLOW);
+}
+
+#[cfg(not(unix))]
+fn configure_no_follow(_options: &mut OpenOptions) {}
 
 fn write_markdown(path: PathBuf, content: &str) -> Result<()> {
     fs::write(&path, content).with_context(|| format!("failed to write {}", path.display()))
@@ -1182,6 +2218,96 @@ impl std::fmt::Display for GateStatus {
     }
 }
 
+impl std::fmt::Display for SubagentOutcomeStatus {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            SubagentOutcomeStatus::Planned => "planned",
+            SubagentOutcomeStatus::Running => "running",
+            SubagentOutcomeStatus::Completed => "completed",
+            SubagentOutcomeStatus::Failed => "failed",
+            SubagentOutcomeStatus::TimedOut => "timed_out",
+            SubagentOutcomeStatus::Closed => "closed",
+            SubagentOutcomeStatus::Blocked => "blocked",
+        };
+        formatter.write_str(value)
+    }
+}
+
+impl FromStr for SubagentOutcomeStatus {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "planned" => Ok(Self::Planned),
+            "running" => Ok(Self::Running),
+            "completed" => Ok(Self::Completed),
+            "failed" => Ok(Self::Failed),
+            "timed_out" => Ok(Self::TimedOut),
+            "closed" => Ok(Self::Closed),
+            "blocked" => Ok(Self::Blocked),
+            _ => Err(format!(
+                "invalid subagent outcome status {value:?}; expected planned, running, completed, failed, timed_out, closed, or blocked"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for SubagentDisposition {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            SubagentDisposition::Accepted => "accepted",
+            SubagentDisposition::Rejected => "rejected",
+            SubagentDisposition::Mixed => "mixed",
+            SubagentDisposition::Informational => "informational",
+            SubagentDisposition::Pending => "pending",
+        };
+        formatter.write_str(value)
+    }
+}
+
+impl FromStr for SubagentDisposition {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "accepted" => Ok(Self::Accepted),
+            "rejected" => Ok(Self::Rejected),
+            "mixed" => Ok(Self::Mixed),
+            "informational" => Ok(Self::Informational),
+            "pending" => Ok(Self::Pending),
+            _ => Err(format!(
+                "invalid subagent disposition {value:?}; expected accepted, rejected, mixed, informational, or pending"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for SubagentSynthesisStatus {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            SubagentSynthesisStatus::Completed => "completed",
+            SubagentSynthesisStatus::Partial => "partial",
+            SubagentSynthesisStatus::Blocked => "blocked",
+        };
+        formatter.write_str(value)
+    }
+}
+
+impl FromStr for SubagentSynthesisStatus {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "completed" => Ok(Self::Completed),
+            "partial" => Ok(Self::Partial),
+            "blocked" => Ok(Self::Blocked),
+            _ => Err(format!(
+                "invalid subagent synthesis status {value:?}; expected completed, partial, or blocked"
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1202,6 +2328,13 @@ mod tests {
             .collect::<Vec<_>>();
         expected.sort();
         assert_eq!(actual, expected);
+    }
+
+    fn merge_json_object(base: &mut Value, extra: Value) {
+        let base = base.as_object_mut().expect("base json object");
+        for (key, value) in extra.as_object().expect("extra json object") {
+            base.insert(key.clone(), value.clone());
+        }
     }
 
     fn init_args(root: PathBuf) -> InitArgs {
@@ -1238,6 +2371,53 @@ mod tests {
                 secrets: false,
             }],
         }
+    }
+
+    fn write_subspawn_plan_fixture(
+        root: &Path,
+        file_name: &str,
+        task: &str,
+        roles: &[&str],
+    ) -> PathBuf {
+        let prompts = roles
+            .iter()
+            .map(|role| {
+                json!({
+                    "role": role,
+                    "prompt": format!("Task: {task}\nRole: {role}\nReturn format:\n- Status\n- Risks/blockers")
+                })
+            })
+            .collect::<Vec<_>>();
+        let roles = roles
+            .iter()
+            .map(|role| json!({ "name": role }))
+            .collect::<Vec<_>>();
+        let path = root.join(file_name);
+        fs::write(
+            &path,
+            serde_json::to_string_pretty(&json!({
+                "task": task,
+                "mode": "read-only",
+                "scope": "fixture scope",
+                "wait_policy": "strict",
+                "rendezvous_required": true,
+                "roles": roles,
+                "prompts": prompts,
+                "registry_issues": [],
+                "duplicate_roles_ignored": {
+                    "test_runner": [
+                        "skills/subagent-creator/templates/agents/test_runner.toml",
+                        "skills/subspawn/templates/agents/test_runner.toml"
+                    ]
+                },
+                "synthesis_checklist": [
+                    "Wait for every spawned subagent in the planned batch."
+                ]
+            }))
+            .expect("plan json"),
+        )
+        .expect("write plan fixture");
+        path
     }
 
     #[test]
@@ -1410,6 +2590,30 @@ mod tests {
                 .iter()
                 .all(|error| !error.contains("failed to open"))
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_rejects_symlinked_contract_file() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let pr_path = capsule.join("pr.json");
+        let outside_path = temp.path().join("outside-pr.json");
+        fs::copy(&pr_path, &outside_path).expect("copy pr fixture");
+        fs::remove_file(&pr_path).expect("remove pr");
+        std::os::unix::fs::symlink(&outside_path, &pr_path).expect("symlink pr");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(
+            joined.contains("refusing to validate symlinked capsule contract file"),
+            "{joined}"
+        );
+        assert!(!joined.contains("invalid pr.json"), "{joined}");
     }
 
     #[test]
@@ -1607,6 +2811,562 @@ mod tests {
 
         assert!(error.to_string().contains("missing required file: pr.json"));
         assert!(!capsule.join("pr.json").exists());
+    }
+
+    #[test]
+    fn record_subagent_plan_accepts_common_batch_fixtures() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let fixtures = [
+            (
+                "research",
+                "research batch",
+                vec!["openai_docs_researcher", "github_researcher"],
+            ),
+            (
+                "review",
+                "review batch",
+                vec!["reviewer", "false_positive_validator"],
+            ),
+            (
+                "implementation",
+                "implementation batch",
+                vec!["repo_explorer", "implementation_worker"],
+            ),
+            ("validation", "validation batch", vec!["test_runner"]),
+        ];
+
+        for (index, (batch_id, task, roles)) in fixtures.iter().enumerate() {
+            let source = write_subspawn_plan_fixture(
+                temp.path(),
+                &format!("{batch_id}-plan.json"),
+                task,
+                roles,
+            );
+            let result = record_subagent_plan(RecordSubagentPlanArgs {
+                capsule: capsule.clone(),
+                batch_id: (*batch_id).to_string(),
+                source,
+                command: Some(format!("subspawn_plan.py plan --fixture {batch_id}")),
+                recorded_at: format!("2026-05-09T05:0{index}:00Z").parse().unwrap(),
+            })
+            .expect("record subagent plan");
+
+            assert_eq!(result.batch.id, *batch_id);
+            assert_eq!(result.batch.status, "planned");
+            assert_eq!(result.batch.agents.len(), roles.len());
+            assert!(result.batch.prompts[0].prompt_hash.starts_with("sha256:"));
+            assert_eq!(result.batch.prompts[0].prompt_hash.len(), 71);
+        }
+
+        let subagents: Subagents = read_json(&capsule.join("subagents.json")).expect("subagents");
+        assert_eq!(subagents.batches.len(), fixtures.len());
+        assert_eq!(
+            subagents.batches[0].duplicate_roles_ignored["test_runner"].len(),
+            2
+        );
+    }
+
+    #[test]
+    fn record_subagent_outcome_and_synthesis_append_evidence() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+        record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect("record plan");
+
+        let outcome = record_subagent_outcome(RecordSubagentOutcomeArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            role: "reviewer".to_string(),
+            status: SubagentOutcomeStatus::Completed,
+            summary: "no blocking findings".to_string(),
+            disposition: SubagentDisposition::Accepted,
+            human_verified: true,
+            source_ids: vec!["reviewer:1".to_string()],
+            artifacts: vec!["review-notes.md".to_string()],
+            recorded_at: "2026-05-09T05:10:00Z".parse().unwrap(),
+        })
+        .expect("record outcome");
+
+        assert_eq!(outcome.agent.status, "completed");
+        assert_eq!(outcome.agent.disposition.as_deref(), Some("accepted"));
+        assert!(outcome.agent.human_verified);
+        assert_eq!(outcome.batch.status, "completed");
+
+        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            status: SubagentSynthesisStatus::Completed,
+            summary: "review batch clean".to_string(),
+            human_verified: true,
+            source_ids: vec!["synthesis:review".to_string()],
+            artifacts: vec!["review-summary.md".to_string()],
+            recorded_at: "2026-05-09T05:20:00Z".parse().unwrap(),
+        })
+        .expect("record synthesis");
+
+        assert_eq!(synthesis.synthesis.status, "completed");
+        assert_eq!(synthesis.batch.status, "completed");
+        assert_eq!(synthesis.evidence.total, 4);
+        let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
+        assert!(evidence.contains("Subagent reviewer completed: no blocking findings"));
+        assert!(evidence.contains("Subagent synthesis completed: review batch clean"));
+        let evidence_records = evidence
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("evidence json line"))
+            .collect::<Vec<_>>();
+        let outcome_evidence = evidence_records
+            .iter()
+            .find(|record| {
+                record["summary"]
+                    .as_str()
+                    .is_some_and(|summary| summary.contains("Subagent reviewer completed"))
+            })
+            .expect("outcome evidence");
+        let source_ids = outcome_evidence["source_ids"]
+            .as_array()
+            .expect("source ids")
+            .iter()
+            .map(|value| value.as_str().expect("source id"))
+            .collect::<Vec<_>>();
+        assert!(source_ids.contains(&"subagents:review"));
+        assert!(source_ids.contains(&"subagent:review:reviewer"));
+        assert!(!source_ids.contains(&"subagent:reviewer"));
+    }
+
+    #[test]
+    fn record_subagent_plan_rejects_ambiguous_prompt_rows() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("bad-plan.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "task": "review batch",
+                "roles": [{ "name": "reviewer" }],
+                "prompts": [
+                    { "role": "reviewer", "prompt": "first prompt" },
+                    { "role": "reviewer", "prompt": "second prompt" },
+                    { "role": "security_reviewer", "prompt": "extra prompt" }
+                ],
+                "duplicate_roles_ignored": {
+                    "test_runner": []
+                }
+            }))
+            .expect("plan json"),
+        )
+        .expect("write plan");
+
+        let error = record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect_err("ambiguous prompt rows rejected");
+
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("duplicate prompt for role reviewer"),
+            "{message}"
+        );
+        assert!(
+            message.contains("prompt role security_reviewer is not present in plan roles"),
+            "{message}"
+        );
+        assert!(
+            message.contains("duplicate_roles_ignored[test_runner] must not be empty"),
+            "{message}"
+        );
+    }
+
+    #[test]
+    fn record_subagent_plan_validates_evidence_before_write() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+
+        let error = record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: Some("subspawn_plan.py plan\nwith-control".to_string()),
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect_err("invalid evidence rejected before write");
+
+        assert!(
+            format!("{error:#}").contains("invalid subagent evidence record"),
+            "{error:#}"
+        );
+        let subagents: Subagents = read_json(&capsule.join("subagents.json")).expect("subagents");
+        assert!(subagents.batches.is_empty());
+    }
+
+    #[test]
+    fn record_subagent_plan_rejects_unknown_json_fields() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+
+        for (file_name, extra) in [
+            ("unknown-root.json", json!({"unexpected_root": true})),
+            (
+                "unknown-role.json",
+                json!({"roles": [{ "name": "reviewer", "unexpected_role": true }]}),
+            ),
+            (
+                "unknown-prompt.json",
+                json!({"prompts": [{ "role": "reviewer", "prompt": "Review.", "unexpected_prompt": true }]}),
+            ),
+        ] {
+            let mut plan = json!({
+                "task": "review batch",
+                "mode": "read-only",
+                "scope": "fixture scope",
+                "wait_policy": "strict",
+                "rendezvous_required": true,
+                "roles": [{ "name": "reviewer" }],
+                "prompts": [{ "role": "reviewer", "prompt": "Review." }],
+                "registry_issues": [],
+                "duplicate_roles_ignored": {}
+            });
+            merge_json_object(&mut plan, extra);
+            let source = temp.path().join(file_name);
+            fs::write(
+                &source,
+                serde_json::to_string_pretty(&plan).expect("plan json"),
+            )
+            .expect("write plan");
+
+            let error = record_subagent_plan(RecordSubagentPlanArgs {
+                capsule: capsule.clone(),
+                batch_id: file_name.trim_end_matches(".json").to_string(),
+                source,
+                command: None,
+                recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+            })
+            .expect_err("unknown field rejected");
+
+            assert!(format!("{error:#}").contains("unknown field"), "{error:#}");
+        }
+
+        let subagents: Subagents = read_json(&capsule.join("subagents.json")).expect("subagents");
+        assert!(subagents.batches.is_empty());
+    }
+
+    #[test]
+    fn record_subagent_completed_synthesis_requires_verified_terminal_outcomes() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+        record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect("record plan");
+
+        let error = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+            capsule,
+            batch_id: "review".to_string(),
+            status: SubagentSynthesisStatus::Completed,
+            summary: "review batch clean".to_string(),
+            human_verified: true,
+            source_ids: vec!["synthesis:review".to_string()],
+            artifacts: vec!["review-summary.md".to_string()],
+            recorded_at: "2026-05-09T05:20:00Z".parse().unwrap(),
+        })
+        .expect_err("completed synthesis requires completed agents");
+
+        assert!(
+            format!("{error:#}").contains("incomplete roles: reviewer"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn record_subagent_outcome_rejects_pending_terminal_disposition() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+        record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect("record plan");
+
+        let error = record_subagent_outcome(RecordSubagentOutcomeArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            role: "reviewer".to_string(),
+            status: SubagentOutcomeStatus::Completed,
+            summary: "not actually finalized".to_string(),
+            disposition: SubagentDisposition::Pending,
+            human_verified: true,
+            source_ids: vec!["reviewer:1".to_string()],
+            artifacts: vec!["review-notes.md".to_string()],
+            recorded_at: "2026-05-09T05:10:00Z".parse().unwrap(),
+        })
+        .expect_err("pending disposition rejected for terminal outcomes");
+
+        assert!(
+            format!("{error:#}").contains("terminal subagent outcomes require a final disposition"),
+            "{error:#}"
+        );
+        let subagents: Subagents = read_json(&capsule.join("subagents.json")).expect("subagents");
+        assert_eq!(subagents.batches[0].agents[0].status, "planned");
+    }
+
+    #[test]
+    fn record_subagent_blocked_outcome_marks_batch_blocked() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+        record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect("record plan");
+
+        let outcome = record_subagent_outcome(RecordSubagentOutcomeArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            role: "reviewer".to_string(),
+            status: SubagentOutcomeStatus::Blocked,
+            summary: "waiting for required input".to_string(),
+            disposition: SubagentDisposition::Pending,
+            human_verified: true,
+            source_ids: vec!["reviewer:1".to_string()],
+            artifacts: vec!["review-notes.md".to_string()],
+            recorded_at: "2026-05-09T05:10:00Z".parse().unwrap(),
+        })
+        .expect("record blocked outcome");
+
+        assert_eq!(outcome.batch.status, "blocked");
+        assert!(validate_capsule(&capsule).expect("validate").valid);
+
+        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+            capsule,
+            batch_id: "review".to_string(),
+            status: SubagentSynthesisStatus::Partial,
+            summary: "blocked agent still needs user input".to_string(),
+            human_verified: true,
+            source_ids: vec!["synthesis:review".to_string()],
+            artifacts: vec!["review-summary.md".to_string()],
+            recorded_at: "2026-05-09T05:20:00Z".parse().unwrap(),
+        })
+        .expect("record partial synthesis");
+
+        assert_eq!(synthesis.batch.status, "blocked");
+    }
+
+    #[test]
+    fn validate_capsule_rejects_invalid_subagents_semantics() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        fs::write(
+            capsule.join("subagents.json"),
+            serde_json::to_string_pretty(&json!({
+                "schema": SUBAGENTS_SCHEMA,
+                "batches": [{
+                    "id": "review",
+                    "status": "nonsense",
+                    "duplicate_roles_ignored": {
+                        "test_runner": [""]
+                    },
+                    "prompts": [{
+                        "role": "Bad Role",
+                        "prompt_id": "",
+                        "prompt_hash": "fnv1a64:example"
+                    }],
+                    "agents": [{
+                        "role": "reviewer",
+                        "task": "review batch",
+                        "status": "completed",
+                        "summary": "done",
+                        "prompt_id": "review:reviewer",
+                        "prompt_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+                        "disposition": "accepted",
+                        "human_verified": false
+                    }]
+                }]
+            }))
+            .expect("subagents json"),
+        )
+        .expect("write subagents");
+
+        let validation = validate_capsule(&capsule).expect("validate capsule");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(joined.contains("status \"nonsense\""), "{joined}");
+        assert!(
+            joined.contains("prompt_hash must start with sha256:"),
+            "{joined}"
+        );
+        assert!(
+            joined.contains("terminal status requires a final human-verified disposition"),
+            "{joined}"
+        );
+        assert!(joined.contains("prompt role Bad Role"), "{joined}");
+    }
+
+    #[test]
+    fn validate_capsule_rejects_empty_completed_subagent_batch() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        fs::write(
+            capsule.join("subagents.json"),
+            serde_json::to_string_pretty(&json!({
+                "schema": SUBAGENTS_SCHEMA,
+                "batches": [{
+                    "id": "review",
+                    "status": "completed",
+                    "prompts": [],
+                    "agents": [],
+                    "synthesis": {
+                        "status": "completed",
+                        "summary": "nothing reviewed",
+                        "human_verified": true,
+                        "source_ids": ["synthesis:review"],
+                        "artifacts": ["review-summary.md"],
+                        "updated_at": "2026-05-09T05:20:00Z"
+                    }
+                }]
+            }))
+            .expect("subagents json"),
+        )
+        .expect("write subagents");
+
+        let validation = validate_capsule(&capsule).expect("validate capsule");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(joined.contains("prompts must not be empty"), "{joined}");
+        assert!(joined.contains("agents must not be empty"), "{joined}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_json_refuses_symlink_targets() {
+        let temp = tempdir().expect("tempdir");
+        let target = temp.path().join("target.json");
+        fs::write(&target, "{\"sentinel\":true}\n").expect("write target");
+        let link = temp.path().join("link.json");
+        std::os::unix::fs::symlink(&target, &link).expect("symlink");
+
+        let error = write_json(link, &json!({"changed": true})).expect_err("symlink refused");
+
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("failed to create") || message.contains("Too many levels"),
+            "{message}"
+        );
+        let target_content = fs::read_to_string(target).expect("target content");
+        assert!(target_content.contains("sentinel"));
+        assert!(!target_content.contains("changed"));
+    }
+
+    #[test]
+    fn record_subagent_outcome_requires_human_verified_disposition() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let source = write_subspawn_plan_fixture(
+            temp.path(),
+            "review-plan.json",
+            "review batch",
+            &["reviewer"],
+        );
+        record_subagent_plan(RecordSubagentPlanArgs {
+            capsule: capsule.clone(),
+            batch_id: "review".to_string(),
+            source,
+            command: None,
+            recorded_at: "2026-05-09T05:00:00Z".parse().unwrap(),
+        })
+        .expect("record plan");
+
+        let error = record_subagent_outcome(RecordSubagentOutcomeArgs {
+            capsule,
+            batch_id: "review".to_string(),
+            role: "reviewer".to_string(),
+            status: SubagentOutcomeStatus::Completed,
+            summary: "looks good".to_string(),
+            disposition: SubagentDisposition::Accepted,
+            human_verified: false,
+            source_ids: Vec::new(),
+            artifacts: Vec::new(),
+            recorded_at: "2026-05-09T05:10:00Z".parse().unwrap(),
+        })
+        .expect_err("requires human verification");
+
+        assert!(
+            format!("{error:#}").contains("human_verified must be set"),
+            "{error:#}"
+        );
     }
 
     #[test]

@@ -3,14 +3,15 @@
 `codex-dev` is the development operating-layer CLI for local task capsules.
 It is separate from `codex-research`: research evidence stays research-owned,
 while `codex-dev` records the local task capsule for a development branch.
-It also plans or executes repo-native policy gates, captures normalized PR
-evidence, and records those outcomes in the task capsule. The optional
-`codex-dev-tui` workbench reads these same contracts for terminal scanning.
+It also plans or executes repo-native policy gates, records subspawn plan,
+outcome, and synthesis evidence, captures normalized PR evidence, and records
+those outcomes in the task capsule. The optional `codex-dev-tui` workbench
+reads these same contracts for terminal scanning.
 Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, and #42.
+Tracking: #20, #22, #23, #25, #42, and #43.
 
 ## Installation
 
@@ -46,6 +47,7 @@ Top-level commands:
 
 - `capsule`
 - `evidence`
+- `subagents`
 - `policy`
 - `pr`
 
@@ -59,6 +61,12 @@ Capsule subcommands:
 Evidence subcommands:
 
 - `evidence append`
+
+Subagent subcommands:
+
+- `subagents record-plan`
+- `subagents record-outcome`
+- `subagents record-synthesis`
 
 Policy subcommands:
 
@@ -119,7 +127,7 @@ it does not append to prior capsule history.
 
 ## capsule validate
 
-Validate required files and JSON schema identifiers:
+Validate required files, JSON schema identifiers, and typed contract semantics:
 
 ```bash
 cargo run -q -p codex-dev -- --json capsule validate .codex/tasks/<id>
@@ -128,8 +136,8 @@ cargo run -q -p codex-dev -- --json capsule validate .codex/tasks/<id>
 Invalid capsules exit nonzero. With `--json`, the command still prints a
 `codex-dev.output.v1` envelope with `ok: false` and `result.valid: false`.
 Validation is intentionally strict: every required capsule file must exist, and
-contract files such as `pr.json` and `policy.json` must keep their documented
-schema identifiers.
+contract files such as `subagents.json`, `pr.json`, and `policy.json` must keep
+their documented schema identifiers and value invariants.
 
 ## capsule status
 
@@ -201,6 +209,85 @@ The command also rejects symlinked JSON/JSONL capsule contract files before
 validation or writing. Successful appends update `capsule.json.updated_at`
 monotonically; backfilled evidence does not move the capsule timestamp
 backwards.
+
+## subagents record-plan
+
+Record a `subspawn_plan.py --json` output into `subagents.json` and append a
+subagent evidence record:
+
+```bash
+python3 skills/subspawn/scripts/subspawn_plan.py plan \
+  --preset review \
+  --task "pre-PR branch review" \
+  --scope "current branch diff" \
+  --json > /tmp/pre-pr-review-plan.json
+
+cargo run -q -p codex-dev -- --json subagents record-plan \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --source /tmp/pre-pr-review-plan.json \
+  --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" \
+  --recorded-at 2026-05-09T06:00:00Z
+```
+
+`codex-dev` does not spawn agents. It reads the planner JSON, validates the
+batch ID, role names, non-empty task text, duplicate-role warning path lists,
+and one prompt per role. Duplicate prompt rows and prompts for unplanned roles
+are rejected instead of normalized. The recorder preserves
+`duplicate_roles_ignored` and `registry_issues`, stores stable prompt IDs, and
+stores SHA-256 prompt hashes. It does not store raw prompt text in
+`subagents.json`; keep the source plan as a local artifact when the full prompt
+is needed.
+
+## subagents record-outcome
+
+Record one planned agent's outcome, disposition, and supporting references:
+
+```bash
+cargo run -q -p codex-dev -- --json subagents record-outcome \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --role reviewer \
+  --status completed \
+  --summary "no blocking findings" \
+  --disposition accepted \
+  --human-verified \
+  --source-id reviewer:1 \
+  --artifact review-notes.md \
+  --recorded-at 2026-05-09T06:10:00Z
+```
+
+Supported outcome statuses are `planned`, `running`, `completed`, `failed`,
+`timed_out`, `closed`, and `blocked`. Supported dispositions are `accepted`,
+`rejected`, `mixed`, `informational`, and `pending`. The command requires
+`--human-verified` so capsules distinguish agent output from parent-session
+judgment. `--source-id` and `--artifact` must each be provided at least once so
+the capsule can prove what output or artifact was assessed.
+
+## subagents record-synthesis
+
+Record the parent synthesis for a batch:
+
+```bash
+cargo run -q -p codex-dev -- --json subagents record-synthesis \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --status completed \
+  --summary "review batch clean after follow-up fixes" \
+  --human-verified \
+  --source-id synthesis:pre-pr-review \
+  --artifact review-summary.md \
+  --recorded-at 2026-05-09T06:20:00Z
+```
+
+Supported synthesis statuses are `completed`, `partial`, and `blocked`.
+`completed` synthesis is accepted only after every planned role has a terminal
+human-verified outcome (`completed`, `failed`, `timed_out`, or `closed`) and a
+final disposition. Outcome and synthesis commands require at least one
+`--source-id` and one `--artifact`, update `subagents.json`, append `subagent`
+evidence to `evidence.jsonl`, and update `capsule.json.updated_at`
+monotonically. They reject invalid capsules and symlinked JSON/JSONL contract
+files before validation or writing.
 
 ## policy manifest
 

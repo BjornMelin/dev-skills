@@ -11,10 +11,13 @@ use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
     PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
-    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, Verification, append_evidence,
-    append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule, pr_status,
-    read_json, record_pr_snapshot, render_capsule, render_command, render_pr_label,
-    render_pr_status, validate_capsule, write_json,
+    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, RecordSubagentOutcomeArgs,
+    RecordSubagentPlanArgs, RecordSubagentSynthesisArgs, SubagentDisposition,
+    SubagentOutcomeStatus, SubagentSynthesisStatus, Verification, append_evidence, append_jsonl,
+    capsule_status, ensure_regular_contract_files, init_capsule, pr_status, read_json,
+    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
+    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
+    write_json,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -55,6 +58,11 @@ impl Cli {
                 PrCommand::Record(_) => "pr record",
                 PrCommand::Status(_) => "pr status",
             },
+            Commands::Subagents { command } => match command {
+                SubagentsCommand::Plan(_) => "subagents record-plan",
+                SubagentsCommand::Outcome(_) => "subagents record-outcome",
+                SubagentsCommand::Synthesis(_) => "subagents record-synthesis",
+            },
         }
     }
 }
@@ -80,6 +88,11 @@ enum Commands {
     Pr {
         #[command(subcommand)]
         command: PrCommand,
+    },
+    /// Record subspawn plans, outcomes, and synthesis into task capsules.
+    Subagents {
+        #[command(subcommand)]
+        command: SubagentsCommand,
     },
 }
 
@@ -117,6 +130,19 @@ enum PrCommand {
     Record(PrRecordCliArgs),
     /// Print the PR snapshot currently stored in a task capsule.
     Status(PrStatusArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum SubagentsCommand {
+    /// Record a subspawn_plan.py JSON plan into subagents.json.
+    #[command(name = "record-plan")]
+    Plan(SubagentsRecordPlanArgs),
+    /// Record one planned subagent's outcome and disposition.
+    #[command(name = "record-outcome")]
+    Outcome(SubagentsRecordOutcomeArgs),
+    /// Record parent synthesis for a completed subagent batch.
+    #[command(name = "record-synthesis")]
+    Synthesis(SubagentsRecordSynthesisArgs),
 }
 
 #[derive(Args, Debug)]
@@ -211,6 +237,114 @@ impl EvidenceAppendArgs {
                 residual_risk: self.residual_risk,
                 artifacts: self.artifacts,
             },
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct SubagentsRecordPlanArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long = "batch-id", value_name = "BATCH_ID")]
+    pub batch_id: String,
+    #[arg(long, value_name = "SUBSPAWN_PLAN_JSON")]
+    pub source: PathBuf,
+    #[arg(long, value_name = "COMMAND")]
+    pub command: Option<String>,
+    #[arg(long = "recorded-at", value_name = "RFC3339")]
+    pub recorded_at: Option<DateTime<Utc>>,
+}
+
+impl SubagentsRecordPlanArgs {
+    fn into_core(self) -> RecordSubagentPlanArgs {
+        RecordSubagentPlanArgs {
+            capsule: self.capsule,
+            batch_id: self.batch_id,
+            source: self.source,
+            command: self.command,
+            recorded_at: self.recorded_at.unwrap_or_else(Utc::now),
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct SubagentsRecordOutcomeArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long = "batch-id", value_name = "BATCH_ID")]
+    pub batch_id: String,
+    #[arg(long, value_name = "ROLE")]
+    pub role: String,
+    #[arg(long, value_name = "STATUS")]
+    pub status: SubagentOutcomeStatus,
+    #[arg(long)]
+    pub summary: String,
+    #[arg(long, value_name = "DISPOSITION")]
+    pub disposition: SubagentDisposition,
+    #[arg(
+        long = "human-verified",
+        help = "Confirm a human parent session verified this outcome and disposition"
+    )]
+    pub human_verified: bool,
+    #[arg(long = "source-id", value_name = "SOURCE_ID")]
+    pub source_ids: Vec<String>,
+    #[arg(long = "artifact", value_name = "ARTIFACT")]
+    pub artifacts: Vec<String>,
+    #[arg(long = "recorded-at", value_name = "RFC3339")]
+    pub recorded_at: Option<DateTime<Utc>>,
+}
+
+impl SubagentsRecordOutcomeArgs {
+    fn into_core(self) -> RecordSubagentOutcomeArgs {
+        RecordSubagentOutcomeArgs {
+            capsule: self.capsule,
+            batch_id: self.batch_id,
+            role: self.role,
+            status: self.status,
+            summary: self.summary,
+            disposition: self.disposition,
+            human_verified: self.human_verified,
+            source_ids: self.source_ids,
+            artifacts: self.artifacts,
+            recorded_at: self.recorded_at.unwrap_or_else(Utc::now),
+        }
+    }
+}
+
+#[derive(Args, Debug)]
+pub struct SubagentsRecordSynthesisArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long = "batch-id", value_name = "BATCH_ID")]
+    pub batch_id: String,
+    #[arg(long, value_name = "STATUS")]
+    pub status: SubagentSynthesisStatus,
+    #[arg(long)]
+    pub summary: String,
+    #[arg(
+        long = "human-verified",
+        help = "Confirm a human parent session verified this synthesis"
+    )]
+    pub human_verified: bool,
+    #[arg(long = "source-id", value_name = "SOURCE_ID")]
+    pub source_ids: Vec<String>,
+    #[arg(long = "artifact", value_name = "ARTIFACT")]
+    pub artifacts: Vec<String>,
+    #[arg(long = "recorded-at", value_name = "RFC3339")]
+    pub recorded_at: Option<DateTime<Utc>>,
+}
+
+impl SubagentsRecordSynthesisArgs {
+    fn into_core(self) -> RecordSubagentSynthesisArgs {
+        RecordSubagentSynthesisArgs {
+            capsule: self.capsule,
+            batch_id: self.batch_id,
+            status: self.status,
+            summary: self.summary,
+            human_verified: self.human_verified,
+            source_ids: self.source_ids,
+            artifacts: self.artifacts,
+            recorded_at: self.recorded_at.unwrap_or_else(Utc::now),
         }
     }
 }
@@ -437,6 +571,45 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                         result.record.kind,
                         result.capsule.display(),
                         result.evidence.total
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
+        Commands::Subagents { command } => match command {
+            SubagentsCommand::Plan(args) => {
+                let result = record_subagent_plan(args.into_core())?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "subagents record-plan",
+                    human: format!(
+                        "recorded subagent plan {} with {} role(s)",
+                        result.batch.id,
+                        result.batch.agents.len()
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            SubagentsCommand::Outcome(args) => {
+                let result = record_subagent_outcome(args.into_core())?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "subagents record-outcome",
+                    human: format!(
+                        "recorded {} outcome for {} in {}",
+                        result.agent.status, result.agent.role, result.batch.id
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            SubagentsCommand::Synthesis(args) => {
+                let result = record_subagent_synthesis(args.into_core())?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "subagents record-synthesis",
+                    human: format!(
+                        "recorded {} synthesis for {}",
+                        result.synthesis.status, result.batch.id
                     ),
                     result: serde_json::to_value(result)?,
                 })
