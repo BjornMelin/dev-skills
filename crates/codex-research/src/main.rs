@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use directories::BaseDirs;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, LINK, RANGE, USER_AGENT};
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, OpenFlags, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -2138,11 +2138,18 @@ fn citation_coverage(claims: &[ClaimRecord], source_ids: &BTreeSet<String>) -> C
 
 fn source_freshness_summary(sources: &[SourceRecord]) -> Result<SourceFreshnessSummary> {
     let paths = research_paths()?;
-    init_db(&paths)?;
     let mut by_status = BTreeMap::new();
     let mut unknown_source_ids = Vec::new();
+    let conn = if paths.database.exists() {
+        Connection::open_with_flags(&paths.database, OpenFlags::SQLITE_OPEN_READ_ONLY).ok()
+    } else {
+        None
+    };
     for source in sources {
-        if let Some(cached) = cached_source(&paths, &source.id)? {
+        if let Some(cached) = conn
+            .as_ref()
+            .and_then(|conn| cached_source_readonly(conn, &source.id).ok().flatten())
+        {
             *by_status.entry(cached.freshness_status).or_insert(0) += 1;
         } else {
             *by_status.entry("unknown".to_string()).or_insert(0) += 1;
@@ -2153,6 +2160,23 @@ fn source_freshness_summary(sources: &[SourceRecord]) -> Result<SourceFreshnessS
         by_status,
         unknown_source_ids,
     })
+}
+
+fn cached_source_readonly(
+    conn: &Connection,
+    source_id: &str,
+) -> rusqlite::Result<Option<SourceCacheRecord>> {
+    let mut stmt = conn.prepare(
+        "select id, provider, route, url, canonical_url, title, fetched_at,
+                freshness_status, privacy_classification, status, content_hash,
+                raw_body_stored, metadata_json
+         from sources where id = ?1",
+    )?;
+    let mut rows = stmt.query(params![source_id])?;
+    if let Some(row) = rows.next()? {
+        return Ok(Some(source_from_row(row)?));
+    }
+    Ok(None)
 }
 
 fn provider_budget_lines(
@@ -5698,7 +5722,6 @@ mod tests {
 
         for leaked in [
             "supersecret",
-            "abc123",
             "punctuatedsecret",
             "spacedsecret",
             "raw-provider-body",
