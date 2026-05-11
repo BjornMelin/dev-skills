@@ -23,6 +23,10 @@ use codex_dev_core::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
+const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
+const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
+const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev")]
 #[command(about = "Development operating-layer helper for Codex task capsules")]
@@ -52,6 +56,7 @@ impl Cli {
             },
             Commands::Policy { command } => match command {
                 PolicyCommand::Manifest(_) => "policy manifest",
+                PolicyCommand::DocsCheck(_) => "policy docs-check",
                 PolicyCommand::Run(_) => "policy run",
             },
             Commands::Pr { command } => match command {
@@ -119,6 +124,9 @@ enum EvidenceCommand {
 enum PolicyCommand {
     /// Print a machine-readable gate manifest.
     Manifest(PolicyManifestArgs),
+    /// Check machine-owned documentation mirrors for policy manifest commands.
+    #[command(name = "docs-check")]
+    DocsCheck(PolicyDocsCheckArgs),
     /// Plan or execute gates and record capsule evidence.
     Run(PolicyRunArgs),
 }
@@ -363,6 +371,16 @@ pub struct PolicyManifestArgs {
 }
 
 #[derive(Args, Debug)]
+pub struct PolicyDocsCheckArgs {
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root containing the checked documentation"
+    )]
+    pub repo_root: Option<PathBuf>,
+}
+
+#[derive(Args, Debug)]
 pub struct PolicyRunArgs {
     #[arg(long, value_name = "CAPSULE_DIR")]
     pub capsule: PathBuf,
@@ -388,6 +406,26 @@ pub struct PolicyRunArgs {
     pub keep_going: bool,
     #[arg(long, value_name = "RFC3339")]
     pub checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyDocsCheckResult {
+    pub schema: &'static str,
+    pub repo_root: PathBuf,
+    pub passed: bool,
+    pub blocks: Vec<PolicyDocsBlockResult>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyDocsBlockResult {
+    pub path: String,
+    pub marker: String,
+    pub profiles: Vec<PolicyProfile>,
+    pub expected_commands: Vec<String>,
+    pub actual_commands: Vec<String>,
+    pub passed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -641,6 +679,27 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            PolicyCommand::DocsCheck(args) => {
+                let result = policy_docs_check(args.repo_root.as_deref())?;
+                let failed = result.blocks.iter().filter(|block| !block.passed).count();
+                let human = if result.passed {
+                    format!(
+                        "checked {} policy documentation mirror(s)",
+                        result.blocks.len()
+                    )
+                } else {
+                    format!(
+                        "found {failed} stale policy documentation mirror(s) out of {}",
+                        result.blocks.len()
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: result.passed,
+                    command: "policy docs-check",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             PolicyCommand::Run(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
                 let result = run_policy_gates(args, checked_at)?;
@@ -754,6 +813,148 @@ pub fn policy_manifest(profile: PolicyProfile, generated_at: DateTime<Utc>) -> P
         generated_at,
         gates: built_in_gates(profile),
     }
+}
+
+pub fn policy_docs_check(explicit_repo_root: Option<&Path>) -> Result<PolicyDocsCheckResult> {
+    let repo_root = resolve_policy_docs_repo_root(explicit_repo_root)?;
+    let blocks = policy_doc_block_specs()
+        .iter()
+        .map(|spec| check_policy_doc_block(&repo_root, spec))
+        .collect::<Vec<_>>();
+    let passed = blocks.iter().all(|block| block.passed);
+
+    Ok(PolicyDocsCheckResult {
+        schema: POLICY_DOCS_CHECK_SCHEMA,
+        repo_root,
+        passed,
+        blocks,
+    })
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PolicyDocBlockSpec {
+    path: &'static str,
+    marker: &'static str,
+    kind: PolicyDocBlockKind,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PolicyDocBlockKind {
+    Smoke,
+    AllProfiles,
+}
+
+fn policy_doc_block_specs() -> [PolicyDocBlockSpec; 5] {
+    [
+        PolicyDocBlockSpec {
+            path: "AGENTS.md",
+            marker: POLICY_DOCS_SMOKE_MARKER,
+            kind: PolicyDocBlockKind::Smoke,
+        },
+        PolicyDocBlockSpec {
+            path: "README.md",
+            marker: POLICY_DOCS_SMOKE_MARKER,
+            kind: PolicyDocBlockKind::Smoke,
+        },
+        PolicyDocBlockSpec {
+            path: "docs/reference/codex-dev-cli.md",
+            marker: POLICY_DOCS_SMOKE_MARKER,
+            kind: PolicyDocBlockKind::Smoke,
+        },
+        PolicyDocBlockSpec {
+            path: "docs/runbooks/validation.md",
+            marker: POLICY_DOCS_SMOKE_MARKER,
+            kind: PolicyDocBlockKind::Smoke,
+        },
+        PolicyDocBlockSpec {
+            path: "docs/runbooks/validation.md",
+            marker: POLICY_DOCS_ALL_MARKER,
+            kind: PolicyDocBlockKind::AllProfiles,
+        },
+    ]
+}
+
+fn check_policy_doc_block(repo_root: &Path, spec: &PolicyDocBlockSpec) -> PolicyDocsBlockResult {
+    let profiles = policy_doc_block_profiles(spec.kind);
+    let expected_commands = profiles
+        .iter()
+        .map(|profile| policy_manifest_command(*profile))
+        .collect::<Vec<_>>();
+
+    let path = repo_root.join(spec.path);
+    let (actual_commands, error) = match fs::read_to_string(&path) {
+        Ok(contents) => match extract_policy_doc_commands(&contents, spec.marker) {
+            Ok(commands) => (commands, None),
+            Err(error) => (Vec::new(), Some(error.to_string())),
+        },
+        Err(error) => (
+            Vec::new(),
+            Some(format!("failed to read {}: {error}", path.display())),
+        ),
+    };
+    let passed = error.is_none() && actual_commands == expected_commands;
+
+    PolicyDocsBlockResult {
+        path: spec.path.to_string(),
+        marker: spec.marker.to_string(),
+        profiles,
+        expected_commands,
+        actual_commands,
+        passed,
+        error,
+    }
+}
+
+fn extract_policy_doc_commands(contents: &str, marker: &str) -> Result<Vec<String>> {
+    let start = policy_doc_marker(marker, "start");
+    let end = policy_doc_marker(marker, "end");
+    let lines = contents.lines().collect::<Vec<_>>();
+    let start_lines = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| line.contains(&start).then_some(index))
+        .collect::<Vec<_>>();
+    let end_lines = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| line.contains(&end).then_some(index))
+        .collect::<Vec<_>>();
+    if start_lines.len() != 1 || end_lines.len() != 1 {
+        bail!(
+            "expected exactly one {start:?} and one {end:?}, found {} and {}",
+            start_lines.len(),
+            end_lines.len()
+        );
+    }
+
+    let start_line = start_lines[0];
+    let end_line = end_lines[0];
+    if start_line >= end_line {
+        bail!("end marker appears before start marker");
+    }
+
+    Ok(lines[start_line + 1..end_line]
+        .iter()
+        .copied()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with("```"))
+        .map(str::to_string)
+        .collect())
+}
+
+fn policy_doc_marker(marker: &str, side: &str) -> String {
+    format!("codex-dev:{marker}:{side}")
+}
+
+fn policy_doc_block_profiles(kind: PolicyDocBlockKind) -> Vec<PolicyProfile> {
+    match kind {
+        PolicyDocBlockKind::Smoke => vec![PolicyProfile::CodexDev, PolicyProfile::FullLocal],
+        PolicyDocBlockKind::AllProfiles => all_policy_profiles().to_vec(),
+    }
+}
+
+fn policy_manifest_command(profile: PolicyProfile) -> String {
+    format!("cargo run -q -p codex-dev -- --json policy manifest --profile {profile}")
 }
 
 pub fn pr_control_plan(
@@ -892,6 +1093,19 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
     })
 }
 
+fn all_policy_profiles() -> [PolicyProfile; 8] {
+    [
+        PolicyProfile::CodexDev,
+        PolicyProfile::CodexDevTui,
+        PolicyProfile::CodexResearch,
+        PolicyProfile::Skills,
+        PolicyProfile::BootstrapInstall,
+        PolicyProfile::Docs,
+        PolicyProfile::Release,
+        PolicyProfile::FullLocal,
+    ]
+}
+
 fn built_in_gates(profile: PolicyProfile) -> Vec<PolicyGate> {
     match profile {
         PolicyProfile::CodexDev => codex_dev_gates(),
@@ -1002,6 +1216,7 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             ["cargo"],
             "Failure means the codex_dev policy profile cannot be emitted as JSON.",
         ),
+        policy_docs_check_gate(),
         policy_gate(
             "codex-dev-pr-plan-smoke",
             "codex-dev PR control-plan smoke",
@@ -1380,6 +1595,7 @@ fn docs_gates() -> Vec<PolicyGate> {
             ["bash", "rg"],
             "Failure means docs contain unresolved TODO/FIXME markers.",
         ),
+        policy_docs_check_gate(),
         docs_links_gate(),
         diff_check_gate(),
     ]
@@ -1459,6 +1675,27 @@ fn bootstrap_pack_validate_gate() -> PolicyGate {
         "docs/runbooks/validation.md#bootstrap-packs",
         ["python3"],
         "Failure means bootstrap pack manifests or templates are invalid.",
+    )
+}
+
+fn policy_docs_check_gate() -> PolicyGate {
+    policy_gate(
+        "codex-dev-policy-docs-check",
+        "codex-dev policy docs drift check",
+        [
+            "cargo",
+            "run",
+            "-q",
+            "-p",
+            "codex-dev",
+            "--",
+            "--json",
+            "policy",
+            "docs-check",
+        ],
+        "docs/runbooks/validation.md#validation-matrix-ownership",
+        ["cargo"],
+        "Failure means machine-owned policy manifest command mirrors in docs drifted from the Rust policy profile owner.",
     )
 }
 
@@ -1620,6 +1857,19 @@ fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
         );
     }
     Ok(root)
+}
+
+fn resolve_policy_docs_repo_root(explicit: Option<&Path>) -> Result<PathBuf> {
+    if let Some(root) = explicit {
+        return canonicalize_repo_root(root);
+    }
+
+    let current_dir = env::current_dir().context("failed to read current directory")?;
+    find_repo_root(&current_dir).ok_or_else(|| {
+        anyhow::anyhow!(
+            "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+        )
+    })
 }
 
 fn find_repo_root(start: &Path) -> Option<PathBuf> {
@@ -1992,6 +2242,46 @@ mod tests {
     }
 
     #[test]
+    fn policy_docs_check_passes_current_repo_docs() {
+        let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = crate_dir
+            .parent()
+            .and_then(Path::parent)
+            .expect("repo root");
+
+        let result = policy_docs_check(Some(repo_root)).expect("docs check");
+
+        assert!(result.passed, "{:#?}", result.blocks);
+    }
+
+    #[test]
+    fn policy_docs_check_reports_stale_doc_block() {
+        let temp = tempdir().expect("tempdir");
+        let smoke_commands = vec![policy_manifest_command(PolicyProfile::CodexDev)];
+        let all_commands = all_policy_profiles()
+            .iter()
+            .map(|profile| policy_manifest_command(*profile))
+            .collect::<Vec<_>>();
+        write_policy_docs_fixture(temp.path(), &smoke_commands, &all_commands);
+
+        let result = policy_docs_check(Some(temp.path())).expect("docs check");
+
+        assert!(!result.passed);
+        let agent_block = result
+            .blocks
+            .iter()
+            .find(|block| block.path == "AGENTS.md")
+            .expect("AGENTS block");
+        assert_eq!(agent_block.actual_commands, smoke_commands);
+        assert!(
+            agent_block
+                .expected_commands
+                .iter()
+                .any(|command| command.contains("--profile full_local"))
+        );
+    }
+
+    #[test]
     fn policy_manifest_profiles_are_explicit_local_gates() {
         for profile in all_policy_profiles() {
             let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
@@ -2044,6 +2334,7 @@ mod tests {
                 "codex-dev-test",
                 "codex-dev-help",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -2097,7 +2388,12 @@ mod tests {
         );
         assert_profile_ids(
             PolicyProfile::Docs,
-            &["docs-no-todo", "docs-links", "diff-check"],
+            &[
+                "docs-no-todo",
+                "codex-dev-policy-docs-check",
+                "docs-links",
+                "diff-check",
+            ],
         );
         assert_profile_ids(
             PolicyProfile::Release,
@@ -2111,6 +2407,7 @@ mod tests {
                 "codex-dev-test",
                 "codex-dev-help",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -2148,6 +2445,7 @@ mod tests {
                 "codex-dev-test",
                 "codex-dev-help",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -2413,17 +2711,43 @@ mod tests {
             .expect("validation doc");
     }
 
-    fn all_policy_profiles() -> [PolicyProfile; 8] {
-        [
-            PolicyProfile::CodexDev,
-            PolicyProfile::CodexDevTui,
-            PolicyProfile::CodexResearch,
-            PolicyProfile::Skills,
-            PolicyProfile::BootstrapInstall,
-            PolicyProfile::Docs,
-            PolicyProfile::Release,
-            PolicyProfile::FullLocal,
-        ]
+    fn write_policy_docs_fixture(root: &Path, smoke_commands: &[String], all_commands: &[String]) {
+        fs::create_dir_all(root.join("docs/reference")).expect("reference dir");
+        fs::create_dir_all(root.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(
+            root.join("AGENTS.md"),
+            policy_doc_fixture_block(POLICY_DOCS_SMOKE_MARKER, smoke_commands),
+        )
+        .expect("agents doc");
+        fs::write(
+            root.join("README.md"),
+            policy_doc_fixture_block(POLICY_DOCS_SMOKE_MARKER, smoke_commands),
+        )
+        .expect("readme");
+        fs::write(
+            root.join("docs/reference/codex-dev-cli.md"),
+            policy_doc_fixture_block(POLICY_DOCS_SMOKE_MARKER, smoke_commands),
+        )
+        .expect("cli reference");
+        fs::write(
+            root.join("docs/runbooks/validation.md"),
+            format!(
+                "{}\n{}",
+                policy_doc_fixture_block(POLICY_DOCS_SMOKE_MARKER, smoke_commands),
+                policy_doc_fixture_block(POLICY_DOCS_ALL_MARKER, all_commands)
+            ),
+        )
+        .expect("validation doc");
+    }
+
+    fn policy_doc_fixture_block(marker: &str, commands: &[String]) -> String {
+        format!(
+            "{}\n```bash\n{}\n```\n{}\n",
+            policy_doc_marker(marker, "start"),
+            commands.join("\n"),
+            policy_doc_marker(marker, "end")
+        )
     }
 
     fn assert_profile_ids(profile: PolicyProfile, expected: &[&str]) {

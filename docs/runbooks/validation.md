@@ -2,6 +2,19 @@
 
 Use this after editing docs, skills, templates, Python helpers, or Rust code.
 
+## Validation Matrix Ownership
+
+The Rust policy profiles in `crates/codex-dev/src/lib.rs` are the canonical
+validation matrix for `codex-dev policy manifest`. Markdown snippets marked
+with `codex-dev:policy-manifest-*` are machine-owned mirrors of that Rust
+source and are checked by:
+
+```bash
+cargo run -q -p codex-dev -- --json policy docs-check
+```
+
+Unmarked prose and workflow notes are human-owned documentation.
+
 ## Rust CLI
 
 Run after any change under `crates/codex-research/` or root Cargo files:
@@ -52,8 +65,11 @@ cargo check -p codex-dev
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+# codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+# codex-dev:policy-manifest-smoke:end
+cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
@@ -316,6 +332,7 @@ cargo check -p codex-dev
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+# codex-dev:policy-manifest-all:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev_tui
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_research
@@ -324,6 +341,8 @@ cargo run -q -p codex-dev -- --json policy manifest --profile bootstrap_install
 cargo run -q -p codex-dev -- --json policy manifest --profile docs
 cargo run -q -p codex-dev -- --json policy manifest --profile release
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+# codex-dev:policy-manifest-all:end
+cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui

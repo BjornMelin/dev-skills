@@ -71,6 +71,7 @@ Subagent subcommands:
 Policy subcommands:
 
 - `policy manifest`
+- `policy docs-check`
 - `policy run`
 
 PR subcommands:
@@ -294,8 +295,10 @@ files before validation or writing.
 Print the built-in repo-native gate manifest:
 
 ```bash
+# codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+# codex-dev:policy-manifest-smoke:end
 ```
 
 The default profile is `codex_dev`. Supported profiles are:
@@ -314,6 +317,20 @@ its source in `docs/runbooks/validation.md`. Each gate records the command,
 working directory, required tools, required/network/secrets flags, and failure
 interpretation. Built-in profiles are local by default and do not require
 secrets or network access.
+
+## policy docs-check
+
+Check machine-owned Markdown mirrors of policy manifest commands against the
+Rust-owned profile list:
+
+```bash
+cargo run -q -p codex-dev -- --json policy docs-check
+```
+
+The checker reads marked `codex-dev:policy-manifest-*` snippets in AGENTS.md,
+README.md, this CLI reference, and [Validation](../runbooks/validation.md). It
+is read-only and exits nonzero when any mirror drifts from the Rust policy
+profiles.
 
 ## policy run
 
@@ -431,8 +448,7 @@ cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> --kind decision --summary "fixture decision"
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
-cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
-cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 ```
 
