@@ -71,7 +71,9 @@ out of version control.
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
-- [Subagent Templates](reference/subagent-templates.md)
+- [Subagent Templates](reference/subagent-templates.md): authority model for
+  reusable templates, packaged fallback copies, duplicate-role validation, and
+  skill packaging rules.
 - [Skill and Subagent Eval Lab](reference/skill-subagent-eval-lab.md)
 
 ## Cookbooks

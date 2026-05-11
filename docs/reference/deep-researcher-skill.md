@@ -10,6 +10,10 @@ Purpose: deep, cited, current research across official docs, Codex web tools,
 Context7 API, GitHub, package source, rendered pages, Firecrawl, and evidence
 ledgers.
 
+For Focused Six template ownership, duplicate-role expectations, and packaged
+fallback rules, see [Subagent Templates](subagent-templates.md). This reference
+covers the deep-researcher skill itself.
+
 ## Files
 
 ```text
@@ -56,6 +60,11 @@ Search results are leads. Hydrated source records are evidence.
 ```
 
 ## Focused Six Agent Pack
+
+`skills/deep-researcher/templates/agents/` is the canonical source for the
+Focused Six research roles. The installer below copies only those roles. Use
+`subagent_creator.py` when you need generic packs, installed-role drift checks,
+sync backups, pruning, or cross-directory template validation.
 
 Install:
 
@@ -134,4 +143,3 @@ python3 -m compileall -q skills/deep-researcher/scripts
 python3 skills/deep-researcher/scripts/install_agents.py --target project --project-dir /tmp/deep-researcher-smoke --dry-run
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents
 ```
-

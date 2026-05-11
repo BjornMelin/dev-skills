@@ -332,6 +332,12 @@ python3 tools/skill/package_skill.py skills/subagent-creator skills/dist
 python3 tools/skill/package_skill.py skills/subspawn skills/dist
 ```
 
+The packager writes archive entries as `<skill-name>/...`, validates
+`SKILL.md`, and skips common generated caches such as `__pycache__`, `*.pyc`,
+`.codex/`, and local tool caches. `quick_validate.py` validates only
+`SKILL.md` frontmatter. If `agents/openai.yaml` changes, review that metadata
+explicitly until this repo has a dedicated validator for it.
+
 ## Python Helpers
 
 ```bash
@@ -384,6 +390,14 @@ The validator also enforces evidence-return headings for research-oriented
 custom agents such as `deep_researcher`, `github_researcher`,
 `context7_researcher`, `openai_docs_researcher`, `source_validator`, and
 `citation_auditor`.
+
+`validate-roles` may report duplicate templates ignored when subspawn fallback
+copies mirror canonical roles. Use
+[Subagent Templates](../reference/subagent-templates.md) to distinguish expected
+packaging duplicates from drift. When fallback copies change, manually compare
+model, sandbox, edit permissions, safety posture, and required return sections
+against the canonical owner; the current validators report duplicate paths but
+do not fail on fallback parity drift.
 
 Validate global installed templates:
 

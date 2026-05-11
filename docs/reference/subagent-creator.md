@@ -9,6 +9,10 @@ skills/subagent-creator/
 Purpose: create, validate, install, inventory, diff, plan syncs, prune stale
 installs, back up, and smoke-test Codex custom subagent TOML roles.
 
+For template ownership, expected duplicate role names, and packaging fallback
+rules, see [Subagent Templates](subagent-templates.md). This reference covers
+the `subagent-creator` command surface.
+
 ## Files
 
 ```text
@@ -20,6 +24,10 @@ skills/subagent-creator/
   scripts/subagent_creator.py
   templates/agents/*.toml
 ```
+
+`templates/agents/*.toml` is the canonical source for the general reusable
+template packs listed below. Do not use this directory for `subspawn` standalone
+fallback copies or hardened-codex overlays.
 
 ## Role Destinations
 
@@ -138,6 +146,11 @@ Validate everything:
 ```bash
 python3 skills/subagent-creator/scripts/subagent_creator.py validate ~/.codex/agents
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/subagent-creator/templates/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate \
+  skills/deep-researcher/templates/agents \
+  skills/subagent-creator/templates/agents \
+  skills/subspawn/templates/agents \
+  subagents/hardened-codex/agents
 ```
 
 Smoke test:
@@ -171,5 +184,7 @@ The validator checks:
   findings, and risks.
 - Pair installed roles with `$subspawn`; templates alone do not enforce runtime
   wait behavior.
+- Validate cross-directory duplicates with `subspawn_plan.py validate-roles`
+  before changing a role used by planner presets.
 - Run `status --include-extra` before broad `sync` or `prune` operations so
   hand-authored global roles are visible before writes.
