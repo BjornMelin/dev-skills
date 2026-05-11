@@ -1069,8 +1069,9 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
     for file in &missing_files {
         errors.push(format!("missing required file: {file}"));
     }
+    let invalid_contract_files = validate_contract_file_paths(path, &mut errors);
 
-    if !missing_files.contains(&"capsule.json") {
+    if can_validate_contract_file("capsule.json", &missing_files, &invalid_contract_files) {
         match read_json::<Capsule>(&path.join("capsule.json")) {
             Ok(capsule) => {
                 if capsule.schema != CAPSULE_SCHEMA {
@@ -1081,14 +1082,14 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         }
     }
 
-    if !missing_files.contains(&"evidence.jsonl") {
+    if can_validate_contract_file("evidence.jsonl", &missing_files, &invalid_contract_files) {
         match validate_evidence(&path.join("evidence.jsonl")) {
             Ok(file_errors) => errors.extend(file_errors),
             Err(error) => errors.push(format!("invalid evidence.jsonl: {error:#}")),
         }
     }
 
-    if !missing_files.contains(&"verification.json") {
+    if can_validate_contract_file("verification.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<Verification, _>(
             &path.join("verification.json"),
             VERIFICATION_SCHEMA,
@@ -1096,13 +1097,13 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
             &mut errors,
         );
     }
-    if !missing_files.contains(&"subagents.json") {
+    if can_validate_contract_file("subagents.json", &missing_files, &invalid_contract_files) {
         match validate_subagents(&path.join("subagents.json")) {
             Ok(file_errors) => errors.extend(file_errors),
             Err(error) => errors.push(format!("invalid subagents.json: {error:#}")),
         }
     }
-    if !missing_files.contains(&"pr.json") {
+    if can_validate_contract_file("pr.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<PrEvidence, _>(
             &path.join("pr.json"),
             PR_SCHEMA,
@@ -1110,7 +1111,7 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
             &mut errors,
         );
     }
-    if !missing_files.contains(&"policy.json") {
+    if can_validate_contract_file("policy.json", &missing_files, &invalid_contract_files) {
         validate_schema_file::<PolicyManifest, _>(
             &path.join("policy.json"),
             POLICY_GATES_SCHEMA,
@@ -1124,6 +1125,51 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         valid: errors.is_empty(),
         errors,
     })
+}
+
+fn can_validate_contract_file(
+    file: &str,
+    missing_files: &[&str],
+    invalid_contract_files: &BTreeSet<String>,
+) -> bool {
+    !missing_files.contains(&file) && !invalid_contract_files.contains(file)
+}
+
+fn validate_contract_file_paths(path: &Path, errors: &mut Vec<String>) -> BTreeSet<String> {
+    let mut invalid = BTreeSet::new();
+    for file in REQUIRED_FILES
+        .iter()
+        .copied()
+        .filter(|file| file.ends_with(".json") || file.ends_with(".jsonl"))
+    {
+        let file_path = path.join(file);
+        let metadata = match file_path.symlink_metadata() {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == ErrorKind::NotFound => continue,
+            Err(error) => {
+                errors.push(format!(
+                    "failed to inspect {}: {error}",
+                    file_path.display()
+                ));
+                invalid.insert(file.to_string());
+                continue;
+            }
+        };
+        if metadata.file_type().is_symlink() {
+            errors.push(format!(
+                "refusing to validate symlinked capsule contract file: {}",
+                file_path.display()
+            ));
+            invalid.insert(file.to_string());
+        } else if !metadata.is_file() {
+            errors.push(format!(
+                "capsule contract path is not a file: {}",
+                file_path.display()
+            ));
+            invalid.insert(file.to_string());
+        }
+    }
+    invalid
 }
 
 pub fn capsule_status(path: &Path) -> Result<StatusResult> {
@@ -1479,7 +1525,10 @@ fn is_batch_status(value: &str) -> bool {
 }
 
 fn subagent_source_ids(batch_id: &str, role: &str, extra: &[String]) -> Vec<String> {
-    let mut source_ids = vec![format!("subagents:{batch_id}"), format!("subagent:{role}")];
+    let mut source_ids = vec![
+        format!("subagents:{batch_id}"),
+        format!("subagent:{batch_id}:{role}"),
+    ];
     source_ids.extend(extra.iter().cloned());
     source_ids
 }
@@ -2543,6 +2592,30 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn validate_rejects_symlinked_contract_file() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let pr_path = capsule.join("pr.json");
+        let outside_path = temp.path().join("outside-pr.json");
+        fs::copy(&pr_path, &outside_path).expect("copy pr fixture");
+        fs::remove_file(&pr_path).expect("remove pr");
+        std::os::unix::fs::symlink(&outside_path, &pr_path).expect("symlink pr");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(
+            joined.contains("refusing to validate symlinked capsule contract file"),
+            "{joined}"
+        );
+        assert!(!joined.contains("invalid pr.json"), "{joined}");
+    }
+
     #[test]
     fn pr_record_updates_capsule_contracts() {
         let temp = tempdir().expect("tempdir");
@@ -2854,6 +2927,27 @@ mod tests {
         let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
         assert!(evidence.contains("Subagent reviewer completed: no blocking findings"));
         assert!(evidence.contains("Subagent synthesis completed: review batch clean"));
+        let evidence_records = evidence
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).expect("evidence json line"))
+            .collect::<Vec<_>>();
+        let outcome_evidence = evidence_records
+            .iter()
+            .find(|record| {
+                record["summary"]
+                    .as_str()
+                    .is_some_and(|summary| summary.contains("Subagent reviewer completed"))
+            })
+            .expect("outcome evidence");
+        let source_ids = outcome_evidence["source_ids"]
+            .as_array()
+            .expect("source ids")
+            .iter()
+            .map(|value| value.as_str().expect("source id"))
+            .collect::<Vec<_>>();
+        assert!(source_ids.contains(&"subagents:review"));
+        assert!(source_ids.contains(&"subagent:review:reviewer"));
+        assert!(!source_ids.contains(&"subagent:reviewer"));
     }
 
     #[test]
