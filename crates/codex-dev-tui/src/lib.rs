@@ -278,6 +278,9 @@ impl DashboardSort {
 /// Single row in the dashboard capsule list.
 pub struct DashboardCapsule {
     pub path: PathBuf,
+    pub display_title: String,
+    pub status_label: String,
+    pub updated_label: String,
     pub validation: ValidationResult,
     pub capsule: Option<StatusResult>,
     pub verification: Option<Verification>,
@@ -297,8 +300,12 @@ impl DashboardCapsule {
             },
         };
         if !validation.valid {
+            let display_title = fallback_dashboard_title(&path);
             return Self {
                 path,
+                display_title,
+                status_label: "invalid".to_string(),
+                updated_label: "unknown".to_string(),
                 diagnostics: validation.errors.clone(),
                 validation,
                 capsule: None,
@@ -321,9 +328,27 @@ impl DashboardCapsule {
         diagnostics.extend(verification.1);
         diagnostics.extend(subagents.1);
         diagnostics.extend(pr.1);
+        let display_title = capsule
+            .0
+            .as_ref()
+            .map(|capsule| capsule.title.clone())
+            .unwrap_or_else(|| fallback_dashboard_title(&path));
+        let status_label = capsule
+            .0
+            .as_ref()
+            .map(|capsule| capsule.status.to_string())
+            .unwrap_or_else(|| "invalid".to_string());
+        let updated_label = capsule
+            .0
+            .as_ref()
+            .map(|capsule| capsule.updated_at.to_rfc3339())
+            .unwrap_or_else(|| "unknown".to_string());
 
         Self {
             path,
+            display_title,
+            status_label,
+            updated_label,
             validation,
             capsule: capsule.0,
             verification: verification.0,
@@ -333,31 +358,16 @@ impl DashboardCapsule {
         }
     }
 
-    fn title(&self) -> String {
-        self.capsule
-            .as_ref()
-            .map(|capsule| capsule.title.clone())
-            .or_else(|| {
-                self.path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .map(str::to_string)
-            })
-            .unwrap_or_else(|| "<unknown>".to_string())
+    fn title(&self) -> &str {
+        &self.display_title
     }
 
-    fn status_label(&self) -> String {
-        self.capsule
-            .as_ref()
-            .map(|capsule| capsule.status.to_string())
-            .unwrap_or_else(|| "invalid".to_string())
+    fn status_label(&self) -> &str {
+        &self.status_label
     }
 
-    fn updated_label(&self) -> String {
-        self.capsule
-            .as_ref()
-            .map(|capsule| capsule.updated_at.to_rfc3339())
-            .unwrap_or_else(|| "unknown".to_string())
+    fn updated_label(&self) -> &str {
+        &self.updated_label
     }
 
     fn matches_filter(&self, filter: DashboardFilter) -> bool {
@@ -378,6 +388,13 @@ impl DashboardCapsule {
                 .is_some_and(|pr| pr.number.is_some() || pr.state != "not_created"),
         }
     }
+}
+
+fn fallback_dashboard_title(path: &Path) -> String {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| "<unknown>".to_string())
 }
 
 #[derive(Debug)]
@@ -631,24 +648,21 @@ fn sort_dashboard_capsules(capsules: &mut [DashboardCapsule], sort: DashboardSor
                 .as_ref()
                 .map(|capsule| capsule.updated_at)
                 .cmp(&left.capsule.as_ref().map(|capsule| capsule.updated_at))
-                .then_with(|| left.title().cmp(&right.title()))
-                .then_with(|| dashboard_path_key(left).cmp(&dashboard_path_key(right)))
+                .then_with(|| left.title().cmp(right.title()))
+                .then_with(|| left.path.as_os_str().cmp(right.path.as_os_str()))
         }),
-        DashboardSort::TitleAsc => {
-            capsules.sort_by_key(|capsule| (capsule.title(), dashboard_path_key(capsule)));
-        }
-        DashboardSort::StatusAsc => capsules.sort_by_key(|capsule| {
-            (
-                capsule.status_label(),
-                capsule.title(),
-                dashboard_path_key(capsule),
-            )
+        DashboardSort::TitleAsc => capsules.sort_by(|left, right| {
+            left.title()
+                .cmp(right.title())
+                .then_with(|| left.path.as_os_str().cmp(right.path.as_os_str()))
+        }),
+        DashboardSort::StatusAsc => capsules.sort_by(|left, right| {
+            left.status_label()
+                .cmp(right.status_label())
+                .then_with(|| left.title().cmp(right.title()))
+                .then_with(|| left.path.as_os_str().cmp(right.path.as_os_str()))
         }),
     }
-}
-
-fn dashboard_path_key(capsule: &DashboardCapsule) -> String {
-    capsule.path.display().to_string()
 }
 
 #[derive(Debug)]
