@@ -21,6 +21,7 @@ pub const SUBAGENTS_SCHEMA: &str = "codex-dev.subagents.v1";
 pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
 pub const PR_SOURCE_PARSER_VERSION: &str = "codex-dev.pr-source-parser.v1";
 pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
+pub const PR_AGENT_STATE_SCHEMA: &str = "codex-dev.pr-agent-state.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 
@@ -463,6 +464,76 @@ pub struct PrRecordResult {
 pub struct PrStatusResult {
     pub capsule: PathBuf,
     pub pr: PrEvidence,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentStateReport {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub checked_at: DateTime<Utc>,
+    pub dry_run: bool,
+    pub pr: PrEvidence,
+    pub sources: Vec<PrAgentSourceRecord>,
+    pub diagnostics: Vec<PrAgentDiagnostic>,
+    pub actions: Vec<PrAgentAction>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentSourceRecord {
+    pub id: String,
+    pub kind: String,
+    pub command: String,
+    pub path: String,
+    pub retrieved_at: DateTime<Utc>,
+    pub exit_code: Option<i32>,
+    pub status: PrAgentSourceStatus,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentSourceStatus {
+    Captured,
+    Failed,
+    Skipped,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentDiagnostic {
+    pub source: String,
+    pub severity: PrAgentSeverity,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    pub at: DateTime<Utc>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrAgentAction {
+    pub id: String,
+    pub priority: PrAgentActionPriority,
+    pub summary: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrAgentActionPriority {
+    Blocked,
+    Required,
+    Wait,
+    Ready,
+    Info,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1591,7 +1662,7 @@ fn normalize_gh_pr_checks(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEv
 
 fn normalize_gh_reviews(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
     let value = read_json::<Value>(path)?;
-    let reviews = array_from_value(&value, "GitHub reviews")?;
+    let reviews = array_or_paginated_arrays(&value, "GitHub reviews")?;
     let mut latest_by_reviewer: BTreeMap<String, (DateTime<Utc>, usize, String)> = BTreeMap::new();
     for (index, review) in reviews.iter().enumerate() {
         let state = optional_string(review, "state")
@@ -1660,8 +1731,8 @@ fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result
 
 fn normalize_gh_review_comments(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
     let value = read_json::<Value>(path)?;
-    let comments = array_from_value(&value, "GitHub review comments")?;
-    let review_threads = review_thread_summary_from_rest_comments(comments, checked_at);
+    let comments = array_or_paginated_arrays(&value, "GitHub review comments")?;
+    let review_threads = review_thread_summary_from_rest_comments(&comments, checked_at);
     Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
 }
 
@@ -1871,6 +1942,175 @@ fn merge_review_comment_summary(existing: &mut ReviewThreadSummary, incoming: Re
     existing.last_checked_at = incoming.last_checked_at;
 }
 
+pub fn recommend_pr_agent_actions(
+    pr: &PrEvidence,
+    diagnostics: &[PrAgentDiagnostic],
+) -> Vec<PrAgentAction> {
+    let mut actions = Vec::new();
+
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
+    {
+        actions.push(PrAgentAction {
+            id: "resolve_state_collection_errors".to_string(),
+            priority: PrAgentActionPriority::Blocked,
+            summary: "Resolve PR state collection errors before hosted action".to_string(),
+            reason: "one or more required hosted-state sources failed to capture or normalize"
+                .to_string(),
+        });
+    }
+
+    let failed_checks = pr
+        .checks
+        .iter()
+        .filter(|check| {
+            matches!(
+                check.conclusion.as_deref(),
+                Some("failure" | "error" | "cancelled" | "canceled" | "timed_out")
+            )
+        })
+        .count();
+    if failed_checks > 0 {
+        actions.push(PrAgentAction {
+            id: "diagnose_failed_checks".to_string(),
+            priority: PrAgentActionPriority::Required,
+            summary: format!("Inspect {failed_checks} failed PR check(s)"),
+            reason: "checks must be understood before review cleanup or merge".to_string(),
+        });
+    }
+
+    let pending_checks = pr
+        .checks
+        .iter()
+        .filter(|check| matches!(check.status.as_str(), "pending" | "queued" | "in_progress"))
+        .count();
+    if pending_checks > 0 && failed_checks == 0 {
+        actions.push(PrAgentAction {
+            id: "wait_for_checks".to_string(),
+            priority: PrAgentActionPriority::Wait,
+            summary: format!("Wait for {pending_checks} pending PR check(s)"),
+            reason: "CI state is not final yet".to_string(),
+        });
+    }
+
+    if pr.review_threads.authoritative && pr.review_threads.unresolved > 0 {
+        actions.push(PrAgentAction {
+            id: "process_review_threads".to_string(),
+            priority: PrAgentActionPriority::Required,
+            summary: format!(
+                "Process {} unresolved review thread(s)",
+                pr.review_threads.unresolved
+            ),
+            reason: "hosted review threads are authoritative and not clean".to_string(),
+        });
+    } else if !pr.review_threads.authoritative {
+        actions.push(PrAgentAction {
+            id: "refresh_review_threads".to_string(),
+            priority: PrAgentActionPriority::Info,
+            summary: "Refresh authoritative review-thread state".to_string(),
+            reason: "current review-thread source is partial or missing pagination closure"
+                .to_string(),
+        });
+    }
+
+    let review_decision_ready = match pr.review_decision.as_deref() {
+        Some("changes_requested") => {
+            actions.push(PrAgentAction {
+                id: "process_requested_changes".to_string(),
+                priority: PrAgentActionPriority::Required,
+                summary: "Address or rebut requested changes".to_string(),
+                reason: "latest review decision is changes_requested".to_string(),
+            });
+            false
+        }
+        Some("review_required") => {
+            actions.push(PrAgentAction {
+                id: "wait_for_required_review".to_string(),
+                priority: PrAgentActionPriority::Wait,
+                summary: "Wait for required approving review".to_string(),
+                reason: "latest review decision is review_required".to_string(),
+            });
+            false
+        }
+        Some("approved") | None => true,
+        Some(other) => {
+            actions.push(PrAgentAction {
+                id: "inspect_review_decision".to_string(),
+                priority: PrAgentActionPriority::Info,
+                summary: format!("Inspect review decision {other}"),
+                reason: "review decision is not explicitly approved".to_string(),
+            });
+            false
+        }
+    };
+
+    let mergeable_ready = match pr.mergeable.as_deref() {
+        Some("mergeable" | "clean") => true,
+        Some("conflicting" | "dirty") => {
+            actions.push(PrAgentAction {
+                id: "resolve_merge_conflict".to_string(),
+                priority: PrAgentActionPriority::Required,
+                summary: "Resolve merge conflict before merge".to_string(),
+                reason: "GitHub reports the pull request is not cleanly mergeable".to_string(),
+            });
+            false
+        }
+        Some("unknown") | None => {
+            actions.push(PrAgentAction {
+                id: "wait_for_mergeability".to_string(),
+                priority: PrAgentActionPriority::Wait,
+                summary: "Wait for GitHub mergeability state".to_string(),
+                reason: "GitHub mergeability is not yet known".to_string(),
+            });
+            false
+        }
+        Some(other) => {
+            actions.push(PrAgentAction {
+                id: "inspect_mergeability".to_string(),
+                priority: PrAgentActionPriority::Required,
+                summary: format!("Inspect mergeability state {other}"),
+                reason: "GitHub reports a non-clean mergeability state".to_string(),
+            });
+            false
+        }
+    };
+
+    if pr.state == "draft" {
+        actions.push(PrAgentAction {
+            id: "mark_ready_when_complete".to_string(),
+            priority: PrAgentActionPriority::Info,
+            summary: "Mark draft PR ready when local gates are complete".to_string(),
+            reason: "draft pull requests do not enter the normal review-to-merge path".to_string(),
+        });
+    }
+
+    if actions.is_empty()
+        && pr.state == "open"
+        && pr.checks.iter().all(|check| {
+            matches!(
+                check.conclusion.as_deref(),
+                Some("success" | "neutral" | "skipped") | None
+            )
+        })
+        && pr.review_threads.authoritative
+        && pr.review_threads.unresolved == 0
+        && review_decision_ready
+        && mergeable_ready
+    {
+        actions.push(PrAgentAction {
+            id: "merge_when_policy_allows".to_string(),
+            priority: PrAgentActionPriority::Ready,
+            summary: "PR state is clean for policy-controlled merge".to_string(),
+            reason:
+                "checks, review threads, review decision, and mergeability have no blocking state"
+                    .to_string(),
+        });
+    }
+
+    actions
+}
+
 impl PrSnapshotInput {
     fn into_pr_evidence(self, checked_at: DateTime<Utc>) -> PrEvidence {
         PrEvidence {
@@ -1994,8 +2234,58 @@ fn review_thread_summary_from_graphql(
     value: &Value,
     checked_at: DateTime<Utc>,
 ) -> Result<ReviewThreadSummary> {
+    if let Some(pages) = value.as_array()
+        && pages.iter().any(Value::is_object)
+    {
+        return review_thread_summary_from_graphql_pages(pages, checked_at);
+    }
+
     let nodes = review_thread_nodes(value)
         .with_context(|| "GitHub review-thread source is missing reviewThreads.nodes")?;
+    let (unresolved, resolved, outdated) = count_review_thread_nodes(nodes)?;
+
+    Ok(ReviewThreadSummary {
+        unresolved,
+        total: nodes.len() as u64,
+        resolved,
+        outdated,
+        authoritative: matches!(review_threads_has_next_page(value), Some(false)),
+        last_checked_at: checked_at,
+    })
+}
+
+fn review_thread_summary_from_graphql_pages(
+    pages: &[Value],
+    checked_at: DateTime<Utc>,
+) -> Result<ReviewThreadSummary> {
+    let mut unresolved = 0;
+    let mut resolved = 0;
+    let mut outdated = 0;
+    let mut total = 0;
+    let mut last_has_next_page = None;
+
+    for page in pages {
+        let nodes = review_thread_nodes(page)
+            .with_context(|| "GitHub review-thread page is missing reviewThreads.nodes")?;
+        let (page_unresolved, page_resolved, page_outdated) = count_review_thread_nodes(nodes)?;
+        unresolved += page_unresolved;
+        resolved += page_resolved;
+        outdated += page_outdated;
+        total += nodes.len() as u64;
+        last_has_next_page = review_threads_has_next_page(page);
+    }
+
+    Ok(ReviewThreadSummary {
+        unresolved,
+        total,
+        resolved,
+        outdated,
+        authoritative: matches!(last_has_next_page, Some(false)),
+        last_checked_at: checked_at,
+    })
+}
+
+fn count_review_thread_nodes(nodes: &[Value]) -> Result<(u64, u64, u64)> {
     let mut unresolved = 0;
     let mut resolved = 0;
     let mut outdated = 0;
@@ -2013,14 +2303,7 @@ fn review_thread_summary_from_graphql(
         }
     }
 
-    Ok(ReviewThreadSummary {
-        unresolved,
-        total: nodes.len() as u64,
-        resolved,
-        outdated,
-        authoritative: matches!(review_threads_has_next_page(value), Some(false)),
-        last_checked_at: checked_at,
-    })
+    Ok((unresolved, resolved, outdated))
 }
 
 fn review_thread_nodes(value: &Value) -> Option<&Vec<Value>> {
@@ -2161,6 +2444,17 @@ fn array_from_value<'a>(value: &'a Value, label: &str) -> Result<&'a Vec<Value>>
     value
         .as_array()
         .with_context(|| format!("{label} source must be a JSON array"))
+}
+
+fn array_or_paginated_arrays(value: &Value, label: &str) -> Result<Vec<Value>> {
+    let array = array_from_value(value, label)?;
+    if array.iter().all(Value::is_array) {
+        return Ok(array
+            .iter()
+            .flat_map(|page| page.as_array().into_iter().flatten().cloned())
+            .collect());
+    }
+    Ok(array.clone())
 }
 
 fn datetime_from_fields(value: &Value, fields: &[&str]) -> Option<DateTime<Utc>> {
@@ -3960,6 +4254,198 @@ mod tests {
             .expect("record threads");
         assert_eq!(result.pr.review_threads.unresolved, 1);
         assert!(!result.pr.review_threads.authoritative);
+    }
+
+    #[test]
+    fn gh_review_threads_support_slurped_paginated_graphql_pages() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("threads")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "reviewThreads": {
+                                    "nodes": [
+                                        { "id": "resolved", "isResolved": true, "isOutdated": false }
+                                    ],
+                                    "pageInfo": { "hasNextPage": true, "endCursor": "cursor-1" }
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "reviewThreads": {
+                                    "nodes": [
+                                        { "id": "current", "isResolved": false, "isOutdated": false },
+                                        { "id": "stale", "isResolved": false, "isOutdated": true }
+                                    ],
+                                    "pageInfo": { "hasNextPage": false, "endCursor": null }
+                                }
+                            }
+                        }
+                    }
+                }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviewThreads);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record paginated threads");
+
+        assert_eq!(result.pr.review_threads.total, 3);
+        assert_eq!(result.pr.review_threads.resolved, 1);
+        assert_eq!(result.pr.review_threads.unresolved, 1);
+        assert_eq!(result.pr.review_threads.outdated, 1);
+        assert!(result.pr.review_threads.authoritative);
+    }
+
+    #[test]
+    fn pr_agent_recommendations_block_on_failures_and_reviews() {
+        let checked_at = "2026-05-09T06:05:00Z".parse().unwrap();
+        let pr = PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: Some("BjornMelin/dev-skills".to_string()),
+            number: Some(46),
+            url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
+            state: "open".to_string(),
+            mergeable: Some("mergeable".to_string()),
+            review_decision: Some("changes_requested".to_string()),
+            head_sha: Some("abc123".to_string()),
+            checks: vec![CheckRecord {
+                name: "ci".to_string(),
+                status: "completed".to_string(),
+                conclusion: Some("failure".to_string()),
+                url: None,
+                checked_at,
+            }],
+            review_threads: ReviewThreadSummary {
+                unresolved: 2,
+                total: 2,
+                resolved: 0,
+                outdated: 0,
+                authoritative: true,
+                last_checked_at: checked_at,
+            },
+            sources: Vec::new(),
+        };
+        let diagnostics = vec![PrAgentDiagnostic {
+            source: "gh-pr-view".to_string(),
+            severity: PrAgentSeverity::Error,
+            message: "missing permission".to_string(),
+            command: None,
+            exit_code: Some(1),
+            at: checked_at,
+        }];
+
+        let actions = recommend_pr_agent_actions(&pr, &diagnostics);
+        let action_ids = actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>();
+        assert!(action_ids.contains(&"resolve_state_collection_errors"));
+        assert!(action_ids.contains(&"diagnose_failed_checks"));
+        assert!(action_ids.contains(&"process_review_threads"));
+        assert!(action_ids.contains(&"process_requested_changes"));
+    }
+
+    #[test]
+    fn pr_agent_recommendations_identify_clean_merge_ready_state() {
+        let checked_at = "2026-05-09T06:05:00Z".parse().unwrap();
+        let pr = PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: Some("BjornMelin/dev-skills".to_string()),
+            number: Some(46),
+            url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
+            state: "open".to_string(),
+            mergeable: Some("mergeable".to_string()),
+            review_decision: Some("approved".to_string()),
+            head_sha: Some("abc123".to_string()),
+            checks: vec![CheckRecord {
+                name: "ci".to_string(),
+                status: "completed".to_string(),
+                conclusion: Some("success".to_string()),
+                url: None,
+                checked_at,
+            }],
+            review_threads: ReviewThreadSummary {
+                unresolved: 0,
+                total: 1,
+                resolved: 1,
+                outdated: 0,
+                authoritative: true,
+                last_checked_at: checked_at,
+            },
+            sources: Vec::new(),
+        };
+
+        let actions = recommend_pr_agent_actions(&pr, &[]);
+        assert_eq!(actions.len(), 1);
+        assert_eq!(actions[0].id, "merge_when_policy_allows");
+        assert_eq!(actions[0].priority, PrAgentActionPriority::Ready);
+    }
+
+    #[test]
+    fn pr_agent_recommendations_do_not_mark_review_required_or_unknown_merge_ready() {
+        let checked_at = "2026-05-09T06:05:00Z".parse().unwrap();
+        let mut pr = PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: Some("BjornMelin/dev-skills".to_string()),
+            number: Some(46),
+            url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
+            state: "open".to_string(),
+            mergeable: Some("unknown".to_string()),
+            review_decision: Some("review_required".to_string()),
+            head_sha: Some("abc123".to_string()),
+            checks: vec![CheckRecord {
+                name: "ci".to_string(),
+                status: "completed".to_string(),
+                conclusion: Some("success".to_string()),
+                url: None,
+                checked_at,
+            }],
+            review_threads: ReviewThreadSummary {
+                unresolved: 0,
+                total: 1,
+                resolved: 1,
+                outdated: 0,
+                authoritative: true,
+                last_checked_at: checked_at,
+            },
+            sources: Vec::new(),
+        };
+
+        let actions = recommend_pr_agent_actions(&pr, &[]);
+        let action_ids = actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>();
+        assert!(action_ids.contains(&"wait_for_required_review"));
+        assert!(action_ids.contains(&"wait_for_mergeability"));
+        assert!(!action_ids.contains(&"merge_when_policy_allows"));
+
+        pr.review_decision = Some("approved".to_string());
+        pr.mergeable = None;
+        let actions = recommend_pr_agent_actions(&pr, &[]);
+        let action_ids = actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>();
+        assert!(action_ids.contains(&"wait_for_mergeability"));
+        assert!(!action_ids.contains(&"merge_when_policy_allows"));
     }
 
     #[test]

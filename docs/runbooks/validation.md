@@ -71,6 +71,7 @@ cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-smoke:end
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+cargo run -q -p codex-dev -- --json pr agent --help
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
@@ -175,6 +176,28 @@ cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" 
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
 ```
+
+Optional live PR-agent smoke, for branches with a GitHub PR and valid `gh`
+authentication:
+
+```bash
+tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json capsule init \
+  --title "PR agent live smoke" \
+  --branch "$(git branch --show-current)" \
+  --root "$tmp" \
+  --id pr-agent-live-smoke \
+  --created-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+cargo run -q -p codex-dev -- --json pr agent \
+  --capsule "$tmp/pr-agent-live-smoke" \
+  --repo BjornMelin/dev-skills \
+  --number <pr-number>
+cargo run -q -p codex-dev -- --json pr status --capsule "$tmp/pr-agent-live-smoke"
+```
+
+This smoke performs read-only hosted collection plus local capsule writes. It
+must not be used as evidence that hosted review comments were resolved or that a
+PR was merged.
 
 Policy gate execution is explicit. Use `--execute` only when you intend to run
 the repo-native commands from the manifest; the default dry run records the
@@ -344,6 +367,7 @@ cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-all:end
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+cargo run -q -p codex-dev -- --json pr agent --help
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui
 cargo test -p codex-dev-tui
