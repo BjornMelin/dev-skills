@@ -300,7 +300,7 @@ fn pr_plan_and_record_support_fixture_mode() {
                 .as_array()
                 .expect("command argv")
                 .iter()
-                .any(|part| part == "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}")
+                .any(|part| part == "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}")
     }));
     assert!(plan_commands.iter().any(|command| {
         command["id"] == "gh-pr-checks"
@@ -508,13 +508,18 @@ fn pr_record_cli_normalizes_github_checks_sources() {
         "BjornMelin/dev-skills"
     );
     assert_eq!(record_json["result"]["pr"]["number"], 46);
+    let checks = record_json["result"]["pr"]["checks"]
+        .as_array()
+        .expect("checks array");
+    let lint = checks
+        .iter()
+        .find(|check| check["name"] == "lint")
+        .expect("lint check");
+    assert_eq!(lint["status"], "completed");
+    assert_eq!(lint["conclusion"], "failure");
     assert_eq!(
-        record_json["result"]["pr"]["checks"][0]["status"],
-        "completed"
-    );
-    assert_eq!(
-        record_json["result"]["pr"]["checks"][0]["conclusion"],
-        "failure"
+        record_json["result"]["pr"]["sources"][0]["kind"],
+        "gh-pr-checks"
     );
     assert_eq!(
         record_json["result"]["pr"]["sources"][0]["parser_version"],

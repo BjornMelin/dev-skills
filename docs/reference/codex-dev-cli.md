@@ -435,9 +435,9 @@ Supported `--source-kind` values:
 - `normalized`: existing local `pr.json` fixture shape.
 - `gh-pr-view`: `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`.
 - `gh-pr-checks`: `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`.
-- `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; records the latest review state as `review_decision`.
-- `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; counts resolved, current unresolved, and outdated threads separately.
-- `gh-review-comments`: REST review-comment arrays; counts comments whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
+- `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; collapses to each reviewer's latest active state before deriving `review_decision`.
+- `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; counts resolved, current unresolved, and outdated threads separately, and is authoritative only when `pageInfo.hasNextPage` is false.
+- `gh-review-comments`: REST review-comment arrays; groups comments by thread root (`in_reply_to_id` or `id`) and counts threads whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
 - `review-pack-remaining`: JSON or text output from `review-pack remaining`; records the unresolved count.
 
 All non-`normalized` source kinds require explicit PR identity unless it can be

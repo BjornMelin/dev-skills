@@ -994,7 +994,7 @@ pub fn pr_control_plan(
     let number_arg = format!("number={number}");
     let reviews_path = format!("repos/{owner}/{name}/pulls/{number}/reviews");
     let review_comments_path = format!("repos/{owner}/{name}/pulls/{number}/comments");
-    let review_threads_query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
+    let review_threads_query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){pageInfo{hasNextPage} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
     let review_threads_query_arg = format!("query={review_threads_query}");
 
     Ok(PrControlPlan {

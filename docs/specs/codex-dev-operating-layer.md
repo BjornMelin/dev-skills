@@ -388,8 +388,8 @@ verify-before-fix rules in the
 }
 ```
 
-When `checks` entries are present, each entry must use the typed fields shown
-above. `review_threads.unresolved` means current unresolved threads only when
+Each present `checks` entry must use the typed fields shown above.
+`review_threads.unresolved` means current unresolved threads only when
 `review_threads.authoritative` is true. Sources that do not carry hosted thread
 state, such as `gh pr checks`, must leave that flag false when no earlier
 authoritative thread source exists. Outdated threads remain visible through
@@ -420,8 +420,11 @@ remaining` outputs. Every non-`normalized` source must preserve explicit PR
 identity through a GitHub PR URL or caller-provided `--repo` and `--number`.
 Provider-derived partial sources merge into the existing `pr.json` snapshot
 instead of replacing unrelated fields, and they must not silently turn unknown
-thread state into a clean authoritative thread count. It writes only the typed
-`pr.json` evidence contract plus an `evidence.jsonl` summary. It updates
+thread state into a clean authoritative thread count. GraphQL review-thread
+captures are authoritative only when `pageInfo.hasNextPage` is false, while REST
+review comments contribute thread-root counts but never current unresolved state.
+It writes only the typed `pr.json` evidence contract plus an `evidence.jsonl`
+summary. It updates
 `capsule.json.updated_at` monotonically, matching the evidence appender
 freshness rule.
 

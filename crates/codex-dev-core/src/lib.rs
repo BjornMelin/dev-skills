@@ -1592,7 +1592,7 @@ fn normalize_gh_pr_checks(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEv
 fn normalize_gh_reviews(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
     let value = read_json::<Value>(path)?;
     let reviews = array_from_value(&value, "GitHub reviews")?;
-    let mut latest: Option<(DateTime<Utc>, usize, String)> = None;
+    let mut latest_by_reviewer: BTreeMap<String, (DateTime<Utc>, usize, String)> = BTreeMap::new();
     for (index, review) in reviews.iter().enumerate() {
         let state = optional_string(review, "state")
             .with_context(|| format!("GitHub review is missing state: {review}"))?
@@ -1602,17 +1602,54 @@ fn normalize_gh_reviews(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvid
             &["submitted_at", "submittedAt", "updated_at", "updatedAt"],
         )
         .unwrap_or(checked_at);
-        match &latest {
+        let reviewer = review_author_key(review, index);
+        match latest_by_reviewer.get(&reviewer) {
             Some((latest_at, latest_index, _))
                 if submitted_at < *latest_at
                     || (submitted_at == *latest_at && index <= *latest_index) => {}
-            _ => latest = Some((submitted_at, index, state)),
+            _ => {
+                latest_by_reviewer.insert(reviewer, (submitted_at, index, state));
+            }
         }
     }
 
     let mut pr = partial_pr_evidence("unknown", Vec::new(), empty_review_threads(checked_at));
-    pr.review_decision = latest.map(|(_, _, state)| state);
+    pr.review_decision = review_decision_from_reviewer_states(latest_by_reviewer.values());
     Ok(pr)
+}
+
+fn review_author_key(review: &Value, index: usize) -> String {
+    for pointer in ["/user/login", "/author/login", "/user/id", "/author/id"] {
+        if let Some(value) = json_scalar_key(review.pointer(pointer)) {
+            return format!("{pointer}:{value}");
+        }
+    }
+    json_scalar_key(review.get("id"))
+        .map(|id| format!("review:{id}"))
+        .unwrap_or_else(|| format!("review-index:{index}"))
+}
+
+fn review_decision_from_reviewer_states<'a>(
+    states: impl Iterator<Item = &'a (DateTime<Utc>, usize, String)>,
+) -> Option<String> {
+    let mut approved = false;
+    let mut commented = false;
+    for (_, _, state) in states {
+        match state.as_str() {
+            "changes_requested" => return Some("changes_requested".to_string()),
+            "approved" => approved = true,
+            "commented" => commented = true,
+            "dismissed" | "pending" => {}
+            _ => {}
+        }
+    }
+    if approved {
+        Some("approved".to_string())
+    } else if commented {
+        Some("commented".to_string())
+    } else {
+        None
+    }
 }
 
 fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
@@ -1624,27 +1661,50 @@ fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result
 fn normalize_gh_review_comments(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
     let value = read_json::<Value>(path)?;
     let comments = array_from_value(&value, "GitHub review comments")?;
-    let total = comments.len() as u64;
-    let outdated = comments
-        .iter()
-        .filter(|comment| {
-            value_is_nullish(comment.get("position"))
-                && (comment.get("original_position").is_some()
-                    || comment.get("originalLine").is_some())
-        })
-        .count() as u64;
-    Ok(partial_pr_evidence(
-        "unknown",
-        Vec::new(),
-        ReviewThreadSummary {
-            unresolved: 0,
-            total,
-            resolved: 0,
-            outdated,
-            authoritative: false,
-            last_checked_at: checked_at,
-        },
-    ))
+    let review_threads = review_thread_summary_from_rest_comments(comments, checked_at);
+    Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
+}
+
+fn review_thread_summary_from_rest_comments(
+    comments: &[Value],
+    checked_at: DateTime<Utc>,
+) -> ReviewThreadSummary {
+    let mut thread_outdated: BTreeMap<String, bool> = BTreeMap::new();
+    for (index, comment) in comments.iter().enumerate() {
+        let thread_key = review_comment_thread_key(comment, index);
+        let is_outdated = review_comment_is_outdated(comment);
+        thread_outdated
+            .entry(thread_key)
+            .and_modify(|all_outdated| *all_outdated &= is_outdated)
+            .or_insert(is_outdated);
+    }
+    ReviewThreadSummary {
+        unresolved: 0,
+        total: thread_outdated.len() as u64,
+        resolved: 0,
+        outdated: thread_outdated
+            .values()
+            .filter(|all_outdated| **all_outdated)
+            .count() as u64,
+        authoritative: false,
+        last_checked_at: checked_at,
+    }
+}
+
+fn review_comment_thread_key(comment: &Value, index: usize) -> String {
+    json_scalar_key(comment.get("in_reply_to_id"))
+        .or_else(|| json_scalar_key(comment.get("inReplyToId")))
+        .or_else(|| json_scalar_key(comment.get("id")))
+        .map(|id| format!("thread:{id}"))
+        .unwrap_or_else(|| format!("comment-index:{index}"))
+}
+
+fn review_comment_is_outdated(comment: &Value) -> bool {
+    value_is_nullish(comment.get("position"))
+        && (comment.get("original_position").is_some()
+            || comment.get("originalPosition").is_some()
+            || comment.get("originalLine").is_some()
+            || comment.get("original_line").is_some())
 }
 
 fn normalize_review_pack_remaining(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
@@ -1958,7 +2018,7 @@ fn review_thread_summary_from_graphql(
         total: nodes.len() as u64,
         resolved,
         outdated,
-        authoritative: true,
+        authoritative: matches!(review_threads_has_next_page(value), Some(false)),
         last_checked_at: checked_at,
     })
 }
@@ -1971,6 +2031,16 @@ fn review_thread_nodes(value: &Value) -> Option<&Vec<Value>> {
         .or_else(|| value.pointer("/reviewThreads/nodes"))
         .or_else(|| value.pointer("/nodes"))
         .and_then(Value::as_array)
+}
+
+fn review_threads_has_next_page(value: &Value) -> Option<bool> {
+    value
+        .pointer("/data/repository/pullRequest/reviewThreads/pageInfo/hasNextPage")
+        .or_else(|| value.pointer("/repository/pullRequest/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/pullRequest/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/pageInfo/hasNextPage"))
+        .and_then(Value::as_bool)
 }
 
 fn parse_review_pack_remaining(contents: &str) -> Result<u64> {
@@ -2077,6 +2147,14 @@ fn optional_u64(value: &Value, key: &str) -> Option<u64> {
 
 fn optional_bool(value: &Value, key: &str) -> Option<bool> {
     value.get(key).and_then(Value::as_bool)
+}
+
+fn json_scalar_key(value: Option<&Value>) -> Option<String> {
+    match value? {
+        Value::String(value) if !value.trim().is_empty() => Some(value.trim().to_string()),
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    }
 }
 
 fn array_from_value<'a>(value: &'a Value, label: &str) -> Result<&'a Vec<Value>> {
@@ -3761,7 +3839,8 @@ mod tests {
                                     { "id": "resolved", "isResolved": true, "isOutdated": false },
                                     { "id": "current", "isResolved": false, "isOutdated": false },
                                     { "id": "stale", "isResolved": false, "isOutdated": true }
-                                ]
+                                ],
+                                "pageInfo": { "hasNextPage": false }
                             }
                         }
                     }
@@ -3792,7 +3871,8 @@ mod tests {
             &comments_source,
             serde_json::to_string_pretty(&json!([
                 { "id": 1, "position": 4, "original_position": 4 },
-                { "id": 2, "position": null, "original_position": 8 }
+                { "id": 2, "in_reply_to_id": 1, "position": null, "original_position": 8 },
+                { "id": 3, "position": null, "original_position": 12 }
             ]))
             .expect("fixture json"),
         )
@@ -3808,6 +3888,77 @@ mod tests {
         assert_eq!(result.pr.review_threads.total, 2);
         assert_eq!(result.pr.review_threads.unresolved, 0);
         assert_eq!(result.pr.review_threads.outdated, 1);
+        assert!(!result.pr.review_threads.authoritative);
+    }
+
+    #[test]
+    fn gh_reviews_collapse_latest_state_per_reviewer() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("reviews")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-reviews.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                {
+                    "id": 1,
+                    "user": { "login": "alice" },
+                    "state": "CHANGES_REQUESTED",
+                    "submitted_at": "2026-05-09T04:00:00Z"
+                },
+                {
+                    "id": 2,
+                    "user": { "login": "alice" },
+                    "state": "APPROVED",
+                    "submitted_at": "2026-05-09T05:00:00Z"
+                },
+                {
+                    "id": 3,
+                    "user": { "login": "bob" },
+                    "state": "COMMENTED",
+                    "submitted_at": "2026-05-09T06:00:00Z"
+                }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviews);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record reviews");
+        assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
+    }
+
+    #[test]
+    fn gh_review_threads_require_complete_page_for_authority() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("threads")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "reviewThreads": {
+                    "nodes": [
+                        { "id": "current", "isResolved": false, "isOutdated": false }
+                    ],
+                    "pageInfo": { "hasNextPage": true }
+                }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviewThreads);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record threads");
+        assert_eq!(result.pr.review_threads.unresolved, 1);
         assert!(!result.pr.review_threads.authoritative);
     }
 
@@ -3952,7 +4103,8 @@ mod tests {
                                     { "id": "resolved", "isResolved": true, "isOutdated": false },
                                     { "id": "current", "isResolved": false, "isOutdated": false },
                                     { "id": "stale", "isResolved": false, "isOutdated": true }
-                                ]
+                                ],
+                                "pageInfo": { "hasNextPage": false }
                             }
                         }
                     }
@@ -4094,7 +4246,8 @@ mod tests {
                 "reviewThreads": {
                     "nodes": [
                         { "id": "stale", "isResolved": false, "isOutdated": true }
-                    ]
+                    ],
+                    "pageInfo": { "hasNextPage": false }
                 }
             }))
             .expect("fixture json"),
