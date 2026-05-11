@@ -685,8 +685,8 @@ impl WorkbenchState {
         let (capsule, verification, pr) = if validation.valid {
             (
                 Some(capsule_status(&path)?),
-                Some(read_json(&path.join("verification.json"))?),
-                Some(read_json(&path.join("pr.json"))?),
+                read_json(&path.join("verification.json")).ok(),
+                read_json(&path.join("pr.json")).ok(),
             )
         } else {
             (None, None, None)
@@ -1367,7 +1367,11 @@ pub fn render_once_for_cli(
 
     let state = AppState::load(None, dashboard_root)
         .map_err(|error| sanitized_path_error(error, dashboard_root, "<tasks-root>"))?;
-    let output = render_app_to_string(&state, width, height)?;
+    let output = redact_path_text_with_placeholder(
+        &render_app_to_string(&state, width, height)?,
+        dashboard_root,
+        "<tasks-root>",
+    );
     Ok(RenderOnceResult {
         output,
         valid: true,
@@ -1511,6 +1515,18 @@ mod tests {
         assert!(result.output.contains("Capsule failed validation"));
         assert!(result.output.contains("<capsule>"));
         assert!(!result.output.contains(&capsule.display().to_string()));
+    }
+
+    #[test]
+    fn render_once_dashboard_redacts_root_path() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("private-tasks-root");
+
+        let result = render_once_for_cli(None, &root, 100, 24).expect("render");
+
+        assert!(result.valid);
+        assert!(result.output.contains("<tasks-root>"));
+        assert!(!result.output.contains(&root.display().to_string()));
     }
 
     #[test]
