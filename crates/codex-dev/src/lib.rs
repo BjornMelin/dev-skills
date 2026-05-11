@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::env;
 use std::ffi::OsString;
 use std::fs;
@@ -351,7 +352,11 @@ impl SubagentsRecordSynthesisArgs {
 
 #[derive(Args, Debug)]
 pub struct PolicyManifestArgs {
-    #[arg(long, default_value_t = PolicyProfile::CodexDev)]
+    #[arg(
+        long,
+        default_value_t = PolicyProfile::CodexDev,
+        help = "Policy profile: codex_dev, codex_dev_tui, codex_research, skills, bootstrap_install, docs, release, or full_local"
+    )]
     pub profile: PolicyProfile,
     #[arg(long, value_name = "RFC3339")]
     pub generated_at: Option<DateTime<Utc>>,
@@ -367,12 +372,18 @@ pub struct PolicyRunArgs {
         help = "Repository root used when executing repo-native gates"
     )]
     pub repo_root: Option<PathBuf>,
-    #[arg(long, default_value_t = PolicyProfile::CodexDev)]
+    #[arg(
+        long,
+        default_value_t = PolicyProfile::CodexDev,
+        help = "Policy profile: codex_dev, codex_dev_tui, codex_research, skills, bootstrap_install, docs, release, or full_local"
+    )]
     pub profile: PolicyProfile,
     #[arg(long, help = "Execute gates instead of recording a dry-run plan")]
     pub execute: bool,
     #[arg(long, help = "Permit gates marked as network-using")]
     pub allow_network: bool,
+    #[arg(long, help = "Permit gates marked as requiring secrets")]
+    pub allow_secrets: bool,
     #[arg(long, help = "Continue executing after a failed required gate")]
     pub keep_going: bool,
     #[arg(long, value_name = "RFC3339")]
@@ -845,11 +856,9 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
     for (index, gate) in manifest.gates.iter().enumerate() {
         let result = if dry_run {
             plan_gate(gate)
-        } else if gate.network && !args.allow_network {
-            skip_gate(
-                gate,
-                "gate requires network and --allow-network was not set",
-            )
+        } else if let Some(reason) = gate_skip_reason(gate, args.allow_network, args.allow_secrets)
+        {
+            skip_gate(gate, reason)
         } else {
             execute_gate(gate, repo_root.as_deref())
         };
@@ -869,7 +878,7 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
     let passed = results.iter().all(|gate| {
         !gate.required || matches!(gate.status, GateStatus::Planned | GateStatus::Passed)
     });
-    record_policy_run(&args.capsule, &results, checked_at)?;
+    record_policy_run(&args.capsule, &manifest, &results, checked_at)?;
 
     Ok(PolicyRunResult {
         verification_path: args.capsule.join("verification.json"),
@@ -885,83 +894,579 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
 
 fn built_in_gates(profile: PolicyProfile) -> Vec<PolicyGate> {
     match profile {
-        PolicyProfile::CodexDev => vec![
-            policy_gate(
-                "cargo-fmt",
-                "Rust workspace formatting",
-                ["cargo", "fmt", "--all", "--check"],
-            ),
-            policy_gate(
-                "codex-dev-core-clippy",
-                "codex-dev-core Clippy",
-                [
-                    "cargo",
-                    "clippy",
-                    "-p",
-                    "codex-dev-core",
-                    "--all-targets",
-                    "--",
-                    "-D",
-                    "warnings",
-                ],
-            ),
-            policy_gate(
-                "codex-dev-clippy",
-                "codex-dev Clippy",
-                [
-                    "cargo",
-                    "clippy",
-                    "-p",
-                    "codex-dev",
-                    "--all-targets",
-                    "--",
-                    "-D",
-                    "warnings",
-                ],
-            ),
-            policy_gate(
-                "codex-dev-core-check",
-                "codex-dev-core cargo check",
-                ["cargo", "check", "-p", "codex-dev-core"],
-            ),
-            policy_gate(
-                "codex-dev-check",
-                "codex-dev cargo check",
-                ["cargo", "check", "-p", "codex-dev"],
-            ),
-            policy_gate(
-                "codex-dev-core-test",
-                "codex-dev-core tests",
-                ["cargo", "test", "-p", "codex-dev-core"],
-            ),
-            policy_gate(
-                "codex-dev-test",
-                "codex-dev tests",
-                ["cargo", "test", "-p", "codex-dev"],
-            ),
-            policy_gate(
-                "codex-dev-help",
-                "codex-dev help smoke",
-                ["cargo", "run", "-q", "-p", "codex-dev", "--", "--help"],
-            ),
-            policy_gate(
-                "docs-links",
-                "documentation link check",
-                [
-                    "python3",
-                    "tools/docs/check_links.py",
-                    "docs",
-                    "README.md",
-                    "AGENTS.md",
-                ],
-            ),
-            policy_gate(
-                "diff-check",
-                "git whitespace check",
-                ["git", "diff", "--check"],
-            ),
-        ],
+        PolicyProfile::CodexDev => codex_dev_gates(),
+        PolicyProfile::CodexDevTui => codex_dev_tui_gates(),
+        PolicyProfile::CodexResearch => codex_research_gates(),
+        PolicyProfile::Skills => skills_gates(),
+        PolicyProfile::BootstrapInstall => bootstrap_install_gates(),
+        PolicyProfile::Docs => docs_gates(),
+        PolicyProfile::Release => release_gates(),
+        PolicyProfile::FullLocal => full_local_gates(),
     }
+}
+
+fn codex_dev_gates() -> Vec<PolicyGate> {
+    vec![
+        cargo_fmt_gate(),
+        policy_gate(
+            "codex-dev-core-clippy",
+            "codex-dev-core Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "codex-dev-core",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means codex-dev-core has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "codex-dev-clippy",
+            "codex-dev Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "codex-dev",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means codex-dev CLI code has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "codex-dev-core-check",
+            "codex-dev-core cargo check",
+            ["cargo", "check", "-p", "codex-dev-core"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means codex-dev-core does not typecheck.",
+        ),
+        policy_gate(
+            "codex-dev-check",
+            "codex-dev cargo check",
+            ["cargo", "check", "-p", "codex-dev"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means codex-dev does not typecheck.",
+        ),
+        policy_gate(
+            "codex-dev-core-test",
+            "codex-dev-core tests",
+            ["cargo", "test", "-p", "codex-dev-core"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means shared capsule or evidence contracts regressed.",
+        ),
+        policy_gate(
+            "codex-dev-test",
+            "codex-dev tests",
+            ["cargo", "test", "-p", "codex-dev"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means codex-dev CLI behavior or integration fixtures regressed.",
+        ),
+        policy_gate(
+            "codex-dev-help",
+            "codex-dev help smoke",
+            ["cargo", "run", "-q", "-p", "codex-dev", "--", "--help"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the CLI cannot render its top-level Clap contract.",
+        ),
+        policy_gate(
+            "codex-dev-policy-manifest",
+            "codex-dev policy manifest smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "policy",
+                "manifest",
+                "--profile",
+                "codex_dev",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the codex_dev policy profile cannot be emitted as JSON.",
+        ),
+        policy_gate(
+            "codex-dev-pr-plan-smoke",
+            "codex-dev PR control-plan smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "pr",
+                "plan",
+                "--repo",
+                "BjornMelin/dev-skills",
+                "--number",
+                "25",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the local PR control-plan JSON contract regressed.",
+        ),
+        docs_links_gate(),
+        diff_check_gate(),
+    ]
+}
+
+fn codex_dev_tui_gates() -> Vec<PolicyGate> {
+    vec![
+        cargo_fmt_gate(),
+        policy_gate(
+            "codex-dev-tui-clippy",
+            "codex-dev-tui Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "codex-dev-tui",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the TUI has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "codex-dev-tui-check",
+            "codex-dev-tui cargo check",
+            ["cargo", "check", "-p", "codex-dev-tui"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the TUI does not typecheck.",
+        ),
+        policy_gate(
+            "codex-dev-tui-test",
+            "codex-dev-tui tests",
+            ["cargo", "test", "-p", "codex-dev-tui"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means TUI rendering or state fixtures regressed.",
+        ),
+        policy_gate(
+            "codex-dev-tui-help",
+            "codex-dev-tui help smoke",
+            ["cargo", "run", "-q", "-p", "codex-dev-tui", "--", "--help"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the TUI cannot render its top-level Clap contract.",
+        ),
+    ]
+}
+
+fn codex_research_gates() -> Vec<PolicyGate> {
+    vec![
+        cargo_fmt_gate(),
+        policy_gate(
+            "codex-research-clippy",
+            "codex-research Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "codex-research",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means codex-research has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "codex-research-check",
+            "codex-research cargo check",
+            ["cargo", "check", "-p", "codex-research"],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means codex-research does not typecheck.",
+        ),
+        policy_gate(
+            "codex-research-test",
+            "codex-research tests",
+            ["cargo", "test", "-p", "codex-research"],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means codex-research unit or integration behavior regressed.",
+        ),
+        policy_gate(
+            "codex-research-doctor",
+            "codex-research doctor smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "--json",
+                "doctor",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means codex-research local environment diagnostics regressed.",
+        ),
+        policy_gate(
+            "codex-research-eval",
+            "codex-research eval smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "--json",
+                "eval",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means the embedded research eval suite regressed.",
+        ),
+        policy_gate(
+            "codex-research-eval-list",
+            "codex-research eval list",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "eval",
+                "--list",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means the eval catalog cannot be listed.",
+        ),
+        policy_gate(
+            "codex-research-eval-strict",
+            "codex-research cited-claims strict eval",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "--json",
+                "eval",
+                "--task",
+                "evidence-claims-cited",
+                "--strict",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means strict cited-claim evidence behavior regressed.",
+        ),
+        policy_gate(
+            "codex-research-plan-quick",
+            "codex-research quick plan smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "--json",
+                "plan",
+                "validation smoke",
+                "--profile",
+                "quick",
+            ],
+            "docs/runbooks/validation.md#rust-cli",
+            ["cargo"],
+            "Failure means local research profile planning regressed.",
+        ),
+    ]
+}
+
+fn skills_gates() -> Vec<PolicyGate> {
+    vec![
+        policy_gate(
+            "skills-quick-validate-all",
+            "validate all skill metadata",
+            [
+                "bash",
+                "-lc",
+                "for d in skills/*; do [ -f \"$d/SKILL.md\" ] && python3 tools/skill/quick_validate.py \"$d\"; done",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["bash", "python3"],
+            "Failure means at least one skill is not AgentSkills-spec compliant.",
+        ),
+        policy_gate(
+            "python-helpers-compile",
+            "Python helper compile smoke",
+            [
+                "python3",
+                "-m",
+                "compileall",
+                "-q",
+                "skills/deep-researcher/scripts",
+                "skills/subagent-creator/scripts",
+                "skills/subspawn/scripts",
+                "subagents/hardened-codex/scripts",
+                "tools/bootstrap",
+            ],
+            "docs/runbooks/validation.md#python-helpers",
+            ["python3"],
+            "Failure means a tracked Python helper has syntax or import-time compilation errors.",
+        ),
+        policy_gate(
+            "subagent-templates-validate",
+            "validate bundled subagent templates",
+            [
+                "python3",
+                "skills/subagent-creator/scripts/subagent_creator.py",
+                "validate",
+                "skills/deep-researcher/templates/agents",
+                "skills/subagent-creator/templates/agents",
+                "skills/subspawn/templates/agents",
+                "subagents/hardened-codex/agents",
+            ],
+            "docs/runbooks/validation.md#subagent-templates",
+            ["python3"],
+            "Failure means one or more bundled custom subagent templates is invalid.",
+        ),
+        policy_gate(
+            "subspawn-roles-validate",
+            "validate subspawn role registry",
+            [
+                "python3",
+                "skills/subspawn/scripts/subspawn_plan.py",
+                "validate-roles",
+            ],
+            "docs/runbooks/validation.md#subagent-templates",
+            ["python3"],
+            "Failure means subspawn role discovery or duplicate-role policy regressed.",
+        ),
+        policy_gate(
+            "subspawn-plan-research-smoke",
+            "subspawn research plan smoke",
+            [
+                "python3",
+                "skills/subspawn/scripts/subspawn_plan.py",
+                "plan",
+                "--preset",
+                "research",
+                "--task",
+                "validation smoke",
+                "--scope",
+                "docs and template metadata",
+                "--json",
+            ],
+            "docs/runbooks/validation.md#subagent-templates",
+            ["python3"],
+            "Failure means subspawn cannot emit the canonical research planning JSON.",
+        ),
+        policy_gate(
+            "skill-subagent-eval",
+            "skill and subagent eval smoke",
+            ["python3", "tools/eval/skill_subagent_eval.py", "--json"],
+            "docs/runbooks/validation.md#subagent-templates",
+            ["python3"],
+            "Failure means the local skill/subagent evaluation smoke regressed.",
+        ),
+    ]
+}
+
+fn bootstrap_install_gates() -> Vec<PolicyGate> {
+    vec![
+        policy_gate(
+            "bootstrap-pack-validate",
+            "validate bootstrap pack manifests",
+            [
+                "python3",
+                "tools/bootstrap/render_bootstrap_pack.py",
+                "--validate",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["python3"],
+            "Failure means bootstrap pack manifests or templates are invalid.",
+        ),
+        policy_gate(
+            "bootstrap-pack-render-smoke",
+            "render bootstrap pack smoke fixtures",
+            [
+                "bash",
+                "-lc",
+                "tmp=$(mktemp -d); python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out \"$tmp/codex\" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z && python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out \"$tmp/rust\" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["bash", "python3"],
+            "Failure means a bootstrap pack cannot render into a fresh local directory.",
+        ),
+        policy_gate(
+            "hardened-codex-release-manifest",
+            "validate hardened-codex release manifest",
+            [
+                "python3",
+                "subagents/hardened-codex/scripts/sync_agents.py",
+                "--validate-release-manifest",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["python3"],
+            "Failure means the hardened-codex release manifest is invalid.",
+        ),
+        policy_gate(
+            "hardened-codex-global-dry-run",
+            "hardened-codex global install dry-run",
+            [
+                "python3",
+                "subagents/hardened-codex/scripts/sync_agents.py",
+                "--global",
+                "--all-overlays",
+                "--dry-run",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["python3"],
+            "Failure means global subagent installation planning regressed.",
+        ),
+        policy_gate(
+            "hardened-codex-validate-sources",
+            "hardened-codex source validation",
+            [
+                "python3",
+                "subagents/hardened-codex/scripts/sync_agents.py",
+                "--global",
+                "--all-overlays",
+                "--validate-sources",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["python3"],
+            "Failure means hardened-codex source pack validation regressed.",
+        ),
+        policy_gate(
+            "bootstrap-local-overlays-ignored",
+            "prove private overlay paths stay gitignored",
+            [
+                "bash",
+                "-lc",
+                "for path in subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do git check-ignore -q -- \"$path\" || exit 1; done",
+            ],
+            "docs/runbooks/validation.md#bootstrap-packs",
+            ["bash", "git"],
+            "Failure means private/local overlay paths may be accidentally trackable.",
+        ),
+    ]
+}
+
+fn docs_gates() -> Vec<PolicyGate> {
+    vec![
+        policy_gate(
+            "docs-no-todo",
+            "docs unresolved-marker check",
+            [
+                "bash",
+                "-lc",
+                "! rg -n \"TO[D]O|FIX[M]E\" docs README.md AGENTS.md",
+            ],
+            "docs/runbooks/validation.md#docs",
+            ["bash", "rg"],
+            "Failure means docs contain unresolved TODO/FIXME markers.",
+        ),
+        docs_links_gate(),
+        diff_check_gate(),
+    ]
+}
+
+fn release_gates() -> Vec<PolicyGate> {
+    let mut gates = Vec::new();
+    append_unique_gates(&mut gates, codex_dev_gates());
+    append_unique_gates(&mut gates, codex_dev_tui_gates());
+    append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, docs_gates());
+    append_unique_gates(&mut gates, vec![bootstrap_install_gates()[0].clone()]);
+    append_unique_gates(&mut gates, skills_gates());
+    gates
+}
+
+fn full_local_gates() -> Vec<PolicyGate> {
+    let mut gates = Vec::new();
+    append_unique_gates(&mut gates, codex_dev_gates());
+    append_unique_gates(&mut gates, codex_dev_tui_gates());
+    append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, bootstrap_install_gates());
+    append_unique_gates(&mut gates, skills_gates());
+    append_unique_gates(&mut gates, docs_gates());
+    gates
+}
+
+fn append_unique_gates(target: &mut Vec<PolicyGate>, gates: Vec<PolicyGate>) {
+    let mut seen = target
+        .iter()
+        .map(|gate| gate.id.clone())
+        .collect::<BTreeSet<_>>();
+    for gate in gates {
+        if seen.insert(gate.id.clone()) {
+            target.push(gate);
+        }
+    }
+}
+
+fn cargo_fmt_gate() -> PolicyGate {
+    policy_gate(
+        "cargo-fmt",
+        "Rust workspace formatting",
+        ["cargo", "fmt", "--all", "--check"],
+        "docs/runbooks/validation.md#full-local-gate",
+        ["cargo"],
+        "Failure means Rust formatting drift; run cargo fmt --all and review the diff.",
+    )
+}
+
+fn docs_links_gate() -> PolicyGate {
+    policy_gate(
+        "docs-links",
+        "documentation link check",
+        [
+            "python3",
+            "tools/docs/check_links.py",
+            "docs",
+            "README.md",
+            "AGENTS.md",
+        ],
+        "docs/runbooks/validation.md#docs",
+        ["python3"],
+        "Failure means tracked docs contain broken local links or stale anchors.",
+    )
+}
+
+fn diff_check_gate() -> PolicyGate {
+    policy_gate(
+        "diff-check",
+        "git whitespace check",
+        ["git", "diff", "--check"],
+        "docs/runbooks/validation.md#full-local-gate",
+        ["git"],
+        "Failure means the working diff has whitespace or conflict-marker problems.",
+    )
 }
 
 fn render_pr_record_command(capsule: &Path, source: &Path, checked_at: DateTime<Utc>) -> String {
@@ -978,15 +1483,28 @@ fn render_pr_record_command(capsule: &Path, source: &Path, checked_at: DateTime<
     ])
 }
 
-fn policy_gate<const N: usize>(id: &str, name: &str, command: [&str; N]) -> PolicyGate {
+fn policy_gate<const N: usize, const M: usize>(
+    id: &str,
+    name: &str,
+    command: [&str; N],
+    source: &str,
+    required_tools: [&str; M],
+    failure_interpretation: &str,
+) -> PolicyGate {
     PolicyGate {
         id: id.to_string(),
         name: name.to_string(),
         command: command.iter().map(|part| (*part).to_string()).collect(),
-        source: "docs/runbooks/validation.md#codex-dev-operating-layer".to_string(),
+        source: source.to_string(),
+        working_directory: ".".to_string(),
+        required_tools: required_tools
+            .iter()
+            .map(|tool| (*tool).to_string())
+            .collect(),
         required: true,
         network: false,
         secrets: false,
+        failure_interpretation: failure_interpretation.to_string(),
     }
 }
 
@@ -1021,26 +1539,61 @@ fn pr_control_command_with_manual_input<const N: usize>(
 }
 
 fn resolve_repo_root(capsule_path: &Path, explicit: Option<&Path>) -> Result<PathBuf> {
+    let current_dir = env::current_dir().context("failed to read current directory")?;
+    resolve_repo_root_from(capsule_path, explicit, &current_dir)
+}
+
+fn resolve_repo_root_from(
+    capsule_path: &Path,
+    explicit: Option<&Path>,
+    current_dir: &Path,
+) -> Result<PathBuf> {
     if let Some(root) = explicit {
         return canonicalize_repo_root(root);
     }
 
-    let current_dir = env::current_dir().context("failed to read current directory")?;
-    if let Some(root) = find_repo_root(&current_dir) {
-        return Ok(root);
-    }
+    let current_root = find_repo_root(current_dir);
 
     let capsule_path =
         fs::canonicalize(capsule_path).unwrap_or_else(|_| capsule_path.to_path_buf());
-    if let Some(parent) = capsule_path.parent()
-        && let Some(root) = find_repo_root(parent)
-    {
-        return Ok(root);
+    let capsule_root = capsule_path.parent().and_then(find_repo_root);
+    match (capsule_root, current_root) {
+        (Some(capsule_root), Some(current_root)) if capsule_root != current_root => {
+            bail!(
+                "capsule path belongs to repo root {} but current directory is under {}; pass --repo-root to choose explicitly",
+                capsule_root.display(),
+                current_root.display()
+            );
+        }
+        (Some(capsule_root), _) => return Ok(capsule_root),
+        (None, Some(current_root)) => return Ok(current_root),
+        (None, None) => {}
     }
 
     bail!(
         "failed to discover repository root from current directory or capsule path; run from the repo or pass --repo-root"
     );
+}
+
+fn gate_working_directory(repo_root: &Path, gate: &PolicyGate) -> Result<PathBuf> {
+    let relative = Path::new(&gate.working_directory);
+    if relative.is_absolute()
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        bail!(
+            "gate {} has unsafe working_directory {:?}",
+            gate.id,
+            gate.working_directory
+        );
+    }
+    Ok(repo_root.join(relative))
 }
 
 fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
@@ -1087,6 +1640,20 @@ fn plan_gate(gate: &PolicyGate) -> PolicyGateResult {
     gate_result(gate, GateStatus::Planned, None, None, None, None)
 }
 
+fn gate_skip_reason(
+    gate: &PolicyGate,
+    allow_network: bool,
+    allow_secrets: bool,
+) -> Option<&'static str> {
+    if gate.network && !allow_network {
+        Some("gate requires network and --allow-network was not set")
+    } else if gate.secrets && !allow_secrets {
+        Some("gate requires secrets and --allow-secrets was not set")
+    } else {
+        None
+    }
+}
+
 fn skip_gate(gate: &PolicyGate, reason: &str) -> PolicyGateResult {
     gate_result(
         gate,
@@ -1113,7 +1680,21 @@ fn execute_gate(gate: &PolicyGate, repo_root: Option<&Path>) -> PolicyGateResult
     let mut command = Command::new(program);
     command.args(args);
     if let Some(repo_root) = repo_root {
-        command.current_dir(repo_root);
+        match gate_working_directory(repo_root, gate) {
+            Ok(working_directory) => {
+                command.current_dir(working_directory);
+            }
+            Err(error) => {
+                return gate_result(
+                    gate,
+                    GateStatus::Failed,
+                    None,
+                    Some(error.to_string()),
+                    None,
+                    None,
+                );
+            }
+        }
     }
 
     match command.output() {
@@ -1169,10 +1750,13 @@ fn gate_result(
 
 fn record_policy_run(
     capsule_path: &Path,
+    manifest: &PolicyManifest,
     results: &[PolicyGateResult],
     checked_at: DateTime<Utc>,
 ) -> Result<()> {
     ensure_regular_contract_files(capsule_path)?;
+    write_json(capsule_path.join("policy.json"), manifest)?;
+
     let mut verification: Verification = read_json(&capsule_path.join("verification.json"))?;
     verification.required = results
         .iter()
@@ -1340,6 +1924,7 @@ mod tests {
                 profile: PolicyProfile::CodexDev,
                 execute: false,
                 allow_network: false,
+                allow_secrets: false,
                 keep_going: false,
                 checked_at: None,
             },
@@ -1366,6 +1951,239 @@ mod tests {
     }
 
     #[test]
+    fn policy_run_persists_selected_profile_manifest() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().to_path_buf()))
+            .expect("init capsule")
+            .path;
+        let result = run_policy_gates(
+            PolicyRunArgs {
+                capsule: capsule.clone(),
+                repo_root: None,
+                profile: PolicyProfile::FullLocal,
+                execute: false,
+                allow_network: false,
+                allow_secrets: false,
+                keep_going: false,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect("policy full local dry run");
+
+        let persisted: PolicyManifest = read_json(&capsule.join("policy.json")).expect("policy");
+        assert_eq!(persisted.profile, PolicyProfile::FullLocal);
+        assert_eq!(persisted.gates.len(), result.gates.len());
+        assert_eq!(
+            persisted.gates.last().map(|gate| gate.id.as_str()),
+            result.gates.last().map(|gate| gate.id.as_str())
+        );
+    }
+
+    #[test]
+    fn policy_manifest_profiles_are_explicit_local_gates() {
+        for profile in all_policy_profiles() {
+            let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
+
+            assert_eq!(manifest.profile, profile);
+            assert!(!manifest.gates.is_empty(), "{profile} should have gates");
+            for gate in &manifest.gates {
+                assert!(!gate.id.is_empty(), "{profile} has an empty gate id");
+                assert!(
+                    !gate.command.is_empty(),
+                    "{profile} gate {} has no command",
+                    gate.id
+                );
+                assert!(
+                    !gate.source.is_empty(),
+                    "{profile} gate {} has no source",
+                    gate.id
+                );
+                assert_eq!(gate.working_directory, ".", "{profile} gate {}", gate.id);
+                assert!(
+                    !gate.required_tools.is_empty(),
+                    "{profile} gate {} has no required_tools",
+                    gate.id
+                );
+                assert!(
+                    !gate.failure_interpretation.is_empty(),
+                    "{profile} gate {} has no failure_interpretation",
+                    gate.id
+                );
+                assert!(
+                    !gate.network && !gate.secrets,
+                    "{profile} gate {} unexpectedly requires network or secrets",
+                    gate.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn policy_manifest_profile_gate_ids_are_stable() {
+        assert_profile_ids(
+            PolicyProfile::CodexDev,
+            &[
+                "cargo-fmt",
+                "codex-dev-core-clippy",
+                "codex-dev-clippy",
+                "codex-dev-core-check",
+                "codex-dev-check",
+                "codex-dev-core-test",
+                "codex-dev-test",
+                "codex-dev-help",
+                "codex-dev-policy-manifest",
+                "codex-dev-pr-plan-smoke",
+                "docs-links",
+                "diff-check",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::CodexDevTui,
+            &[
+                "cargo-fmt",
+                "codex-dev-tui-clippy",
+                "codex-dev-tui-check",
+                "codex-dev-tui-test",
+                "codex-dev-tui-help",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::CodexResearch,
+            &[
+                "cargo-fmt",
+                "codex-research-clippy",
+                "codex-research-check",
+                "codex-research-test",
+                "codex-research-doctor",
+                "codex-research-eval",
+                "codex-research-eval-list",
+                "codex-research-eval-strict",
+                "codex-research-plan-quick",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::Skills,
+            &[
+                "skills-quick-validate-all",
+                "python-helpers-compile",
+                "subagent-templates-validate",
+                "subspawn-roles-validate",
+                "subspawn-plan-research-smoke",
+                "skill-subagent-eval",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::BootstrapInstall,
+            &[
+                "bootstrap-pack-validate",
+                "bootstrap-pack-render-smoke",
+                "hardened-codex-release-manifest",
+                "hardened-codex-global-dry-run",
+                "hardened-codex-validate-sources",
+                "bootstrap-local-overlays-ignored",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::Docs,
+            &["docs-no-todo", "docs-links", "diff-check"],
+        );
+        assert_profile_ids(
+            PolicyProfile::Release,
+            &[
+                "cargo-fmt",
+                "codex-dev-core-clippy",
+                "codex-dev-clippy",
+                "codex-dev-core-check",
+                "codex-dev-check",
+                "codex-dev-core-test",
+                "codex-dev-test",
+                "codex-dev-help",
+                "codex-dev-policy-manifest",
+                "codex-dev-pr-plan-smoke",
+                "docs-links",
+                "diff-check",
+                "codex-dev-tui-clippy",
+                "codex-dev-tui-check",
+                "codex-dev-tui-test",
+                "codex-dev-tui-help",
+                "codex-research-clippy",
+                "codex-research-check",
+                "codex-research-test",
+                "codex-research-doctor",
+                "codex-research-eval",
+                "codex-research-eval-list",
+                "codex-research-eval-strict",
+                "codex-research-plan-quick",
+                "docs-no-todo",
+                "bootstrap-pack-validate",
+                "skills-quick-validate-all",
+                "python-helpers-compile",
+                "subagent-templates-validate",
+                "subspawn-roles-validate",
+                "subspawn-plan-research-smoke",
+                "skill-subagent-eval",
+            ],
+        );
+        assert_profile_ids(
+            PolicyProfile::FullLocal,
+            &[
+                "cargo-fmt",
+                "codex-dev-core-clippy",
+                "codex-dev-clippy",
+                "codex-dev-core-check",
+                "codex-dev-check",
+                "codex-dev-core-test",
+                "codex-dev-test",
+                "codex-dev-help",
+                "codex-dev-policy-manifest",
+                "codex-dev-pr-plan-smoke",
+                "docs-links",
+                "diff-check",
+                "codex-dev-tui-clippy",
+                "codex-dev-tui-check",
+                "codex-dev-tui-test",
+                "codex-dev-tui-help",
+                "codex-research-clippy",
+                "codex-research-check",
+                "codex-research-test",
+                "codex-research-doctor",
+                "codex-research-eval",
+                "codex-research-eval-list",
+                "codex-research-eval-strict",
+                "codex-research-plan-quick",
+                "bootstrap-pack-validate",
+                "bootstrap-pack-render-smoke",
+                "hardened-codex-release-manifest",
+                "hardened-codex-global-dry-run",
+                "hardened-codex-validate-sources",
+                "bootstrap-local-overlays-ignored",
+                "skills-quick-validate-all",
+                "python-helpers-compile",
+                "subagent-templates-validate",
+                "subspawn-roles-validate",
+                "subspawn-plan-research-smoke",
+                "skill-subagent-eval",
+                "docs-no-todo",
+            ],
+        );
+    }
+
+    #[test]
+    fn policy_manifest_profile_snapshots_are_stable() {
+        let actual = all_policy_profiles()
+            .iter()
+            .map(|profile| profile_snapshot(*profile))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert_eq!(
+            actual.trim(),
+            include_str!("../tests/snapshots/policy_profiles.tsv").trim()
+        );
+    }
+
+    #[test]
     fn policy_run_keeps_capsule_updated_at_monotonic() {
         let temp = tempdir().expect("tempdir");
         let mut args = init_args(temp.path().to_path_buf());
@@ -1379,6 +2197,7 @@ mod tests {
                 profile: PolicyProfile::CodexDev,
                 execute: false,
                 allow_network: false,
+                allow_secrets: false,
                 keep_going: false,
                 checked_at: None,
             },
@@ -1413,6 +2232,7 @@ mod tests {
                 profile: PolicyProfile::CodexDev,
                 execute: false,
                 allow_network: false,
+                allow_secrets: false,
                 keep_going: false,
                 checked_at: None,
             },
@@ -1437,9 +2257,12 @@ mod tests {
             name: "missing command".to_string(),
             command: vec!["codex-dev-command-that-does-not-exist".to_string()],
             source: "test".to_string(),
+            working_directory: ".".to_string(),
+            required_tools: vec!["codex-dev-command-that-does-not-exist".to_string()],
             required: true,
             network: false,
             secrets: false,
+            failure_interpretation: "fixture failure".to_string(),
         };
 
         let result = execute_gate(&missing, None);
@@ -1467,14 +2290,65 @@ mod tests {
                     .to_string(),
             ],
             source: "test".to_string(),
+            working_directory: ".".to_string(),
+            required_tools: vec!["python3".to_string()],
             required: true,
             network: false,
             secrets: false,
+            failure_interpretation: "fixture failure".to_string(),
         };
 
         let result = execute_gate(&gate, Some(temp.path()));
 
         assert_eq!(result.status, GateStatus::Passed);
+    }
+
+    #[test]
+    fn policy_repo_root_resolution_rejects_mismatched_capsule_and_current_repos() {
+        let temp = tempdir().expect("tempdir");
+        let capsule_repo = temp.path().join("capsule-repo");
+        let current_repo = temp.path().join("current-repo");
+        write_repo_fixture(&capsule_repo);
+        write_repo_fixture(&current_repo);
+        let capsule = capsule_repo.join(".codex/tasks/example");
+        fs::create_dir_all(&capsule).expect("capsule dir");
+        let current_dir = current_repo.join("nested");
+        fs::create_dir_all(&current_dir).expect("current dir");
+
+        let error = resolve_repo_root_from(&capsule, None, &current_dir)
+            .expect_err("mismatched roots rejected");
+
+        assert!(error.to_string().contains("pass --repo-root"), "{error:#}");
+    }
+
+    #[test]
+    fn policy_gate_skip_reason_requires_secret_opt_in() {
+        let mut gate = cargo_fmt_gate();
+        gate.secrets = true;
+
+        assert_eq!(
+            gate_skip_reason(&gate, false, false),
+            Some("gate requires secrets and --allow-secrets was not set")
+        );
+        assert_eq!(gate_skip_reason(&gate, false, true), None);
+    }
+
+    #[test]
+    fn policy_execution_rejects_unsafe_working_directory() {
+        let temp = tempdir().expect("tempdir");
+        let mut gate = cargo_fmt_gate();
+        gate.working_directory = "../outside".to_string();
+
+        let result = execute_gate(&gate, Some(temp.path()));
+
+        assert_eq!(result.status, GateStatus::Failed);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .expect("error")
+                .contains("unsafe working_directory")
+        );
     }
 
     #[test]
@@ -1488,9 +2362,12 @@ mod tests {
                 "import sys; sys.stderr.write('boom'); raise SystemExit(9)".to_string(),
             ],
             source: "test".to_string(),
+            working_directory: ".".to_string(),
+            required_tools: vec!["python3".to_string()],
             required: true,
             network: false,
             secrets: false,
+            failure_interpretation: "fixture failure".to_string(),
         };
 
         let result = execute_gate(&gate, None);
@@ -1498,5 +2375,55 @@ mod tests {
         assert_eq!(result.status, GateStatus::Failed);
         assert_eq!(result.exit_code, Some(9));
         assert_eq!(result.stderr.as_deref(), Some("boom"));
+    }
+
+    fn write_repo_fixture(root: &Path) {
+        fs::create_dir_all(root.join("docs/runbooks")).expect("docs dir");
+        fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(root.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation doc");
+    }
+
+    fn all_policy_profiles() -> [PolicyProfile; 8] {
+        [
+            PolicyProfile::CodexDev,
+            PolicyProfile::CodexDevTui,
+            PolicyProfile::CodexResearch,
+            PolicyProfile::Skills,
+            PolicyProfile::BootstrapInstall,
+            PolicyProfile::Docs,
+            PolicyProfile::Release,
+            PolicyProfile::FullLocal,
+        ]
+    }
+
+    fn assert_profile_ids(profile: PolicyProfile, expected: &[&str]) {
+        let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
+        let ids = manifest
+            .gates
+            .iter()
+            .map(|gate| gate.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, expected, "{profile} profile gate ids drifted");
+    }
+
+    fn profile_snapshot(profile: PolicyProfile) -> String {
+        let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
+        let mut lines = vec![format!("== {profile} ==")];
+        lines.extend(manifest.gates.iter().map(|gate| {
+            format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                gate.id,
+                serde_json::to_string(&gate.command).expect("command json"),
+                gate.source,
+                gate.working_directory,
+                serde_json::to_string(&gate.required_tools).expect("tools json"),
+                gate.required,
+                gate.network,
+                gate.secrets,
+                gate.failure_interpretation
+            )
+        }));
+        lines.join("\n")
     }
 }

@@ -89,7 +89,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.p
 PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
-git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
+for path in \
+  subagents/hardened-codex/overlays.local.json \
+  subagents/hardened-codex/roles.local.json \
+  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
+done
 git diff --check
 ```
 
