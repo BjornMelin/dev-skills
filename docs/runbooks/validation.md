@@ -15,6 +15,28 @@ cargo run -q -p codex-dev -- --json policy docs-check
 
 Unmarked prose and workflow notes are human-owned documentation.
 
+## Local Release Supply Chain
+
+Use [Local Release and Supply Chain](local-release-supply-chain.md) before
+global CLI install handoff, release assets, or Cargo metadata changes.
+
+```bash
+cargo metadata --locked --no-deps --format-version 1
+cargo tree -d --target all
+cargo deny check bans licenses sources
+cargo deny check advisories
+cargo audit
+cargo package --list -p codex-dev-core
+cargo package --list -p codex-dev
+cargo package --list -p codex-dev-tui
+cargo package --list -p codex-research
+```
+
+`cargo deny check advisories` and `cargo audit` are networked release evidence
+unless their advisory databases are already cached. The manifest-backed
+`release` and `full_local` policy profiles keep only local, non-secret
+supply-chain gates by default.
+
 ## Rust CLI
 
 Run after any change under `crates/codex-research/` or root Cargo files:
@@ -60,6 +82,13 @@ files, or the `codex-dev` architecture/spec docs:
 
 ```bash
 cargo fmt --all --check
+cargo metadata --locked --no-deps --format-version 1
+cargo tree -d --target all
+cargo deny check bans licenses sources
+cargo package --list -p codex-dev-core
+cargo package --list -p codex-dev
+cargo package --list -p codex-dev-tui
+cargo package --list -p codex-research
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo check -p codex-dev-core

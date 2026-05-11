@@ -316,10 +316,10 @@ The default profile is `codex_dev`. Supported profiles are:
 - `full_local`
 
 The manifest is versioned as `codex-dev.policy-gates.v1` and ties each gate to
-its source in `docs/runbooks/validation.md`. Each gate records the command,
-working directory, required tools, required/network/secrets flags, and failure
-interpretation. Built-in profiles are local by default and do not require
-secrets or network access.
+its tracked runbook source. Each gate records the command, working directory,
+required tools, required/network/secrets flags, and failure interpretation.
+Built-in profiles are local by default and do not require secrets or network
+access; networked advisory checks stay explicit in the release runbook.
 
 ## policy docs-check
 
@@ -649,4 +649,5 @@ cargo run -q -p codex-dev -- --json pr record --help
 ```
 
 Use [Validation](../runbooks/validation.md) for the canonical local matrix and
-task capsule smoke.
+task capsule smoke. Use [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
+for release/install supply-chain evidence.

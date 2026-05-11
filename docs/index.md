@@ -56,6 +56,9 @@ out of version control.
   data model, provider behavior, and extension points.
 - [Validation](runbooks/validation.md): local gates including research evals,
   bootstrap pack rendering, and hardened subagent smoke checks.
+- [Local Release and Supply Chain](runbooks/local-release-supply-chain.md):
+  MSRV, cargo-deny, audit, package dry-run, duplicate dependency, and global
+  local install baseline for the Rust CLIs.
 - [codex-research v0.2 Spec](specs/codex-research-v0.2.md): implemented
   follow-up plan covering config, budgets, GitHub hydration, source cache,
   privacy, evals, and research-agent contracts.
@@ -88,6 +91,8 @@ out of version control.
 
 - [Validation](runbooks/validation.md): required checks for docs, skills, and
   Rust changes.
+- [Local Release and Supply Chain](runbooks/local-release-supply-chain.md):
+  audited local release and install checks for the Rust CLIs.
 - [Troubleshooting](runbooks/troubleshooting.md): common failures and recovery
   steps.
 - [Maintenance](runbooks/maintenance.md): how to update templates, rebuild

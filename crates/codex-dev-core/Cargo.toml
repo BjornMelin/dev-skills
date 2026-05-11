@@ -1,7 +1,9 @@
 [package]
 name = "codex-dev-core"
 version = "0.1.0"
+publish = false
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Shared codex-dev task capsule contracts and read models"

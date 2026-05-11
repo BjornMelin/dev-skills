@@ -1,7 +1,9 @@
 [package]
 name = "codex-research"
 version = "0.2.0"
+publish = false
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Evidence-first research helper for Codex skills and subagents"

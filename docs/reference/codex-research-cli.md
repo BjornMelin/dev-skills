@@ -9,9 +9,14 @@ From the repository root:
 
 ```bash
 cargo build -p codex-research
-cargo install --path crates/codex-research --force
+cargo install --path crates/codex-research --locked --force
 codex-research --help
 ```
+
+For the full global install/update baseline across `codex-research`,
+`codex-dev`, and `codex-dev-tui`, use the
+[Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
+runbook.
 
 The binary supports `--json` globally for machine-readable output where
 supported, and `--config <path>` to load an explicit TOML config.

@@ -1,0 +1,43 @@
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+yanked = "deny"
+unmaintained = "workspace"
+unsound = "workspace"
+ignore = []
+unused-ignored-advisory = "deny"
+
+[licenses]
+confidence-threshold = 0.95
+include-dev = true
+unused-allowed-license = "warn"
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "simplest-path"
+skip = [
+    { crate = "core-foundation@0.9.4", reason = "Accepted target-specific duplicate until reqwest TLS/platform verifier dependencies converge." },
+    { crate = "getrandom@0.2.17", reason = "Accepted transition duplicate until directories/redox_users completes the getrandom 0.3 migration." },
+    { crate = "hashbrown@0.16.1", reason = "Accepted transitive duplicate until rusqlite/hashlink and ratatui/lru/kasuari converge with indexmap." },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

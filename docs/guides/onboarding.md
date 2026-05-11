@@ -63,9 +63,13 @@ From the repository root:
 
 ```bash
 cargo build -p codex-research
-cargo install --path crates/codex-research --force
+cargo install --path crates/codex-research --locked --force
 codex-research --help
 ```
+
+For installing or updating every local Rust CLI, use the
+[Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
+runbook.
 
 If you do not install the binary, the skill wrapper can run it from this repo:
 
