@@ -247,21 +247,29 @@ planning. Each gate includes:
 - `name`
 - `command`
 - `source`
+- `working_directory`
+- `required_tools`
 - `required`
 - `network`
 - `secrets`
+- `failure_interpretation`
 
 The default `codex_dev` profile owns the executable operating-layer gate
-manifest: formatting, `codex-dev-core` and `codex-dev` Rust gates, CLI help
-smoke, docs links, and whitespace checks. The broader validation runbook remains
-the canonical human matrix for the exact command list plus TUI checks, render
-smoke, bootstrap packs, subagent templates, and research gates. Dry-run policy
-checks record `planned` gate status in `verification.json`; executed gates
-record `passed`, `failed`, or `skipped`.
+manifest: formatting, `codex-dev-core` and `codex-dev` Rust gates, CLI help,
+manifest and PR-plan smokes, docs links, and whitespace checks. Additional
+profiles are `codex_dev_tui`, `codex_research`, `skills`, `bootstrap_install`,
+`docs`, `release`, and `full_local`. Profiles are branch-selection helpers for
+agents; they do not replace the validation runbook as the human source of truth.
+Dry-run policy checks record `planned` gate status in `verification.json`;
+executed gates record `passed`, `failed`, or `skipped`.
 
 Executed gates must run from a discovered or explicit repository root so
 repo-relative commands produce stable results whether invoked from the root, a
 subdirectory, or an installed binary with `--repo-root`.
+Execution rejects ambiguous capsule/current-directory repo mismatches unless
+`--repo-root` is explicit. Gate `working_directory` values are repo-relative and
+must not escape the selected root. Gates marked `network` or `secrets` require
+explicit execution opt-in flags before they run.
 
 ### subagents.json
 

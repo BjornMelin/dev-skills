@@ -52,7 +52,8 @@ cargo check -p codex-dev
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
-cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
@@ -164,10 +165,27 @@ the repo-native commands from the manifest; the default dry run records the
 planned gate snapshot in the capsule without running commands.
 Execution discovers the repository root from the current directory or capsule
 path. Pass `--repo-root <path>` when running an installed binary from outside
-the repository.
-The `codex_dev` policy profile covers core `codex-dev` CLI gates only. Use this
-runbook for the broader human validation matrix, including TUI render smoke,
-bootstrap packs, subagent templates, and research gates.
+the repository. If capsule-path and current-directory discovery point at
+different repos, execution fails until `--repo-root` makes the target explicit.
+Gate working directories are repo-relative and cannot escape the selected root.
+Policy profiles are branch-selection helpers, not automatic release gates:
+
+| Profile | Use for |
+| --- | --- |
+| `codex_dev` | `crates/codex-dev-core/`, `crates/codex-dev/`, and operating-layer docs |
+| `codex_dev_tui` | `crates/codex-dev-tui/` changes and TUI docs |
+| `codex_research` | `crates/codex-research/` and research CLI docs |
+| `skills` | `skills/`, subagent templates, and Python helper changes |
+| `bootstrap_install` | bootstrap packs and global subagent install sync changes |
+| `docs` | docs-only updates |
+| `release` | audited local release readiness before publishing/install handoff |
+| `full_local` | broad local pre-release or high-risk cross-surface changes |
+
+Each manifest gate declares its source, command, working directory, required
+tools, network/secrets expectation, and failure interpretation. Built-in
+profiles are local and do not require provider credentials; live provider checks
+stay explicit in their owning runbooks. Executed gates marked `network` require
+`--allow-network`; executed gates marked `secrets` require `--allow-secrets`.
 
 Keep `codex-research` gates scoped to research changes.
 
@@ -213,7 +231,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.p
 PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
-git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
+for path in \
+  subagents/hardened-codex/overlays.local.json \
+  subagents/hardened-codex/roles.local.json \
+  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
+done
 git diff --check
 ```
 
@@ -293,7 +316,14 @@ cargo check -p codex-dev
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
-cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev_tui
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_research
+cargo run -q -p codex-dev -- --json policy manifest --profile skills
+cargo run -q -p codex-dev -- --json policy manifest --profile bootstrap_install
+cargo run -q -p codex-dev -- --json policy manifest --profile docs
+cargo run -q -p codex-dev -- --json policy manifest --profile release
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui
@@ -337,7 +367,12 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
-git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
+for path in \
+  subagents/hardened-codex/overlays.local.json \
+  subagents/hardened-codex/roles.local.json \
+  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
+done
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json
 python3 tools/eval/skill_subagent_eval.py --json

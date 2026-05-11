@@ -11,7 +11,7 @@ Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, #42, and #43.
+Tracking: #20, #22, #23, #25, #42, #43, and #44.
 
 ## Installation
 
@@ -294,13 +294,26 @@ files before validation or writing.
 Print the built-in repo-native gate manifest:
 
 ```bash
-cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 ```
 
-The default profile is `codex_dev`. The manifest is versioned as
-`codex-dev.policy-gates.v1` and ties each gate to its source in
-`docs/runbooks/validation.md`. The default profile contains only local gates
-that do not require secrets or network access.
+The default profile is `codex_dev`. Supported profiles are:
+
+- `codex_dev`
+- `codex_dev_tui`
+- `codex_research`
+- `skills`
+- `bootstrap_install`
+- `docs`
+- `release`
+- `full_local`
+
+The manifest is versioned as `codex-dev.policy-gates.v1` and ties each gate to
+its source in `docs/runbooks/validation.md`. Each gate records the command,
+working directory, required tools, required/network/secrets flags, and failure
+interpretation. Built-in profiles are local by default and do not require
+secrets or network access.
 
 ## policy run
 
@@ -319,17 +332,22 @@ Execute gates explicitly:
 ```bash
 cargo run -q -p codex-dev -- --json policy run \
   --capsule .codex/tasks/<id> \
+  --profile codex_dev \
   --execute
 ```
 
 Executed required-gate failures set `ok: false` and exit nonzero. Use
 `--keep-going` to continue after a failed required gate. Gates marked as
-network-using are skipped unless `--allow-network` is passed; the built-in
-`codex_dev` profile currently has no network or secret gates.
+network-using are skipped unless `--allow-network` is passed. Gates marked as
+secret-using are skipped unless `--allow-secrets` is passed. The built-in local
+profiles currently have no network or secret gates.
 
 Execution discovers the repository root from the current directory or capsule
 path before running repo-native commands. Pass `--repo-root <path>` for
-installed-binary workflows where discovery would be ambiguous.
+installed-binary workflows where discovery would be ambiguous. If the capsule
+path is inside one repo and the current directory is inside another, execution
+fails until `--repo-root` makes the target explicit. Gate `working_directory`
+values are repo-relative and cannot escape the selected root.
 
 ## pr plan
 
@@ -413,7 +431,8 @@ cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> --kind decision --summary "fixture decision"
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
-cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 ```
 

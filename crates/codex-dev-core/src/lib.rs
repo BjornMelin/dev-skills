@@ -41,6 +41,13 @@ pub enum CapsuleStatus {
 #[serde(rename_all = "snake_case")]
 pub enum PolicyProfile {
     CodexDev,
+    CodexDevTui,
+    CodexResearch,
+    Skills,
+    BootstrapInstall,
+    Docs,
+    Release,
+    FullLocal,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -472,9 +479,15 @@ pub struct PolicyGate {
     pub name: String,
     pub command: Vec<String>,
     pub source: String,
+    #[serde(default = "default_policy_working_directory")]
+    pub working_directory: String,
+    #[serde(default = "default_policy_required_tools")]
+    pub required_tools: Vec<String>,
     pub required: bool,
     pub network: bool,
     pub secrets: bool,
+    #[serde(default = "default_policy_failure_interpretation")]
+    pub failure_interpretation: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1112,12 +1125,10 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         );
     }
     if can_validate_contract_file("policy.json", &missing_files, &invalid_contract_files) {
-        validate_schema_file::<PolicyManifest, _>(
-            &path.join("policy.json"),
-            POLICY_GATES_SCHEMA,
-            |value| &value.schema,
-            &mut errors,
-        );
+        match validate_policy_manifest(&path.join("policy.json")) {
+            Ok(file_errors) => errors.extend(file_errors),
+            Err(error) => errors.push(format!("invalid policy.json: {error:#}")),
+        }
     }
 
     Ok(ValidationResult {
@@ -1170,6 +1181,84 @@ fn validate_contract_file_paths(path: &Path, errors: &mut Vec<String>) -> BTreeS
         }
     }
     invalid
+}
+
+fn default_policy_working_directory() -> String {
+    ".".to_string()
+}
+
+fn default_policy_required_tools() -> Vec<String> {
+    vec!["legacy-unspecified".to_string()]
+}
+
+fn default_policy_failure_interpretation() -> String {
+    "Legacy v1 policy manifest omitted failure interpretation.".to_string()
+}
+
+fn validate_policy_manifest(path: &Path) -> Result<Vec<String>> {
+    let manifest = read_json::<PolicyManifest>(path)?;
+    let mut errors = Vec::new();
+    if manifest.schema != POLICY_GATES_SCHEMA {
+        errors.push(format!("policy.json schema must be {POLICY_GATES_SCHEMA}"));
+    }
+    validate_policy_manifest_value(&manifest, &mut errors);
+    Ok(errors)
+}
+
+fn validate_policy_manifest_value(manifest: &PolicyManifest, errors: &mut Vec<String>) {
+    if manifest.gates.is_empty() {
+        errors.push("policy gates must not be empty".to_string());
+    }
+    let mut seen = BTreeSet::new();
+    for (index, gate) in manifest.gates.iter().enumerate() {
+        let prefix = format!("policy.gates[{index}]");
+        if let Err(error) = validate_stable_id(&format!("{prefix}.id"), &gate.id) {
+            errors.push(error.to_string());
+        }
+        if !gate.id.is_empty() && !seen.insert(gate.id.as_str()) {
+            errors.push(format!("{prefix}.id {} is duplicated", gate.id));
+        }
+        validate_non_empty_text(&format!("{prefix}.name"), &gate.name, errors);
+        validate_required_repeated_text(&format!("{prefix}.command"), &gate.command, errors);
+        validate_non_empty_text(&format!("{prefix}.source"), &gate.source, errors);
+        validate_required_repeated_text(
+            &format!("{prefix}.required_tools"),
+            &gate.required_tools,
+            errors,
+        );
+        validate_non_empty_text(
+            &format!("{prefix}.failure_interpretation"),
+            &gate.failure_interpretation,
+            errors,
+        );
+        validate_policy_working_directory(
+            &format!("{prefix}.working_directory"),
+            &gate.working_directory,
+            errors,
+        );
+    }
+}
+
+fn validate_policy_working_directory(field: &str, value: &str, errors: &mut Vec<String>) {
+    validate_non_empty_text(field, value, errors);
+    if value.trim().is_empty() {
+        return;
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        errors.push(format!("{field} must be a repo-relative path"));
+        return;
+    }
+    if path.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        errors.push(format!(
+            "{field} must stay within the repository and cannot contain '..'"
+        ));
+    }
 }
 
 pub fn capsule_status(path: &Path) -> Result<StatusResult> {
@@ -2189,6 +2278,13 @@ impl std::fmt::Display for PolicyProfile {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PolicyProfile::CodexDev => formatter.write_str("codex_dev"),
+            PolicyProfile::CodexDevTui => formatter.write_str("codex_dev_tui"),
+            PolicyProfile::CodexResearch => formatter.write_str("codex_research"),
+            PolicyProfile::Skills => formatter.write_str("skills"),
+            PolicyProfile::BootstrapInstall => formatter.write_str("bootstrap_install"),
+            PolicyProfile::Docs => formatter.write_str("docs"),
+            PolicyProfile::Release => formatter.write_str("release"),
+            PolicyProfile::FullLocal => formatter.write_str("full_local"),
         }
     }
 }
@@ -2199,8 +2295,15 @@ impl FromStr for PolicyProfile {
     fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "codex_dev" => Ok(Self::CodexDev),
+            "codex_dev_tui" => Ok(Self::CodexDevTui),
+            "codex_research" => Ok(Self::CodexResearch),
+            "skills" => Ok(Self::Skills),
+            "bootstrap_install" => Ok(Self::BootstrapInstall),
+            "docs" => Ok(Self::Docs),
+            "release" => Ok(Self::Release),
+            "full_local" => Ok(Self::FullLocal),
             _ => Err(format!(
-                "invalid policy profile {value:?}; expected codex_dev"
+                "invalid policy profile {value:?}; expected codex_dev, codex_dev_tui, codex_research, skills, bootstrap_install, docs, release, or full_local"
             )),
         }
     }
@@ -2366,9 +2469,12 @@ mod tests {
                 name: "test gate".to_string(),
                 command: vec!["fixture-command".to_string()],
                 source: "test".to_string(),
+                working_directory: ".".to_string(),
+                required_tools: vec!["fixture-command".to_string()],
                 required: true,
                 network: false,
                 secrets: false,
+                failure_interpretation: "fixture failure".to_string(),
             }],
         }
     }
@@ -2509,7 +2615,16 @@ mod tests {
         assert_json_keys(
             &policy["gates"][0],
             &[
-                "id", "name", "command", "source", "required", "network", "secrets",
+                "id",
+                "name",
+                "command",
+                "source",
+                "working_directory",
+                "required_tools",
+                "required",
+                "network",
+                "secrets",
+                "failure_interpretation",
             ],
         );
 
@@ -2775,6 +2890,69 @@ mod tests {
                 .errors
                 .iter()
                 .any(|error| { error == &format!("pr.json schema must be {PR_SCHEMA}") })
+        );
+    }
+
+    #[test]
+    fn validate_accepts_legacy_policy_manifest_without_gate_metadata() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let mut policy: Value = read_json(&capsule.join("policy.json")).expect("policy json");
+        let gate = policy["gates"][0].as_object_mut().expect("gate object");
+        gate.remove("working_directory");
+        gate.remove("required_tools");
+        gate.remove("failure_interpretation");
+        write_json(capsule.join("policy.json"), &policy).expect("write legacy policy");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(validation.valid, "{:?}", validation.errors);
+    }
+
+    #[test]
+    fn validate_rejects_invalid_policy_manifest_semantics() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        fs::write(
+            capsule.join("policy.json"),
+            serde_json::to_string_pretty(&json!({
+                "schema": POLICY_GATES_SCHEMA,
+                "profile": "codex_dev",
+                "generated_at": "2026-05-09T04:00:00Z",
+                "gates": [{
+                    "id": "bad gate",
+                    "name": "",
+                    "command": [],
+                    "source": "",
+                    "working_directory": "../outside",
+                    "required_tools": [],
+                    "required": true,
+                    "network": false,
+                    "secrets": false,
+                    "failure_interpretation": ""
+                }]
+            }))
+            .expect("policy json"),
+        )
+        .expect("write policy");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(joined.contains("policy.gates[0].id"), "{joined}");
+        assert!(joined.contains("policy.gates[0].command"), "{joined}");
+        assert!(
+            joined.contains("policy.gates[0].required_tools"),
+            "{joined}"
+        );
+        assert!(
+            joined.contains("working_directory must stay within the repository"),
+            "{joined}"
         );
     }
 

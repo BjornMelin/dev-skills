@@ -124,7 +124,8 @@ cargo build -p codex-dev
 cargo build -p codex-dev-core
 cargo build -p codex-dev-tui
 cargo run -q -p codex-dev -- --help
-cargo run -q -p codex-dev -- --json policy manifest
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 ```
 
