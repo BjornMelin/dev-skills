@@ -944,8 +944,35 @@ fn load_evidence_records(path: &Path) -> (Vec<EvidenceRecord>, Vec<String>) {
 
 fn load_pr_agent_actions(path: &Path) -> (Vec<PrAgentHostedActionReport>, Vec<String>) {
     let actions_root = path.join("pr-agent-actions");
-    if !actions_root.exists() {
-        return (Vec::new(), Vec::new());
+    match actions_root.symlink_metadata() {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return (
+                Vec::new(),
+                vec!["pr-agent-actions: symlinks are not supported".to_string()],
+            );
+        }
+        Ok(metadata) if !metadata.file_type().is_dir() => {
+            return (
+                Vec::new(),
+                vec!["pr-agent-actions: expected a directory".to_string()],
+            );
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return (Vec::new(), Vec::new());
+        }
+        Err(error) => {
+            return (
+                Vec::new(),
+                vec![format!(
+                    "pr-agent-actions: {}",
+                    redact_path_text(
+                        &format!("failed to inspect {}: {error}", actions_root.display()),
+                        path
+                    )
+                )],
+            );
+        }
     }
 
     let entries = match fs::read_dir(&actions_root) {
@@ -1043,6 +1070,11 @@ where
             self.armed = false;
         }
     }
+}
+
+#[cfg(all(test, unix))]
+fn symlink_path(target: &Path, link: &Path) {
+    std::os::unix::fs::symlink(target, link).expect("symlink");
 }
 
 impl<F> Drop for RestoreGuard<F>
@@ -2699,8 +2731,6 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn optional_pr_agent_symlinks_render_as_diagnostics() {
-        use std::os::unix::fs::symlink;
-
         let temp = tempdir().expect("tempdir");
         let root = temp.path().join("tasks");
         let capsule = init_test_capsule(
@@ -2721,11 +2751,10 @@ mod tests {
             .expect("state json"),
         )
         .expect("write external state");
-        symlink(
+        symlink_path(
             &external_state_path,
-            capsule.path.join("pr-agent-state.json"),
-        )
-        .expect("state symlink");
+            &capsule.path.join("pr-agent-state.json"),
+        );
 
         let action_dir = capsule.path.join("pr-agent-actions").join("symlink-plan");
         fs::create_dir_all(&action_dir).expect("action dir");
@@ -2736,7 +2765,7 @@ mod tests {
                 .expect("action json"),
         )
         .expect("write external plan");
-        symlink(&external_plan_path, action_dir.join("plan.json")).expect("plan symlink");
+        symlink_path(&external_plan_path, &action_dir.join("plan.json"));
 
         let mut state = WorkbenchState::load(&capsule.path).expect("state");
         state.active_panel = Panel::PrAgent;
@@ -2749,6 +2778,31 @@ mod tests {
         assert!(
             screen.contains("pr-agent-actions/symlink-plan/plan.json: symlinks are not supported")
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_pr_agent_actions_root_renders_as_diagnostic() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let capsule = init_test_capsule(
+            &root,
+            "symlink-pr-agent-actions-root",
+            "Symlink PR agent actions root",
+            CapsuleStatus::InReview,
+            0,
+        );
+        let external_actions = temp.path().join("external-pr-agent-actions");
+        fs::create_dir_all(&external_actions).expect("external actions");
+        symlink_path(&external_actions, &capsule.path.join("pr-agent-actions"));
+
+        let mut state = WorkbenchState::load(&capsule.path).expect("state");
+        state.active_panel = Panel::PrAgent;
+        let screen = render_to_string(&state, 140, 36).expect("render");
+
+        assert!(state.validation.valid);
+        assert!(state.pr_agent_actions.is_empty());
+        assert!(screen.contains("pr-agent-actions: symlinks are not supported"));
     }
 
     #[test]
