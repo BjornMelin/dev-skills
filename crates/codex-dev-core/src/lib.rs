@@ -1678,6 +1678,8 @@ fn normalize_gh_reviews(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvid
             Some((latest_at, latest_index, _))
                 if submitted_at < *latest_at
                     || (submitted_at == *latest_at && index <= *latest_index) => {}
+            Some((_, _, existing_state))
+                if state == "commented" && review_state_is_decisive(existing_state) => {}
             _ => {
                 latest_by_reviewer.insert(reviewer, (submitted_at, index, state));
             }
@@ -1698,6 +1700,10 @@ fn review_author_key(review: &Value, index: usize) -> String {
     json_scalar_key(review.get("id"))
         .map(|id| format!("review:{id}"))
         .unwrap_or_else(|| format!("review-index:{index}"))
+}
+
+fn review_state_is_decisive(state: &str) -> bool {
+    matches!(state, "approved" | "changes_requested")
 }
 
 fn review_decision_from_reviewer_states<'a>(
@@ -1993,6 +1999,19 @@ pub fn recommend_pr_agent_actions(
             reason: "CI state is not final yet".to_string(),
         });
     }
+    let unknown_check_outcomes = pr
+        .checks
+        .iter()
+        .filter(|check| check.status == "completed" && check.conclusion.is_none())
+        .count();
+    if unknown_check_outcomes > 0 {
+        actions.push(PrAgentAction {
+            id: "inspect_check_outcomes".to_string(),
+            priority: PrAgentActionPriority::Required,
+            summary: format!("Inspect {unknown_check_outcomes} check(s) with unknown outcome"),
+            reason: "completed checks require an explicit success, neutral, or skipped conclusion before merge".to_string(),
+        });
+    }
 
     if pr.review_threads.authoritative && pr.review_threads.unresolved > 0 {
         actions.push(PrAgentAction {
@@ -2033,7 +2052,16 @@ pub fn recommend_pr_agent_actions(
             });
             false
         }
-        Some("approved") | None => true,
+        Some("approved") => true,
+        None => {
+            actions.push(PrAgentAction {
+                id: "refresh_review_decision".to_string(),
+                priority: PrAgentActionPriority::Wait,
+                summary: "Refresh review decision before merge".to_string(),
+                reason: "merge readiness requires an explicit review decision".to_string(),
+            });
+            false
+        }
         Some(other) => {
             actions.push(PrAgentAction {
                 id: "inspect_review_decision".to_string(),
@@ -2088,11 +2116,13 @@ pub fn recommend_pr_agent_actions(
     if actions.is_empty()
         && pr.state == "open"
         && pr.checks.iter().all(|check| {
-            matches!(
-                check.conclusion.as_deref(),
-                Some("success" | "neutral" | "skipped") | None
-            )
+            check.status == "completed"
+                && matches!(
+                    check.conclusion.as_deref(),
+                    Some("success" | "neutral" | "skipped")
+                )
         })
+        && unknown_check_outcomes == 0
         && pr.review_threads.authoritative
         && pr.review_threads.unresolved == 0
         && review_decision_ready
@@ -4209,9 +4239,15 @@ mod tests {
                 },
                 {
                     "id": 3,
-                    "user": { "login": "bob" },
+                    "user": { "login": "alice" },
                     "state": "COMMENTED",
                     "submitted_at": "2026-05-09T06:00:00Z"
+                },
+                {
+                    "id": 4,
+                    "user": { "login": "bob" },
+                    "state": "COMMENTED",
+                    "submitted_at": "2026-05-09T07:00:00Z"
                 }
             ]))
             .expect("fixture json"),
@@ -4224,6 +4260,45 @@ mod tests {
         let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
             .expect("record reviews");
         assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
+    }
+
+    #[test]
+    fn gh_reviews_keep_change_request_across_later_comment() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("reviews")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-reviews.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                {
+                    "id": 1,
+                    "user": { "login": "alice" },
+                    "state": "CHANGES_REQUESTED",
+                    "submitted_at": "2026-05-09T04:00:00Z"
+                },
+                {
+                    "id": 2,
+                    "user": { "login": "alice" },
+                    "state": "COMMENTED",
+                    "submitted_at": "2026-05-09T05:00:00Z"
+                }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviews);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record reviews");
+
+        assert_eq!(
+            result.pr.review_decision.as_deref(),
+            Some("changes_requested")
+        );
     }
 
     #[test]
@@ -4445,6 +4520,55 @@ mod tests {
             .map(|action| action.id.as_str())
             .collect::<Vec<_>>();
         assert!(action_ids.contains(&"wait_for_mergeability"));
+        assert!(!action_ids.contains(&"merge_when_policy_allows"));
+
+        pr.review_decision = None;
+        pr.mergeable = Some("mergeable".to_string());
+        let actions = recommend_pr_agent_actions(&pr, &[]);
+        let action_ids = actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>();
+        assert!(action_ids.contains(&"refresh_review_decision"));
+        assert!(!action_ids.contains(&"merge_when_policy_allows"));
+    }
+
+    #[test]
+    fn pr_agent_recommendations_require_explicit_check_conclusions() {
+        let checked_at = "2026-05-09T06:05:00Z".parse().unwrap();
+        let pr = PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: Some("BjornMelin/dev-skills".to_string()),
+            number: Some(46),
+            url: Some("https://github.com/BjornMelin/dev-skills/pull/46".to_string()),
+            state: "open".to_string(),
+            mergeable: Some("mergeable".to_string()),
+            review_decision: Some("approved".to_string()),
+            head_sha: Some("abc123".to_string()),
+            checks: vec![CheckRecord {
+                name: "ci".to_string(),
+                status: "completed".to_string(),
+                conclusion: None,
+                url: None,
+                checked_at,
+            }],
+            review_threads: ReviewThreadSummary {
+                unresolved: 0,
+                total: 1,
+                resolved: 1,
+                outdated: 0,
+                authoritative: true,
+                last_checked_at: checked_at,
+            },
+            sources: Vec::new(),
+        };
+
+        let actions = recommend_pr_agent_actions(&pr, &[]);
+        let action_ids = actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>();
+        assert!(action_ids.contains(&"inspect_check_outcomes"));
         assert!(!action_ids.contains(&"merge_when_policy_allows"));
     }
 
