@@ -2,7 +2,7 @@
 
 Status: active implementation.
 
-Tracking: #20, #21, #22, #23, #24, #25, #26, #27, and #28.
+Tracking: #20 through #28, parent epic #37, and child issues #38 through #57.
 
 ## Purpose
 
@@ -18,6 +18,12 @@ proposal guidance, and issue #28 adds an optional terminal workbench.
 continues to own provider routing, source hydration, research ledgers, cache,
 and research evals. The new operating layer coordinates development work around
 those tools instead of becoming another research provider.
+
+The next release sequence is tracked by the
+[dev-skills v0.3/v1 Roadmap](dev-skills-v0.3-roadmap.md). That roadmap is the
+canonical issue ledger for parent epic #37 and child issues #38 through #57:
+strict contracts, local CLI/TUI-first work, apply-gated PR-agent behavior,
+audited local release, and future-surface design.
 
 ## Goals
 
@@ -300,7 +306,7 @@ owner for research routing, privacy, budgets, evidence, and report contracts.
 
 ## Branch And PR Graph
 
-The release is split into issue-backed lanes:
+The first operating-layer release was split into issue-backed lanes:
 
 | Issue | Branch | Depends on | Unblocks | Schema owner | Purpose |
 | --- | --- | --- | --- | --- | --- |
@@ -330,6 +336,12 @@ scrape Markdown notes. Deterministic `--render-once` output uses Ratatui's
 
 Each implementation PR must link its lane issue and #20, include validation
 evidence, document docs impact, and identify residual risks.
+
+After this roadmap PR merges, implementation PRs for the remaining child issues
+from #39 through #57 must follow the dependency order and branch ledger in the
+[dev-skills v0.3/v1 Roadmap](dev-skills-v0.3-roadmap.md). Implement one issue
+per branch and PR, merge into `main`, sync local `main`, and then start the next
+issue.
 
 ## Hardened Subagent Pack Boundary
 

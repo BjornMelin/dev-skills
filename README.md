@@ -28,6 +28,7 @@ Key docs:
 - [System overview](docs/architecture/overview.md)
 - [Research architecture](docs/architecture/research-system.md)
 - [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
+- [dev-skills v0.3/v1 roadmap](docs/specs/dev-skills-v0.3-roadmap.md)
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
