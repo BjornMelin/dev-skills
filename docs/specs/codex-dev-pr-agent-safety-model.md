@@ -80,8 +80,8 @@ Use current official docs when implementing the future PR-agent:
   <https://developers.openai.com/codex/subagents>
 - OpenAI Codex internet access:
   <https://developers.openai.com/codex/cloud/internet-access>
-- OpenAI Model Spec:
-  <https://model-spec.openai.com/2025-12-18.html>
+- OpenAI Model Spec latest:
+  <https://model-spec.openai.com/>
 
 ## Trust Boundaries
 
