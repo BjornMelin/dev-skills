@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -844,6 +845,40 @@ impl WorkbenchState {
     }
 }
 
+fn optional_regular_file(
+    file_path: &Path,
+    capsule_path: &Path,
+    label: &str,
+) -> Result<bool, String> {
+    let metadata = match file_path.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => {
+            return Err(format!(
+                "{label}: {}",
+                redact_path_text(
+                    &format!("failed to inspect {}: {error}", file_path.display()),
+                    capsule_path
+                )
+            ));
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(format!("{label}: symlinks are not supported"));
+    }
+    if !metadata.file_type().is_file() {
+        return Err(format!("{label}: expected a regular file"));
+    }
+    Ok(true)
+}
+
+fn required_regular_file(file_path: &Path, capsule_path: &Path, label: &str) -> Result<(), String> {
+    match optional_regular_file(file_path, capsule_path, label)? {
+        true => Ok(()),
+        false => Err(format!("{label}: missing file")),
+    }
+}
+
 fn load_optional_schema_contract<T>(
     path: &Path,
     file: &str,
@@ -854,8 +889,10 @@ where
     T: DeserializeOwned,
 {
     let file_path = path.join(file);
-    if !file_path.exists() {
-        return (None, Vec::new());
+    match optional_regular_file(&file_path, path, file) {
+        Ok(false) => return (None, Vec::new()),
+        Ok(true) => {}
+        Err(error) => return (None, vec![error]),
     }
     load_optional_contract(path, file, || {
         let value: T = read_json(&file_path)?;
@@ -868,8 +905,8 @@ where
 
 fn load_evidence_records(path: &Path) -> (Vec<EvidenceRecord>, Vec<String>) {
     let evidence_path = path.join("evidence.jsonl");
-    let text = match fs::read_to_string(&evidence_path) {
-        Ok(text) => text,
+    let file = match fs::File::open(&evidence_path) {
+        Ok(file) => file,
         Err(error) => {
             return (
                 Vec::new(),
@@ -886,11 +923,18 @@ fn load_evidence_records(path: &Path) -> (Vec<EvidenceRecord>, Vec<String>) {
 
     let mut records = Vec::new();
     let mut diagnostics = Vec::new();
-    for (index, line) in text.lines().enumerate() {
+    for (index, line) in BufReader::new(file).lines().enumerate() {
+        let line = match line {
+            Ok(line) => line,
+            Err(error) => {
+                diagnostics.push(format!("evidence.jsonl line {}: {error}", index + 1));
+                continue;
+            }
+        };
         if line.trim().is_empty() {
             continue;
         }
-        match serde_json::from_str::<EvidenceRecord>(line) {
+        match serde_json::from_str::<EvidenceRecord>(&line) {
             Ok(record) => records.push(record),
             Err(error) => diagnostics.push(format!("evidence.jsonl line {}: {error}", index + 1)),
         }
@@ -942,11 +986,12 @@ fn load_pr_agent_actions(path: &Path) -> (Vec<PrAgentHostedActionReport>, Vec<St
             }
         }
         let plan_path = entry.path().join("plan.json");
-        if !plan_path.is_file() {
-            diagnostics.push(format!(
-                "pr-agent-actions/{}: missing plan.json",
-                entry.file_name().to_string_lossy()
-            ));
+        let label = format!(
+            "pr-agent-actions/{}/plan.json",
+            entry.file_name().to_string_lossy()
+        );
+        if let Err(error) = required_regular_file(&plan_path, path, &label) {
+            diagnostics.push(error);
             continue;
         }
         match read_json::<PrAgentHostedActionReport>(&plan_path) {
@@ -1620,7 +1665,7 @@ fn subagents_text(state: &WorkbenchState) -> String {
         if !batch.registry_issues.is_empty() {
             lines.push(format!(
                 "  registry issues: {}",
-                batch.registry_issues.join("; ")
+                sanitize_list(&batch.registry_issues, &state.capsule_path)
             ));
         }
         for agent in batch.agents.iter().take(4) {
@@ -2542,6 +2587,26 @@ mod tests {
     }
 
     #[test]
+    fn subagents_panel_redacts_registry_issues() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::Subagents;
+        state
+            .subagents
+            .as_mut()
+            .expect("subagents")
+            .batches
+            .get_mut(0)
+            .expect("batch")
+            .registry_issues
+            .push("/tmp/tui-fixture/private-plan.json".to_string());
+
+        let screen = render_to_string(&state, 120, 34).expect("render");
+
+        assert!(screen.contains("registry issues: <capsule>/private-plan.json"));
+        assert!(!screen.contains("/tmp/tui-fixture/private-plan.json"));
+    }
+
+    #[test]
     fn pr_agent_panel_distinguishes_dry_run_plans_from_ready_actions() {
         let mut state = fixture_state();
         state.active_panel = Panel::PrAgent;
@@ -2629,6 +2694,61 @@ mod tests {
         assert!(screen.contains("pr-agent-state.json schema must be"));
         assert!(screen.contains("pr-readiness.json schema must be"));
         assert!(screen.contains("plan.json schema must be"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn optional_pr_agent_symlinks_render_as_diagnostics() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let capsule = init_test_capsule(
+            &root,
+            "symlink-pr-agent-artifacts",
+            "Symlink PR agent artifacts",
+            CapsuleStatus::InReview,
+            0,
+        );
+        let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
+        let external_state_path = temp.path().join("external-pr-agent-state.json");
+        fs::write(
+            &external_state_path,
+            serde_json::to_string_pretty(&fixture_pr_agent_state(
+                checked_at,
+                fixture_pr(checked_at),
+            ))
+            .expect("state json"),
+        )
+        .expect("write external state");
+        symlink(
+            &external_state_path,
+            capsule.path.join("pr-agent-state.json"),
+        )
+        .expect("state symlink");
+
+        let action_dir = capsule.path.join("pr-agent-actions").join("symlink-plan");
+        fs::create_dir_all(&action_dir).expect("action dir");
+        let external_plan_path = temp.path().join("external-plan.json");
+        fs::write(
+            &external_plan_path,
+            serde_json::to_string_pretty(&fixture_pr_agent_action(checked_at))
+                .expect("action json"),
+        )
+        .expect("write external plan");
+        symlink(&external_plan_path, action_dir.join("plan.json")).expect("plan symlink");
+
+        let mut state = WorkbenchState::load(&capsule.path).expect("state");
+        state.active_panel = Panel::PrAgent;
+        let screen = render_to_string(&state, 140, 36).expect("render");
+
+        assert!(state.validation.valid);
+        assert!(state.pr_agent_state.is_none());
+        assert!(state.pr_agent_actions.is_empty());
+        assert!(screen.contains("pr-agent-state.json: symlinks are not supported"));
+        assert!(
+            screen.contains("pr-agent-actions/symlink-plan/plan.json: symlinks are not supported")
+        );
     }
 
     #[test]

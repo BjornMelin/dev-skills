@@ -89,7 +89,7 @@ Single-capsule detail mode has these panels:
   hides raw command output and provider dumps.
 - Subagents: delegation batches, mode/scope, completed and human-verified agent
   counts, agent summaries, source IDs, artifacts, and synthesis status.
-- PR: normalized `pr.json` snapshot, check state, and authoritative vs
+- PR: normalized `pr.json` snapshot, check state, and authoritative versus
   non-authoritative review-thread status.
 - PR Agent: local PR-agent state/readiness/action artifacts. It distinguishes
   dry-run plans from apply-requested or executed hosted actions, summarizes
