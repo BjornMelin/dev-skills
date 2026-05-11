@@ -30,7 +30,17 @@ EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".skill"}
 
 
 def should_package_file(file_path: Path, skill_path: Path) -> bool:
-    """Return whether a skill file belongs in a redistributable bundle."""
+    """Return whether a skill file belongs in a redistributable bundle.
+
+    Args:
+        file_path: Candidate file path under the skill directory.
+        skill_path: Root path of the skill being packaged.
+
+    Returns:
+        True when the file should be included in the bundle, else False.
+    """
+    if file_path.is_symlink():
+        return False
     relative = file_path.relative_to(skill_path)
     if any(part in EXCLUDED_DIR_NAMES for part in relative.parts[:-1]):
         return False

@@ -335,8 +335,9 @@ python3 tools/skill/package_skill.py skills/subspawn skills/dist
 The packager writes archive entries as `<skill-name>/...`, validates
 `SKILL.md`, and skips common generated caches such as `__pycache__`, `*.pyc`,
 `*.skill`, `.codex/`, and local tool caches. It rejects output directories
-nested inside the source skill folder so the bundle cannot package itself.
-`quick_validate.py` validates only `SKILL.md` frontmatter. If
+nested inside the source skill folder and skips symlinks so the bundle cannot
+package itself or out-of-tree targets. `quick_validate.py` validates only
+`SKILL.md` frontmatter. If
 `agents/openai.yaml` changes, review that metadata explicitly until this repo
 has a dedicated validator for it.
 
