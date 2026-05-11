@@ -16,6 +16,39 @@ from pathlib import Path
 from quick_validate import validate_skill
 
 
+EXCLUDED_DIR_NAMES = {
+    "__pycache__",
+    ".codex",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "node_modules",
+}
+EXCLUDED_FILE_NAMES = {".DS_Store"}
+EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".skill"}
+
+
+def should_package_file(file_path: Path, skill_path: Path) -> bool:
+    """Return whether a skill file belongs in a redistributable bundle.
+
+    Args:
+        file_path: Candidate file path under the skill directory.
+        skill_path: Root path of the skill being packaged.
+
+    Returns:
+        True when the file should be included in the bundle, else False.
+    """
+    if file_path.is_symlink():
+        return False
+    relative = file_path.relative_to(skill_path)
+    if any(part in EXCLUDED_DIR_NAMES for part in relative.parts[:-1]):
+        return False
+    if file_path.name in EXCLUDED_FILE_NAMES:
+        return False
+    return file_path.suffix not in EXCLUDED_SUFFIXES
+
+
 def package_skill(skill_path: str | Path, output_dir: str | Path | None = None) -> Path | None:
     skill_path = Path(skill_path).resolve()
 
@@ -41,6 +74,9 @@ def package_skill(skill_path: str | Path, output_dir: str | Path | None = None) 
     skill_name = skill_path.name
     if output_dir:
         output_path = Path(output_dir).resolve()
+        if output_path == skill_path or skill_path in output_path.parents:
+            print(f"❌ Error: Output directory cannot be inside the skill folder: {output_path}")
+            return None
         output_path.mkdir(parents=True, exist_ok=True)
     else:
         output_path = Path.cwd()
@@ -49,8 +85,10 @@ def package_skill(skill_path: str | Path, output_dir: str | Path | None = None) 
 
     try:
         with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for file_path in skill_path.rglob("*"):
+            for file_path in sorted(skill_path.rglob("*")):
                 if not file_path.is_file():
+                    continue
+                if not should_package_file(file_path, skill_path):
                     continue
                 arcname = file_path.relative_to(skill_path.parent)
                 zipf.write(file_path, arcname)
@@ -80,4 +118,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -8,6 +8,10 @@ skills/subspawn/
 
 Purpose: bounded subagent delegation and synthesis policy for Codex sessions.
 
+Template ownership and duplicate-role handling are defined in
+[Subagent Templates](subagent-templates.md). This reference covers the
+delegation policy and planner CLI.
+
 ## Planner CLI
 
 Path:
@@ -67,6 +71,11 @@ In a full repository checkout, the planner loads the deeper research and
 subagent template directories first. In a packaged standalone `subspawn` skill,
 it falls back to the local `skills/subspawn/templates/agents/` copies so preset
 plans remain usable without sibling skills.
+
+If `validate-roles` prints "duplicate role templates ignored" for known
+research, creator-pack, or subspawn fallback roles, treat that as an audit trail,
+not a failure. Investigate it as drift only when the duplicate falls outside the
+authority model or changes the canonical role contract.
 
 ## Core Contract
 

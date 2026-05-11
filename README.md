@@ -173,6 +173,10 @@ python3 skills/deep-researcher/scripts/install_agents.py --target global --dry-r
 python3 skills/deep-researcher/scripts/install_agents.py --target global
 ```
 
+For custom subagent template ownership, packaged fallback copies, duplicate-role
+validation, and skill packaging rules, see
+[Subagent Templates](docs/reference/subagent-templates.md).
+
 ## Skill catalog
 
 All skills are stored in `skills/`. The canonical entrypoint for each skill is its `SKILL.md`.
@@ -273,7 +277,9 @@ Use [docs/runbooks/validation.md](docs/runbooks/validation.md) for the
 canonical validation matrix and
 [docs/runbooks/local-release-supply-chain.md](docs/runbooks/local-release-supply-chain.md)
 for the audited local install and release baseline. README intentionally stays a
-portal so command lists do not drift from the runbooks.
+portal so command lists do not drift from the runbooks. Use
+[docs/reference/subagent-templates.md](docs/reference/subagent-templates.md) for
+the subagent template authority model and duplicate-role expectations.
 
 Rust skill suite validation:
 
@@ -284,8 +290,10 @@ node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skill
 
 Notes:
 
-- A `.skill` file is a ZIP archive containing the `skills/<skill-name>/...` folder.
-- Bundles are treated as build artifacts here (gitignored) and are intended to be published via release assets / registries.
+- A `.skill` file is a ZIP archive containing a `<skill-name>/...` folder.
+  `skills/<skill-name>/...` is the source-tree path used to create it.
+- Bundles are treated as build artifacts here (gitignored) and are intended to
+  be published via release assets / registries.
 
 ## Contributing (to this repo)
 
