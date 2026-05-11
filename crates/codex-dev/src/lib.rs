@@ -4975,6 +4975,7 @@ fn release_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, docs_gates());
     append_unique_gates(&mut gates, vec![bootstrap_pack_validate_gate()]);
     append_unique_gates(&mut gates, skills_gates());
+    append_unique_gates(&mut gates, supply_chain_gates());
     gates
 }
 
@@ -4986,6 +4987,7 @@ fn full_local_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, bootstrap_install_gates());
     append_unique_gates(&mut gates, skills_gates());
     append_unique_gates(&mut gates, docs_gates());
+    append_unique_gates(&mut gates, supply_chain_gates());
     gates
 }
 
@@ -5074,6 +5076,74 @@ fn diff_check_gate() -> PolicyGate {
         ["git"],
         "Failure means the working diff has whitespace or conflict-marker problems.",
     )
+}
+
+fn supply_chain_gates() -> Vec<PolicyGate> {
+    vec![
+        policy_gate(
+            "cargo-metadata-locked",
+            "locked Cargo metadata smoke",
+            [
+                "cargo",
+                "metadata",
+                "--locked",
+                "--no-deps",
+                "--format-version",
+                "1",
+            ],
+            "docs/runbooks/local-release-supply-chain.md#release-baseline-gates",
+            ["cargo"],
+            "Failure means workspace manifests or Cargo.lock no longer resolve with the committed lockfile.",
+        ),
+        policy_gate(
+            "cargo-tree-duplicates",
+            "Cargo duplicate dependency report",
+            ["cargo", "tree", "-d", "--target", "all"],
+            "docs/runbooks/local-release-supply-chain.md#duplicate-dependency-baseline",
+            ["cargo"],
+            "Failure means Cargo could not build the duplicate dependency report; duplicate output itself is audited in the release runbook.",
+        ),
+        policy_gate(
+            "cargo-deny-policy",
+            "cargo-deny license, ban, and source policy",
+            ["cargo", "deny", "check", "bans", "licenses", "sources"],
+            "docs/runbooks/local-release-supply-chain.md#release-baseline-gates",
+            ["cargo", "cargo-deny"],
+            "Failure means the configured license, dependency ban, or source allowlist policy rejected the workspace.",
+        ),
+        policy_gate(
+            "cargo-package-codex-dev-core-list",
+            "codex-dev-core package file list",
+            ["cargo", "package", "--list", "-p", "codex-dev-core"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means codex-dev-core is missing package metadata or would package unexpected invalid content.",
+        ),
+        policy_gate(
+            "cargo-package-codex-dev-list",
+            "codex-dev package file list",
+            ["cargo", "package", "--list", "-p", "codex-dev"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means codex-dev is missing package metadata or would package unexpected invalid content.",
+        ),
+        policy_gate(
+            "cargo-package-codex-dev-tui-list",
+            "codex-dev-tui package file list",
+            ["cargo", "package", "--list", "-p", "codex-dev-tui"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means codex-dev-tui is missing package metadata or would package unexpected invalid content.",
+        ),
+        policy_gate(
+            "cargo-package-codex-research-list",
+            "codex-research package file list",
+            ["cargo", "package", "--list", "-p", "codex-research"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means codex-research is missing package metadata or would package unexpected invalid content.",
+        ),
+    ]
 }
 
 fn render_pr_record_command(args: &PrRecordCliArgs, checked_at: DateTime<Utc>) -> String {
@@ -5983,6 +6053,13 @@ mod tests {
                 "subspawn-roles-validate",
                 "subspawn-plan-research-smoke",
                 "skill-subagent-eval",
+                "cargo-metadata-locked",
+                "cargo-tree-duplicates",
+                "cargo-deny-policy",
+                "cargo-package-codex-dev-core-list",
+                "cargo-package-codex-dev-list",
+                "cargo-package-codex-dev-tui-list",
+                "cargo-package-codex-research-list",
             ],
         );
         assert_profile_ids(
@@ -6026,6 +6103,13 @@ mod tests {
                 "subspawn-plan-research-smoke",
                 "skill-subagent-eval",
                 "docs-no-todo",
+                "cargo-metadata-locked",
+                "cargo-tree-duplicates",
+                "cargo-deny-policy",
+                "cargo-package-codex-dev-core-list",
+                "cargo-package-codex-dev-list",
+                "cargo-package-codex-dev-tui-list",
+                "cargo-package-codex-research-list",
             ],
         );
     }

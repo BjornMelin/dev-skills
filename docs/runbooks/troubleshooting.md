@@ -11,8 +11,11 @@ zsh: command not found: codex-research
 Fix:
 
 ```bash
-cargo install --path crates/codex-research --force
+cargo install --path crates/codex-research --locked --force
 ```
+
+For full local CLI install/update recovery, use
+[Local Release and Supply Chain](local-release-supply-chain.md).
 
 Or run through the skill wrapper:
 

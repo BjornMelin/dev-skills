@@ -109,15 +109,21 @@ operating layer:
 - `subspawn`: strict subagent delegation policy with planner-generated prompts
   and mandatory wait-before-next-work synthesis.
 
-Build and install the research CLI:
+Build and install the local CLIs from a trusted checkout:
 
 ```bash
 cargo build -p codex-research
-cargo install --path crates/codex-research --force
-codex-research doctor
+cargo build -p codex-dev
+cargo build -p codex-dev-tui
+cargo install --path crates/codex-research --locked --force
+cargo install --path crates/codex-dev --locked --force
+cargo install --path crates/codex-dev-tui --locked --force
+codex-research --json doctor
+codex-dev --help
+codex-dev-tui --help
 ```
 
-Build and smoke the development CLI:
+Smoke the development CLI from source:
 
 ```bash
 cargo build -p codex-dev
@@ -134,6 +140,10 @@ cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
 cargo run -q -p codex-dev -- --json pr readiness --help
 ```
+
+For release handoff and safe updates from any directory, use the
+[Local Release and Supply Chain](docs/runbooks/local-release-supply-chain.md)
+runbook. `codex-dev-core` is a library crate, not an installed binary.
 
 Preview a repo bootstrap pack:
 
@@ -247,8 +257,10 @@ cargo build -p codex-research
 ```
 
 Use [docs/runbooks/validation.md](docs/runbooks/validation.md) for the
-canonical validation matrix. README intentionally stays a portal so command
-lists do not drift from the runbook.
+canonical validation matrix and
+[docs/runbooks/local-release-supply-chain.md](docs/runbooks/local-release-supply-chain.md)
+for the audited local install and release baseline. README intentionally stays a
+portal so command lists do not drift from the runbooks.
 
 Rust skill suite validation:
 
