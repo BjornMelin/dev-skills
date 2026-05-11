@@ -2894,7 +2894,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_legacy_policy_manifest_without_profile_metadata() {
+    fn validate_accepts_legacy_policy_manifest_without_gate_metadata() {
         let temp = tempdir().expect("tempdir");
         let capsule = init_capsule(init_args(temp.path().join("tasks")))
             .expect("init capsule")
