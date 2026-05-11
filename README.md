@@ -13,6 +13,7 @@ This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
+- a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
 - a Rust development CLI, `codex-dev`, under `crates/`;
 - an optional Rust terminal workbench, `codex-dev-tui`, under `crates/`;
 - a Rust research CLI, `codex-research`, under `crates/`;
@@ -29,6 +30,7 @@ Key docs:
 - [Research architecture](docs/architecture/research-system.md)
 - [codex-dev operating layer spec](docs/specs/codex-dev-operating-layer.md)
 - [dev-skills v0.3/v1 roadmap](docs/specs/dev-skills-v0.3-roadmap.md)
+- [codex-dev core reference](docs/reference/codex-dev-core.md)
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
@@ -59,6 +61,7 @@ skills/
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
 crates/
+  codex-dev-core/         # Shared task capsule contracts and read-model helpers
   codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
   codex-dev-tui/          # Optional Ratatui workbench for codex-dev capsules
   codex-research/         # Rust CLI for evidence-first research helpers
@@ -89,10 +92,14 @@ operating layer:
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
   doctor, and evals.
+- `codex-dev-core`: shared contract/read-model crate for task capsules,
+  validation, rendered summaries, policy manifest data, and PR evidence
+  snapshots.
 - `codex-dev`: current CLI for local task capsule lifecycle, repo-native
-  policy gates, and PR evidence capture.
+  policy gates, and PR evidence capture. It depends on `codex-dev-core` and
+  keeps Clap parsing plus process execution at the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
-  JSON contracts without owning policy logic.
+  JSON contracts through `codex-dev-core` without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
   templates, role contracts, and planner presets.
 - `render_bootstrap_pack.py`: manifest-backed bootstrap packs for seeding new
@@ -113,6 +120,7 @@ Build and smoke the development CLI:
 
 ```bash
 cargo build -p codex-dev
+cargo build -p codex-dev-core
 cargo build -p codex-dev-tui
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
@@ -225,6 +233,7 @@ Build the Rust CLIs:
 
 ```bash
 cargo build -p codex-dev
+cargo build -p codex-dev-core
 cargo build -p codex-dev-tui
 cargo build -p codex-research
 ```

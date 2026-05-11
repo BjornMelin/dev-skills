@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/codex-dev-core",
     "crates/codex-dev",
     "crates/codex-dev-tui",
     "crates/codex-research",

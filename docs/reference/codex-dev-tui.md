@@ -1,9 +1,9 @@
 # codex-dev TUI Reference
 
 `codex-dev-tui` is an optional Ratatui workbench for local `codex-dev` task
-capsules. It reads the existing capsule JSON contracts and renders an operator
-view for quick scanning. It does not own policy gates, PR remediation, or
-capsule business logic.
+capsules. It reads the existing capsule JSON contracts through
+`codex-dev-core` and renders an operator view for quick scanning. It does not
+own policy gates, PR remediation, or capsule business logic.
 
 Tracking: #20 and #28.
 
@@ -12,10 +12,10 @@ Tracking: #20 and #28.
 The TUI consumes:
 
 - `capsule.json` as the `codex-dev.task-capsule.v1` contract after
-  `codex_dev::validate_capsule`;
+  `codex_dev_core::validate_capsule`;
 - `verification.json` as `codex-dev.verification.v1`;
 - `pr.json` as `codex-dev.pr.v1`;
-- `codex_dev::validate_capsule` for validation errors.
+- `codex_dev_core::validate_capsule` for validation errors.
 
 The TUI must not scrape Markdown notes or duplicate policy-gate decisions.
 Automation should continue to use `codex-dev --json` and contract files as the
@@ -66,7 +66,7 @@ cargo run -q -p codex-dev-tui -- \
 The crate keeps UI state and rendering testable without opening a real
 terminal:
 
-- state loading tests create a real `codex-dev` capsule and read its JSON
+- state loading tests create a real `codex-dev-core` capsule and read its JSON
   contracts;
 - render snapshot tests assert the `TestBackend` buffer includes capsule,
   validation, and PR summaries;

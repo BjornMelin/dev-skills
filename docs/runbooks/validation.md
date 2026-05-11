@@ -40,13 +40,16 @@ routing, privacy, budgets, cited claims, and report shape.
 
 ## codex-dev Operating Layer
 
-Run after changing `crates/codex-dev/`, root Cargo files, or the `codex-dev`
-architecture/spec docs:
+Run after changing `crates/codex-dev-core/`, `crates/codex-dev/`, root Cargo
+files, or the `codex-dev` architecture/spec docs:
 
 ```bash
 cargo fmt --all --check
+cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo check -p codex-dev-core
 cargo check -p codex-dev
+cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest
@@ -217,8 +220,11 @@ Manual checks:
 
 ```bash
 cargo fmt --all --check
+cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo check -p codex-dev-core
 cargo check -p codex-dev
+cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest

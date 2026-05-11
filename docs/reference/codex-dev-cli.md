@@ -6,6 +6,9 @@ while `codex-dev` records the local task capsule for a development branch.
 It also plans or executes repo-native policy gates, captures normalized PR
 evidence, and records those outcomes in the task capsule. The optional
 `codex-dev-tui` workbench reads these same contracts for terminal scanning.
+Shared capsule schemas and local read/write helpers live in
+[`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
+parsing, command output, and policy subprocess execution.
 
 Tracking: #20, #22, #23, and #25.
 
@@ -257,7 +260,9 @@ Run after changing `crates/codex-dev/`:
 
 ```bash
 cargo fmt --all --check
+cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo test -p codex-dev-core
 cargo check -p codex-dev
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help

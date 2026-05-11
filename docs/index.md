@@ -37,6 +37,9 @@ out of version control.
   release, and future-surface wave.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle and policy-gate commands.
+- [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
+  contract/read-model crate for capsule files, schema validation, and PR/policy
+  evidence shapes.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for

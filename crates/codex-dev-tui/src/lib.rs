@@ -1,12 +1,11 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::Parser;
-use codex_dev::{
-    Capsule, CapsuleStatus, CheckRecord, PrEvidence, StatusResult, ValidationResult, Verification,
-    validate_capsule,
+use codex_dev_core::{
+    CapsuleStatus, CheckRecord, PrEvidence, StatusResult, ValidationResult, Verification,
+    capsule_status, read_json, render_pr_label, validate_capsule,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::backend::{Backend, TestBackend};
@@ -199,9 +198,9 @@ impl WorkbenchState {
         let validation = validate_capsule(&path)?;
         let (capsule, verification, pr) = if validation.valid {
             (
-                Some(read_capsule_status(&path)?),
-                read_optional_json(path.join("verification.json"))?,
-                read_optional_json(path.join("pr.json"))?,
+                Some(capsule_status(&path)?),
+                Some(read_json(&path.join("verification.json"))?),
+                Some(read_json(&path.join("pr.json"))?),
             )
         } else {
             (None, None, None)
@@ -254,41 +253,6 @@ impl WorkbenchState {
         self.pr = None;
         self.last_error = Some(message);
     }
-}
-
-fn read_capsule_status(path: &Path) -> Result<StatusResult> {
-    let capsule: Capsule = read_required_json(path.join("capsule.json"))?;
-    Ok(StatusResult {
-        path: path.to_path_buf(),
-        id: capsule.id,
-        title: capsule.title,
-        status: capsule.status,
-        objective: capsule.objective,
-        branch: capsule.branch,
-        base_branch: capsule.base_branch,
-        issues: capsule.issues,
-        pull_requests: capsule.pull_requests,
-        updated_at: capsule.updated_at,
-    })
-}
-
-fn read_required_json<T>(path: PathBuf) -> Result<T>
-where
-    T: serde::de::DeserializeOwned,
-{
-    let content =
-        fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
-    serde_json::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))
-}
-
-fn read_optional_json<T>(path: PathBuf) -> Result<Option<T>>
-where
-    T: serde::de::DeserializeOwned,
-{
-    if !path.is_file() {
-        return Ok(None);
-    }
-    read_required_json(path).map(Some)
 }
 
 /// Restores terminal state exactly once on explicit restore or drop.
@@ -458,7 +422,7 @@ fn overview_items(state: &WorkbenchState) -> Vec<ListItem<'static>> {
 fn overview_text(state: &WorkbenchState) -> String {
     match &state.capsule {
         Some(capsule) => format!(
-            "{}\n\ncapsule: {}\n\nThis workbench reads codex-dev capsule JSON contracts and does not own policy logic.",
+            "{}\n\ncapsule: {}\n\nThis workbench reads codex-dev-core capsule JSON contracts and does not own policy logic.",
             capsule.objective, capsule.id
         ),
         None => format!(
@@ -550,16 +514,7 @@ fn render_check(check: &CheckRecord) -> String {
 }
 
 fn help_text() -> &'static str {
-    "Open a capsule with --capsule <dir>. Use --render-once for deterministic automation. The UI refreshes by rereading codex-dev JSON contract files."
-}
-
-fn render_pr_label(pr: &PrEvidence) -> String {
-    match (&pr.repository, pr.number) {
-        (Some(repository), Some(number)) => format!("{repository}#{number}"),
-        (Some(repository), None) => repository.clone(),
-        (None, Some(number)) => format!("#{number}"),
-        (None, None) => "no PR".to_string(),
-    }
+    "Open a capsule with --capsule <dir>. Use --render-once for deterministic automation. The UI refreshes by rereading codex-dev-core JSON contract files."
 }
 
 fn status_style(state: &WorkbenchState) -> Style {
@@ -666,36 +621,40 @@ mod tests {
     use std::rc::Rc;
 
     use chrono::{TimeZone, Utc};
-    use codex_dev::{GateRecord, ReviewThreadSummary};
+    use codex_dev_core::{
+        GateRecord, InitArgs, POLICY_GATES_SCHEMA, PR_SCHEMA, PolicyManifest, PolicyProfile,
+        ReviewThreadSummary, VERIFICATION_SCHEMA, init_capsule,
+    };
     use tempfile::tempdir;
 
     #[test]
-    fn load_reads_codex_dev_contracts() {
+    fn load_reads_codex_dev_core_contracts() {
         let temp = tempdir().expect("tempdir");
         let root = temp.path().join("tasks");
-        let output = codex_dev::run_from([
-            "codex-dev",
-            "--json",
-            "capsule",
-            "init",
-            "--title",
-            "TUI smoke",
-            "--branch",
-            "feat/codex-dev-tui-workbench",
-            "--issue",
-            "28",
-            "--root",
-            root.to_str().expect("utf8 root"),
-            "--id",
-            "tui-smoke",
-            "--created-at",
-            "2026-05-09T07:00:00Z",
-        ])
+        let created_at = "2026-05-09T07:00:00Z".parse().expect("timestamp");
+        let capsule = init_capsule(InitArgs {
+            title: "TUI smoke".to_string(),
+            objective: "TUI smoke".to_string(),
+            branch: "feat/codex-dev-tui-workbench".to_string(),
+            base_branch: "main".to_string(),
+            issues: vec![28],
+            pull_requests: Vec::new(),
+            root,
+            slug: None,
+            id: Some("tui-smoke".to_string()),
+            status: CapsuleStatus::Active,
+            created_at,
+            policy_manifest: PolicyManifest {
+                schema: POLICY_GATES_SCHEMA.to_string(),
+                profile: PolicyProfile::CodexDev,
+                generated_at: created_at,
+                gates: Vec::new(),
+            },
+            force: false,
+        })
         .expect("init capsule");
-        let payload: serde_json::Value = serde_json::from_str(&output).expect("json output");
-        let path = payload["result"]["path"].as_str().expect("path");
 
-        let state = WorkbenchState::load(path).expect("state");
+        let state = WorkbenchState::load(&capsule.path).expect("state");
 
         assert!(state.validation.valid);
         assert_eq!(state.capsule.as_ref().expect("capsule").issues, vec![28]);
@@ -829,7 +788,7 @@ mod tests {
                 updated_at: checked_at,
             }),
             verification: Some(Verification {
-                schema: codex_dev::VERIFICATION_SCHEMA.to_string(),
+                schema: VERIFICATION_SCHEMA.to_string(),
                 required: vec![GateRecord {
                     name: "docs-links".to_string(),
                     command: "python3 tools/docs/check_links.py docs README.md AGENTS.md"
@@ -840,7 +799,7 @@ mod tests {
                 last_checked_at: checked_at,
             }),
             pr: Some(PrEvidence {
-                schema: codex_dev::PR_SCHEMA.to_string(),
+                schema: PR_SCHEMA.to_string(),
                 repository: Some("BjornMelin/dev-skills".to_string()),
                 number: Some(28),
                 url: Some("https://github.com/BjornMelin/dev-skills/pull/28".to_string()),
