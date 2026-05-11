@@ -32,6 +32,9 @@ out of version control.
 - [codex-dev Operating Layer](specs/codex-dev-operating-layer.md): task capsule
   schema, ownership map, branch graph, and validation expectations for the
   development control plane.
+- [codex-dev PR-Agent Safety Model](specs/codex-dev-pr-agent-safety-model.md):
+  token, trust-boundary, dry-run, `--apply`, idempotency, and review-comment
+  verification policy for future hosted PR automation.
 - [dev-skills v0.3/v1 Roadmap](specs/dev-skills-v0.3-roadmap.md): canonical
   issue ledger and execution order for the next local CLI/TUI, PR-agent,
   release, and future-surface wave.
