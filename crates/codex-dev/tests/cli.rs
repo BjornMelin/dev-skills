@@ -173,7 +173,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
             .as_array()
             .expect("core test command")
             .iter()
-            .filter_map(Value::as_str)
+            .map(|value| value.as_str().expect("command token must be a string"))
             .collect::<Vec<_>>(),
         vec!["cargo", "test", "-p", "codex-dev-core"]
     );
