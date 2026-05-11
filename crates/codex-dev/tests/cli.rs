@@ -157,12 +157,12 @@ fn write_pr_view_fixture(
     .expect("write pr view");
 }
 
-fn write_pr_checks_fixture(source_dir: &std::path::Path, state: &str, link: &str) {
+fn write_pr_checks_fixture(source_dir: &std::path::Path, bucket: &str, state: &str, link: &str) {
     std::fs::write(
         source_dir.join("gh-pr-checks.json"),
         format!(
             r#"[
-  {{"bucket": "{state}", "completedAt": "2026-05-09T05:01:00Z", "link": "{link}", "name": "ci", "state": "{state}"}}
+  {{"bucket": "{bucket}", "completedAt": "2026-05-09T05:01:00Z", "link": "{link}", "name": "ci", "state": "{state}"}}
 ]"#
         ),
     )
@@ -204,19 +204,36 @@ fn write_fake_gh(bin_dir: &std::path::Path) -> std::path::PathBuf {
         &script,
         r#"#!/bin/sh
 printf '%s\n' "$*" >> "$GH_LOG"
+fixture_root="$GH_FIXTURES"
+if [ -n "$GH_REFRESH_FIXTURES" ] && [ -f "$GH_LOG.refresh" ]; then
+  fixture_root="$GH_REFRESH_FIXTURES"
+fi
 case "$*" in
-  pr\ view*) cat "$GH_FIXTURES/gh-pr-view.json" ;;
-  pr\ checks*) cat "$GH_FIXTURES/gh-pr-checks.json" ;;
-  api\ --paginate\ --slurp\ repos/*/pulls/*/reviews*) cat "$GH_FIXTURES/gh-reviews.json" ;;
-  api\ --paginate\ --slurp\ repos/*/pulls/*/comments*) cat "$GH_FIXTURES/gh-review-comments.json" ;;
+  pr\ view*)
+    count_file="$GH_LOG.pr_view_count"
+    count=0
+    if [ -f "$count_file" ]; then
+      count="$(cat "$count_file")"
+    fi
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$count_file"
+    if [ -n "$GH_REFRESH_FIXTURES" ] && [ "$count" -gt 1 ]; then
+      touch "$GH_LOG.refresh"
+      fixture_root="$GH_REFRESH_FIXTURES"
+    fi
+    cat "$fixture_root/gh-pr-view.json"
+    ;;
+  pr\ checks*) cat "$fixture_root/gh-pr-checks.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/reviews*) cat "$fixture_root/gh-reviews.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/comments*) cat "$fixture_root/gh-review-comments.json" ;;
   api\ graphql*)
     if [ -n "$FAIL_THREADS" ]; then
       echo "thread capture failed" >&2
       exit 2
     fi
-    cat "$GH_FIXTURES/gh-review-threads.json"
+    cat "$fixture_root/gh-review-threads.json"
     ;;
-  api\ rate_limit*) cat "$GH_FIXTURES/gh-rate-limit.json" ;;
+  api\ rate_limit*) cat "$fixture_root/gh-rate-limit.json" ;;
   api\ --paginate\ --slurp\ repos/*/issues/*/comments*)
     if [ -n "$DUPLICATE_MARKER" ]; then
       printf '[{"id":99,"html_url":"https://example.test/duplicate","body":"<!-- %s -->"}]\n' "$DUPLICATE_MARKER"
@@ -1552,7 +1569,7 @@ fn pr_readiness_blocks_missing_pr_identity_and_still_writes_report() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1623,7 +1640,7 @@ fn pr_readiness_blocks_missing_merge_state_status() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1696,6 +1713,64 @@ fn pr_readiness_distinguishes_stale_review_decision_from_clean_threads() {
 }
 
 #[test]
+fn pr_readiness_reports_outdated_review_comments_as_warning() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(
+        source_dir.join("gh-review-comments.json"),
+        r#"[
+  {"id": 7, "body": "stale feedback", "outdated": true}
+]"#,
+    )
+    .expect("write outdated comments");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-outdated-comments",
+        "PR readiness outdated comments",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "ready");
+    assert_eq!(json["result"]["attempts"][0]["outdated_review_comments"], 1);
+    assert!(
+        json["result"]["attempts"][0]["warnings"]
+            .as_array()
+            .expect("warnings")
+            .iter()
+            .any(|warning| warning
+                .as_str()
+                .is_some_and(|warning| warning.contains("outdated review comment")))
+    );
+}
+
+#[test]
 fn pr_readiness_fails_closed_for_missing_or_unknown_check_evidence() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("tasks");
@@ -1728,7 +1803,7 @@ fn pr_readiness_fails_closed_for_missing_or_unknown_check_evidence() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1776,7 +1851,7 @@ fn pr_readiness_fails_closed_for_missing_or_unknown_check_evidence() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1817,7 +1892,7 @@ fn pr_readiness_blocks_unresolved_review_threads() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1838,6 +1913,7 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
     write_pr_agent_source_fixtures(&source_dir, 49);
     write_pr_checks_fixture(
         &source_dir,
+        "fail",
         "FAILURE",
         "https://github.com/BjornMelin/dev-skills/actions/runs/777/jobs/888",
     );
@@ -1866,7 +1942,7 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1878,7 +1954,12 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
     );
     assert_eq!(failing_json["result"]["actions"][0]["status"], "planned");
 
-    write_pr_checks_fixture(&source_dir, "PENDING", "https://example.test/pending");
+    write_pr_checks_fixture(
+        &source_dir,
+        "pending",
+        "PENDING",
+        "https://example.test/pending",
+    );
     write_pr_view_fixture(&source_dir, 49, false, "MERGEABLE", "UNKNOWN", "APPROVED");
     let pending_capsule =
         init_capsule_fixture(&root, "pr-readiness-pending", "PR readiness pending");
@@ -1902,7 +1983,7 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -1913,7 +1994,7 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
         "https://example.test/pending"
     );
 
-    write_pr_checks_fixture(&source_dir, "SUCCESS", "https://example.test/ci");
+    write_pr_checks_fixture(&source_dir, "pass", "SUCCESS", "https://example.test/ci");
     write_pr_view_fixture(&source_dir, 49, true, "MERGEABLE", "DRAFT", "APPROVED");
     let draft_capsule = init_capsule_fixture(&root, "pr-readiness-draft", "PR readiness draft");
     let draft_output = Command::cargo_bin("codex-dev")
@@ -1936,7 +2017,7 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -2002,9 +2083,134 @@ fn pr_readiness_apply_merge_requires_clean_latest_state() {
     assert_eq!(json["result"]["final_status"], "merged");
     assert_eq!(json["result"]["actions"][0]["status"], "applied");
     let gh_log = std::fs::read_to_string(log).expect("gh log");
-    assert!(gh_log.contains("pr view 49 --repo BjornMelin/dev-skills"));
+    assert!(
+        gh_log
+            .matches("pr view 49 --repo BjornMelin/dev-skills")
+            .count()
+            >= 2
+    );
     assert!(
         gh_log.contains("pr merge 49 --repo BjornMelin/dev-skills --squash --match-head-commit abc123 --delete-branch")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_merge_rechecks_live_state_before_merge() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let refresh_fixtures = temp.path().join("refresh-fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 49);
+    write_pr_agent_source_fixtures(&refresh_fixtures, 49);
+    write_pr_view_fixture(
+        &refresh_fixtures,
+        49,
+        true,
+        "MERGEABLE",
+        "DRAFT",
+        "APPROVED",
+    );
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-merge-refresh",
+        "PR readiness merge refresh",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_REFRESH_FIXTURES", &refresh_fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--poll-interval-seconds",
+            "0",
+            "--merge",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("merge refresh json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert_eq!(json["result"]["actions"][0]["status"], "failed");
+    assert!(
+        json["result"]["actions"][0]["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("pre-merge readiness refresh")
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(!gh_log.contains("pr merge 49"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_rejects_replay_source() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-apply-replay",
+        "PR readiness apply replay",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--apply",
+            "--merge",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("apply replay json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("--source-dir")
     );
 }
 
@@ -2019,6 +2225,7 @@ fn pr_readiness_apply_rerun_delegates_to_hosted_action_preflight() {
     write_pr_agent_source_fixtures(&fixtures, 49);
     write_pr_checks_fixture(
         &fixtures,
+        "fail",
         "FAILURE",
         "https://github.com/BjornMelin/dev-skills/actions/runs/777/jobs/888",
     );
@@ -2054,7 +2261,7 @@ fn pr_readiness_apply_rerun_delegates_to_hosted_action_preflight() {
             "2026-05-09T05:05:00Z",
         ])
         .assert()
-        .success()
+        .failure()
         .get_output()
         .stdout
         .clone();
@@ -2080,6 +2287,7 @@ fn pr_readiness_apply_rerun_rejects_mismatched_workflow_run_identity() {
     write_pr_agent_source_fixtures(&fixtures, 49);
     write_pr_checks_fixture(
         &fixtures,
+        "fail",
         "FAILURE",
         "https://github.com/BjornMelin/dev-skills/actions/runs/779/jobs/889",
     );

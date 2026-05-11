@@ -520,6 +520,10 @@ same live or replayed sources as `pr agent`, writes `pr-readiness.json` and
 - draft state, mergeability, `mergeStateStatus`, head SHA, and branch refs;
 - final status as `ready`, `waiting`, `blocked`, `merged`, or `stopped`.
 
+The command exits successfully only when the final status is `ready` or
+`merged` and no requested hosted action failed. With `--json`, non-ready states
+still emit the full readiness report before exiting nonzero.
+
 Polling is bounded by `--poll-attempts`; there is no daemon mode. Replay mode
 is deterministic and accepts `--source-dir`; apply mode rejects replayed
 sources and must capture current hosted state.
@@ -528,9 +532,10 @@ Hosted mutations are opt-in. `--rerun-failed` plans reruns for failed checks
 whose URLs expose GitHub Actions run IDs; adding `--apply` delegates each run to
 the existing `rerun-failed-jobs` hosted action, which rechecks workflow-run
 repository, event, PR binding, head branch, and head SHA before POSTing.
-`--merge` plans a `gh pr merge` command only after a ready final state; adding
-`--apply` executes it with
-`--match-head-commit <captured-head-sha>`. Merge uses `--squash` by default and
+`--merge` plans a `gh pr merge` command only after a ready final state. Adding
+`--apply` captures fresh live PR state immediately before merging, re-evaluates
+readiness, and only then executes with
+`--match-head-commit <fresh-head-sha>`. Merge uses `--squash` by default and
 supports `--merge-method`, `--delete-branch`, `--merge-subject`, and
 `--merge-body`.
 

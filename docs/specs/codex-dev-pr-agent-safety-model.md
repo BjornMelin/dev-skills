@@ -1,7 +1,7 @@
 # codex-dev PR-Agent Safety Model
 
 Status: active design; apply-gated hosted actions and readiness loop shipped in
-#48 and #49.
+issues #48 and #49.
 
 Tracking: #41, parent epic #37, and implementation issues #46 through #49.
 
@@ -349,9 +349,12 @@ Issue #49, readiness and merge loop:
   state, stale review comments, draft state, mergeability, `mergeStateStatus`,
   and branch refs.
 - Allow merge only as a clean-state gated action with explicit
-  `--apply --merge` and `--match-head-commit`.
+  `--apply --merge`, an immediate live readiness refresh, and
+  `--match-head-commit`.
 - Reuse the read-only state engine for every bounded polling attempt and reject
   replayed sources in apply mode.
+- Exit nonzero for `blocked`, `waiting`, and `stopped` readiness outcomes while
+  still writing the structured readiness report.
 - Leave linked issue updates and local `main` sync to the outer
   goal-to-release loop after merge success.
 

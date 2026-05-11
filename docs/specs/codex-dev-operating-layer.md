@@ -481,14 +481,19 @@ comments, draft state, mergeability, `mergeStateStatus`, head SHA, and branch
 refs. It deliberately keeps hosted review-thread resolution separate
 from local code fixes and from stale `reviewDecision` values.
 
+Non-ready final states are gate failures: with `--json`, `pr readiness` still
+writes the readiness artifacts and output envelope, but exits nonzero unless
+the final status is `ready` or `merged` and all requested hosted actions avoided
+failure.
+
 `pr readiness` has bounded polling only; it is not a daemon. Dry-run mode may
 use replay sources. Apply mode rejects replay sources and only executes hosted
 mutations when the caller also requests the specific intent: `--rerun-failed`
 for failed-job reruns or `--merge` for merging. Failed-job reruns delegate to
 the apply-gated hosted-action contract so workflow-run repository, event, PR
 binding, head branch, and head SHA are rechecked. Merge execution requires a
-ready final state, explicit `--apply --merge`, and
-`gh pr merge --match-head-commit <captured-head-sha>`.
+ready final state, explicit `--apply --merge`, an immediate fresh readiness
+refresh, and `gh pr merge --match-head-commit <fresh-head-sha>`.
 
 ### Markdown Notes
 

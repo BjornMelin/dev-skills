@@ -989,7 +989,10 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result.attempts.len()
                 );
                 Ok(CommandOutput {
-                    ok: result
+                    ok: matches!(
+                        result.final_status,
+                        PrAgentReadinessStatus::Ready | PrAgentReadinessStatus::Merged
+                    ) && result
                         .actions
                         .iter()
                         .all(|action| action.status != PrAgentReadinessActionStatus::Failed),
@@ -1667,6 +1670,7 @@ fn evaluate_pr_readiness_attempt(
     let mut warnings = Vec::new();
     let mut failing_checks = Vec::new();
     let mut pending_checks = Vec::new();
+    let (active_review_comments, outdated_review_comments) = review_comment_counts(state)?;
 
     for diagnostic in &state.diagnostics {
         if diagnostic.severity == PrAgentSeverity::Error {
@@ -1690,6 +1694,8 @@ fn evaluate_pr_readiness_attempt(
                     warnings,
                     failing_checks,
                     pending_checks,
+                    active_review_comments,
+                    outdated_review_comments,
                 },
             );
         }
@@ -1705,6 +1711,8 @@ fn evaluate_pr_readiness_attempt(
                     warnings,
                     failing_checks,
                     pending_checks,
+                    active_review_comments,
+                    outdated_review_comments,
                 },
             );
         }
@@ -1837,6 +1845,17 @@ fn evaluate_pr_readiness_attempt(
         Some(other) => warnings.push(format!("GitHub reviewDecision is {other}")),
     }
 
+    if outdated_review_comments > 0 {
+        warnings.push(format!(
+            "{outdated_review_comments} outdated review comment(s) captured; hosted review-thread state remains the readiness authority"
+        ));
+    }
+    if active_review_comments > 0 && state.pr.review_threads.unresolved == 0 {
+        warnings.push(format!(
+            "{active_review_comments} active review comment(s) captured, but hosted review threads are resolved"
+        ));
+    }
+
     let status = if !blockers.is_empty() {
         PrAgentReadinessStatus::Blocked
     } else if !wait_reasons.is_empty() {
@@ -1855,6 +1874,8 @@ fn evaluate_pr_readiness_attempt(
             warnings,
             failing_checks,
             pending_checks,
+            active_review_comments,
+            outdated_review_comments,
         },
     )
 }
@@ -1866,6 +1887,8 @@ struct ReadinessAttemptParts {
     warnings: Vec<String>,
     failing_checks: Vec<PrAgentReadinessCheck>,
     pending_checks: Vec<PrAgentReadinessCheck>,
+    active_review_comments: u64,
+    outdated_review_comments: u64,
 }
 
 fn readiness_attempt(
@@ -1873,7 +1896,6 @@ fn readiness_attempt(
     state: &PrAgentStateReport,
     parts: ReadinessAttemptParts,
 ) -> Result<PrAgentReadinessAttempt> {
-    let (active_review_comments, outdated_review_comments) = review_comment_counts(state)?;
     Ok(PrAgentReadinessAttempt {
         attempt,
         checked_at: state.checked_at,
@@ -1884,8 +1906,8 @@ fn readiness_attempt(
         warnings: parts.warnings,
         failing_checks: parts.failing_checks,
         pending_checks: parts.pending_checks,
-        active_review_comments,
-        outdated_review_comments,
+        active_review_comments: parts.active_review_comments,
+        outdated_review_comments: parts.outdated_review_comments,
         diagnostics: state.diagnostics.clone(),
     })
 }
@@ -2142,6 +2164,44 @@ fn plan_or_apply_merge(
             stderr: None,
         });
     }
+    let refresh_checked_at = attempt
+        .checked_at
+        .checked_add_signed(TimeDelta::seconds(1))
+        .unwrap_or_else(Utc::now);
+    let refreshed_state = run_pr_agent_state(
+        PrAgentArgs {
+            capsule: args.capsule.clone(),
+            repo: args.repo.clone(),
+            number: args.number,
+            checked_at: Some(refresh_checked_at),
+            source_dir: None,
+        },
+        refresh_checked_at,
+    )?;
+    let refreshed_attempt =
+        evaluate_pr_readiness_attempt(attempt.attempt.saturating_add(1), &refreshed_state)?;
+    if refreshed_attempt.status != PrAgentReadinessStatus::Ready {
+        let reason = refreshed_attempt
+            .blockers
+            .first()
+            .or_else(|| refreshed_attempt.wait_reasons.first())
+            .cloned()
+            .unwrap_or_else(|| "fresh PR state is not ready".to_string());
+        return Ok(PrAgentReadinessAction {
+            id: "merge-pr".to_string(),
+            kind: "merge".to_string(),
+            status: PrAgentReadinessActionStatus::Failed,
+            reason: format!(
+                "pre-merge readiness refresh returned {:?}; merge was not executed: {reason}",
+                refreshed_attempt.status
+            ),
+            command,
+            exit_code: None,
+            stdout: None,
+            stderr: None,
+        });
+    }
+    let command = merge_command(args, &refreshed_state.pr)?;
     let output = run_hosted_command(&command)?;
     Ok(PrAgentReadinessAction {
         id: "merge-pr".to_string(),
@@ -4241,10 +4301,13 @@ fn redact_assignment_values(text: &str, key: &str) -> String {
     let mut index = 0;
     while index < text.len() {
         let rest = &text[index..];
-        if rest.starts_with(key) && rest[key.len()..].starts_with('=') {
+        if rest.starts_with(key)
+            && assignment_key_starts_at_boundary(text, index)
+            && let Some(value_start) = assignment_value_start(rest, key)
+        {
             output.push_str(key);
             output.push_str("=[redacted]");
-            index += key.len() + 1;
+            index += value_start;
             while index < text.len() {
                 let ch = text[index..].chars().next().expect("character");
                 if ch.is_whitespace() || matches!(ch, ',' | ';') {
@@ -4259,6 +4322,44 @@ fn redact_assignment_values(text: &str, key: &str) -> String {
         }
     }
     output
+}
+
+fn assignment_key_starts_at_boundary(text: &str, index: usize) -> bool {
+    if index == 0 {
+        return true;
+    }
+    text[..index]
+        .chars()
+        .next_back()
+        .is_none_or(|ch| !assignment_key_character(ch))
+}
+
+fn assignment_value_start(rest: &str, key: &str) -> Option<usize> {
+    let mut offset = key.len();
+    while offset < rest.len() {
+        let ch = rest[offset..].chars().next().expect("character");
+        if !ch.is_whitespace() {
+            break;
+        }
+        offset += ch.len_utf8();
+    }
+    let equals = rest[offset..].chars().next()?;
+    if equals != '=' {
+        return None;
+    }
+    offset += equals.len_utf8();
+    while offset < rest.len() {
+        let ch = rest[offset..].chars().next().expect("character");
+        if !ch.is_whitespace() {
+            break;
+        }
+        offset += ch.len_utf8();
+    }
+    Some(offset)
+}
+
+fn assignment_key_character(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_'
 }
 
 fn redact_prefixed_tokens(text: &str, prefixes: &[&str]) -> String {
@@ -5398,13 +5499,15 @@ mod tests {
     #[test]
     fn hosted_diagnostics_redact_token_like_values() {
         let excerpt = diagnostic_excerpt(
-            b"Authorization: Bearer ghp_secret123\nGH_TOKEN=plain-secret github_pat_abc123",
+            b"Authorization: Bearer ghp_secret123\nexport GH_TOKEN=plain-secret\nGITHUB_TOKEN = spaced-secret\nNOT_GH_TOKEN=kept github_pat_abc123",
         )
         .expect("excerpt");
 
         assert!(!excerpt.contains("ghp_secret123"));
         assert!(!excerpt.contains("plain-secret"));
+        assert!(!excerpt.contains("spaced-secret"));
         assert!(!excerpt.contains("github_pat_abc123"));
+        assert!(excerpt.contains("NOT_GH_TOKEN=kept"));
         assert!(excerpt.contains("[redacted]"));
     }
 
