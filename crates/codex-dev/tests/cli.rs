@@ -291,6 +291,35 @@ fn pr_plan_and_record_support_fixture_mode() {
         plan_json["result"]["schema"],
         "codex-dev.pr-control-plan.v1"
     );
+    let plan_commands = plan_json["result"]["commands"]
+        .as_array()
+        .expect("plan commands");
+    assert!(plan_commands.iter().any(|command| {
+        command["id"] == "gh-review-threads"
+            && command["command"]
+                .as_array()
+                .expect("command argv")
+                .iter()
+                .any(|part| part == "query=query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}")
+    }));
+    assert!(plan_commands.iter().any(|command| {
+        command["id"] == "gh-pr-checks"
+            && command["command"]
+                .as_array()
+                .expect("command argv")
+                .iter()
+                .any(|part| part == "bucket,completedAt,description,event,link,name,startedAt,state,workflow")
+    }));
+    assert!(
+        plan_commands
+            .iter()
+            .any(|command| command["id"] == "gh-reviews")
+    );
+    assert!(
+        plan_commands
+            .iter()
+            .any(|command| command["id"] == "gh-review-comments")
+    );
 
     let init_output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -378,6 +407,95 @@ fn pr_plan_and_record_support_fixture_mode() {
         .assert()
         .success()
         .stdout(predicates::str::contains("BjornMelin/dev-skills#25 open"));
+}
+
+#[test]
+fn pr_record_cli_normalizes_github_checks_sources() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "PR checks",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "pr-checks",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+    let source = temp.path().join("gh-pr-checks.json");
+    std::fs::write(
+        &source,
+        r#"[
+  {"bucket": "fail", "completedAt": "2026-05-09T05:01:00Z", "link": "https://example.test/lint", "name": "lint", "state": "FAILURE"},
+  {"bucket": "pass", "completedAt": "2026-05-09T05:02:00Z", "link": "https://example.test/test", "name": "test", "state": "SUCCESS"}
+]"#,
+    )
+    .expect("write fixture");
+
+    let record_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "record",
+            "--capsule",
+            capsule,
+            "--source",
+            source.to_str().expect("utf8 fixture path"),
+            "--source-kind",
+            "gh-pr-checks",
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "46",
+            "--retrieved-at",
+            "2026-05-09T04:59:00Z",
+            "--source-command",
+            "gh pr checks 46 --json bucket,completedAt,link,name,state",
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let record_json: Value = serde_json::from_slice(&record_output).expect("record json");
+
+    assert_eq!(
+        record_json["result"]["pr"]["repository"],
+        "BjornMelin/dev-skills"
+    );
+    assert_eq!(record_json["result"]["pr"]["number"], 46);
+    assert_eq!(
+        record_json["result"]["pr"]["checks"][0]["conclusion"],
+        "failure"
+    );
+    assert_eq!(
+        record_json["result"]["pr"]["sources"][0]["parser_version"],
+        "codex-dev.pr-source-parser.v1"
+    );
+    assert_eq!(
+        record_json["result"]["pr"]["sources"][0]["retrieved_at"],
+        "2026-05-09T04:59:00Z"
+    );
+    assert_eq!(
+        record_json["result"]["pr"]["sources"][0]["command"],
+        "gh pr checks 46 --json bucket,completedAt,link,name,state"
+    );
 }
 
 #[test]

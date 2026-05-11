@@ -383,6 +383,9 @@ remediation; it records the command plan so agents can run the canonical tools
 and capture the normalized result. Commands that need caller-supplied artifacts
 set `manual_input`; for example `review-pack remaining` requires the bundle path
 created by `review-pack start` and is not marked as directly executable.
+The plan includes JSON-producing `gh pr view`, `gh pr checks`, REST review,
+REST review-comment, and GraphQL review-thread commands whose saved outputs can
+be passed to `pr record` with the matching `--source-kind`.
 
 ## pr record
 
@@ -395,8 +398,7 @@ cargo run -q -p codex-dev -- --json pr record \
   --checked-at 2026-05-09T05:00:00Z
 ```
 
-The fixture is local-only. Live provider output should be normalized before it
-is recorded. The accepted input shape is:
+The default `--source-kind normalized` accepts the local fixture shape below:
 
 ```json
 {
@@ -417,6 +419,39 @@ is recorded. The accepted input shape is:
   }
 }
 ```
+
+`pr record` can also normalize saved provider/tool output directly:
+
+```bash
+cargo run -q -p codex-dev -- --json pr record \
+  --capsule .codex/tasks/<id> \
+  --source /tmp/gh-pr-view.json \
+  --source-kind gh-pr-view \
+  --source-command "gh pr view 25 --repo BjornMelin/dev-skills --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt"
+```
+
+Supported `--source-kind` values:
+
+- `normalized`: existing local `pr.json` fixture shape.
+- `gh-pr-view`: `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`.
+- `gh-pr-checks`: `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`.
+- `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; records the latest review state as `review_decision`.
+- `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; counts resolved, current unresolved, and outdated threads separately.
+- `gh-review-comments`: REST review-comment arrays; counts comments whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
+- `review-pack-remaining`: JSON or text output from `review-pack remaining`; records the unresolved count.
+
+All non-`normalized` source kinds require explicit PR identity unless it can be
+derived from a GitHub pull request URL in the saved source. Pass `--repo
+OWNER/REPO` and `--number PR_NUMBER` for source shapes that do not include that
+URL.
+
+All source kinds, including `normalized`, add a `sources[]` trace entry with the
+source kind, `codex-dev.pr-source-parser.v1`, retrieval timestamp, source path,
+and the optional `--source-command` used to fetch the saved artifact. Use
+`--retrieved-at` when a saved artifact was fetched before the local record time.
+Partial sources such as `gh-pr-checks` and `gh-review-comments` merge into the
+existing capsule snapshot and do not mark review-thread state authoritative by
+themselves.
 
 `pr record` requires an already-valid capsule. It writes `pr.json`, appends
 review evidence to `evidence.jsonl`, updates `capsule.json.updated_at`
@@ -450,6 +485,7 @@ cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> 
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
+cargo run -q -p codex-dev -- --json pr record --help
 ```
 
 Use [Validation](../runbooks/validation.md) for the canonical local matrix and

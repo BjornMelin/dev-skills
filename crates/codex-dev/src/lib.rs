@@ -12,13 +12,13 @@ use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
     PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
-    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, RecordSubagentOutcomeArgs,
-    RecordSubagentPlanArgs, RecordSubagentSynthesisArgs, SubagentDisposition,
-    SubagentOutcomeStatus, SubagentSynthesisStatus, Verification, append_evidence, append_jsonl,
-    capsule_status, ensure_regular_contract_files, init_capsule, pr_status, read_json,
-    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
-    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
-    write_json,
+    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, PrRecordSourceKind,
+    RecordSubagentOutcomeArgs, RecordSubagentPlanArgs, RecordSubagentSynthesisArgs,
+    SubagentDisposition, SubagentOutcomeStatus, SubagentSynthesisStatus, Verification,
+    append_evidence, append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule,
+    pr_status, read_json, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
+    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
+    validate_capsule, write_json,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -135,7 +135,7 @@ enum PolicyCommand {
 enum PrCommand {
     /// Print the live-command plan for PR evidence capture.
     Plan(PrPlanArgs),
-    /// Record a normalized PR snapshot into a task capsule.
+    /// Normalize and record a PR evidence source into a task capsule.
     Record(PrRecordCliArgs),
     /// Print the PR snapshot currently stored in a task capsule.
     Status(PrStatusArgs),
@@ -170,22 +170,37 @@ pub struct PrRecordCliArgs {
     pub capsule: PathBuf,
     #[arg(
         long,
-        value_name = "SNAPSHOT_JSON",
-        help = "Local normalized PR snapshot fixture to record"
+        value_name = "SOURCE_JSON",
+        help = "Local PR evidence source to normalize and record"
     )]
     pub source: PathBuf,
+    #[arg(long, value_name = "KIND", default_value_t = PrRecordSourceKind::Normalized)]
+    pub source_kind: PrRecordSourceKind,
+    #[arg(long, value_name = "OWNER/REPO")]
+    pub repo: Option<String>,
+    #[arg(long, value_name = "PR_NUMBER")]
+    pub number: Option<u64>,
     #[arg(long, value_name = "RFC3339")]
     pub checked_at: Option<DateTime<Utc>>,
+    #[arg(long, value_name = "RFC3339")]
+    pub retrieved_at: Option<DateTime<Utc>>,
+    #[arg(long, value_name = "COMMAND")]
+    pub source_command: Option<String>,
 }
 
 impl PrRecordCliArgs {
     fn into_core(self) -> (PrRecordArgs, DateTime<Utc>) {
         let checked_at = self.checked_at.unwrap_or_else(Utc::now);
-        let command = render_pr_record_command(&self.capsule, &self.source, checked_at);
+        let command = render_pr_record_command(&self, checked_at);
         (
             PrRecordArgs {
                 capsule: self.capsule,
                 source: self.source,
+                source_kind: self.source_kind,
+                repository: self.repo,
+                number: self.number,
+                retrieved_at: self.retrieved_at,
+                source_command: self.source_command,
                 command: Some(command),
             },
             checked_at,
@@ -754,11 +769,17 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             PrCommand::Record(args) => {
                 let (args, checked_at) = args.into_core();
                 let result = record_pr_snapshot(args, checked_at)?;
-                let unresolved = result.pr.review_threads.unresolved;
+                let review_summary = if result.pr.review_threads.authoritative {
+                    format!(
+                        "{} unresolved thread(s)",
+                        result.pr.review_threads.unresolved
+                    )
+                } else {
+                    "review threads not checked".to_string()
+                };
                 let human = format!(
-                    "recorded PR snapshot for {} with {} unresolved thread(s)",
-                    render_pr_label(&result.pr),
-                    unresolved
+                    "recorded PR snapshot for {} with {review_summary}",
+                    render_pr_label(&result.pr)
                 );
                 Ok(CommandOutput {
                     ok: true,
@@ -967,6 +988,15 @@ pub fn pr_control_plan(
     number: u64,
     generated_at: DateTime<Utc>,
 ) -> PrControlPlan {
+    let (owner, name) = repository.split_once('/').unwrap_or((&repository, ""));
+    let owner_arg = format!("owner={owner}");
+    let name_arg = format!("name={name}");
+    let number_arg = format!("number={number}");
+    let reviews_path = format!("repos/{owner}/{name}/pulls/{number}/reviews");
+    let review_comments_path = format!("repos/{owner}/{name}/pulls/{number}/comments");
+    let review_threads_query = "query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100){nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
+    let review_threads_query_arg = format!("query={review_threads_query}");
+
     PrControlPlan {
         schema: PR_CONTROL_PLAN_SCHEMA.to_string(),
         repository: repository.clone(),
@@ -984,7 +1014,7 @@ pub fn pr_control_plan(
                     "--repo",
                     &repository,
                     "--json",
-                    "number,url,state,statusCheckRollup,reviewDecision,headRefOid",
+                    "number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
                 ],
             ),
             pr_control_command(
@@ -997,6 +1027,35 @@ pub fn pr_control_plan(
                     &number.to_string(),
                     "--repo",
                     &repository,
+                    "--json",
+                    "bucket,completedAt,description,event,link,name,startedAt,state,workflow",
+                ],
+            ),
+            pr_control_command(
+                "gh-reviews",
+                "GitHub REST review submissions",
+                ["gh", "api", &reviews_path],
+            ),
+            pr_control_command(
+                "gh-review-comments",
+                "GitHub REST review comments",
+                ["gh", "api", &review_comments_path],
+            ),
+            pr_control_command(
+                "gh-review-threads",
+                "GitHub GraphQL review-thread state",
+                [
+                    "gh",
+                    "api",
+                    "graphql",
+                    "-f",
+                    &owner_arg,
+                    "-f",
+                    &name_arg,
+                    "-F",
+                    &number_arg,
+                    "-f",
+                    &review_threads_query_arg,
                 ],
             ),
             pr_control_command(
@@ -1715,18 +1774,39 @@ fn diff_check_gate() -> PolicyGate {
     )
 }
 
-fn render_pr_record_command(capsule: &Path, source: &Path, checked_at: DateTime<Utc>) -> String {
-    render_command(&[
+fn render_pr_record_command(args: &PrRecordCliArgs, checked_at: DateTime<Utc>) -> String {
+    let mut command = vec![
         "codex-dev".to_string(),
         "pr".to_string(),
         "record".to_string(),
         "--capsule".to_string(),
-        capsule.display().to_string(),
+        args.capsule.display().to_string(),
         "--source".to_string(),
-        source.display().to_string(),
+        args.source.display().to_string(),
+        "--source-kind".to_string(),
+        args.source_kind.to_string(),
+    ];
+    if let Some(repo) = &args.repo {
+        command.push("--repo".to_string());
+        command.push(repo.clone());
+    }
+    if let Some(number) = args.number {
+        command.push("--number".to_string());
+        command.push(number.to_string());
+    }
+    command.extend([
         "--checked-at".to_string(),
         checked_at.to_rfc3339_opts(SecondsFormat::AutoSi, true),
-    ])
+    ]);
+    if let Some(retrieved_at) = args.retrieved_at {
+        command.push("--retrieved-at".to_string());
+        command.push(retrieved_at.to_rfc3339_opts(SecondsFormat::AutoSi, true));
+    }
+    if let Some(source_command) = &args.source_command {
+        command.push("--source-command".to_string());
+        command.push(source_command.clone());
+    }
+    render_command(&command)
 }
 
 fn policy_gate<const N: usize, const M: usize>(
