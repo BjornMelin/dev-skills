@@ -73,8 +73,10 @@ ZIP archive:
 
 `tools/skill/package_skill.py` validates `SKILL.md`, writes archive entries as
 `<skill-name>/...`, and skips common generated caches such as `__pycache__`,
-`*.pyc`, `.codex/`, and local tool caches. `quick_validate.py` validates only
-`SKILL.md` frontmatter; custom-agent TOML files are validated by
+`*.pyc`, `*.skill`, `.codex/`, and local tool caches. It rejects output
+directories nested inside the source skill folder so the bundle cannot package
+itself. `quick_validate.py` validates only `SKILL.md` frontmatter;
+custom-agent TOML files are validated by
 `subagent_creator.py validate`, and `agents/openai.yaml` changes need a focused
 manual review until this repo grows a dedicated metadata validator.
 

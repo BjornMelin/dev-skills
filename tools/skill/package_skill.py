@@ -26,7 +26,7 @@ EXCLUDED_DIR_NAMES = {
     "node_modules",
 }
 EXCLUDED_FILE_NAMES = {".DS_Store"}
-EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
+EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".skill"}
 
 
 def should_package_file(file_path: Path, skill_path: Path) -> bool:
@@ -64,6 +64,9 @@ def package_skill(skill_path: str | Path, output_dir: str | Path | None = None) 
     skill_name = skill_path.name
     if output_dir:
         output_path = Path(output_dir).resolve()
+        if output_path == skill_path or skill_path in output_path.parents:
+            print(f"❌ Error: Output directory cannot be inside the skill folder: {output_path}")
+            return None
         output_path.mkdir(parents=True, exist_ok=True)
     else:
         output_path = Path.cwd()
