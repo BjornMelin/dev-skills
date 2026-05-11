@@ -59,7 +59,17 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Bootstrap packs: `python3 tools/bootstrap/render_bootstrap_pack.py --validate`, render changed packs into temp directories only, and run the hardened subagent smoke matrix in `docs/runbooks/validation.md`
 - Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`
-- Development core/CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-core --all-targets -- -D warnings`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev-core`, `cargo check -p codex-dev`, `cargo test -p codex-dev-core`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev`, `cargo run -q -p codex-dev -- --json policy manifest --profile full_local`, `cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25`; run the task capsule and PR fixture smoke in `docs/runbooks/validation.md` when capsule, policy, or PR recording behavior changes.
+- Development core/CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-core --all-targets -- -D warnings`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev-core`, `cargo check -p codex-dev`, `cargo test -p codex-dev-core`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- --json policy docs-check`, `cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25`; run the task capsule and PR fixture smoke in `docs/runbooks/validation.md` when capsule, policy, or PR recording behavior changes.
+
+Machine-owned policy manifest smoke mirror, checked by `cargo run -q -p codex-dev -- --json policy docs-check`:
+
+```bash
+# codex-dev:policy-manifest-smoke:start
+cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+# codex-dev:policy-manifest-smoke:end
+```
+
 - Development TUI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-tui --all-targets -- -D warnings`, `cargo check -p codex-dev-tui`, `cargo test -p codex-dev-tui`; run the render-once smoke in `docs/runbooks/validation.md` when TUI rendering or state loading changes.
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
 - Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
