@@ -105,8 +105,9 @@ codex-dev completions bash > ~/.local/share/dev-skills/completions/bash/codex-de
 codex-dev completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev.fish
 ```
 
-The command writes the completion script to stdout and does not modify shell
-startup files.
+Without `--json`, the command writes the completion script directly to stdout
+and does not modify shell startup files. With global `--json`, the same content
+is wrapped in the standard output envelope at `result.content`.
 
 ## manpage
 
@@ -117,7 +118,9 @@ cargo run -q -p codex-dev -- manpage > /tmp/codex-dev.1
 codex-dev manpage > ~/.local/share/man/man1/codex-dev.1
 ```
 
-The command writes roff to stdout and does not install it automatically.
+Without `--json`, the command writes roff directly to stdout and does not
+install it automatically. With global `--json`, the same content is wrapped in
+the standard output envelope at `result.content`.
 
 ## capsule init
 
