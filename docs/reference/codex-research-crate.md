@@ -85,6 +85,8 @@ provider calls, evals, and artifact rendering live in focused sibling modules.
 | `anyhow` | error context and early bail-outs |
 | `chrono` | timestamped ledger/cache records |
 | `clap` | CLI parser and command surface |
+| `clap_complete` | shell completion generation from the Clap command surface |
+| `clap_mangen` | roff manpage generation from the Clap command surface |
 | `directories` | platform-aware cache root |
 | `reqwest` | async HTTP client |
 | `rusqlite` | SQLite cache and route memory |

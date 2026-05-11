@@ -1,9 +1,12 @@
 # Local Release and Supply-Chain Runbook
 
 Use this runbook before handing off local installs, release assets, or any PR
-that changes workspace Cargo metadata. It is intentionally Cargo-native: the
-repo records policy in `Cargo.toml`, `Cargo.lock`, `deny.toml`, and
-`codex-dev` policy profiles instead of adding a separate release framework.
+that changes workspace Cargo metadata. Pair it with the
+[Global CLI Workflow](global-cli-workflow.md) when installing, updating, or
+generating shell artifacts for the local binaries. It is intentionally
+Cargo-native: the repo records policy in `Cargo.toml`, `Cargo.lock`,
+`deny.toml`, and `codex-dev` policy profiles instead of adding a separate
+release framework.
 
 References:
 
@@ -128,6 +131,10 @@ cargo install --path crates/codex-research --locked --force
 cargo install --path crates/codex-dev --locked --force
 cargo install --path crates/codex-dev-tui --locked --force
 ```
+
+Use [Global CLI Workflow](global-cli-workflow.md) for completion generation,
+manpage generation, and isolated `cargo install --root` smoke checks that prove
+the binaries execute from another directory without mutating `~/.cargo/bin`.
 
 Smoke the installed binaries from any directory:
 

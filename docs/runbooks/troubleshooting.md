@@ -15,6 +15,8 @@ cargo install --path crates/codex-research --locked --force
 ```
 
 For full local CLI install/update recovery, use
+[Global CLI Workflow](global-cli-workflow.md). For Cargo metadata or
+supply-chain release checks, use
 [Local Release and Supply Chain](local-release-supply-chain.md).
 
 Or run through the skill wrapper:

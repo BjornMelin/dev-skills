@@ -46,6 +46,8 @@ cargo fmt --all --check
 cargo clippy -p codex-research --all-targets -- -D warnings
 cargo check -p codex-research
 cargo test -p codex-research
+cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh
+cargo run -q -p codex-research -- manpage >/tmp/codex-research.1
 ```
 
 CLI smoke:
@@ -96,6 +98,8 @@ cargo check -p codex-dev
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
+cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
+cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
@@ -154,6 +158,8 @@ cargo fmt --all --check
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui
 cargo test -p codex-dev-tui
+cargo run -q -p codex-dev-tui -- completions zsh >/tmp/codex-dev-tui.zsh
+cargo run -q -p codex-dev-tui -- manpage >/tmp/codex-dev-tui.1
 ```
 
 Task capsule smoke:
@@ -209,6 +215,34 @@ cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" 
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 cargo run -q -p codex-dev-tui -- --root "$tmp" --render-once --width 100 --height 24
 cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
+```
+
+## Global CLI Install And Artifact Smokes
+
+Use [Global CLI Workflow](global-cli-workflow.md) after changes to binary
+manifests, command shapes, completions, manpages, or local install
+documentation.
+
+```bash
+cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh
+cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
+cargo run -q -p codex-dev-tui -- completions zsh >/tmp/codex-dev-tui.zsh
+cargo run -q -p codex-research -- manpage >/tmp/codex-research.1
+cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
+cargo run -q -p codex-dev-tui -- manpage >/tmp/codex-dev-tui.1
+repo=$(pwd)
+root="$repo/target/codex-dev-install-smoke/codex-research"
+rm -rf "$root"
+cargo install --path crates/codex-research --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/codex-research" --help >/dev/null)
+root="$repo/target/codex-dev-install-smoke/codex-dev"
+rm -rf "$root"
+cargo install --path crates/codex-dev --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/codex-dev" --help >/dev/null)
+root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
+rm -rf "$root"
+cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null)
 ```
 
 Optional live PR-agent smoke, for branches with a GitHub PR and valid `gh`

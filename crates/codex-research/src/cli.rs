@@ -25,6 +25,10 @@ pub(crate) struct Cli {
 
 #[derive(Subcommand)]
 pub(crate) enum Commands {
+    /// Generate shell completions for local installation.
+    Completions { shell: Shell },
+    /// Generate a roff manpage for local installation.
+    Manpage,
     /// Inspect local provider auth, external tools, and cache paths.
     Doctor,
     /// Produce a provider-aware research plan for a query.

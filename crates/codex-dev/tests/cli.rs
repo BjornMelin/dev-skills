@@ -33,6 +33,28 @@ fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
+#[test]
+fn codex_dev_generates_shell_completion() {
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("codex-dev"))
+        .stdout(predicates::str::contains("capsule"));
+}
+
+#[test]
+fn codex_dev_generates_manpage() {
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .arg("manpage")
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("codex-dev"))
+        .stdout(predicates::str::contains("codex\\-dev\\-capsule"));
+}
+
 fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String {
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")

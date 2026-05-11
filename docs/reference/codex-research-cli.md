@@ -15,8 +15,9 @@ codex-research --help
 
 For the full global install/update baseline across `codex-research`,
 `codex-dev`, and `codex-dev-tui`, use the
+[Global CLI Workflow](../runbooks/global-cli-workflow.md) and
 [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
-runbook.
+runbooks.
 
 The binary supports `--json` globally for machine-readable output where
 supported, and `--config <path>` to load an explicit TOML config.
@@ -71,6 +72,32 @@ Commands:
 - `config`
 - `run`
 - `eval`
+- `completions`
+- `manpage`
+
+## completions
+
+Generate shell completions from the canonical Clap command definition:
+
+```bash
+cargo run -q -p codex-research -- completions zsh > /tmp/_codex-research
+codex-research completions bash > ~/.local/share/dev-skills/completions/bash/codex-research
+codex-research completions fish > ~/.local/share/dev-skills/completions/fish/codex-research.fish
+```
+
+The command writes the completion script to stdout and does not modify shell
+startup files.
+
+## manpage
+
+Generate a roff manpage from the canonical Clap command definition:
+
+```bash
+cargo run -q -p codex-research -- manpage > /tmp/codex-research.1
+codex-research manpage > ~/.local/share/man/man1/codex-research.1
+```
+
+The command writes roff to stdout and does not install it automatically.
 
 ## config
 

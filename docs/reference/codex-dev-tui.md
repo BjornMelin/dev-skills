@@ -7,7 +7,7 @@ It reads the existing capsule JSON contracts through `codex-dev-core` and
 renders an operator view for quick scanning. It does not own policy gates, PR
 remediation, or capsule business logic.
 
-Tracking: #20, #28, #52, and #53.
+Tracking: #20, #28, #52, #53, and #55.
 
 ## Ownership Boundary
 
@@ -39,7 +39,11 @@ Build the binary:
 
 ```bash
 cargo build -p codex-dev-tui
+cargo install --path crates/codex-dev-tui --locked --force
 ```
+
+Use [Global CLI Workflow](../runbooks/global-cli-workflow.md) for the
+three-binary install/update workflow and shell artifact generation.
 
 Open the dashboard for the default local task root:
 
@@ -57,6 +61,13 @@ Open a local task capsule directly:
 
 ```bash
 cargo run -q -p codex-dev-tui -- --capsule .codex/tasks/<id>
+```
+
+Generate shell completions and a manpage:
+
+```bash
+cargo run -q -p codex-dev-tui -- completions zsh > /tmp/_codex-dev-tui
+cargo run -q -p codex-dev-tui -- manpage > /tmp/codex-dev-tui.1
 ```
 
 Interactive mode polls for terminal input and refresh ticks every 250

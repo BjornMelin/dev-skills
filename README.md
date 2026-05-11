@@ -36,6 +36,7 @@ Key docs:
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
+- [Global CLI workflow](docs/runbooks/global-cli-workflow.md)
 - [Rust skill suite](docs/reference/rust-skill-suite.md)
 - [Memory guidance proposals](docs/cookbooks/memory-guidance-proposals.md)
 - [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
@@ -123,6 +124,17 @@ codex-dev --help
 codex-dev-tui --help
 ```
 
+Generate shell completions and manpages from the installed binaries:
+
+```bash
+codex-research completions zsh > /tmp/_codex-research
+codex-dev completions zsh > /tmp/_codex-dev
+codex-dev-tui completions zsh > /tmp/_codex-dev-tui
+codex-research manpage > /tmp/codex-research.1
+codex-dev manpage > /tmp/codex-dev.1
+codex-dev-tui manpage > /tmp/codex-dev-tui.1
+```
+
 Smoke the development CLI from source:
 
 ```bash
@@ -142,8 +154,9 @@ cargo run -q -p codex-dev -- --json pr readiness --help
 ```
 
 For release handoff and safe updates from any directory, use the
+[Global CLI Workflow](docs/runbooks/global-cli-workflow.md) and
 [Local Release and Supply Chain](docs/runbooks/local-release-supply-chain.md)
-runbook. `codex-dev-core` is a library crate, not an installed binary.
+runbooks. `codex-dev-core` is a library crate, not an installed binary.
 
 Preview a repo bootstrap pack:
 

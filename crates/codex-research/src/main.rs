@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
 use directories::BaseDirs;
 use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, LINK, RANGE, USER_AGENT};
 use rusqlite::{Connection, OpenFlags, params};
@@ -73,9 +74,24 @@ const EVIDENCE_BUNDLE_SCHEMA: &str = "codex-research.evidence-bundle.v1";
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    match &cli.command {
+        Commands::Completions { shell } => {
+            print!("{}", render_completion(*shell)?);
+            return Ok(());
+        }
+        Commands::Manpage => {
+            print!("{}", render_manpage()?);
+            return Ok(());
+        }
+        _ => {}
+    }
+
     let loaded_config = load_config(cli.config.as_deref())?;
     let config = loaded_config.config;
     match cli.command {
+        Commands::Completions { .. } | Commands::Manpage => {
+            unreachable!("handled before config load")
+        }
         Commands::Doctor => doctor(cli.json),
         Commands::Plan(args) => output_plan(args, &config, cli.json),
         Commands::Search(args) => output_search_plan(args, &config, cli.json),
@@ -90,6 +106,21 @@ async fn main() -> Result<()> {
         Commands::Run { command } => handle_run(command, &config, cli.json),
         Commands::Eval(args) => run_eval(args, &config, cli.json).await,
     }
+}
+
+fn render_completion(shell: Shell) -> Result<String> {
+    let mut command = Cli::command();
+    let binary_name = command.get_name().to_string();
+    let mut buffer = Vec::new();
+    clap_complete::generate(shell, &mut command, binary_name, &mut buffer);
+    Ok(String::from_utf8(buffer)?)
+}
+
+fn render_manpage() -> Result<String> {
+    let command = Cli::command();
+    let mut buffer = Vec::new();
+    clap_mangen::Man::new(command).render(&mut buffer)?;
+    Ok(String::from_utf8(buffer)?)
 }
 
 #[cfg(test)]

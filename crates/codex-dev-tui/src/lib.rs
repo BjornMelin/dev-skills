@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser, Subcommand};
+use clap_complete::Shell;
 use codex_dev_core::{
     CapsuleStatus, CheckRecord, EvidenceKind, EvidenceRecord, PR_AGENT_HOSTED_ACTION_SCHEMA,
     PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA, PrAgentHostedActionReport,
@@ -57,13 +58,44 @@ pub struct Cli {
         help = "Interactive poll interval in milliseconds"
     )]
     tick_ms: u64,
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Generate shell completions for local installation.
+    Completions { shell: Shell },
+    /// Generate a roff manpage for local installation.
+    Manpage,
 }
 
 /// Parse CLI arguments and run either the interactive TUI or deterministic render mode.
 pub fn run() -> Result<()> {
-    let cli = Cli::parse();
-    if cli.render_once {
-        let result = render_once_for_cli(cli.capsule.as_deref(), &cli.root, cli.width, cli.height)?;
+    let Cli {
+        capsule,
+        root,
+        render_once,
+        width,
+        height,
+        tick_ms,
+        command,
+    } = Cli::parse();
+
+    match command {
+        Some(Commands::Completions { shell }) => {
+            print!("{}", render_completion(shell)?);
+            return Ok(());
+        }
+        Some(Commands::Manpage) => {
+            print!("{}", render_manpage()?);
+            return Ok(());
+        }
+        None => {}
+    }
+
+    if render_once {
+        let result = render_once_for_cli(capsule.as_deref(), &root, width, height)?;
         print!("{}", result.output);
         if !result.valid {
             anyhow::bail!("invalid capsule; see render output for validation details");
@@ -71,15 +103,27 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    run_interactive(
-        cli.capsule.as_deref(),
-        &cli.root,
-        interactive_tick_rate(cli.tick_ms)?,
-    )
-    .map_err(|error| match cli.capsule.as_deref() {
-        Some(capsule) => sanitized_cli_error(error, capsule),
-        None => sanitized_path_error(error, &cli.root, "<tasks-root>"),
+    run_interactive(capsule.as_deref(), &root, interactive_tick_rate(tick_ms)?).map_err(|error| {
+        match capsule.as_deref() {
+            Some(capsule) => sanitized_cli_error(error, capsule),
+            None => sanitized_path_error(error, &root, "<tasks-root>"),
+        }
     })
+}
+
+fn render_completion(shell: Shell) -> Result<String> {
+    let mut command = Cli::command();
+    let binary_name = command.get_name().to_string();
+    let mut buffer = Vec::new();
+    clap_complete::generate(shell, &mut command, binary_name, &mut buffer);
+    Ok(String::from_utf8(buffer)?)
+}
+
+fn render_manpage() -> Result<String> {
+    let command = Cli::command();
+    let mut buffer = Vec::new();
+    clap_mangen::Man::new(command).render(&mut buffer)?;
+    Ok(String::from_utf8(buffer)?)
 }
 
 /// Open the interactive terminal UI for the dashboard or one local `codex-dev` capsule.
@@ -2318,6 +2362,17 @@ mod tests {
         SubagentSynthesisRecord, VERIFICATION_SCHEMA, init_capsule,
     };
     use tempfile::tempdir;
+
+    #[test]
+    fn cli_artifact_generation_uses_tui_command_contract() {
+        let completion = render_completion(Shell::Zsh).expect("completion");
+        assert!(completion.contains("codex-dev-tui"));
+        assert!(completion.contains("render-once"));
+
+        let manpage = render_manpage().expect("manpage");
+        assert!(manpage.contains("codex-dev-tui"));
+        assert!(manpage.contains("Terminal workbench"));
+    }
 
     #[test]
     fn load_reads_codex_dev_core_contracts() {

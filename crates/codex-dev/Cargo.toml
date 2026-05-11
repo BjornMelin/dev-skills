@@ -16,6 +16,8 @@ path = "src/main.rs"
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.6"
+clap_mangen = "0.3"
 codex-dev-core = { version = "0.1.0", path = "../codex-dev-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

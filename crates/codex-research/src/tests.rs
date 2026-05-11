@@ -8,6 +8,19 @@ fn temp_path(name: &str) -> PathBuf {
 }
 
 #[test]
+fn cli_artifact_generation_uses_research_command_contract() -> Result<()> {
+    let completion = render_completion(Shell::Fish)?;
+    assert!(completion.contains("codex-research"));
+    assert!(completion.contains("context7"));
+
+    let manpage = render_manpage()?;
+    assert!(manpage.contains("codex-research"));
+    assert!(manpage.contains("codex\\-research\\-context7"));
+
+    Ok(())
+}
+
+#[test]
 fn dependency_plan_prefers_docs_source_and_github_routes() {
     let plan = build_plan(
         "verify dependency behavior",

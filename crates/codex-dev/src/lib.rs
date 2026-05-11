@@ -9,7 +9,8 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use clap_complete::Shell;
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
     EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
@@ -84,6 +85,8 @@ impl Cli {
                 SubagentsCommand::Outcome(_) => "subagents record-outcome",
                 SubagentsCommand::Synthesis(_) => "subagents record-synthesis",
             },
+            Commands::Completions(_) => "completions",
+            Commands::Manpage => "manpage",
         }
     }
 }
@@ -115,6 +118,16 @@ enum Commands {
         #[command(subcommand)]
         command: SubagentsCommand,
     },
+    /// Generate shell completions for local installation.
+    Completions(CompletionArgs),
+    /// Generate a roff manpage for local installation.
+    Manpage,
+}
+
+#[derive(Args, Debug)]
+pub struct CompletionArgs {
+    #[arg(value_enum)]
+    shell: Shell,
 }
 
 #[derive(Subcommand, Debug)]
@@ -740,6 +753,33 @@ where
 
 fn handle_cli(cli: Cli) -> Result<CommandOutput> {
     match cli.command {
+        Commands::Completions(args) => {
+            let shell = shell_name(args.shell);
+            let content = render_completion(args.shell)?;
+            Ok(CommandOutput {
+                ok: true,
+                command: "completions",
+                human: content.clone(),
+                result: json!({
+                    "binary": "codex-dev",
+                    "shell": shell,
+                    "content": content,
+                }),
+            })
+        }
+        Commands::Manpage => {
+            let content = render_manpage()?;
+            Ok(CommandOutput {
+                ok: true,
+                command: "manpage",
+                human: content.clone(),
+                result: json!({
+                    "binary": "codex-dev",
+                    "section": 1,
+                    "content": content,
+                }),
+            })
+        }
         Commands::Capsule { command } => match command {
             CapsuleCommand::Init(args) => {
                 let result = init_capsule(args.into_core())?;
@@ -1049,6 +1089,28 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
         },
     }
+}
+
+fn render_completion(shell: Shell) -> Result<String> {
+    let mut command = Cli::command();
+    let binary_name = command.get_name().to_string();
+    let mut buffer = Vec::new();
+    clap_complete::generate(shell, &mut command, binary_name, &mut buffer);
+    Ok(String::from_utf8(buffer)?)
+}
+
+fn render_manpage() -> Result<String> {
+    let command = Cli::command();
+    let mut buffer = Vec::new();
+    clap_mangen::Man::new(command).render(&mut buffer)?;
+    Ok(String::from_utf8(buffer)?)
+}
+
+fn shell_name(shell: Shell) -> String {
+    shell
+        .to_possible_value()
+        .map(|value| value.get_name().to_string())
+        .unwrap_or_else(|| format!("{shell:?}").to_ascii_lowercase())
 }
 
 fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
@@ -4563,6 +4625,31 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "Failure means the CLI cannot render its top-level Clap contract.",
         ),
         policy_gate(
+            "codex-dev-completion-zsh",
+            "codex-dev zsh completion smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "completions",
+                "zsh",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-dev cannot generate shell completions from its Clap contract.",
+        ),
+        policy_gate(
+            "codex-dev-manpage",
+            "codex-dev manpage smoke",
+            ["cargo", "run", "-q", "-p", "codex-dev", "--", "manpage"],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-dev cannot generate a manpage from its Clap contract.",
+        ),
+        policy_gate(
             "codex-dev-policy-manifest",
             "codex-dev policy manifest smoke",
             [
@@ -4653,6 +4740,31 @@ fn codex_dev_tui_gates() -> Vec<PolicyGate> {
             "docs/runbooks/validation.md#codex-dev-operating-layer",
             ["cargo"],
             "Failure means the TUI cannot render its top-level Clap contract.",
+        ),
+        policy_gate(
+            "codex-dev-tui-completion-zsh",
+            "codex-dev-tui zsh completion smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev-tui",
+                "--",
+                "completions",
+                "zsh",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-dev-tui cannot generate shell completions from its Clap contract.",
+        ),
+        policy_gate(
+            "codex-dev-tui-manpage",
+            "codex-dev-tui manpage smoke",
+            ["cargo", "run", "-q", "-p", "codex-dev-tui", "--", "manpage"],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-dev-tui cannot generate a manpage from its Clap contract.",
         ),
     ]
 }
@@ -4783,6 +4895,39 @@ fn codex_research_gates() -> Vec<PolicyGate> {
             "docs/runbooks/validation.md#rust-cli",
             ["cargo"],
             "Failure means local research profile planning regressed.",
+        ),
+        policy_gate(
+            "codex-research-completion-zsh",
+            "codex-research zsh completion smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "completions",
+                "zsh",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-research cannot generate shell completions from its Clap contract.",
+        ),
+        policy_gate(
+            "codex-research-manpage",
+            "codex-research manpage smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-research",
+                "--",
+                "manpage",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means codex-research cannot generate a manpage from its Clap contract.",
         ),
     ]
 }
@@ -4984,6 +5129,7 @@ fn full_local_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, codex_dev_gates());
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, local_cli_install_smoke_gates());
     append_unique_gates(&mut gates, bootstrap_install_gates());
     append_unique_gates(&mut gates, skills_gates());
     append_unique_gates(&mut gates, docs_gates());
@@ -5144,6 +5290,34 @@ fn supply_chain_gates() -> Vec<PolicyGate> {
             "Failure means codex-research is missing package metadata or would package unexpected invalid content.",
         ),
     ]
+}
+
+fn local_cli_install_smoke_gates() -> Vec<PolicyGate> {
+    vec![
+        local_cli_install_smoke_gate("codex-research", "crates/codex-research"),
+        local_cli_install_smoke_gate("codex-dev", "crates/codex-dev"),
+        local_cli_install_smoke_gate("codex-dev-tui", "crates/codex-dev-tui"),
+    ]
+}
+
+fn local_cli_install_smoke_gate(binary: &'static str, crate_path: &'static str) -> PolicyGate {
+    let command = format!(
+        "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null)"
+    );
+    PolicyGate {
+        id: format!("cargo-install-{binary}-smoke"),
+        name: format!("{binary} isolated cargo install smoke"),
+        command: vec!["bash".to_string(), "-lc".to_string(), command],
+        source: "docs/runbooks/global-cli-workflow.md#install-smoke-gates".to_string(),
+        working_directory: ".".to_string(),
+        required_tools: vec!["bash".to_string(), "cargo".to_string()],
+        required: true,
+        network: false,
+        secrets: false,
+        failure_interpretation: format!(
+            "Failure means {binary} cannot be installed into an isolated Cargo root and executed from another directory."
+        ),
+    }
 }
 
 fn render_pr_record_command(args: &PrRecordCliArgs, checked_at: DateTime<Utc>) -> String {
@@ -5955,6 +6129,8 @@ mod tests {
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "codex-dev-help",
+                "codex-dev-completion-zsh",
+                "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
@@ -5970,6 +6146,8 @@ mod tests {
                 "codex-dev-tui-check",
                 "codex-dev-tui-test",
                 "codex-dev-tui-help",
+                "codex-dev-tui-completion-zsh",
+                "codex-dev-tui-manpage",
             ],
         );
         assert_profile_ids(
@@ -5984,6 +6162,8 @@ mod tests {
                 "codex-research-eval-list",
                 "codex-research-eval-strict",
                 "codex-research-plan-quick",
+                "codex-research-completion-zsh",
+                "codex-research-manpage",
             ],
         );
         assert_profile_ids(
@@ -6028,6 +6208,8 @@ mod tests {
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "codex-dev-help",
+                "codex-dev-completion-zsh",
+                "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
@@ -6037,6 +6219,8 @@ mod tests {
                 "codex-dev-tui-check",
                 "codex-dev-tui-test",
                 "codex-dev-tui-help",
+                "codex-dev-tui-completion-zsh",
+                "codex-dev-tui-manpage",
                 "codex-research-clippy",
                 "codex-research-check",
                 "codex-research-test",
@@ -6045,6 +6229,8 @@ mod tests {
                 "codex-research-eval-list",
                 "codex-research-eval-strict",
                 "codex-research-plan-quick",
+                "codex-research-completion-zsh",
+                "codex-research-manpage",
                 "docs-no-todo",
                 "bootstrap-pack-validate",
                 "skills-quick-validate-all",
@@ -6073,6 +6259,8 @@ mod tests {
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "codex-dev-help",
+                "codex-dev-completion-zsh",
+                "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
                 "codex-dev-pr-plan-smoke",
@@ -6082,6 +6270,8 @@ mod tests {
                 "codex-dev-tui-check",
                 "codex-dev-tui-test",
                 "codex-dev-tui-help",
+                "codex-dev-tui-completion-zsh",
+                "codex-dev-tui-manpage",
                 "codex-research-clippy",
                 "codex-research-check",
                 "codex-research-test",
@@ -6090,6 +6280,11 @@ mod tests {
                 "codex-research-eval-list",
                 "codex-research-eval-strict",
                 "codex-research-plan-quick",
+                "codex-research-completion-zsh",
+                "codex-research-manpage",
+                "cargo-install-codex-research-smoke",
+                "cargo-install-codex-dev-smoke",
+                "cargo-install-codex-dev-tui-smoke",
                 "bootstrap-pack-validate",
                 "bootstrap-pack-render-smoke",
                 "hardened-codex-release-manifest",
