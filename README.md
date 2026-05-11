@@ -95,9 +95,10 @@ operating layer:
 - `codex-dev-core`: shared contract/read-model crate for task capsules,
   validation, rendered summaries, policy manifest data, and PR evidence
   snapshots.
-- `codex-dev`: current CLI for local task capsule lifecycle, repo-native
-  policy gates, and PR evidence capture. It depends on `codex-dev-core` and
-  keeps Clap parsing plus process execution at the CLI boundary.
+- `codex-dev`: current CLI for local task capsule lifecycle, structured
+  evidence appenders, repo-native policy gates, and PR evidence capture. It
+  depends on `codex-dev-core` and keeps Clap parsing plus process execution at
+  the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
   JSON contracts through `codex-dev-core` without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent

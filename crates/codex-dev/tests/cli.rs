@@ -432,3 +432,163 @@ fn pr_record_json_error_does_not_repair_missing_pr_contract() {
         evidence_before
     );
 }
+
+#[test]
+fn evidence_append_records_typed_entries_and_status_counts() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Evidence append smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "evidence-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let append_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "evidence",
+            "append",
+            "--capsule",
+            capsule,
+            "--kind",
+            "decision",
+            "--summary",
+            "Use one typed append command",
+            "--at",
+            "2026-05-09T06:00:00Z",
+            "--source-id",
+            "issue:42",
+            "--actor",
+            "codex",
+            "--tool",
+            "codex-dev",
+            "--confidence",
+            "95",
+            "--residual-risk",
+            "future PR normalizers still need fixtures",
+            "--artifact",
+            "docs/reference/codex-dev-cli.md",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let append_json: Value = serde_json::from_slice(&append_output).expect("append json");
+    assert_eq!(append_json["command"], "evidence append");
+    assert_eq!(append_json["result"]["record"]["kind"], "decision");
+    assert_eq!(append_json["result"]["record"]["source_ids"][0], "issue:42");
+    assert_eq!(append_json["result"]["record"]["confidence"], 95);
+    assert_eq!(append_json["result"]["evidence"]["total"], 2);
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["capsule", "status", capsule])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("evidence: decision=1"))
+        .stdout(predicates::str::contains("manual=1"));
+
+    let status_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["--json", "capsule", "status", capsule])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let status_json: Value = serde_json::from_slice(&status_output).expect("status json");
+    assert_eq!(status_json["result"]["evidence"]["total"], 2);
+    let decision = status_json["result"]["evidence"]["by_kind"]
+        .as_array()
+        .expect("by kind")
+        .iter()
+        .find(|kind| kind["kind"] == "decision")
+        .expect("decision summary");
+    assert_eq!(decision["latest_summary"], "Use one typed append command");
+}
+
+#[test]
+fn evidence_append_json_errors_are_typed_and_do_not_write() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Evidence invalid smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "evidence-invalid-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+    let evidence_path = std::path::Path::new(capsule).join("evidence.jsonl");
+    let evidence_before = std::fs::read_to_string(&evidence_path).expect("evidence before");
+
+    let append_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "evidence",
+            "append",
+            "--capsule",
+            capsule,
+            "--kind",
+            "ci",
+            "--summary",
+            "",
+            "--at",
+            "2026-05-09T06:00:00Z",
+            "--exit-code",
+            "1",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let append_json: Value = serde_json::from_slice(&append_output).expect("append error json");
+    assert_eq!(append_json["ok"], false);
+    assert_eq!(append_json["command"], "evidence append");
+    let message = append_json["result"]["error"]["message"]
+        .as_str()
+        .expect("message");
+    assert!(message.contains("summary must not be empty"));
+    assert!(message.contains("exit_code requires command"));
+    assert_eq!(
+        std::fs::read_to_string(&evidence_path).expect("evidence after"),
+        evidence_before
+    );
+}

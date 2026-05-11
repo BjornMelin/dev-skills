@@ -39,7 +39,8 @@ out of version control.
   issue ledger and execution order for the next local CLI/TUI, PR-agent,
   release, and future-surface wave.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
-  local task capsule lifecycle and policy-gate commands.
+  local task capsule lifecycle, evidence appenders, policy gates, and PR
+  evidence capture.
 - [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.

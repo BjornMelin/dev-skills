@@ -5,7 +5,7 @@ contracts and read models. It is intentionally small: CLI parsing, terminal UI
 rendering, hosted provider calls, subprocess execution, and merge/review actions
 live outside this crate.
 
-Tracking: #40.
+Tracking: #40 and #42.
 
 ## Public Boundary
 
@@ -16,11 +16,14 @@ The crate owns:
 - serde data models for `capsule.json`, `evidence.jsonl`,
   `verification.json`, `subagents.json`, `pr.json`, and `policy.json`;
 - local capsule helpers including `init_capsule`, `validate_capsule`,
-  `capsule_status`, `render_capsule`, `record_pr_snapshot`, and `pr_status`;
+  `capsule_status`, `render_capsule`, `append_evidence`,
+  `record_pr_snapshot`, and `pr_status`;
 - policy and PR evidence data models such as `PolicyManifest`,
   `PolicyGate`, `PrControlPlan`, and `PrControlCommand`;
+- evidence summaries used by status/render output, including total count,
+  count by kind, and latest record by kind;
 - narrow JSON/JSONL file helpers used by `codex-dev` when recording policy
-  evidence.
+  and evidence appender output.
 
 The crate does not own:
 

@@ -58,6 +58,9 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
+The task capsule smoke below covers `evidence append` and the follow-up
+`capsule status` evidence summary against a real fixture capsule.
+
 Run after changing `crates/codex-dev-tui/` or TUI docs:
 
 ```bash
@@ -75,6 +78,8 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T04:30:00Z
+cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/pr-snapshot.json" <<'JSON'
 {
@@ -237,6 +242,8 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
+cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T04:30:00Z
+cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/pr-snapshot.json" <<'JSON'
 {

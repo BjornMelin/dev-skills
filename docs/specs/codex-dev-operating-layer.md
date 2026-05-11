@@ -56,7 +56,7 @@ preserve.
 
 | Surface | Canonical owner | `codex-dev` relationship |
 | --- | --- | --- |
-| Research provider routing, source cache, claim ledgers, research evals | `codex-research` | Calls or records output as external evidence. |
+| Research provider routing, source cache, claim ledgers, research evals | `codex-research` | May reference sanitized source IDs or summaries as local evidence; provider calls and raw provider output remain outside `codex-dev`. |
 | Task capsule contracts and local read models | `codex-dev-core` | Shared schema and file-helper owner for CLI, TUI, and future PR-agent surfaces. |
 | Policy-gate orchestration and PR/eval/bootstrap evidence appenders | `codex-dev` | CLI/process boundary over `codex-dev-core` contracts. |
 | Skill metadata and package validation | `tools/skill`, skill folders | Runs existing validators and records results. |
@@ -104,7 +104,8 @@ Validation is strict. Every required file must exist and every JSON contract
 must keep its exact schema identifier. Capsule initialization is the command
 that creates the layout; follow-on commands such as `pr record` update their
 owned files but do not silently repair missing contracts in an already-created
-capsule.
+capsule. Follow-on write commands must not move `capsule.json.updated_at`
+backwards when recording backfilled evidence.
 
 ### capsule.json
 
@@ -165,6 +166,11 @@ Allowed `status` values:
   "summary": "docs link check passed",
   "command": "python3 tools/docs/check_links.py docs README.md AGENTS.md",
   "exit_code": 0,
+  "source_ids": ["validation:docs-links"],
+  "actor": "codex",
+  "tool": "codex-dev",
+  "confidence": 100,
+  "residual_risk": "none identified",
   "artifacts": []
 }
 ```
@@ -178,11 +184,39 @@ Allowed `kind` values:
 - `decision`
 - `research`
 - `manual`
+- `output`
+
+Optional evidence metadata:
+
+- `command` and `exit_code` record command evidence; an `exit_code` requires a
+  command.
+- `source_ids` records local source IDs, issue IDs, fixture IDs, or sanitized
+  IDs from an external evidence ledger. It does not authorize `codex-dev` to
+  fetch, ingest, or persist raw provider output.
+- `actor` and `tool` record who or what produced the evidence.
+- `confidence` is an integer from `0` to `100`.
+- `residual_risk` records known risks.
+- `artifacts` records local paths or stable artifact identifiers.
+
+Record validity rules:
+
+- `schema` must be `codex-dev.evidence.v1`.
+- Text fields and repeated values must be non-empty and must not contain control
+  characters.
+- `exit_code` requires `command`.
+- `confidence` must be between `0` and `100`.
 
 Provider response dumps, secrets, private repository content, ignored overlay
 manifests, and raw local workstation paths must not be written to any tracked
 artifact, including docs and task-capsule evidence files. Capsules may include
 local paths only when they remain local and untracked.
+
+`codex-dev evidence append` is the CLI owner for adding validated evidence
+records without hand-editing this JSONL file. Follow-on write commands reject
+symlinked JSON/JSONL contract files before validation or writing. The appender
+updates `capsule.json.updated_at` monotonically: backfilled evidence never
+moves the capsule timestamp backwards. `capsule status` and `capsule render`
+summarize total evidence count, count by kind, and latest evidence by kind.
 
 ### verification.json
 
@@ -308,7 +342,9 @@ commands, but those tools remain the live source of truth for hosted review and
 CI state. Commands that need a caller-supplied artifact expose that requirement
 with `manual_input` and are not marked directly required. `codex-dev pr record`
 accepts local normalized snapshots and writes only the typed `pr.json` evidence
-contract plus an `evidence.jsonl` summary.
+contract plus an `evidence.jsonl` summary. It updates
+`capsule.json.updated_at` monotonically, matching the evidence appender
+freshness rule.
 
 ### Markdown Notes
 
