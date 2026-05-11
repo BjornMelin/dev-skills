@@ -50,9 +50,10 @@ name = "codex-research"
 path = "src/main.rs"
 ```
 
-`main.rs` is intentionally thin: it owns process startup, `Cli::parse()`,
-configuration loading, and top-level dispatch only. Command behavior, storage,
-provider calls, evals, and artifact rendering live in focused sibling modules.
+`main.rs` is intentionally thin: it owns process startup, early Clap artifact
+rendering for completions/manpages, `Cli::parse()`, configuration loading, and
+top-level dispatch only. Command behavior, storage, provider calls, and evals
+live in focused sibling modules.
 
 ## Module Ownership
 
@@ -121,6 +122,8 @@ provider calls, evals, and artifact rendering live in focused sibling modules.
 - `Config`
 - `Run`
 - `Eval`
+- `Completions`
+- `Manpage`
 
 Nested command enums:
 
