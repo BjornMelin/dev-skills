@@ -8,12 +8,13 @@ use anyhow::{Context, Result, bail};
 use chrono::{DateTime, SecondsFormat, Utc};
 use clap::{Args, Parser, Subcommand};
 use codex_dev_core::{
-    Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceRecord, GateRecord, GateStatus,
-    InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate,
-    PolicyGateResult, PolicyManifest, PolicyProfile, PolicyRunResult, PrControlCommand,
-    PrControlPlan, PrRecordArgs, Verification, append_jsonl, capsule_status, init_capsule,
-    pr_status, read_json, record_pr_snapshot, render_capsule, render_command, render_pr_label,
-    render_pr_status, validate_capsule, write_json,
+    AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
+    EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
+    PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
+    PolicyRunResult, PrControlCommand, PrControlPlan, PrRecordArgs, Verification, append_evidence,
+    append_jsonl, capsule_status, init_capsule, pr_status, read_json, record_pr_snapshot,
+    render_capsule, render_command, render_pr_label, render_pr_status, validate_capsule,
+    write_json,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -42,6 +43,9 @@ impl Cli {
                 CapsuleCommand::Status(_) => "capsule status",
                 CapsuleCommand::Render(_) => "capsule render",
             },
+            Commands::Evidence { command } => match command {
+                EvidenceCommand::Append(_) => "evidence append",
+            },
             Commands::Policy { command } => match command {
                 PolicyCommand::Manifest(_) => "policy manifest",
                 PolicyCommand::Run(_) => "policy run",
@@ -61,6 +65,11 @@ enum Commands {
     Capsule {
         #[command(subcommand)]
         command: CapsuleCommand,
+    },
+    /// Append typed evidence records to task capsules.
+    Evidence {
+        #[command(subcommand)]
+        command: EvidenceCommand,
     },
     /// Plan or run repo-native validation policy gates.
     Policy {
@@ -84,6 +93,12 @@ enum CapsuleCommand {
     Status(PathArgs),
     /// Render a Markdown summary from capsule state.
     Render(PathArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum EvidenceCommand {
+    /// Append one typed evidence record to evidence.jsonl.
+    Append(EvidenceAppendArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -147,6 +162,57 @@ impl PrRecordCliArgs {
 pub struct PrStatusArgs {
     #[arg(long, value_name = "CAPSULE_DIR")]
     pub capsule: PathBuf,
+}
+
+#[derive(Args, Debug)]
+pub struct EvidenceAppendArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long, value_name = "KIND")]
+    pub kind: EvidenceKind,
+    #[arg(long)]
+    pub summary: String,
+    #[arg(long, value_name = "RFC3339")]
+    pub at: Option<DateTime<Utc>>,
+    #[arg(long, value_name = "COMMAND")]
+    pub command: Option<String>,
+    #[arg(long, value_name = "EXIT_CODE")]
+    pub exit_code: Option<i32>,
+    #[arg(long = "source-id", value_name = "SOURCE_ID")]
+    pub source_ids: Vec<String>,
+    #[arg(long)]
+    pub actor: Option<String>,
+    #[arg(long)]
+    pub tool: Option<String>,
+    #[arg(long, value_name = "0_TO_100")]
+    pub confidence: Option<u8>,
+    #[arg(long = "residual-risk")]
+    pub residual_risk: Option<String>,
+    #[arg(long = "artifact", value_name = "ARTIFACT")]
+    pub artifacts: Vec<String>,
+}
+
+impl EvidenceAppendArgs {
+    fn into_core(self) -> AppendEvidenceArgs {
+        let at = self.at.unwrap_or_else(Utc::now);
+        AppendEvidenceArgs {
+            capsule: self.capsule,
+            record: EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: self.kind,
+                at,
+                summary: self.summary,
+                command: self.command,
+                exit_code: self.exit_code,
+                source_ids: self.source_ids,
+                actor: self.actor,
+                tool: self.tool,
+                confidence: self.confidence,
+                residual_risk: self.residual_risk,
+                artifacts: self.artifacts,
+            },
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -340,7 +406,13 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 Ok(CommandOutput {
                     ok: true,
                     command: "capsule status",
-                    human: format!("{} [{}] on {}", result.title, result.status, result.branch),
+                    human: format!(
+                        "{} [{}] on {}; evidence: {}",
+                        result.title,
+                        result.status,
+                        result.branch,
+                        render_evidence_counts(&result.evidence.by_kind)
+                    ),
                     result: serde_json::to_value(result)?,
                 })
             }
@@ -350,6 +422,22 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     ok: true,
                     command: "capsule render",
                     human: result.markdown.clone(),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
+        Commands::Evidence { command } => match command {
+            EvidenceCommand::Append(args) => {
+                let result = append_evidence(args.into_core())?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "evidence append",
+                    human: format!(
+                        "appended {} evidence to {}; {} total evidence record(s)",
+                        result.record.kind,
+                        result.capsule.display(),
+                        result.evidence.total
+                    ),
                     result: serde_json::to_value(result)?,
                 })
             }
@@ -461,6 +549,18 @@ fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
     } else {
         Ok(format!("{}\n", output.human))
     }
+}
+
+fn render_evidence_counts(by_kind: &[EvidenceKindSummary]) -> String {
+    if by_kind.is_empty() {
+        return "0 records".to_string();
+    }
+
+    by_kind
+        .iter()
+        .map(|summary| format!("{}={}", summary.kind, summary.count))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 pub fn policy_manifest(profile: PolicyProfile, generated_at: DateTime<Utc>) -> PolicyManifest {
@@ -933,13 +1033,18 @@ fn record_policy_run(
                 summary: format!("Policy gate {} {}", gate.id, gate.status),
                 command: Some(gate.command.clone()),
                 exit_code: gate.exit_code,
+                source_ids: Vec::new(),
+                actor: None,
+                tool: None,
+                confidence: None,
+                residual_risk: None,
                 artifacts: vec!["verification.json".to_string()],
             },
         )?;
     }
 
     let mut capsule: Capsule = read_json(&capsule_path.join("capsule.json"))?;
-    capsule.updated_at = checked_at;
+    capsule.updated_at = std::cmp::max(capsule.updated_at, checked_at);
     write_json(capsule_path.join("capsule.json"), &capsule)?;
     Ok(())
 }
@@ -1083,6 +1188,34 @@ mod tests {
 
         let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
         assert!(evidence.contains("Policy gate cargo-fmt planned"));
+    }
+
+    #[test]
+    fn policy_run_keeps_capsule_updated_at_monotonic() {
+        let temp = tempdir().expect("tempdir");
+        let mut args = init_args(temp.path().to_path_buf());
+        args.created_at = "2026-05-09T10:00:00Z".parse().unwrap();
+        let capsule = init_capsule(args).expect("init capsule").path;
+
+        run_policy_gates(
+            PolicyRunArgs {
+                capsule: capsule.clone(),
+                repo_root: None,
+                profile: PolicyProfile::CodexDev,
+                execute: false,
+                allow_network: false,
+                keep_going: false,
+                checked_at: None,
+            },
+            "2026-05-09T09:00:00Z".parse().unwrap(),
+        )
+        .expect("policy dry run");
+
+        let capsule_state: Capsule = read_json(&capsule.join("capsule.json")).expect("capsule");
+        assert_eq!(
+            capsule_state.updated_at,
+            "2026-05-09T10:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
     }
 
     #[test]

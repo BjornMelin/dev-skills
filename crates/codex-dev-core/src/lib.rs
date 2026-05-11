@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -50,7 +51,7 @@ pub struct Capsule {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EvidenceRecord {
     pub schema: String,
     pub kind: EvidenceKind,
@@ -60,10 +61,20 @@ pub struct EvidenceRecord {
     pub command: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residual_risk: Option<String>,
     pub artifacts: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum EvidenceKind {
     Command,
@@ -73,6 +84,21 @@ pub enum EvidenceKind {
     Decision,
     Research,
     Manual,
+    Output,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceSummary {
+    pub total: u64,
+    pub by_kind: Vec<EvidenceKindSummary>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceKindSummary {
+    pub kind: EvidenceKind,
+    pub count: u64,
+    pub latest_at: DateTime<Utc>,
+    pub latest_summary: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -164,6 +190,20 @@ pub struct PrRecordArgs {
     pub capsule: PathBuf,
     pub source: PathBuf,
     pub command: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppendEvidenceArgs {
+    pub capsule: PathBuf,
+    pub record: EvidenceRecord,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AppendEvidenceResult {
+    pub capsule: PathBuf,
+    pub evidence_path: PathBuf,
+    pub record: EvidenceRecord,
+    pub evidence: EvidenceSummary,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -312,6 +352,7 @@ pub struct StatusResult {
     pub issues: Vec<u64>,
     pub pull_requests: Vec<u64>,
     pub updated_at: DateTime<Utc>,
+    pub evidence: EvidenceSummary,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -333,9 +374,11 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
     {
         capsule.pull_requests.push(number);
     }
-    capsule.updated_at = checked_at;
+    capsule.updated_at = std::cmp::max(capsule.updated_at, checked_at);
     write_json(args.capsule.join("capsule.json"), &capsule)?;
 
+    let evidence_command = args.command;
+    let evidence_exit_code = evidence_command.as_ref().map(|_| 0);
     append_jsonl(
         args.capsule.join("evidence.jsonl"),
         &EvidenceRecord {
@@ -348,8 +391,13 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
                 pr.review_threads.unresolved,
                 pr.checks.len()
             ),
-            command: args.command,
-            exit_code: Some(0),
+            command: evidence_command,
+            exit_code: evidence_exit_code,
+            source_ids: Vec::new(),
+            actor: None,
+            tool: None,
+            confidence: None,
+            residual_risk: None,
             artifacts: vec!["pr.json".to_string()],
         },
     )?;
@@ -360,6 +408,72 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
         capsule: args.capsule,
         pr,
     })
+}
+
+pub fn append_evidence(args: AppendEvidenceArgs) -> Result<AppendEvidenceResult> {
+    ensure_regular_contract_files(&args.capsule)?;
+    let validation = validate_capsule(&args.capsule)?;
+    if !validation.valid {
+        bail!(
+            "invalid capsule at {}: {}",
+            args.capsule.display(),
+            validation.errors.join("; ")
+        );
+    }
+
+    let errors = validate_evidence_record(&args.record);
+    if !errors.is_empty() {
+        bail!("invalid evidence record: {}", errors.join("; "));
+    }
+
+    append_jsonl(args.capsule.join("evidence.jsonl"), &args.record)?;
+
+    let mut capsule: Capsule = read_json(&args.capsule.join("capsule.json"))?;
+    capsule.updated_at = std::cmp::max(capsule.updated_at, args.record.at);
+    write_json(args.capsule.join("capsule.json"), &capsule)?;
+
+    let evidence = evidence_summary(&args.capsule)?;
+
+    Ok(AppendEvidenceResult {
+        evidence_path: args.capsule.join("evidence.jsonl"),
+        capsule: args.capsule,
+        record: args.record,
+        evidence,
+    })
+}
+
+fn ensure_regular_contract_file(capsule_path: &Path, file: &str) -> Result<()> {
+    let path = capsule_path.join(file);
+    let metadata = match path.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            bail!("missing required file: {file}");
+        }
+        Err(error) => {
+            return Err(error).with_context(|| format!("failed to inspect {}", path.display()));
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        bail!(
+            "refusing to write through symlinked capsule contract file: {}",
+            path.display()
+        );
+    }
+    if !metadata.is_file() {
+        bail!("capsule contract path is not a file: {}", path.display());
+    }
+    Ok(())
+}
+
+fn ensure_regular_contract_files(capsule_path: &Path) -> Result<()> {
+    for file in REQUIRED_FILES
+        .iter()
+        .copied()
+        .filter(|file| file.ends_with(".json") || file.ends_with(".jsonl"))
+    {
+        ensure_regular_contract_file(capsule_path, file)?;
+    }
+    Ok(())
 }
 
 pub fn pr_status(capsule_path: &Path) -> Result<PrStatusResult> {
@@ -379,6 +493,7 @@ pub fn pr_status(capsule_path: &Path) -> Result<PrStatusResult> {
 }
 
 fn validate_capsule_for_pr_record(capsule_path: &Path) -> Result<()> {
+    ensure_regular_contract_files(capsule_path)?;
     let validation = validate_capsule(capsule_path)?;
     if !validation.valid {
         bail!(
@@ -448,6 +563,11 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
         summary: "Task capsule initialized".to_string(),
         command: None,
         exit_code: None,
+        source_ids: Vec::new(),
+        actor: None,
+        tool: None,
+        confidence: None,
+        residual_risk: None,
         artifacts: Vec::new(),
     };
     append_jsonl(path.join("evidence.jsonl"), &evidence)?;
@@ -619,6 +739,7 @@ pub fn capsule_status(path: &Path) -> Result<StatusResult> {
         );
     }
     let capsule: Capsule = read_json(&path.join("capsule.json"))?;
+    let evidence = evidence_summary(path)?;
     Ok(StatusResult {
         path: path.to_path_buf(),
         id: capsule.id,
@@ -630,6 +751,7 @@ pub fn capsule_status(path: &Path) -> Result<StatusResult> {
         issues: capsule.issues,
         pull_requests: capsule.pull_requests,
         updated_at: capsule.updated_at,
+        evidence,
     })
 }
 
@@ -649,6 +771,17 @@ pub fn render_capsule(path: &Path) -> Result<RenderResult> {
         render_numbers(&status.pull_requests)
     )?;
     writeln!(markdown)?;
+    writeln!(markdown, "## Evidence")?;
+    writeln!(markdown)?;
+    writeln!(markdown, "- Total records: {}", status.evidence.total)?;
+    for kind in &status.evidence.by_kind {
+        writeln!(
+            markdown,
+            "- `{}`: {} record(s); latest `{}` - {}",
+            kind.kind, kind.count, kind.latest_at, kind.latest_summary
+        )?;
+    }
+    writeln!(markdown)?;
     writeln!(markdown, "## Objective")?;
     writeln!(markdown)?;
     writeln!(markdown, "{}", status.objective)?;
@@ -657,6 +790,37 @@ pub fn render_capsule(path: &Path) -> Result<RenderResult> {
         path: path.to_path_buf(),
         markdown,
     })
+}
+
+pub fn evidence_summary(capsule_path: &Path) -> Result<EvidenceSummary> {
+    let records = read_evidence_records(&capsule_path.join("evidence.jsonl"))?;
+    Ok(summarize_evidence(&records))
+}
+
+fn summarize_evidence(records: &[EvidenceRecord]) -> EvidenceSummary {
+    let mut by_kind: BTreeMap<EvidenceKind, EvidenceKindSummary> = BTreeMap::new();
+    for record in records {
+        by_kind
+            .entry(record.kind)
+            .and_modify(|summary| {
+                summary.count += 1;
+                if record.at >= summary.latest_at {
+                    summary.latest_at = record.at;
+                    summary.latest_summary = record.summary.clone();
+                }
+            })
+            .or_insert_with(|| EvidenceKindSummary {
+                kind: record.kind,
+                count: 1,
+                latest_at: record.at,
+                latest_summary: record.summary.clone(),
+            });
+    }
+
+    EvidenceSummary {
+        total: records.len() as u64,
+        by_kind: by_kind.into_values().collect(),
+    }
 }
 
 impl PrSnapshotInput {
@@ -735,9 +899,20 @@ fn validate_schema_file<T, F>(
 }
 
 fn validate_evidence(path: &Path) -> Result<Vec<String>> {
+    let records = read_evidence_records(path)?;
+    let mut errors = Vec::new();
+    for (index, record) in records.iter().enumerate() {
+        for error in validate_evidence_record(record) {
+            errors.push(format!("evidence.jsonl line {} {error}", index + 1));
+        }
+    }
+    Ok(errors)
+}
+
+fn read_evidence_records(path: &Path) -> Result<Vec<EvidenceRecord>> {
     let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
     let reader = BufReader::new(file);
-    let mut errors = Vec::new();
+    let mut records = Vec::new();
     for (index, line) in reader.lines().enumerate() {
         let line = line?;
         if line.trim().is_empty() {
@@ -745,14 +920,59 @@ fn validate_evidence(path: &Path) -> Result<Vec<String>> {
         }
         let record: EvidenceRecord = serde_json::from_str(&line)
             .with_context(|| format!("line {} is not valid evidence JSON", index + 1))?;
-        if record.schema != EVIDENCE_SCHEMA {
-            errors.push(format!(
-                "evidence.jsonl line {} schema must be {EVIDENCE_SCHEMA}",
-                index + 1
-            ));
-        }
+        records.push(record);
     }
-    Ok(errors)
+    Ok(records)
+}
+
+fn validate_evidence_record(record: &EvidenceRecord) -> Vec<String> {
+    let mut errors = Vec::new();
+    if record.schema != EVIDENCE_SCHEMA {
+        errors.push(format!("schema must be {EVIDENCE_SCHEMA}"));
+    }
+    validate_non_empty_text("summary", &record.summary, &mut errors);
+    validate_optional_text("command", record.command.as_deref(), &mut errors);
+    validate_optional_text("actor", record.actor.as_deref(), &mut errors);
+    validate_optional_text("tool", record.tool.as_deref(), &mut errors);
+    validate_optional_text(
+        "residual_risk",
+        record.residual_risk.as_deref(),
+        &mut errors,
+    );
+    validate_repeated_text("source_ids", &record.source_ids, &mut errors);
+    validate_repeated_text("artifacts", &record.artifacts, &mut errors);
+    if record.exit_code.is_some() && record.command.is_none() {
+        errors.push("exit_code requires command".to_string());
+    }
+    if let Some(confidence) = record.confidence
+        && confidence > 100
+    {
+        errors.push("confidence must be between 0 and 100".to_string());
+    }
+    errors
+}
+
+fn validate_optional_text(field: &str, value: Option<&str>, errors: &mut Vec<String>) {
+    if let Some(value) = value {
+        validate_non_empty_text(field, value, errors);
+    }
+}
+
+fn validate_repeated_text(field: &str, values: &[String], errors: &mut Vec<String>) {
+    for (index, value) in values.iter().enumerate() {
+        let item = format!("{field}[{index}]");
+        validate_non_empty_text(&item, value, errors);
+    }
+}
+
+fn validate_non_empty_text(field: &str, value: &str, errors: &mut Vec<String>) {
+    if value.trim().is_empty() {
+        errors.push(format!("{field} must not be empty"));
+        return;
+    }
+    if value.chars().any(char::is_control) {
+        errors.push(format!("{field} must not contain control characters"));
+    }
 }
 
 pub fn write_json<T: Serialize>(path: PathBuf, value: &T) -> Result<()> {
@@ -888,6 +1108,42 @@ impl FromStr for CapsuleStatus {
             "closed" => Ok(Self::Closed),
             _ => Err(format!(
                 "invalid capsule status {value:?}; expected active, blocked, ready_for_pr, in_review, merged, or closed"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for EvidenceKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            EvidenceKind::Command => "command",
+            EvidenceKind::Subagent => "subagent",
+            EvidenceKind::Review => "review",
+            EvidenceKind::Ci => "ci",
+            EvidenceKind::Decision => "decision",
+            EvidenceKind::Research => "research",
+            EvidenceKind::Manual => "manual",
+            EvidenceKind::Output => "output",
+        };
+        formatter.write_str(value)
+    }
+}
+
+impl FromStr for EvidenceKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "command" => Ok(Self::Command),
+            "subagent" => Ok(Self::Subagent),
+            "review" => Ok(Self::Review),
+            "ci" => Ok(Self::Ci),
+            "decision" => Ok(Self::Decision),
+            "research" => Ok(Self::Research),
+            "manual" => Ok(Self::Manual),
+            "output" => Ok(Self::Output),
+            _ => Err(format!(
+                "invalid evidence kind {value:?}; expected command, subagent, review, ci, decision, research, manual, or output"
             )),
         }
     }
@@ -1213,6 +1469,91 @@ mod tests {
     }
 
     #[test]
+    fn pr_record_keeps_capsule_updated_at_monotonic() {
+        let temp = tempdir().expect("tempdir");
+        let mut args = init_args(temp.path().join("tasks"));
+        args.created_at = "2026-05-09T10:00:00Z".parse().unwrap();
+        let capsule = init_capsule(args).expect("init capsule").path;
+        let source = temp.path().join("pr-snapshot.json");
+        fs::write(
+            &source,
+            r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "state": "OPEN",
+  "review_threads": {
+    "unresolved": 0
+  }
+}"#,
+        )
+        .expect("write fixture");
+
+        record_pr_snapshot(
+            PrRecordArgs {
+                capsule: capsule.clone(),
+                source,
+                command: Some("fixture-pr-recorder".to_string()),
+            },
+            "2026-05-09T09:00:00Z".parse().unwrap(),
+        )
+        .expect("record backfilled pr");
+
+        let status = capsule_status(&capsule).expect("status");
+        assert_eq!(
+            status.updated_at,
+            "2026-05-09T10:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn pr_record_rejects_symlinked_contract_file_before_writing() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let pr_path = capsule.join("pr.json");
+        let outside_path = temp.path().join("outside-pr.json");
+        fs::write(&outside_path, "not json").expect("write invalid outside pr");
+        fs::remove_file(&pr_path).expect("remove pr");
+        std::os::unix::fs::symlink(&outside_path, &pr_path).expect("symlink pr");
+        let outside_before = fs::read_to_string(&outside_path).expect("outside before");
+        let source = temp.path().join("pr-snapshot.json");
+        fs::write(
+            &source,
+            r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "state": "OPEN",
+  "review_threads": {
+    "unresolved": 0
+  }
+}"#,
+        )
+        .expect("write fixture");
+
+        let error = record_pr_snapshot(
+            PrRecordArgs {
+                capsule: capsule.clone(),
+                source,
+                command: Some("fixture-pr-recorder".to_string()),
+            },
+            "2026-05-09T09:00:00Z".parse().unwrap(),
+        )
+        .expect_err("symlinked pr rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("symlinked capsule contract file")
+        );
+        assert_eq!(
+            fs::read_to_string(&outside_path).expect("outside after"),
+            outside_before
+        );
+    }
+
+    #[test]
     fn validate_rejects_drifted_pr_schema_name() {
         let temp = tempdir().expect("tempdir");
         let capsule = init_capsule(init_args(temp.path().join("tasks")))
@@ -1266,6 +1607,174 @@ mod tests {
 
         assert!(error.to_string().contains("missing required file: pr.json"));
         assert!(!capsule.join("pr.json").exists());
+    }
+
+    #[test]
+    fn append_evidence_updates_ledger_and_status_summary() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+
+        let result = append_evidence(AppendEvidenceArgs {
+            capsule: capsule.clone(),
+            record: EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Decision,
+                at: "2026-05-09T06:00:00Z".parse().unwrap(),
+                summary: "Use one typed evidence append command".to_string(),
+                command: None,
+                exit_code: None,
+                source_ids: vec!["issue:42".to_string()],
+                actor: Some("codex".to_string()),
+                tool: Some("codex-dev".to_string()),
+                confidence: Some(95),
+                residual_risk: Some("future PR normalizers still need fixtures".to_string()),
+                artifacts: vec!["docs/reference/codex-dev-cli.md".to_string()],
+            },
+        })
+        .expect("append evidence");
+
+        assert_eq!(result.record.kind, EvidenceKind::Decision);
+        assert_eq!(result.evidence.total, 2);
+        assert!(
+            result
+                .evidence
+                .by_kind
+                .iter()
+                .any(|kind| kind.kind == EvidenceKind::Decision
+                    && kind.count == 1
+                    && kind.latest_summary == "Use one typed evidence append command")
+        );
+
+        let status = capsule_status(&capsule).expect("status");
+        assert_eq!(
+            status.updated_at,
+            "2026-05-09T06:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+        assert_eq!(status.evidence.total, 2);
+
+        let rendered = render_capsule(&capsule).expect("render");
+        assert!(rendered.markdown.contains("## Evidence"));
+        assert!(
+            rendered
+                .markdown
+                .contains("`decision`: 1 record(s); latest")
+        );
+    }
+
+    #[test]
+    fn append_evidence_rejects_invalid_records_before_writing() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let evidence_before = fs::read_to_string(capsule.join("evidence.jsonl")).unwrap();
+
+        let error = append_evidence(AppendEvidenceArgs {
+            capsule: capsule.clone(),
+            record: EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Ci,
+                at: "2026-05-09T06:00:00Z".parse().unwrap(),
+                summary: " ".to_string(),
+                command: None,
+                exit_code: Some(1),
+                source_ids: vec!["".to_string()],
+                actor: Some("codex".to_string()),
+                tool: Some("codex-dev".to_string()),
+                confidence: Some(90),
+                residual_risk: None,
+                artifacts: Vec::new(),
+            },
+        })
+        .expect_err("invalid evidence rejected");
+
+        let message = error.to_string();
+        assert!(message.contains("summary must not be empty"));
+        assert!(message.contains("exit_code requires command"));
+        assert!(message.contains("source_ids[0] must not be empty"));
+        assert_eq!(
+            fs::read_to_string(capsule.join("evidence.jsonl")).unwrap(),
+            evidence_before
+        );
+    }
+
+    #[test]
+    fn append_evidence_keeps_capsule_updated_at_monotonic() {
+        let temp = tempdir().expect("tempdir");
+        let mut args = init_args(temp.path().join("tasks"));
+        args.created_at = "2026-05-09T10:00:00Z".parse().unwrap();
+        let capsule = init_capsule(args).expect("init capsule").path;
+
+        append_evidence(AppendEvidenceArgs {
+            capsule: capsule.clone(),
+            record: EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Manual,
+                at: "2026-05-09T09:00:00Z".parse().unwrap(),
+                summary: "Backfilled manual note".to_string(),
+                command: None,
+                exit_code: None,
+                source_ids: Vec::new(),
+                actor: None,
+                tool: None,
+                confidence: None,
+                residual_risk: None,
+                artifacts: Vec::new(),
+            },
+        })
+        .expect("append backfilled evidence");
+
+        let status = capsule_status(&capsule).expect("status");
+        assert_eq!(
+            status.updated_at,
+            "2026-05-09T10:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn append_evidence_rejects_symlinked_contract_file_before_writing() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let evidence_path = capsule.join("evidence.jsonl");
+        let outside_path = temp.path().join("outside-evidence.jsonl");
+        fs::write(&outside_path, "not jsonl").expect("write invalid outside evidence");
+        fs::remove_file(&evidence_path).expect("remove evidence");
+        std::os::unix::fs::symlink(&outside_path, &evidence_path).expect("symlink evidence");
+        let outside_before = fs::read_to_string(&outside_path).expect("outside before");
+
+        let error = append_evidence(AppendEvidenceArgs {
+            capsule: capsule.clone(),
+            record: EvidenceRecord {
+                schema: EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Manual,
+                at: "2026-05-09T06:00:00Z".parse().unwrap(),
+                summary: "Symlink write attempt".to_string(),
+                command: None,
+                exit_code: None,
+                source_ids: Vec::new(),
+                actor: None,
+                tool: None,
+                confidence: None,
+                residual_risk: None,
+                artifacts: Vec::new(),
+            },
+        })
+        .expect_err("symlinked evidence rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("symlinked capsule contract file")
+        );
+        assert_eq!(
+            fs::read_to_string(&outside_path).expect("outside after"),
+            outside_before
+        );
     }
 
     #[test]
