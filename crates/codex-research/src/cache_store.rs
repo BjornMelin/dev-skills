@@ -66,7 +66,11 @@ pub(crate) fn init_db(paths: &ResearchPaths) -> Result<()> {
         &conn,
         "sources",
         "privacy_classification",
-        "text not null default 'unverified'",
+        "text not null default 'ambiguous'",
+    )?;
+    conn.execute(
+        "update sources set privacy_classification = 'ambiguous' where privacy_classification = 'unverified'",
+        [],
     )?;
     add_column_if_missing(
         &conn,

@@ -953,6 +953,10 @@ fn privacy_classifier_blocks_private_external_targets() {
         PrivacyClass::PrivateOrAuthenticated
     );
     assert_eq!(
+        classify_privacy("https://github/org/repo"),
+        PrivacyClass::PrivateOrAuthenticated
+    );
+    assert_eq!(
         classify_privacy("https://user:token@example.com/docs"),
         PrivacyClass::PrivateOrAuthenticated
     );
@@ -977,6 +981,55 @@ fn privacy_classifier_blocks_private_external_targets() {
         )
         .is_err()
     );
+}
+
+#[test]
+fn cache_init_normalizes_legacy_unverified_privacy_classification() -> Result<()> {
+    let dir = temp_path("cache-privacy-normalize");
+    let paths = ResearchPaths {
+        cache_dir: dir.clone(),
+        database: dir.join("research.sqlite"),
+        blobs_dir: dir.join("blobs"),
+    };
+    fs::create_dir_all(&paths.cache_dir)?;
+    let conn = Connection::open(&paths.database)?;
+    conn.execute_batch(
+        "
+        create table sources (
+            id text primary key,
+            url text not null,
+            provider text not null,
+            fetched_at text not null,
+            content_hash text,
+            status integer,
+            route text,
+            metadata_json text,
+            canonical_url text,
+            title text,
+            freshness_status text not null default 'unverified',
+            privacy_classification text not null default 'unverified',
+            raw_body_stored integer not null default 0
+        );
+        insert into sources (
+            id, url, provider, fetched_at, metadata_json, privacy_classification
+        ) values (
+            'legacy-source',
+            'https://example.com/doc',
+            'direct',
+            '2026-05-11T00:00:00Z',
+            '{}',
+            'unverified'
+        );
+        ",
+    )?;
+    drop(conn);
+
+    init_db(&paths)?;
+    let record = cached_source(&paths, "legacy-source")?.expect("source should exist");
+    fs::remove_dir_all(paths.cache_dir)?;
+
+    assert_eq!(record.privacy_classification, "ambiguous");
+    Ok(())
 }
 
 #[test]

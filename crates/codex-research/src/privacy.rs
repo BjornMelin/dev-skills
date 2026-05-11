@@ -60,7 +60,7 @@ pub(crate) fn classify_privacy(value: &str) -> PrivacyClass {
         || host.ends_with(".local")
         || host.ends_with(".internal")
         || host.ends_with(".corp")
-        || (!host.contains('.') && host != "github")
+        || !host.contains('.')
     {
         return PrivacyClass::PrivateOrAuthenticated;
     }
