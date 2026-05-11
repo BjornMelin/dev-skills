@@ -82,12 +82,21 @@ evidence.jsonl
 verification.json
 subagents.json
 pr.json
+policy.json
+output.md
 retrospective.md
 ```
 
 Contract files are `capsule.json`, `evidence.jsonl`, `verification.json`,
-`subagents.json`, and `pr.json`. Markdown files are human notes whose headings
-are conventional but not machine contracts.
+`subagents.json`, `pr.json`, and `policy.json`. Markdown files are human notes
+whose headings are conventional but not machine contracts; `output.md` is the
+operator-facing closeout slot for rendered summaries.
+
+Validation is strict. Every required file must exist and every JSON contract
+must keep its exact schema identifier. Capsule initialization is the command
+that creates the layout; follow-on commands such as `pr record` update their
+owned files but do not silently repair missing contracts in an already-created
+capsule.
 
 ### capsule.json
 
@@ -272,6 +281,14 @@ When `checks` entries are present, each entry must use the typed fields shown
 above. Later PR-control work may add more typed PR evidence, but it should not
 replace this field with raw provider JSON.
 
+### policy.json
+
+`policy.json` records the capsule's local policy-gate manifest snapshot. The
+schema identifier is `codex-dev.policy-gates.v1`; the default profile is
+`codex_dev`. Policy execution may append verification and evidence records, but
+the manifest contract remains a typed JSON file instead of a rendered Markdown
+section.
+
 `codex-dev.pr-control-plan.v1` records the live-command plan for PR evidence
 capture. It may reference network- and auth-dependent `gh`, `review-pack`, and
 `gh-pr-review-fix` commands, but those tools remain the live source of truth for
@@ -282,10 +299,10 @@ typed `pr.json` evidence contract plus an `evidence.jsonl` summary.
 
 ### Markdown Notes
 
-`plan.md`, `decisions.md`, and `retrospective.md` are durable human notes inside
-the local capsule. They should render summaries that can be copied into issues
-or PRs, but automation must read contract JSON files instead of scraping
-Markdown.
+`plan.md`, `decisions.md`, `output.md`, and `retrospective.md` are durable
+human notes inside the local capsule. They should render summaries that can be
+copied into issues or PRs, but automation must read contract JSON files instead
+of scraping Markdown.
 
 ## Skill And Subagent Eval Lab
 

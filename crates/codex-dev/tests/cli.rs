@@ -319,3 +319,87 @@ fn pr_plan_and_record_support_fixture_mode() {
         .success()
         .stdout(predicates::str::contains("BjornMelin/dev-skills#25 open"));
 }
+
+#[test]
+fn pr_record_json_error_does_not_repair_missing_pr_contract() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "PR strict smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "pr-strict-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+    let capsule_path = std::path::Path::new(capsule);
+    std::fs::remove_file(capsule_path.join("pr.json")).expect("remove pr contract");
+    let capsule_before =
+        std::fs::read_to_string(capsule_path.join("capsule.json")).expect("capsule before");
+    let evidence_before =
+        std::fs::read_to_string(capsule_path.join("evidence.jsonl")).expect("evidence before");
+
+    let source = temp.path().join("pr-snapshot.json");
+    std::fs::write(
+        &source,
+        r#"{
+  "repository": "BjornMelin/dev-skills",
+  "number": 25,
+  "state": "OPEN",
+  "review_threads": {"unresolved": 0}
+}"#,
+    )
+    .expect("write fixture");
+
+    let record_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "record",
+            "--capsule",
+            capsule,
+            "--source",
+            source.to_str().expect("utf8 fixture path"),
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let record_json: Value = serde_json::from_slice(&record_output).expect("record error json");
+    assert_eq!(record_json["ok"], false);
+    assert_eq!(record_json["command"], "pr record");
+    assert!(
+        record_json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("missing required file: pr.json")
+    );
+    assert!(!capsule_path.join("pr.json").exists());
+    assert_eq!(
+        std::fs::read_to_string(capsule_path.join("capsule.json")).expect("capsule after"),
+        capsule_before
+    );
+    assert_eq!(
+        std::fs::read_to_string(capsule_path.join("evidence.jsonl")).expect("evidence after"),
+        evidence_before
+    );
+}
