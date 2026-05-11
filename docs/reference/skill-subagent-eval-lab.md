@@ -3,8 +3,8 @@
 `tools/eval/skill_subagent_eval.py` runs deterministic offline checks for skill
 metadata, subagent templates, subspawn role contracts, planner presets, and
 helper-script syntax. It is deliberately separate from `codex-research eval`,
-which remains scoped to research routing, privacy, budgets, evidence, and report
-contracts.
+which remains scoped to research routing, privacy, budgets, evidence, report,
+and closeout bundle contracts.
 
 Tracking: #20 and #24.
 

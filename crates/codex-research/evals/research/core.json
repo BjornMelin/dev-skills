@@ -118,6 +118,84 @@
       }
     },
     {
+      "id": "evidence-bundle-closeout-shape",
+      "kind": "evidence-bundle",
+      "description": "Closeout bundles should expose run budget, ledger coverage, source freshness, provider errors, and artifacts.",
+      "input": {
+        "bundle": {
+          "schema": "codex-research.evidence-bundle.v1",
+          "generated_at": "2026-05-11T12:00:00Z",
+          "status": "passed",
+          "strict": true,
+          "run": {
+            "path": ".codex/research/run.json",
+            "query": "verify package upgrade behavior",
+            "profile": "deep",
+            "topic": "dependency",
+            "status": "closed",
+            "cache_source_ids": ["src-official-docs"]
+          },
+          "budget": {
+            "by_provider": [
+              {"provider": "github", "budget": 8, "spent": 2, "remaining": 6}
+            ]
+          },
+          "provider_errors": [],
+          "ledger": {
+            "path": ".codex/research/ledger.jsonl",
+            "source_count": 2,
+            "claim_count": 2,
+            "source_ids": ["src-official-docs", "src-github-source"],
+            "claim_ids": ["claim-official-docs-first", "claim-source-hydrated"]
+          },
+          "citation_coverage": {
+            "cited_claims": 2,
+            "uncited_claims": 0,
+            "uncited_claim_ids": [],
+            "missing_source_refs": [],
+            "coverage": 1.0
+          },
+          "source_freshness": {
+            "by_status": {"current": 2},
+            "unknown_source_ids": []
+          },
+          "report": {
+            "path": ".codex/research/report.md",
+            "exists": true
+          },
+          "artifacts": [".codex/research/evidence-bundle.json"],
+          "warnings": [],
+          "failures": []
+        }
+      },
+      "expected": {
+        "status": "passed",
+        "min_sources": 2,
+        "min_claims": 2,
+          "max_uncited_claims": 0,
+        "max_provider_errors": 0,
+        "max_failures": 0,
+        "report_exists": true,
+        "required_source_freshness_statuses": ["current"],
+        "required_top_level_keys": [
+          "schema",
+          "generated_at",
+          "status",
+          "strict",
+          "run",
+          "budget",
+          "provider_errors",
+          "ledger",
+          "citation_coverage",
+          "source_freshness",
+          "report",
+          "artifacts",
+          "warnings",
+          "failures"
+        ]
+      }
+    },
+    {
       "id": "report-contract-source-ledger",
       "kind": "report-contract",
       "description": "Human research reports should expose claims, source hydration, provider limits, and privacy notes.",

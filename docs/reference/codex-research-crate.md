@@ -61,6 +61,7 @@ path = "src/main.rs"
 - `Github`
 - `Ledger`
 - `Report`
+- `Bundle`
 - `Cache`
 - `Config`
 - `Run`
@@ -220,6 +221,7 @@ Tagged enum:
 - `handle_github`
 - `handle_ledger`
 - `render_report`
+- `build_evidence_bundle_command`
 - `handle_cache`
 - `handle_config`
 - `handle_run`
@@ -232,6 +234,27 @@ Async provider commands run under `tokio`.
 caller-supplied suite file at runtime. The eval harness is deliberately
 offline-first so it can run in PR validation without provider credentials. It
 supports task filtering, listing, strict warning handling, and JSON output.
+
+### EvidenceBundle
+
+`bundle` composes existing research contracts into
+`codex-research.evidence-bundle.v1`:
+
+- run metadata, status, cache source IDs, provider budgets, and sanitized debit
+  history;
+- redacted unresolved provider errors;
+- ledger source/claim IDs;
+- citation coverage, uncited claims, and missing claim source references;
+- source freshness counts resolved through the cache when possible;
+- report path status, artifact paths, warnings, and closeout failures.
+
+The bundle status is `failed` when closeout evidence is incomplete: uncited
+claims, missing source references, unresolved provider errors, missing
+ledger/report artifacts, or missing source freshness records in strict mode.
+Non-strict command execution still exits zero after writing output for
+inspection; strict mode exits nonzero for recorded failures. Bundle generation
+records metadata only, sanitizes free-form handoff text, and does not embed raw
+provider payloads.
 
 ## Provider Implementations
 
@@ -392,6 +415,7 @@ cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
 codex-research --json eval --task evidence-claims-cited --strict
+codex-research --json eval --task evidence-bundle-closeout-shape --strict
 git diff --check
 ```
 

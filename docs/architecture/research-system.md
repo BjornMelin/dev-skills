@@ -92,6 +92,24 @@ codex-research report --ledger .codex/research/ledger.jsonl --out .codex/researc
 
 Use source IDs in final analysis so claim support can be checked later.
 
+Close out a run with a replayable evidence bundle:
+
+```bash
+codex-research --json bundle \
+  --run .codex/research/run.json \
+  --ledger .codex/research/ledger.jsonl \
+  --report .codex/research/report.md \
+  --out .codex/research/evidence-bundle.json \
+  --markdown-out .codex/research/evidence-bundle.md \
+  --strict
+```
+
+The bundle is the handoff artifact for task capsules and PR descriptions. It
+contains run budget status, redacted provider errors, ledger source and claim
+IDs, citation coverage, source freshness counts, report path status, and
+generated artifact paths. It intentionally sanitizes free-form query/debit/error
+text and excludes raw provider payloads and cached page bodies.
+
 ## Cache
 
 Global cache state defaults to:

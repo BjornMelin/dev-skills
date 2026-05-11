@@ -90,8 +90,8 @@ operating layer:
 - `deep-researcher`: skill for deep cited research with a Focused Six subagent
   pack.
 - `codex-research`: Rust CLI for planning, provider routing, Context7 REST,
-  GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports, cache,
-  doctor, and evals.
+  GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports,
+  closeout bundles, cache, doctor, and evals.
 - `codex-dev-core`: shared contract/read-model crate for task capsules,
   validation, rendered summaries, policy manifest data, and PR evidence
   snapshots.
