@@ -912,12 +912,12 @@ fn extract_policy_doc_commands(contents: &str, marker: &str) -> Result<Vec<Strin
     let start_lines = lines
         .iter()
         .enumerate()
-        .filter_map(|(index, line)| line.contains(&start).then_some(index))
+        .filter_map(|(index, line)| policy_doc_marker_line(line, &start).then_some(index))
         .collect::<Vec<_>>();
     let end_lines = lines
         .iter()
         .enumerate()
-        .filter_map(|(index, line)| line.contains(&end).then_some(index))
+        .filter_map(|(index, line)| policy_doc_marker_line(line, &end).then_some(index))
         .collect::<Vec<_>>();
     if start_lines.len() != 1 || end_lines.len() != 1 {
         bail!(
@@ -940,6 +940,10 @@ fn extract_policy_doc_commands(contents: &str, marker: &str) -> Result<Vec<Strin
         .filter(|line| !line.is_empty() && !line.starts_with("```"))
         .map(str::to_string)
         .collect())
+}
+
+fn policy_doc_marker_line(line: &str, marker: &str) -> bool {
+    line.trim().trim_start_matches('#').trim() == marker
 }
 
 fn policy_doc_marker(marker: &str, side: &str) -> String {
@@ -2279,6 +2283,25 @@ mod tests {
                 .iter()
                 .any(|command| command.contains("--profile full_local"))
         );
+    }
+
+    #[test]
+    fn policy_docs_extractor_ignores_marker_tokens_in_prose() {
+        let command = policy_manifest_command(PolicyProfile::CodexDev);
+        let contents = format!(
+            "Prose can mention codex-dev:policy-manifest-smoke:start without opening a block.\n\
+             # codex-dev:policy-manifest-smoke:start\n\
+             ```bash\n\
+             {command}\n\
+             ```\n\
+             # codex-dev:policy-manifest-smoke:end\n\
+             Prose can mention codex-dev:policy-manifest-smoke:end too.\n"
+        );
+
+        let commands =
+            extract_policy_doc_commands(&contents, POLICY_DOCS_SMOKE_MARKER).expect("commands");
+
+        assert_eq!(commands, vec![command]);
     }
 
     #[test]
