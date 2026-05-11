@@ -356,6 +356,9 @@ verify-before-fix rules in the
   "number": 29,
   "url": "https://github.com/BjornMelin/dev-skills/pull/29",
   "state": "open",
+  "mergeable": "mergeable",
+  "review_decision": "approved",
+  "head_sha": "abc123",
   "checks": [
     {
       "name": "GitGuardian Security Checks",
@@ -367,14 +370,34 @@ verify-before-fix rules in the
   ],
   "review_threads": {
     "unresolved": 0,
+    "total": 3,
+    "resolved": 3,
+    "outdated": 0,
+    "authoritative": true,
     "last_checked_at": "2026-05-09T03:45:00Z"
-  }
+  },
+  "sources": [
+    {
+      "kind": "gh-pr-view",
+      "parser_version": "codex-dev.pr-source-parser.v1",
+      "retrieved_at": "2026-05-09T03:45:00Z",
+      "command": "gh pr view 29 --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
+      "path": "/tmp/gh-pr-view.json"
+    }
+  ]
 }
 ```
 
-When `checks` entries are present, each entry must use the typed fields shown
-above. Later PR-control work may add more typed PR evidence, but it should not
-replace this field with raw provider JSON.
+Each present `checks` entry must use the typed fields shown above.
+`review_threads.unresolved` means current unresolved threads only when
+`review_threads.authoritative` is true. Sources that do not carry hosted thread
+state, such as `gh pr checks`, must leave that flag false when no earlier
+authoritative thread source exists. Outdated threads remain visible through
+`review_threads.outdated` instead of being folded into the current unresolved
+count. `sources[]` records deterministic parser provenance for saved
+normalized, `gh`, GitHub API, and review-pack artifacts. Later PR-control work
+may add more typed PR evidence, but it should not replace these fields with raw
+provider JSON.
 
 ### policy.json
 
@@ -391,8 +414,17 @@ network- and auth-dependent `gh`, `review-pack`, and `gh-pr-review-fix`
 commands, but those tools remain the live source of truth for hosted review and
 CI state. Commands that need a caller-supplied artifact expose that requirement
 with `manual_input` and are not marked directly required. `codex-dev pr record`
-accepts local normalized snapshots and writes only the typed `pr.json` evidence
-contract plus an `evidence.jsonl` summary. It updates
+accepts local normalized snapshots plus saved `gh pr view`, `gh pr checks`,
+REST review, REST review-comment, GraphQL review-thread, and `review-pack
+remaining` outputs. Every non-`normalized` source must preserve explicit PR
+identity through a GitHub PR URL or caller-provided `--repo` and `--number`.
+Provider-derived partial sources merge into the existing `pr.json` snapshot
+instead of replacing unrelated fields, and they must not silently turn unknown
+thread state into a clean authoritative thread count. GraphQL review-thread
+captures are authoritative only when `pageInfo.hasNextPage` is false, while REST
+review comments contribute thread-root counts but never current unresolved state.
+It writes only the typed `pr.json` evidence contract plus an `evidence.jsonl`
+summary. It updates
 `capsule.json.updated_at` monotonically, matching the evidence appender
 freshness rule.
 

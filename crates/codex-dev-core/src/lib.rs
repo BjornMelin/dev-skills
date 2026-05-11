@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufRead, BufReader, ErrorKind, Write};
 #[cfg(unix)]
@@ -11,6 +11,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 pub const CAPSULE_SCHEMA: &str = "codex-dev.task-capsule.v1";
@@ -18,6 +19,7 @@ pub const EVIDENCE_SCHEMA: &str = "codex-dev.evidence.v1";
 pub const VERIFICATION_SCHEMA: &str = "codex-dev.verification.v1";
 pub const SUBAGENTS_SCHEMA: &str = "codex-dev.subagents.v1";
 pub const PR_SCHEMA: &str = "codex-dev.pr.v1";
+pub const PR_SOURCE_PARSER_VERSION: &str = "codex-dev.pr-source-parser.v1";
 pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
@@ -213,8 +215,27 @@ pub struct PrEvidence {
     pub number: Option<u64>,
     pub url: Option<String>,
     pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mergeable: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_decision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_sha: Option<String>,
     pub checks: Vec<CheckRecord>,
     pub review_threads: ReviewThreadSummary,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<PrEvidenceSource>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrEvidenceSource {
+    pub kind: String,
+    pub parser_version: String,
+    pub retrieved_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -229,6 +250,14 @@ pub struct CheckRecord {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ReviewThreadSummary {
     pub unresolved: u64,
+    #[serde(default)]
+    pub total: u64,
+    #[serde(default)]
+    pub resolved: u64,
+    #[serde(default)]
+    pub outdated: u64,
+    #[serde(default)]
+    pub authoritative: bool,
     pub last_checked_at: DateTime<Utc>,
 }
 
@@ -254,10 +283,66 @@ pub struct PrControlCommand {
     pub manual_input: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PrRecordSourceKind {
+    #[default]
+    Normalized,
+    GhPrView,
+    GhPrChecks,
+    GhReviews,
+    GhReviewThreads,
+    GhReviewComments,
+    ReviewPackRemaining,
+}
+
+impl PrRecordSourceKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Normalized => "normalized",
+            Self::GhPrView => "gh-pr-view",
+            Self::GhPrChecks => "gh-pr-checks",
+            Self::GhReviews => "gh-reviews",
+            Self::GhReviewThreads => "gh-review-threads",
+            Self::GhReviewComments => "gh-review-comments",
+            Self::ReviewPackRemaining => "review-pack-remaining",
+        }
+    }
+}
+
+impl fmt::Display for PrRecordSourceKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for PrRecordSourceKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "normalized" => Ok(Self::Normalized),
+            "gh-pr-view" => Ok(Self::GhPrView),
+            "gh-pr-checks" => Ok(Self::GhPrChecks),
+            "gh-reviews" => Ok(Self::GhReviews),
+            "gh-review-threads" => Ok(Self::GhReviewThreads),
+            "gh-review-comments" => Ok(Self::GhReviewComments),
+            "review-pack-remaining" => Ok(Self::ReviewPackRemaining),
+            _ => Err(format!(
+                "unsupported PR evidence source kind '{value}' (expected one of: normalized, gh-pr-view, gh-pr-checks, gh-reviews, gh-review-threads, gh-review-comments, review-pack-remaining)"
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrRecordArgs {
     pub capsule: PathBuf,
     pub source: PathBuf,
+    pub source_kind: PrRecordSourceKind,
+    pub repository: Option<String>,
+    pub number: Option<u64>,
+    pub retrieved_at: Option<DateTime<Utc>>,
+    pub source_command: Option<String>,
     pub command: Option<String>,
 }
 
@@ -389,8 +474,16 @@ struct PrSnapshotInput {
     url: Option<String>,
     state: String,
     #[serde(default)]
+    mergeable: Option<String>,
+    #[serde(default)]
+    review_decision: Option<String>,
+    #[serde(default)]
+    head_sha: Option<String>,
+    #[serde(default)]
     checks: Vec<CheckSnapshotInput>,
     review_threads: ReviewThreadSnapshotInput,
+    #[serde(default)]
+    sources: Vec<PrEvidenceSource>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -461,6 +554,14 @@ struct CheckSnapshotInput {
 #[derive(Debug, Deserialize)]
 struct ReviewThreadSnapshotInput {
     unresolved: u64,
+    #[serde(default)]
+    total: u64,
+    #[serde(default)]
+    resolved: u64,
+    #[serde(default)]
+    outdated: u64,
+    #[serde(default)]
+    authoritative: Option<bool>,
     #[serde(default)]
     last_checked_at: Option<DateTime<Utc>>,
 }
@@ -583,8 +684,11 @@ pub struct RenderResult {
 pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Result<PrRecordResult> {
     validate_capsule_for_pr_record(&args.capsule)?;
 
-    let snapshot: PrSnapshotInput = read_json(&args.source)?;
-    let pr = snapshot.into_pr_evidence(checked_at);
+    let mut pr = normalize_pr_record_source(&args, checked_at)?;
+    if args.source_kind != PrRecordSourceKind::Normalized {
+        let existing: PrEvidence = read_json(&args.capsule.join("pr.json"))?;
+        pr = merge_provider_pr_evidence(existing, pr, args.source_kind)?;
+    }
     write_json(args.capsule.join("pr.json"), &pr)?;
 
     let mut capsule: Capsule = read_json(&args.capsule.join("capsule.json"))?;
@@ -605,9 +709,9 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
             kind: EvidenceKind::Review,
             at: checked_at,
             summary: format!(
-                "PR snapshot recorded for {}; {} unresolved review thread(s); {} check(s)",
+                "PR snapshot recorded for {}; {}; {} check(s)",
                 render_pr_label(&pr),
-                pr.review_threads.unresolved,
+                render_review_thread_summary(&pr.review_threads),
                 pr.checks.len()
             ),
             command: evidence_command,
@@ -1008,11 +1112,19 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
             number: None,
             url: None,
             state: "not_created".to_string(),
+            mergeable: None,
+            review_decision: None,
+            head_sha: None,
             checks: Vec::new(),
             review_threads: ReviewThreadSummary {
                 unresolved: 0,
+                total: 0,
+                resolved: 0,
+                outdated: 0,
+                authoritative: false,
                 last_checked_at: created_at,
             },
+            sources: Vec::new(),
         },
     )?;
     write_json(path.join("policy.json"), &args.policy_manifest)?;
@@ -1353,6 +1465,412 @@ pub fn evidence_summary(capsule_path: &Path) -> Result<EvidenceSummary> {
     })
 }
 
+fn normalize_pr_record_source(
+    args: &PrRecordArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<PrEvidence> {
+    let retrieved_at = args.retrieved_at.unwrap_or(checked_at);
+    let mut pr = match args.source_kind {
+        PrRecordSourceKind::Normalized => {
+            let snapshot: PrSnapshotInput = read_json(&args.source)?;
+            snapshot.into_pr_evidence(checked_at)
+        }
+        PrRecordSourceKind::GhPrView => normalize_gh_pr_view(&args.source, checked_at)?,
+        PrRecordSourceKind::GhPrChecks => normalize_gh_pr_checks(&args.source, checked_at)?,
+        PrRecordSourceKind::GhReviews => normalize_gh_reviews(&args.source, checked_at)?,
+        PrRecordSourceKind::GhReviewThreads => {
+            normalize_gh_review_threads(&args.source, checked_at)?
+        }
+        PrRecordSourceKind::GhReviewComments => {
+            normalize_gh_review_comments(&args.source, checked_at)?
+        }
+        PrRecordSourceKind::ReviewPackRemaining => {
+            normalize_review_pack_remaining(&args.source, checked_at)?
+        }
+    };
+
+    apply_pr_record_identity(
+        &mut pr,
+        args.source_kind,
+        args.repository.as_deref(),
+        args.number,
+    )?;
+    pr.sources.push(PrEvidenceSource {
+        kind: args.source_kind.to_string(),
+        parser_version: PR_SOURCE_PARSER_VERSION.to_string(),
+        retrieved_at,
+        command: args.source_command.clone(),
+        path: Some(args.source.display().to_string()),
+    });
+    Ok(pr)
+}
+
+fn apply_pr_record_identity(
+    pr: &mut PrEvidence,
+    source_kind: PrRecordSourceKind,
+    repository: Option<&str>,
+    number: Option<u64>,
+) -> Result<()> {
+    if let Some(repository) = pr.url.as_deref().and_then(repository_from_pr_url) {
+        merge_pr_string_field(&mut pr.repository, Some(repository), "repository")?;
+    }
+    if let Some(number) = pr.url.as_deref().and_then(number_from_pr_url) {
+        merge_pr_number_field(&mut pr.number, Some(number), "number")?;
+    }
+    if let Some(repository) = repository {
+        merge_pr_string_field(
+            &mut pr.repository,
+            Some(repository.to_string()),
+            "repository",
+        )?;
+    }
+    if let Some(number) = number {
+        merge_pr_number_field(&mut pr.number, Some(number), "number")?;
+    }
+    if source_kind != PrRecordSourceKind::Normalized
+        && (pr.repository.is_none() || pr.number.is_none())
+    {
+        bail!(
+            "PR evidence source kind {source_kind} requires explicit PR identity; pass --repo and --number or provide a GitHub pull request URL"
+        );
+    }
+    Ok(())
+}
+
+fn normalize_gh_pr_view(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let value = read_json::<Value>(path)?;
+    let number = optional_u64(&value, "number");
+    let url = optional_string(&value, "url");
+    let repository = url.as_deref().and_then(repository_from_pr_url);
+    let state = if optional_bool(&value, "isDraft").unwrap_or(false) {
+        "draft".to_string()
+    } else {
+        optional_string(&value, "state")
+            .unwrap_or_else(|| "unknown".to_string())
+            .to_ascii_lowercase()
+    };
+    let mergeable = optional_string(&value, "mergeable").map(|value| value.to_ascii_lowercase());
+    let review_decision =
+        optional_string(&value, "reviewDecision").map(|value| value.to_ascii_lowercase());
+    let head_sha = optional_string(&value, "headRefOid");
+    let checks = value
+        .get("statusCheckRollup")
+        .map(|rollup| checks_from_status_rollup(rollup, checked_at))
+        .transpose()?
+        .unwrap_or_default();
+    let review_threads = value
+        .get("reviewThreads")
+        .map(|threads| review_thread_summary_from_graphql(threads, checked_at))
+        .transpose()?
+        .unwrap_or_else(|| empty_review_threads(checked_at));
+
+    Ok(PrEvidence {
+        schema: PR_SCHEMA.to_string(),
+        repository,
+        number,
+        url,
+        state,
+        mergeable,
+        review_decision,
+        head_sha,
+        checks,
+        review_threads,
+        sources: Vec::new(),
+    })
+}
+
+fn normalize_gh_pr_checks(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let value = read_json::<Value>(path)?;
+    let checks = checks_from_gh_pr_checks(&value, checked_at)?;
+    Ok(partial_pr_evidence(
+        "unknown",
+        checks,
+        empty_review_threads(checked_at),
+    ))
+}
+
+fn normalize_gh_reviews(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let value = read_json::<Value>(path)?;
+    let reviews = array_from_value(&value, "GitHub reviews")?;
+    let mut latest_by_reviewer: BTreeMap<String, (DateTime<Utc>, usize, String)> = BTreeMap::new();
+    for (index, review) in reviews.iter().enumerate() {
+        let state = optional_string(review, "state")
+            .with_context(|| format!("GitHub review is missing state: {review}"))?
+            .to_ascii_lowercase();
+        let submitted_at = datetime_from_fields(
+            review,
+            &["submitted_at", "submittedAt", "updated_at", "updatedAt"],
+        )
+        .unwrap_or(checked_at);
+        let reviewer = review_author_key(review, index);
+        match latest_by_reviewer.get(&reviewer) {
+            Some((latest_at, latest_index, _))
+                if submitted_at < *latest_at
+                    || (submitted_at == *latest_at && index <= *latest_index) => {}
+            _ => {
+                latest_by_reviewer.insert(reviewer, (submitted_at, index, state));
+            }
+        }
+    }
+
+    let mut pr = partial_pr_evidence("unknown", Vec::new(), empty_review_threads(checked_at));
+    pr.review_decision = review_decision_from_reviewer_states(latest_by_reviewer.values());
+    Ok(pr)
+}
+
+fn review_author_key(review: &Value, index: usize) -> String {
+    for pointer in ["/user/login", "/author/login", "/user/id", "/author/id"] {
+        if let Some(value) = json_scalar_key(review.pointer(pointer)) {
+            return format!("{pointer}:{value}");
+        }
+    }
+    json_scalar_key(review.get("id"))
+        .map(|id| format!("review:{id}"))
+        .unwrap_or_else(|| format!("review-index:{index}"))
+}
+
+fn review_decision_from_reviewer_states<'a>(
+    states: impl Iterator<Item = &'a (DateTime<Utc>, usize, String)>,
+) -> Option<String> {
+    let mut approved = false;
+    let mut commented = false;
+    for (_, _, state) in states {
+        match state.as_str() {
+            "changes_requested" => return Some("changes_requested".to_string()),
+            "approved" => approved = true,
+            "commented" => commented = true,
+            "dismissed" | "pending" => {}
+            _ => {}
+        }
+    }
+    if approved {
+        Some("approved".to_string())
+    } else if commented {
+        Some("commented".to_string())
+    } else {
+        None
+    }
+}
+
+fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let value = read_json::<Value>(path)?;
+    let review_threads = review_thread_summary_from_graphql(&value, checked_at)?;
+    Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
+}
+
+fn normalize_gh_review_comments(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let value = read_json::<Value>(path)?;
+    let comments = array_from_value(&value, "GitHub review comments")?;
+    let review_threads = review_thread_summary_from_rest_comments(comments, checked_at);
+    Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
+}
+
+fn review_thread_summary_from_rest_comments(
+    comments: &[Value],
+    checked_at: DateTime<Utc>,
+) -> ReviewThreadSummary {
+    let mut thread_outdated: BTreeMap<String, bool> = BTreeMap::new();
+    for (index, comment) in comments.iter().enumerate() {
+        let thread_key = review_comment_thread_key(comment, index);
+        let is_outdated = review_comment_is_outdated(comment);
+        thread_outdated
+            .entry(thread_key)
+            .and_modify(|all_outdated| *all_outdated &= is_outdated)
+            .or_insert(is_outdated);
+    }
+    ReviewThreadSummary {
+        unresolved: 0,
+        total: thread_outdated.len() as u64,
+        resolved: 0,
+        outdated: thread_outdated
+            .values()
+            .filter(|all_outdated| **all_outdated)
+            .count() as u64,
+        authoritative: false,
+        last_checked_at: checked_at,
+    }
+}
+
+fn review_comment_thread_key(comment: &Value, index: usize) -> String {
+    json_scalar_key(comment.get("in_reply_to_id"))
+        .or_else(|| json_scalar_key(comment.get("inReplyToId")))
+        .or_else(|| json_scalar_key(comment.get("id")))
+        .map(|id| format!("thread:{id}"))
+        .unwrap_or_else(|| format!("comment-index:{index}"))
+}
+
+fn review_comment_is_outdated(comment: &Value) -> bool {
+    value_is_nullish(comment.get("position"))
+        && (comment.get("original_position").is_some()
+            || comment.get("originalPosition").is_some()
+            || comment.get("originalLine").is_some()
+            || comment.get("original_line").is_some())
+}
+
+fn normalize_review_pack_remaining(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
+    let contents =
+        fs::read_to_string(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let unresolved = parse_review_pack_remaining(&contents)
+        .with_context(|| format!("failed to parse {}", path.display()))?;
+    Ok(partial_pr_evidence(
+        "unknown",
+        Vec::new(),
+        ReviewThreadSummary {
+            unresolved,
+            total: unresolved,
+            resolved: 0,
+            outdated: 0,
+            authoritative: true,
+            last_checked_at: checked_at,
+        },
+    ))
+}
+
+fn partial_pr_evidence(
+    state: &str,
+    checks: Vec<CheckRecord>,
+    review_threads: ReviewThreadSummary,
+) -> PrEvidence {
+    PrEvidence {
+        schema: PR_SCHEMA.to_string(),
+        repository: None,
+        number: None,
+        url: None,
+        state: state.to_string(),
+        mergeable: None,
+        review_decision: None,
+        head_sha: None,
+        checks,
+        review_threads,
+        sources: Vec::new(),
+    }
+}
+
+fn merge_provider_pr_evidence(
+    mut existing: PrEvidence,
+    incoming: PrEvidence,
+    source_kind: PrRecordSourceKind,
+) -> Result<PrEvidence> {
+    if source_kind == PrRecordSourceKind::Normalized {
+        return Ok(incoming);
+    }
+    if existing.schema != PR_SCHEMA || incoming.schema != PR_SCHEMA {
+        bail!("cannot merge PR evidence with unexpected schema");
+    }
+
+    merge_pr_string_field(&mut existing.repository, incoming.repository, "repository")?;
+    merge_pr_number_field(&mut existing.number, incoming.number, "number")?;
+    merge_pr_string_field(&mut existing.url, incoming.url, "url")?;
+
+    if incoming.state != "unknown" {
+        existing.state = incoming.state;
+    } else if existing.state == "not_created" {
+        existing.state = "unknown".to_string();
+    }
+
+    if incoming.mergeable.is_some() {
+        existing.mergeable = incoming.mergeable;
+    }
+    if incoming.review_decision.is_some()
+        && (source_kind != PrRecordSourceKind::GhReviews || existing.review_decision.is_none())
+    {
+        existing.review_decision = incoming.review_decision;
+    }
+    if incoming.head_sha.is_some() {
+        existing.head_sha = incoming.head_sha;
+    }
+
+    match source_kind {
+        PrRecordSourceKind::GhPrView => {
+            if !incoming.checks.is_empty() {
+                existing.checks = incoming.checks;
+            }
+            if incoming.review_threads.authoritative {
+                existing.review_threads = incoming.review_threads;
+            }
+        }
+        PrRecordSourceKind::GhPrChecks => {
+            existing.checks = incoming.checks;
+        }
+        PrRecordSourceKind::GhReviews => {}
+        PrRecordSourceKind::GhReviewThreads => {
+            existing.review_threads = incoming.review_threads;
+        }
+        PrRecordSourceKind::GhReviewComments => {
+            merge_review_comment_summary(&mut existing.review_threads, incoming.review_threads);
+        }
+        PrRecordSourceKind::ReviewPackRemaining => {
+            merge_review_pack_summary(&mut existing.review_threads, incoming.review_threads);
+        }
+        PrRecordSourceKind::Normalized => unreachable!("handled before merge"),
+    }
+
+    existing.sources.extend(incoming.sources);
+    Ok(existing)
+}
+
+fn merge_pr_string_field(
+    existing: &mut Option<String>,
+    incoming: Option<String>,
+    field: &str,
+) -> Result<()> {
+    let Some(incoming) = incoming else {
+        return Ok(());
+    };
+    if let Some(existing_value) = existing.as_deref()
+        && existing_value != incoming
+    {
+        bail!("conflicting PR {field}: existing {existing_value}, incoming {incoming}");
+    }
+    *existing = Some(incoming);
+    Ok(())
+}
+
+fn merge_pr_number_field(
+    existing: &mut Option<u64>,
+    incoming: Option<u64>,
+    field: &str,
+) -> Result<()> {
+    let Some(incoming) = incoming else {
+        return Ok(());
+    };
+    if let Some(existing_value) = *existing
+        && existing_value != incoming
+    {
+        bail!("conflicting PR {field}: existing {existing_value}, incoming {incoming}");
+    }
+    *existing = Some(incoming);
+    Ok(())
+}
+
+fn merge_review_pack_summary(existing: &mut ReviewThreadSummary, incoming: ReviewThreadSummary) {
+    existing.unresolved = incoming.unresolved;
+    existing.total = existing
+        .total
+        .max(incoming.total)
+        .max(existing.unresolved + existing.resolved + existing.outdated);
+    existing.authoritative = true;
+    existing.last_checked_at = incoming.last_checked_at;
+}
+
+fn merge_review_comment_summary(existing: &mut ReviewThreadSummary, incoming: ReviewThreadSummary) {
+    if existing.authoritative {
+        existing.total = existing
+            .total
+            .max(incoming.total)
+            .max(existing.unresolved + existing.resolved + existing.outdated);
+        existing.last_checked_at = incoming.last_checked_at;
+        return;
+    }
+    existing.outdated = incoming.outdated;
+    existing.total = existing
+        .total
+        .max(incoming.total)
+        .max(existing.unresolved + existing.resolved + existing.outdated);
+    existing.authoritative = existing.authoritative || incoming.authoritative;
+    existing.last_checked_at = incoming.last_checked_at;
+}
+
 impl PrSnapshotInput {
     fn into_pr_evidence(self, checked_at: DateTime<Utc>) -> PrEvidence {
         PrEvidence {
@@ -1361,6 +1879,9 @@ impl PrSnapshotInput {
             number: self.number,
             url: self.url,
             state: self.state.to_ascii_lowercase(),
+            mergeable: self.mergeable.map(|value| value.to_ascii_lowercase()),
+            review_decision: self.review_decision.map(|value| value.to_ascii_lowercase()),
+            head_sha: self.head_sha,
             checks: self
                 .checks
                 .into_iter()
@@ -1374,20 +1895,352 @@ impl PrSnapshotInput {
                 .collect(),
             review_threads: ReviewThreadSummary {
                 unresolved: self.review_threads.unresolved,
+                total: self.review_threads.total,
+                resolved: self.review_threads.resolved,
+                outdated: self.review_threads.outdated,
+                authoritative: self.review_threads.authoritative.unwrap_or(true),
                 last_checked_at: self.review_threads.last_checked_at.unwrap_or(checked_at),
             },
+            sources: self.sources,
         }
     }
 }
 
+fn checks_from_status_rollup(value: &Value, checked_at: DateTime<Utc>) -> Result<Vec<CheckRecord>> {
+    array_from_value(value, "GitHub statusCheckRollup")?
+        .iter()
+        .map(|check| check_from_github_value(check, checked_at))
+        .collect()
+}
+
+fn checks_from_gh_pr_checks(value: &Value, checked_at: DateTime<Utc>) -> Result<Vec<CheckRecord>> {
+    array_from_value(value, "gh pr checks")?
+        .iter()
+        .map(|check| check_from_github_value(check, checked_at))
+        .collect()
+}
+
+fn check_from_github_value(value: &Value, checked_at: DateTime<Utc>) -> Result<CheckRecord> {
+    let name = optional_string(value, "name")
+        .or_else(|| optional_string(value, "context"))
+        .with_context(|| format!("GitHub check is missing name/context: {value}"))?;
+    let status = check_lifecycle_status(value)
+        .with_context(|| format!("GitHub check {name} is missing status/state/bucket"))?;
+    let conclusion = optional_string(value, "conclusion")
+        .or_else(|| optional_string(value, "state").and_then(state_to_conclusion))
+        .or_else(|| optional_string(value, "bucket").and_then(bucket_to_conclusion))
+        .map(|conclusion| conclusion.to_ascii_lowercase());
+    let url = optional_string(value, "detailsUrl")
+        .or_else(|| optional_string(value, "targetUrl"))
+        .or_else(|| optional_string(value, "link"))
+        .or_else(|| optional_string(value, "url"))
+        .filter(|url| !url.is_empty());
+    let checked_at = datetime_from_fields(
+        value,
+        &["completedAt", "startedAt", "updatedAt", "createdAt"],
+    )
+    .unwrap_or(checked_at);
+
+    Ok(CheckRecord {
+        name,
+        status,
+        conclusion,
+        url,
+        checked_at,
+    })
+}
+
+fn check_lifecycle_status(value: &Value) -> Option<String> {
+    if let Some(status) = optional_string(value, "status") {
+        return Some(normalize_lifecycle_status(&status));
+    }
+    if let Some(state) = optional_string(value, "state") {
+        return Some(lifecycle_status_from_state(&state));
+    }
+    optional_string(value, "bucket").map(|bucket| lifecycle_status_from_bucket(&bucket))
+}
+
+fn normalize_lifecycle_status(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "completed" | "complete" => "completed".to_string(),
+        "in_progress" | "in progress" | "running" => "in_progress".to_string(),
+        "queued" => "queued".to_string(),
+        "pending" => "pending".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn lifecycle_status_from_state(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "success" | "failure" | "error" | "cancelled" | "canceled" | "skipped" => {
+            "completed".to_string()
+        }
+        "pending" => "pending".to_string(),
+        "queued" => "queued".to_string(),
+        "in_progress" | "in progress" | "running" => "in_progress".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn lifecycle_status_from_bucket(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "pass" | "fail" | "cancel" | "skipping" => "completed".to_string(),
+        "pending" => "pending".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn review_thread_summary_from_graphql(
+    value: &Value,
+    checked_at: DateTime<Utc>,
+) -> Result<ReviewThreadSummary> {
+    let nodes = review_thread_nodes(value)
+        .with_context(|| "GitHub review-thread source is missing reviewThreads.nodes")?;
+    let mut unresolved = 0;
+    let mut resolved = 0;
+    let mut outdated = 0;
+
+    for node in nodes {
+        let is_resolved = optional_bool(node, "isResolved")
+            .with_context(|| format!("GitHub review thread is missing isResolved: {node}"))?;
+        let is_outdated = optional_bool(node, "isOutdated").unwrap_or(false);
+        if is_resolved {
+            resolved += 1;
+        } else if is_outdated {
+            outdated += 1;
+        } else {
+            unresolved += 1;
+        }
+    }
+
+    Ok(ReviewThreadSummary {
+        unresolved,
+        total: nodes.len() as u64,
+        resolved,
+        outdated,
+        authoritative: matches!(review_threads_has_next_page(value), Some(false)),
+        last_checked_at: checked_at,
+    })
+}
+
+fn review_thread_nodes(value: &Value) -> Option<&Vec<Value>> {
+    value
+        .pointer("/data/repository/pullRequest/reviewThreads/nodes")
+        .or_else(|| value.pointer("/repository/pullRequest/reviewThreads/nodes"))
+        .or_else(|| value.pointer("/pullRequest/reviewThreads/nodes"))
+        .or_else(|| value.pointer("/reviewThreads/nodes"))
+        .or_else(|| value.pointer("/nodes"))
+        .and_then(Value::as_array)
+}
+
+fn review_threads_has_next_page(value: &Value) -> Option<bool> {
+    value
+        .pointer("/data/repository/pullRequest/reviewThreads/pageInfo/hasNextPage")
+        .or_else(|| value.pointer("/repository/pullRequest/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/pullRequest/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/reviewThreads/pageInfo/hasNextPage"))
+        .or_else(|| value.pointer("/pageInfo/hasNextPage"))
+        .and_then(Value::as_bool)
+}
+
+fn parse_review_pack_remaining(contents: &str) -> Result<u64> {
+    let trimmed = contents.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed)
+        && let Some(unresolved) = review_pack_remaining_from_json(&value)
+    {
+        return Ok(unresolved);
+    }
+    if let Ok(unresolved) = trimmed.parse::<u64>() {
+        return Ok(unresolved);
+    }
+    for line in contents.lines() {
+        if let Some(unresolved) = review_pack_count_from_line(line) {
+            return Ok(unresolved);
+        }
+    }
+    bail!("review-pack remaining output did not include an unresolved count")
+}
+
+fn review_pack_remaining_from_json(value: &Value) -> Option<u64> {
+    [
+        "/unresolved",
+        "/unresolved_threads",
+        "/remaining",
+        "/review_threads/unresolved",
+        "/result/unresolved",
+        "/result/unresolved_threads",
+        "/summary/unresolved",
+    ]
+    .iter()
+    .find_map(|pointer| value.pointer(pointer).and_then(Value::as_u64))
+}
+
+fn review_pack_count_from_line(value: &str) -> Option<u64> {
+    let lower = value.to_ascii_lowercase();
+    for key in [
+        "unresolved_threads",
+        "unresolved threads",
+        "unresolved",
+        "remaining",
+    ] {
+        let Some(index) = lower.find(key) else {
+            continue;
+        };
+        if let Some(count) = trailing_u64(value[..index].trim()) {
+            return Some(count);
+        }
+        if let Some(count) = leading_u64_after_key(&value[index + key.len()..]) {
+            return Some(count);
+        }
+    }
+    None
+}
+
+fn trailing_u64(value: &str) -> Option<u64> {
+    let token = value
+        .split(|ch: char| !ch.is_ascii_digit())
+        .rfind(|part| !part.is_empty())?;
+    if value.trim() == token {
+        token.parse().ok()
+    } else {
+        None
+    }
+}
+
+fn leading_u64_after_key(value: &str) -> Option<u64> {
+    let value =
+        value.trim_start_matches(|ch: char| ch.is_whitespace() || matches!(ch, ':' | '=' | '-'));
+    let digits = value
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    if digits.is_empty() {
+        None
+    } else {
+        digits.parse().ok()
+    }
+}
+
+fn empty_review_threads(checked_at: DateTime<Utc>) -> ReviewThreadSummary {
+    ReviewThreadSummary {
+        unresolved: 0,
+        total: 0,
+        resolved: 0,
+        outdated: 0,
+        authoritative: false,
+        last_checked_at: checked_at,
+    }
+}
+
+fn optional_string(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn optional_u64(value: &Value, key: &str) -> Option<u64> {
+    value.get(key).and_then(Value::as_u64)
+}
+
+fn optional_bool(value: &Value, key: &str) -> Option<bool> {
+    value.get(key).and_then(Value::as_bool)
+}
+
+fn json_scalar_key(value: Option<&Value>) -> Option<String> {
+    match value? {
+        Value::String(value) if !value.trim().is_empty() => Some(value.trim().to_string()),
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn array_from_value<'a>(value: &'a Value, label: &str) -> Result<&'a Vec<Value>> {
+    value
+        .as_array()
+        .with_context(|| format!("{label} source must be a JSON array"))
+}
+
+fn datetime_from_fields(value: &Value, fields: &[&str]) -> Option<DateTime<Utc>> {
+    fields.iter().find_map(|field| {
+        value
+            .get(*field)
+            .and_then(Value::as_str)
+            .and_then(parse_github_datetime)
+    })
+}
+
+fn parse_github_datetime(value: &str) -> Option<DateTime<Utc>> {
+    let value = value.trim();
+    if value.is_empty() || value.starts_with("0001-01-01T00:00:00") {
+        return None;
+    }
+    value.parse().ok()
+}
+
+fn bucket_to_conclusion(value: String) -> Option<String> {
+    match value.as_str() {
+        "pass" => Some("success".to_string()),
+        "fail" => Some("failure".to_string()),
+        "cancel" => Some("cancelled".to_string()),
+        "skipping" => Some("skipped".to_string()),
+        _ => None,
+    }
+}
+
+fn state_to_conclusion(value: String) -> Option<String> {
+    match value.to_ascii_lowercase().as_str() {
+        "success" | "failure" | "error" | "cancelled" | "canceled" | "skipped" => {
+            Some(value.to_ascii_lowercase())
+        }
+        _ => None,
+    }
+}
+
+fn value_is_nullish(value: Option<&Value>) -> bool {
+    matches!(value, None | Some(Value::Null))
+}
+
+fn repository_from_pr_url(url: &str) -> Option<String> {
+    let mut parts = github_pr_url_parts(url)?;
+    Some(format!("{}/{}", parts.next()?, parts.next()?))
+}
+
+fn number_from_pr_url(url: &str) -> Option<u64> {
+    let mut parts = github_pr_url_parts(url)?;
+    parts.nth(3)?.parse().ok()
+}
+
+fn github_pr_url_parts(url: &str) -> Option<impl Iterator<Item = &str>> {
+    let path = url.split("github.com/").nth(1)?;
+    let mut parts = path.split('/');
+    let owner = parts.next()?;
+    let repo = parts.next()?;
+    let pull = parts.next()?;
+    if owner.is_empty() || repo.is_empty() || pull != "pull" {
+        return None;
+    }
+    Some(path.split('/'))
+}
+
 pub fn render_pr_status(pr: &PrEvidence) -> String {
     format!(
-        "{} {}: {} unresolved review thread(s), {} check(s)",
+        "{} {}: {}, {} check(s)",
         render_pr_label(pr),
         pr.state,
-        pr.review_threads.unresolved,
+        render_review_thread_summary(&pr.review_threads),
         pr.checks.len()
     )
+}
+
+fn render_review_thread_summary(review_threads: &ReviewThreadSummary) -> String {
+    if review_threads.authoritative {
+        format!("{} unresolved review thread(s)", review_threads.unresolved)
+    } else {
+        "review threads not checked".to_string()
+    }
 }
 
 pub fn render_pr_label(pr: &PrEvidence) -> String {
@@ -2479,6 +3332,23 @@ mod tests {
         }
     }
 
+    fn pr_record_args(
+        capsule: PathBuf,
+        source: PathBuf,
+        source_kind: PrRecordSourceKind,
+    ) -> PrRecordArgs {
+        PrRecordArgs {
+            capsule,
+            source,
+            source_kind,
+            repository: None,
+            number: None,
+            retrieved_at: None,
+            source_command: None,
+            command: Some("fixture-pr-recorder".to_string()),
+        }
+    }
+
     fn write_subspawn_plan_fixture(
         root: &Path,
         file_name: &str,
@@ -2764,6 +3634,11 @@ mod tests {
             PrRecordArgs {
                 capsule: capsule.clone(),
                 source,
+                source_kind: PrRecordSourceKind::Normalized,
+                repository: None,
+                number: None,
+                retrieved_at: None,
+                source_command: None,
                 command: Some("fixture-pr-recorder --source pr-snapshot.json".to_string()),
             },
             "2026-05-09T05:00:00Z".parse().unwrap(),
@@ -2775,6 +3650,12 @@ mod tests {
         assert_eq!(result.pr.checks[0].status, "completed");
         assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("success"));
         assert_eq!(result.pr.review_threads.unresolved, 0);
+        assert_eq!(result.pr.sources[0].kind, "normalized");
+        assert_eq!(
+            result.pr.sources[0].parser_version,
+            PR_SOURCE_PARSER_VERSION
+        );
+        assert!(result.pr.review_threads.authoritative);
 
         let pr: PrEvidence = read_json(&capsule.join("pr.json")).expect("pr json");
         assert_eq!(pr.number, Some(25));
@@ -2785,6 +3666,645 @@ mod tests {
         let evidence = fs::read_to_string(capsule.join("evidence.jsonl")).expect("evidence");
         assert!(evidence.contains("PR snapshot recorded"));
         assert!(evidence.contains("fixture-pr-recorder --source pr-snapshot.json"));
+    }
+
+    #[test]
+    fn pr_record_normalizes_gh_pr_view_open_draft_and_mergeable_cases() {
+        let temp = tempdir().expect("tempdir");
+        let cases = [
+            ("open.json", false, "MERGEABLE", "APPROVED", "open"),
+            (
+                "draft.json",
+                true,
+                "CONFLICTING",
+                "REVIEW_REQUIRED",
+                "draft",
+            ),
+        ];
+
+        for (file_name, is_draft, mergeable, review_decision, expected_state) in cases {
+            let capsule = init_capsule(init_args(temp.path().join(file_name)))
+                .expect("init capsule")
+                .path;
+            let source = temp.path().join(format!("source-{file_name}"));
+            fs::write(
+                &source,
+                serde_json::to_string_pretty(&json!({
+                    "number": 46,
+                    "url": "https://github.com/BjornMelin/dev-skills/pull/46",
+                    "state": "OPEN",
+                    "isDraft": is_draft,
+                    "mergeable": mergeable,
+                    "reviewDecision": review_decision,
+                    "headRefOid": "abc123",
+                    "statusCheckRollup": [{
+                        "__typename": "CheckRun",
+                        "name": "GitGuardian Security Checks",
+                        "status": "COMPLETED",
+                        "conclusion": "SUCCESS",
+                        "detailsUrl": "https://example.test/check",
+                        "completedAt": "2026-05-09T05:01:00Z"
+                    }]
+                }))
+                .expect("fixture json"),
+            )
+            .expect("write fixture");
+
+            let mut args = pr_record_args(capsule.clone(), source, PrRecordSourceKind::GhPrView);
+            args.source_command = Some("gh pr view 46 --json ...".to_string());
+            let result = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+                .expect("record pr");
+
+            assert_eq!(
+                result.pr.repository.as_deref(),
+                Some("BjornMelin/dev-skills")
+            );
+            assert_eq!(result.pr.number, Some(46));
+            assert_eq!(result.pr.state, expected_state);
+            let expected_mergeable = mergeable.to_ascii_lowercase();
+            let expected_review_decision = review_decision.to_ascii_lowercase();
+            assert_eq!(
+                result.pr.mergeable.as_deref(),
+                Some(expected_mergeable.as_str())
+            );
+            assert_eq!(
+                result.pr.review_decision.as_deref(),
+                Some(expected_review_decision.as_str())
+            );
+            assert_eq!(result.pr.head_sha.as_deref(), Some("abc123"));
+            assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("success"));
+            assert!(!result.pr.review_threads.authoritative);
+            assert_eq!(result.pr.sources[0].kind, "gh-pr-view");
+            assert_eq!(
+                result.pr.sources[0].command.as_deref(),
+                Some("gh pr view 46 --json ...")
+            );
+        }
+    }
+
+    #[test]
+    fn pr_record_normalizes_gh_pr_checks_failing_statuses() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-pr-checks.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                {
+                    "bucket": "fail",
+                    "completedAt": "2026-05-09T05:02:00Z",
+                    "link": "https://example.test/check/fail",
+                    "name": "lint",
+                    "state": "FAILURE",
+                    "workflow": "ci"
+                },
+                {
+                    "bucket": "pending",
+                    "completedAt": "0001-01-01T00:00:00Z",
+                    "link": "",
+                    "name": "test",
+                    "startedAt": "0001-01-01T00:00:00Z",
+                    "state": "PENDING",
+                    "workflow": "ci"
+                }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhPrChecks);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect("record checks");
+
+        assert_eq!(result.pr.state, "unknown");
+        assert_eq!(result.pr.checks.len(), 2);
+        assert_eq!(result.pr.checks[0].status, "completed");
+        assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("failure"));
+        assert_eq!(result.pr.checks[1].status, "pending");
+        assert!(!result.pr.review_threads.authoritative);
+        assert_eq!(
+            result.pr.checks[1].checked_at,
+            "2026-05-09T05:00:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+    }
+
+    #[test]
+    fn pr_record_normalizes_unresolved_and_stale_review_sources() {
+        let temp = tempdir().expect("tempdir");
+        let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
+
+        let reviews_capsule = init_capsule(init_args(temp.path().join("reviews")))
+            .expect("init capsule")
+            .path;
+        let reviews_source = temp.path().join("gh-reviews.json");
+        fs::write(
+            &reviews_source,
+            serde_json::to_string_pretty(&json!([
+                { "id": 1, "state": "COMMENTED", "submitted_at": "2026-05-09T04:00:00Z" },
+                { "id": 2, "state": "CHANGES_REQUESTED", "submitted_at": "2026-05-09T05:00:00Z" }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            reviews_capsule,
+            reviews_source,
+            PrRecordSourceKind::GhReviews,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record reviews");
+        assert_eq!(
+            result.pr.review_decision.as_deref(),
+            Some("changes_requested")
+        );
+        assert!(!result.pr.review_threads.authoritative);
+
+        let threads_capsule = init_capsule(init_args(temp.path().join("threads")))
+            .expect("init capsule")
+            .path;
+        let threads_source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &threads_source,
+            serde_json::to_string_pretty(&json!({
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    { "id": "resolved", "isResolved": true, "isOutdated": false },
+                                    { "id": "current", "isResolved": false, "isOutdated": false },
+                                    { "id": "stale", "isResolved": false, "isOutdated": true }
+                                ],
+                                "pageInfo": { "hasNextPage": false }
+                            }
+                        }
+                    }
+                }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            threads_capsule,
+            threads_source,
+            PrRecordSourceKind::GhReviewThreads,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record threads");
+        assert_eq!(result.pr.review_threads.total, 3);
+        assert_eq!(result.pr.review_threads.resolved, 1);
+        assert_eq!(result.pr.review_threads.unresolved, 1);
+        assert_eq!(result.pr.review_threads.outdated, 1);
+        assert!(result.pr.review_threads.authoritative);
+
+        let comments_capsule = init_capsule(init_args(temp.path().join("comments")))
+            .expect("init capsule")
+            .path;
+        let comments_source = temp.path().join("gh-review-comments.json");
+        fs::write(
+            &comments_source,
+            serde_json::to_string_pretty(&json!([
+                { "id": 1, "position": 4, "original_position": 4 },
+                { "id": 2, "in_reply_to_id": 1, "position": null, "original_position": 8 },
+                { "id": 3, "position": null, "original_position": 12 }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            comments_capsule,
+            comments_source,
+            PrRecordSourceKind::GhReviewComments,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record comments");
+        assert_eq!(result.pr.review_threads.total, 2);
+        assert_eq!(result.pr.review_threads.unresolved, 0);
+        assert_eq!(result.pr.review_threads.outdated, 1);
+        assert!(!result.pr.review_threads.authoritative);
+    }
+
+    #[test]
+    fn gh_reviews_collapse_latest_state_per_reviewer() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("reviews")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-reviews.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                {
+                    "id": 1,
+                    "user": { "login": "alice" },
+                    "state": "CHANGES_REQUESTED",
+                    "submitted_at": "2026-05-09T04:00:00Z"
+                },
+                {
+                    "id": 2,
+                    "user": { "login": "alice" },
+                    "state": "APPROVED",
+                    "submitted_at": "2026-05-09T05:00:00Z"
+                },
+                {
+                    "id": 3,
+                    "user": { "login": "bob" },
+                    "state": "COMMENTED",
+                    "submitted_at": "2026-05-09T06:00:00Z"
+                }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviews);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record reviews");
+        assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
+    }
+
+    #[test]
+    fn gh_review_threads_require_complete_page_for_authority() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("threads")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "reviewThreads": {
+                    "nodes": [
+                        { "id": "current", "isResolved": false, "isOutdated": false }
+                    ],
+                    "pageInfo": { "hasNextPage": true }
+                }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhReviewThreads);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, "2026-05-09T06:05:00Z".parse().unwrap())
+            .expect("record threads");
+        assert_eq!(result.pr.review_threads.unresolved, 1);
+        assert!(!result.pr.review_threads.authoritative);
+    }
+
+    #[test]
+    fn pr_record_normalizes_review_pack_zero_thread_output() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("review-pack-remaining.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "review_threads": { "unresolved": 0 }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::ReviewPackRemaining);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        args.retrieved_at = Some("2026-05-09T04:59:00Z".parse().unwrap());
+        let result = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect("record remaining");
+
+        assert_eq!(result.pr.review_threads.unresolved, 0);
+        assert!(result.pr.review_threads.authoritative);
+        assert_eq!(
+            result.pr.sources[0].retrieved_at,
+            "2026-05-09T04:59:00Z".parse::<DateTime<Utc>>().unwrap()
+        );
+    }
+
+    #[test]
+    fn pr_record_rejects_non_normalized_sources_without_identity() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-pr-checks.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!([
+                { "bucket": "pass", "name": "lint", "state": "SUCCESS" }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let error = record_pr_snapshot(
+            pr_record_args(capsule, source, PrRecordSourceKind::GhPrChecks),
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect_err("identity required");
+
+        assert!(error.to_string().contains("requires explicit PR identity"));
+    }
+
+    #[test]
+    fn pr_record_rejects_explicit_identity_that_conflicts_with_source_url() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let source = temp.path().join("gh-pr-view.json");
+        fs::write(
+            &source,
+            serde_json::to_string_pretty(&json!({
+                "number": 46,
+                "url": "https://github.com/BjornMelin/dev-skills/pull/46",
+                "state": "OPEN"
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+
+        let mut args = pr_record_args(
+            capsule.clone(),
+            source.clone(),
+            PrRecordSourceKind::GhPrView,
+        );
+        args.repository = Some("Other/repo".to_string());
+        args.number = Some(46);
+        let error = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect_err("repository mismatch rejected");
+        assert!(error.to_string().contains("conflicting PR repository"));
+
+        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::GhPrView);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(47);
+        let error = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
+            .expect_err("number mismatch rejected");
+        assert!(error.to_string().contains("conflicting PR number"));
+    }
+
+    #[test]
+    fn pr_record_merges_provider_sources_without_dropping_prior_evidence() {
+        let temp = tempdir().expect("tempdir");
+        let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+
+        let pr_view_source = temp.path().join("gh-pr-view.json");
+        fs::write(
+            &pr_view_source,
+            serde_json::to_string_pretty(&json!({
+                "number": 46,
+                "url": "https://github.com/BjornMelin/dev-skills/pull/46",
+                "state": "OPEN",
+                "isDraft": false,
+                "mergeable": "MERGEABLE",
+                "reviewDecision": "APPROVED",
+                "headRefOid": "abc123",
+                "statusCheckRollup": [{
+                    "name": "lint",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS"
+                }]
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            pr_view_source,
+            PrRecordSourceKind::GhPrView,
+        );
+        args.source_command = Some("gh pr view 46 --json ...".to_string());
+        record_pr_snapshot(args, checked_at).expect("record pr view");
+
+        let thread_source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &thread_source,
+            serde_json::to_string_pretty(&json!({
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    { "id": "resolved", "isResolved": true, "isOutdated": false },
+                                    { "id": "current", "isResolved": false, "isOutdated": false },
+                                    { "id": "stale", "isResolved": false, "isOutdated": true }
+                                ],
+                                "pageInfo": { "hasNextPage": false }
+                            }
+                        }
+                    }
+                }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            thread_source,
+            PrRecordSourceKind::GhReviewThreads,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        record_pr_snapshot(args, checked_at).expect("record review threads");
+
+        let checks_source = temp.path().join("gh-pr-checks.json");
+        fs::write(
+            &checks_source,
+            serde_json::to_string_pretty(&json!([
+                { "bucket": "fail", "name": "lint", "state": "FAILURE" }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            checks_source,
+            PrRecordSourceKind::GhPrChecks,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        record_pr_snapshot(args, checked_at).expect("record checks");
+
+        let remaining_source = temp.path().join("review-pack-remaining.txt");
+        fs::write(&remaining_source, "0 unresolved threads\n").expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            remaining_source,
+            PrRecordSourceKind::ReviewPackRemaining,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record remaining");
+
+        assert_eq!(
+            result.pr.repository.as_deref(),
+            Some("BjornMelin/dev-skills")
+        );
+        assert_eq!(result.pr.number, Some(46));
+        assert_eq!(result.pr.state, "open");
+        assert_eq!(result.pr.mergeable.as_deref(), Some("mergeable"));
+        assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
+        assert_eq!(result.pr.head_sha.as_deref(), Some("abc123"));
+        assert_eq!(result.pr.checks.len(), 1);
+        assert_eq!(result.pr.checks[0].name, "lint");
+        assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("failure"));
+        assert_eq!(result.pr.review_threads.unresolved, 0);
+        assert_eq!(result.pr.review_threads.resolved, 1);
+        assert_eq!(result.pr.review_threads.outdated, 1);
+        assert_eq!(result.pr.review_threads.total, 3);
+        assert!(result.pr.review_threads.authoritative);
+        assert_eq!(
+            result
+                .pr
+                .sources
+                .iter()
+                .map(|source| source.kind.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "gh-pr-view",
+                "gh-review-threads",
+                "gh-pr-checks",
+                "review-pack-remaining"
+            ]
+        );
+    }
+
+    #[test]
+    fn pr_record_merge_precedence_keeps_stronger_provider_evidence() {
+        let temp = tempdir().expect("tempdir");
+        let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+
+        let pr_view_source = temp.path().join("gh-pr-view.json");
+        fs::write(
+            &pr_view_source,
+            serde_json::to_string_pretty(&json!({
+                "number": 46,
+                "url": "https://github.com/BjornMelin/dev-skills/pull/46",
+                "state": "OPEN",
+                "isDraft": false,
+                "reviewDecision": "APPROVED",
+                "statusCheckRollup": [{
+                    "name": "lint",
+                    "status": "COMPLETED",
+                    "conclusion": "FAILURE"
+                }]
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        record_pr_snapshot(
+            pr_record_args(
+                capsule.clone(),
+                pr_view_source,
+                PrRecordSourceKind::GhPrView,
+            ),
+            checked_at,
+        )
+        .expect("record pr view");
+
+        let reviews_source = temp.path().join("gh-reviews.json");
+        fs::write(
+            &reviews_source,
+            serde_json::to_string_pretty(&json!([
+                { "id": 1, "state": "COMMENTED", "submitted_at": "2026-05-09T06:00:00Z" }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            reviews_source,
+            PrRecordSourceKind::GhReviews,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record reviews");
+        assert_eq!(result.pr.review_decision.as_deref(), Some("approved"));
+
+        let thread_source = temp.path().join("gh-review-threads.json");
+        fs::write(
+            &thread_source,
+            serde_json::to_string_pretty(&json!({
+                "reviewThreads": {
+                    "nodes": [
+                        { "id": "stale", "isResolved": false, "isOutdated": true }
+                    ],
+                    "pageInfo": { "hasNextPage": false }
+                }
+            }))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            thread_source,
+            PrRecordSourceKind::GhReviewThreads,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        record_pr_snapshot(args, checked_at).expect("record threads");
+
+        let comments_source = temp.path().join("gh-review-comments.json");
+        fs::write(
+            &comments_source,
+            serde_json::to_string_pretty(&json!([
+                { "id": 2, "position": 4, "original_position": 4 }
+            ]))
+            .expect("fixture json"),
+        )
+        .expect("write fixture");
+        let mut args = pr_record_args(
+            capsule.clone(),
+            comments_source,
+            PrRecordSourceKind::GhReviewComments,
+        );
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record comments");
+        assert_eq!(result.pr.review_threads.outdated, 1);
+        assert!(result.pr.review_threads.authoritative);
+
+        let checks_source = temp.path().join("empty-gh-pr-checks.json");
+        fs::write(&checks_source, "[]").expect("write fixture");
+        let mut args = pr_record_args(capsule, checks_source, PrRecordSourceKind::GhPrChecks);
+        args.repository = Some("BjornMelin/dev-skills".to_string());
+        args.number = Some(46);
+        let result = record_pr_snapshot(args, checked_at).expect("record empty checks");
+        assert!(result.pr.checks.is_empty());
+    }
+
+    #[test]
+    fn review_pack_remaining_text_parser_uses_review_count_not_exit_code() {
+        assert_eq!(
+            parse_review_pack_remaining("exit 0; unresolved_threads: 5").expect("parse count"),
+            5
+        );
+        assert_eq!(
+            parse_review_pack_remaining("0 unresolved threads").expect("parse prefix count"),
+            0
+        );
+        assert!(
+            parse_review_pack_remaining("exit 0; no review count").is_err(),
+            "wrapper status without a review count must be rejected"
+        );
     }
 
     #[test]
@@ -2811,6 +4331,11 @@ mod tests {
             PrRecordArgs {
                 capsule: capsule.clone(),
                 source,
+                source_kind: PrRecordSourceKind::Normalized,
+                repository: None,
+                number: None,
+                retrieved_at: None,
+                source_command: None,
                 command: Some("fixture-pr-recorder".to_string()),
             },
             "2026-05-09T09:00:00Z".parse().unwrap(),
@@ -2855,6 +4380,11 @@ mod tests {
             PrRecordArgs {
                 capsule: capsule.clone(),
                 source,
+                source_kind: PrRecordSourceKind::Normalized,
+                repository: None,
+                number: None,
+                retrieved_at: None,
+                source_command: None,
                 command: Some("fixture-pr-recorder".to_string()),
             },
             "2026-05-09T09:00:00Z".parse().unwrap(),
@@ -2981,6 +4511,11 @@ mod tests {
             PrRecordArgs {
                 capsule: capsule.clone(),
                 source,
+                source_kind: PrRecordSourceKind::Normalized,
+                repository: None,
+                number: None,
+                retrieved_at: None,
+                source_command: None,
                 command: Some("fixture-pr-recorder".to_string()),
             },
             "2026-05-09T05:00:00Z".parse().unwrap(),
