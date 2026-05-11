@@ -147,7 +147,7 @@ Required design constraints:
   `codex-dev` commands and preserve the PR-agent safety model.
 - Use typed Axum extractors and `State` over clone-cheap shared state. Handlers
   stay thin and return typed errors.
-- Add Tower/Tower HTTP layers deliberately: request IDs, sensitive-header
+- Add Tower and tower-http layers deliberately: request IDs, sensitive-header
   redaction, tracing, request body limits, timeouts, CORS, and panic handling
   where appropriate.
 - Support graceful shutdown. No background daemon autostart, hidden process
