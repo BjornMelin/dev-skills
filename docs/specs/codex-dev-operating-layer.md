@@ -359,6 +359,9 @@ verify-before-fix rules in the
   "mergeable": "mergeable",
   "review_decision": "approved",
   "head_sha": "abc123",
+  "head_ref_name": "feat/codex-dev-pr-agent",
+  "base_ref_name": "main",
+  "base_ref_oid": "base123",
   "checks": [
     {
       "name": "GitGuardian Security Checks",
@@ -381,7 +384,7 @@ verify-before-fix rules in the
       "kind": "gh-pr-view",
       "parser_version": "codex-dev.pr-source-parser.v1",
       "retrieved_at": "2026-05-09T03:45:00Z",
-      "command": "gh pr view 29 --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt",
+      "command": "gh pr view 29 --json number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels",
       "path": "/tmp/gh-pr-view.json"
     }
   ]
@@ -455,17 +458,42 @@ diagnostics. Comment and review-reply actions include a stable hidden
 idempotency marker derived from the plan hash and run a duplicate check before
 posting. Thread and label actions check current PR state and skip if the target
 is already in the desired state. Failed-job reruns fetch the workflow run,
-require its `head_sha` to match the captured PR head SHA, and skip non-failed or
-still-running runs. Applied or duplicate skipped actions append evidence and
-capture after-state when possible.
+require same-repository head identity, allowed workflow events, matching PR head
+branch/SHA, and a bound workflow-run URL, then skip non-failed or still-running
+runs. Applied or duplicate skipped actions append evidence and capture
+after-state when possible.
 
 The hosted action layer may plan or apply issue comments, review-comment
 replies, review-thread resolve/unresolve mutations, label edits, and rerun
 failed workflow-job requests. Permission diagnostics are advisory: the report
 records token-environment posture and expected GitHub permission classes, while
 GitHub remains authoritative for actual write authorization. Failed hosted
-commands must be recorded with command, exit code, stderr excerpt, and residual
-risk rather than being treated as successful review cleanup.
+commands must be recorded with command, exit code, redacted stderr excerpt, and
+residual risk rather than being treated as successful review cleanup.
+
+`codex-dev.pr-agent-readiness.v1` records the bounded PR closeout loop. The CLI
+reuses the `pr agent` state engine for every poll attempt, writes
+`pr-readiness.json` and `pr-readiness.md`, and classifies the final state as
+`ready`, `waiting`, `blocked`, `merged`, or `stopped`. Readiness evaluates
+checks, allowlisted check conclusions, GitHub Actions run IDs from
+same-repository check URLs, authoritative review-thread state, stale review
+comments, draft state, mergeability, `mergeStateStatus`, head SHA, and branch
+refs. It deliberately keeps hosted review-thread resolution separate
+from local code fixes and from stale `reviewDecision` values.
+
+Non-ready final states are gate failures: with `--json`, `pr readiness` still
+writes the readiness artifacts and output envelope, but exits nonzero unless
+the final status is `ready` or `merged` and all requested hosted actions avoided
+failure.
+
+`pr readiness` has bounded polling only; it is not a daemon. Dry-run mode may
+use replay sources. Apply mode rejects replay sources and only executes hosted
+mutations when the caller also requests the specific intent: `--rerun-failed`
+for failed-job reruns or `--merge` for merging. Failed-job reruns delegate to
+the apply-gated hosted-action contract so workflow-run repository, event, PR
+binding, head branch, and head SHA are rechecked. Merge execution requires a
+ready final state, explicit `--apply --merge`, an immediate fresh readiness
+refresh, and `gh pr merge --match-head-commit <fresh-head-sha>`.
 
 ### Markdown Notes
 

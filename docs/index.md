@@ -36,14 +36,14 @@ out of version control.
   development control plane.
 - [codex-dev PR-Agent Safety Model](specs/codex-dev-pr-agent-safety-model.md):
   token, trust-boundary, dry-run, `--apply`, idempotency, and review-comment
-  verification policy for future hosted PR automation.
+  verification policy for hosted PR automation.
 - [dev-skills v0.3/v1 Roadmap](specs/dev-skills-v0.3-roadmap.md): canonical
   issue ledger and execution order for the next local CLI/TUI, PR-agent,
   release, and future-surface wave.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle, evidence appenders, subspawn
   plan/outcome/synthesis capture, policy gates, PR evidence capture, and
-  apply-gated PR actions.
+  apply-gated PR actions and closeout readiness reports.
 - [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.

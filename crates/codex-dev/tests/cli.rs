@@ -72,8 +72,12 @@ fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
   "state": "OPEN",
   "isDraft": false,
   "mergeable": "MERGEABLE",
+  "mergeStateStatus": "CLEAN",
   "reviewDecision": "APPROVED",
   "headRefOid": "abc123",
+  "headRefName": "feature",
+  "baseRefName": "main",
+  "baseRefOid": "base123",
   "statusCheckRollup": [],
   "labels": [{{"name": "ready"}}]
 }}"#
@@ -122,6 +126,75 @@ fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
     .expect("write rate limit");
 }
 
+fn write_pr_view_fixture(
+    source_dir: &std::path::Path,
+    number: u64,
+    is_draft: bool,
+    mergeable: &str,
+    merge_state_status: &str,
+    review_decision: &str,
+) {
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        format!(
+            r#"{{
+  "number": {number},
+  "url": "https://github.com/BjornMelin/dev-skills/pull/{number}",
+  "state": "OPEN",
+  "isDraft": {is_draft},
+  "mergeable": "{mergeable}",
+  "mergeStateStatus": "{merge_state_status}",
+  "reviewDecision": "{review_decision}",
+  "headRefOid": "abc123",
+  "headRefName": "feature",
+  "baseRefName": "main",
+  "baseRefOid": "base123",
+  "statusCheckRollup": [],
+  "labels": [{{"name": "ready"}}]
+}}"#
+        ),
+    )
+    .expect("write pr view");
+}
+
+fn write_pr_checks_fixture(source_dir: &std::path::Path, bucket: &str, state: &str, link: &str) {
+    std::fs::write(
+        source_dir.join("gh-pr-checks.json"),
+        format!(
+            r#"[
+  {{"bucket": "{bucket}", "completedAt": "2026-05-09T05:01:00Z", "link": "{link}", "name": "ci", "state": "{state}"}}
+]"#
+        ),
+    )
+    .expect("write checks");
+}
+
+fn write_review_threads_fixture(source_dir: &std::path::Path, unresolved: bool) {
+    let is_resolved = if unresolved { "false" } else { "true" };
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        format!(
+            r#"[
+  {{
+    "data": {{
+      "repository": {{
+        "pullRequest": {{
+          "reviewThreads": {{
+            "nodes": [
+              {{"id": "thread-1", "isResolved": {is_resolved}, "isOutdated": false}}
+            ],
+            "pageInfo": {{"hasNextPage": false, "endCursor": null}}
+          }}
+        }}
+      }}
+    }}
+  }}
+]"#
+        ),
+    )
+    .expect("write threads");
+}
+
 #[cfg(unix)]
 fn write_fake_gh(bin_dir: &std::path::Path) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -131,19 +204,36 @@ fn write_fake_gh(bin_dir: &std::path::Path) -> std::path::PathBuf {
         &script,
         r#"#!/bin/sh
 printf '%s\n' "$*" >> "$GH_LOG"
+fixture_root="$GH_FIXTURES"
+if [ -n "$GH_REFRESH_FIXTURES" ] && [ -f "$GH_LOG.refresh" ]; then
+  fixture_root="$GH_REFRESH_FIXTURES"
+fi
 case "$*" in
-  pr\ view*) cat "$GH_FIXTURES/gh-pr-view.json" ;;
-  pr\ checks*) cat "$GH_FIXTURES/gh-pr-checks.json" ;;
-  api\ --paginate\ --slurp\ repos/*/pulls/*/reviews*) cat "$GH_FIXTURES/gh-reviews.json" ;;
-  api\ --paginate\ --slurp\ repos/*/pulls/*/comments*) cat "$GH_FIXTURES/gh-review-comments.json" ;;
+  pr\ view*)
+    count_file="$GH_LOG.pr_view_count"
+    count=0
+    if [ -f "$count_file" ]; then
+      count="$(cat "$count_file")"
+    fi
+    count=$((count + 1))
+    printf '%s\n' "$count" > "$count_file"
+    if [ -n "$GH_REFRESH_FIXTURES" ] && [ "$count" -gt 1 ]; then
+      touch "$GH_LOG.refresh"
+      fixture_root="$GH_REFRESH_FIXTURES"
+    fi
+    cat "$fixture_root/gh-pr-view.json"
+    ;;
+  pr\ checks*) cat "$fixture_root/gh-pr-checks.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/reviews*) cat "$fixture_root/gh-reviews.json" ;;
+  api\ --paginate\ --slurp\ repos/*/pulls/*/comments*) cat "$fixture_root/gh-review-comments.json" ;;
   api\ graphql*)
     if [ -n "$FAIL_THREADS" ]; then
       echo "thread capture failed" >&2
       exit 2
     fi
-    cat "$GH_FIXTURES/gh-review-threads.json"
+    cat "$fixture_root/gh-review-threads.json"
     ;;
-  api\ rate_limit*) cat "$GH_FIXTURES/gh-rate-limit.json" ;;
+  api\ rate_limit*) cat "$fixture_root/gh-rate-limit.json" ;;
   api\ --paginate\ --slurp\ repos/*/issues/*/comments*)
     if [ -n "$DUPLICATE_MARKER" ]; then
       printf '[{"id":99,"html_url":"https://example.test/duplicate","body":"<!-- %s -->"}]\n' "$DUPLICATE_MARKER"
@@ -153,10 +243,23 @@ case "$*" in
     ;;
   api\ --method\ POST\ repos/*/issues/*/comments*) echo '{"id":123,"html_url":"https://example.test/comment"}' ;;
   api\ --method\ POST\ repos/*/pulls/*/comments/*/replies*) echo '{"id":124,"html_url":"https://example.test/reply"}' ;;
+  api\ --method\ POST\ repos/*/actions/runs/*/rerun-failed-jobs*) echo '{"ok":true}' ;;
+  pr\ merge*) echo '{"merged":true}' ;;
   api\ repos/*/actions/runs/*)
+    run_id="$(printf '%s\n' "$*" | sed -n 's#.*actions/runs/\([0-9][0-9]*\).*#\1#p')"
+    test -n "$run_id" || run_id=456
     conclusion="${RUN_CONCLUSION:-success}"
     status="${RUN_STATUS:-completed}"
-    printf '{"id":456,"head_sha":"abc123","status":"%s","conclusion":"%s"}\n' "$status" "$conclusion"
+    event="${RUN_EVENT:-pull_request}"
+    repository="${RUN_REPOSITORY:-BjornMelin/dev-skills}"
+    head_repository="${RUN_HEAD_REPOSITORY:-BjornMelin/dev-skills}"
+    head_branch="${RUN_HEAD_BRANCH:-feature}"
+    fork="${RUN_FORK:-false}"
+    pull_requests="${RUN_PULL_REQUESTS:-}"
+    if [ -z "$pull_requests" ]; then
+      pull_requests='[{"number":48},{"number":49}]'
+    fi
+    printf '{"id":%s,"head_sha":"abc123","head_branch":"%s","event":"%s","status":"%s","conclusion":"%s","html_url":"https://github.com/%s/actions/runs/%s","repository":{"full_name":"%s"},"head_repository":{"full_name":"%s","fork":%s},"pull_requests":%s}\n' "$run_id" "$head_branch" "$event" "$status" "$conclusion" "$repository" "$run_id" "$repository" "$head_repository" "$fork" "$pull_requests"
     ;;
   issue\ edit*) echo '{"ok":true}' ;;
   *) echo "unexpected gh args: $*" >&2; exit 2 ;;
@@ -461,7 +564,19 @@ fn pr_plan_and_record_support_fixture_mode() {
                 .as_array()
                 .expect("command argv")
                 .iter()
-                .any(|part| part == "bucket,completedAt,description,event,link,name,startedAt,state,workflow")
+                .any(|part| {
+                    part == "bucket,completedAt,description,event,link,name,startedAt,state,workflow"
+                })
+    }));
+    assert!(plan_commands.iter().any(|command| {
+        command["id"] == "gh-pr-view"
+            && command["command"]
+                .as_array()
+                .expect("command argv")
+                .iter()
+                .any(|part| {
+                    part == "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels"
+                })
     }));
     assert!(
         plan_commands
@@ -1351,6 +1466,884 @@ fn pr_agent_action_apply_skips_non_failed_workflow_rerun() {
     assert_eq!(json["result"]["execution"]["status"], "skipped_duplicate");
     let gh_log = std::fs::read_to_string(log).expect("gh log");
     assert!(gh_log.contains("api repos/BjornMelin/dev-skills/actions/runs/456"));
+    assert!(!gh_log.contains("rerun-failed-jobs"));
+}
+
+#[test]
+fn pr_readiness_replays_green_state_and_plans_merge_report() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    let capsule = init_capsule_fixture(&root, "pr-readiness-green", "PR readiness green");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-attempts",
+            "1",
+            "--poll-interval-seconds",
+            "0",
+            "--merge",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["command"], "pr readiness");
+    assert_eq!(json["result"]["schema"], "codex-dev.pr-agent-readiness.v1");
+    assert_eq!(json["result"]["final_status"], "ready");
+    assert_eq!(json["result"]["ready"], true);
+    assert_eq!(json["result"]["actions"][0]["kind"], "merge");
+    assert_eq!(json["result"]["actions"][0]["status"], "planned");
+    let capsule_path = std::path::Path::new(&capsule);
+    assert!(capsule_path.join("pr-readiness.json").is_file());
+    let markdown = std::fs::read_to_string(capsule_path.join("pr-readiness.md")).expect("markdown");
+    assert!(markdown.contains("# PR Readiness: BjornMelin/dev-skills#49"));
+    assert!(markdown.contains("- Status: Ready"));
+    let evidence = std::fs::read_to_string(capsule_path.join("evidence.jsonl")).expect("evidence");
+    assert!(evidence.contains("PR readiness for BjornMelin/dev-skills#49 finished as Ready"));
+}
+
+#[test]
+fn pr_readiness_blocks_missing_pr_identity_and_still_writes_report() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        r#"{
+  "number": 49,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/49",
+  "state": "OPEN",
+  "isDraft": false,
+  "mergeable": "MERGEABLE",
+  "mergeStateStatus": "CLEAN",
+  "reviewDecision": "APPROVED",
+  "statusCheckRollup": [],
+  "labels": [{"name": "ready"}]
+}"#,
+    )
+    .expect("write pr view without identity");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-missing-identity",
+        "PR readiness missing identity",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--merge",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert_eq!(json["result"]["actions"][0]["status"], "skipped");
+    let blockers = json["result"]["attempts"][0]["blockers"]
+        .as_array()
+        .expect("blockers");
+    assert!(blockers.iter().any(|blocker| {
+        blocker
+            .as_str()
+            .is_some_and(|blocker| blocker.contains("head SHA"))
+    }));
+    let capsule_path = std::path::Path::new(&capsule);
+    assert!(capsule_path.join("pr-readiness.json").is_file());
+    assert!(capsule_path.join("pr-readiness.md").is_file());
+}
+
+#[test]
+fn pr_readiness_blocks_missing_merge_state_status() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        r#"{
+  "number": 49,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/49",
+  "state": "OPEN",
+  "isDraft": false,
+  "mergeable": "MERGEABLE",
+  "reviewDecision": "APPROVED",
+  "headRefOid": "abc123",
+  "headRefName": "feature",
+  "baseRefName": "main",
+  "baseRefOid": "base123",
+  "statusCheckRollup": [],
+  "labels": [{"name": "ready"}]
+}"#,
+    )
+    .expect("write pr view without merge state");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-missing-merge-state",
+        "PR readiness missing merge state",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert!(
+        json["result"]["attempts"][0]["blockers"]
+            .as_array()
+            .expect("blockers")
+            .iter()
+            .any(|blocker| blocker
+                .as_str()
+                .is_some_and(|blocker| blocker.contains("merge state was not captured")))
+    );
+}
+
+#[test]
+fn pr_readiness_distinguishes_stale_review_decision_from_clean_threads() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    write_pr_view_fixture(
+        &source_dir,
+        49,
+        false,
+        "MERGEABLE",
+        "CLEAN",
+        "CHANGES_REQUESTED",
+    );
+    write_review_threads_fixture(&source_dir, false);
+    let capsule = init_capsule_fixture(&root, "pr-readiness-stale", "PR readiness stale");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "ready");
+    let warnings = json["result"]["attempts"][0]["warnings"]
+        .as_array()
+        .expect("warnings");
+    assert!(warnings.iter().any(|warning| {
+        warning
+            .as_str()
+            .is_some_and(|warning| warning.contains("reviewDecision is changes_requested"))
+    }));
+}
+
+#[test]
+fn pr_readiness_reports_outdated_review_comments_as_warning() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(
+        source_dir.join("gh-review-comments.json"),
+        r#"[
+  {"id": 7, "body": "stale feedback", "outdated": true}
+]"#,
+    )
+    .expect("write outdated comments");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-outdated-comments",
+        "PR readiness outdated comments",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "ready");
+    assert_eq!(json["result"]["attempts"][0]["outdated_review_comments"], 1);
+    assert!(
+        json["result"]["attempts"][0]["warnings"]
+            .as_array()
+            .expect("warnings")
+            .iter()
+            .any(|warning| warning
+                .as_str()
+                .is_some_and(|warning| warning.contains("outdated review comment")))
+    );
+}
+
+#[test]
+fn pr_readiness_fails_closed_for_missing_or_unknown_check_evidence() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(source_dir.join("gh-pr-checks.json"), "[]").expect("write empty checks");
+    let empty_checks_capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-empty-checks",
+        "PR readiness empty checks",
+    );
+
+    let empty_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &empty_checks_capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let empty_json: Value = serde_json::from_slice(&empty_output).expect("empty checks json");
+    assert_eq!(empty_json["result"]["final_status"], "blocked");
+    assert!(
+        empty_json["result"]["attempts"][0]["blockers"]
+            .as_array()
+            .expect("blockers")
+            .iter()
+            .any(|blocker| blocker
+                .as_str()
+                .is_some_and(|blocker| blocker.contains("cannot prove CI passed")))
+    );
+
+    std::fs::write(
+        source_dir.join("gh-pr-checks.json"),
+        r#"[
+  {"name": "ci", "status": "COMPLETED", "conclusion": "STALE", "link": "https://github.com/BjornMelin/dev-skills/actions/runs/778"}
+]"#,
+    )
+    .expect("write stale check");
+    let unknown_checks_capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-unknown-check",
+        "PR readiness unknown check",
+    );
+    let unknown_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &unknown_checks_capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let unknown_json: Value = serde_json::from_slice(&unknown_output).expect("unknown check json");
+    assert_eq!(unknown_json["result"]["final_status"], "blocked");
+    assert_eq!(
+        unknown_json["result"]["attempts"][0]["failing_checks"][0]["run_id"],
+        778
+    );
+}
+
+#[test]
+fn pr_readiness_blocks_unresolved_review_threads() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    write_review_threads_fixture(&source_dir, true);
+    let capsule = init_capsule_fixture(&root, "pr-readiness-unresolved", "PR readiness unresolved");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert_eq!(
+        json["result"]["attempts"][0]["pr"]["review_threads"]["unresolved"],
+        1
+    );
+}
+
+#[test]
+fn pr_readiness_reports_failing_pending_and_draft_states() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    write_pr_checks_fixture(
+        &source_dir,
+        "fail",
+        "FAILURE",
+        "https://github.com/BjornMelin/dev-skills/actions/runs/777/jobs/888",
+    );
+    write_pr_view_fixture(&source_dir, 49, false, "MERGEABLE", "UNSTABLE", "APPROVED");
+    let failing_capsule =
+        init_capsule_fixture(&root, "pr-readiness-failing", "PR readiness failing");
+
+    let failing_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &failing_capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--rerun-failed",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let failing_json: Value = serde_json::from_slice(&failing_output).expect("failing json");
+    assert_eq!(failing_json["result"]["final_status"], "blocked");
+    assert_eq!(
+        failing_json["result"]["attempts"][0]["failing_checks"][0]["run_id"],
+        777
+    );
+    assert_eq!(failing_json["result"]["actions"][0]["status"], "planned");
+
+    write_pr_checks_fixture(
+        &source_dir,
+        "pending",
+        "PENDING",
+        "https://example.test/pending",
+    );
+    write_pr_view_fixture(&source_dir, 49, false, "MERGEABLE", "UNKNOWN", "APPROVED");
+    let pending_capsule =
+        init_capsule_fixture(&root, "pr-readiness-pending", "PR readiness pending");
+    let pending_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &pending_capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let pending_json: Value = serde_json::from_slice(&pending_output).expect("pending json");
+    assert_eq!(pending_json["result"]["final_status"], "waiting");
+    assert_eq!(
+        pending_json["result"]["attempts"][0]["pending_checks"][0]["diagnostic_command"],
+        "https://example.test/pending"
+    );
+
+    write_pr_checks_fixture(&source_dir, "pass", "SUCCESS", "https://example.test/ci");
+    write_pr_view_fixture(&source_dir, 49, true, "MERGEABLE", "DRAFT", "APPROVED");
+    let draft_capsule = init_capsule_fixture(&root, "pr-readiness-draft", "PR readiness draft");
+    let draft_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &draft_capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let draft_json: Value = serde_json::from_slice(&draft_output).expect("draft json");
+    assert_eq!(draft_json["result"]["final_status"], "blocked");
+    assert!(
+        draft_json["result"]["attempts"][0]["blockers"]
+            .as_array()
+            .expect("blockers")
+            .iter()
+            .any(|blocker| blocker
+                .as_str()
+                .is_some_and(|blocker| blocker.contains("draft")))
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_merge_requires_clean_latest_state() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 49);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-readiness-merge", "PR readiness merge");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--poll-interval-seconds",
+            "0",
+            "--merge",
+            "--apply",
+            "--delete-branch",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("merge json");
+    assert_eq!(json["result"]["final_status"], "merged");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(
+        gh_log
+            .matches("pr view 49 --repo BjornMelin/dev-skills")
+            .count()
+            >= 2
+    );
+    assert!(
+        gh_log.contains("pr merge 49 --repo BjornMelin/dev-skills --squash --match-head-commit abc123 --delete-branch")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_merge_rechecks_live_state_before_merge() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let refresh_fixtures = temp.path().join("refresh-fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 49);
+    write_pr_agent_source_fixtures(&refresh_fixtures, 49);
+    write_pr_view_fixture(
+        &refresh_fixtures,
+        49,
+        true,
+        "MERGEABLE",
+        "DRAFT",
+        "APPROVED",
+    );
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-merge-refresh",
+        "PR readiness merge refresh",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_REFRESH_FIXTURES", &refresh_fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--poll-interval-seconds",
+            "0",
+            "--merge",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("merge refresh json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert_eq!(json["result"]["actions"][0]["status"], "failed");
+    assert!(
+        json["result"]["actions"][0]["reason"]
+            .as_str()
+            .expect("reason")
+            .contains("pre-merge readiness refresh")
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(!gh_log.contains("pr merge 49"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_rejects_replay_source() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-apply-replay",
+        "PR readiness apply replay",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--apply",
+            "--merge",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("apply replay json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .expect("message")
+            .contains("--source-dir")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_rerun_delegates_to_hosted_action_preflight() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 49);
+    write_pr_checks_fixture(
+        &fixtures,
+        "fail",
+        "FAILURE",
+        "https://github.com/BjornMelin/dev-skills/actions/runs/777/jobs/888",
+    );
+    write_pr_view_fixture(&fixtures, 49, false, "MERGEABLE", "UNSTABLE", "APPROVED");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-readiness-rerun", "PR readiness rerun");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("RUN_CONCLUSION", "failure")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--poll-interval-seconds",
+            "0",
+            "--rerun-failed",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("rerun json");
+    assert_eq!(json["result"]["actions"][0]["kind"], "rerun_failed_jobs");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api repos/BjornMelin/dev-skills/actions/runs/777"));
+    assert!(gh_log.contains(
+        "api --method POST repos/BjornMelin/dev-skills/actions/runs/777/rerun-failed-jobs"
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_readiness_apply_rerun_rejects_mismatched_workflow_run_identity() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 49);
+    write_pr_checks_fixture(
+        &fixtures,
+        "fail",
+        "FAILURE",
+        "https://github.com/BjornMelin/dev-skills/actions/runs/779/jobs/889",
+    );
+    write_pr_view_fixture(&fixtures, 49, false, "MERGEABLE", "UNSTABLE", "APPROVED");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-rerun-mismatch",
+        "PR readiness rerun mismatch",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("RUN_CONCLUSION", "failure")
+        .env("RUN_REPOSITORY", "Other/repo")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--poll-interval-seconds",
+            "0",
+            "--rerun-failed",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("rerun mismatch json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert_eq!(json["result"]["actions"][0]["status"], "failed");
+    assert!(
+        json["result"]["actions"][0]["stderr"]
+            .as_str()
+            .expect("stderr")
+            .contains("workflow run repository")
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api repos/BjornMelin/dev-skills/actions/runs/779"));
     assert!(!gh_log.contains("rerun-failed-jobs"));
 }
 

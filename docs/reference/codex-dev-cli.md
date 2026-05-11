@@ -79,6 +79,7 @@ PR subcommands:
 - `pr agent`
 - `pr agent-action`
 - `pr plan`
+- `pr readiness`
 - `pr record`
 - `pr status`
 
@@ -416,7 +417,7 @@ or merge the PR. It records:
 
 Live collection uses these read-only sources:
 
-- `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt,labels`
+- `gh pr view --json number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels`
 - `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`
 - `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/reviews?per_page=100`
 - `gh api --paginate --slurp repos/<owner>/<repo>/pulls/<number>/comments?per_page=100`
@@ -483,13 +484,65 @@ hidden `codex-dev-pr-agent:<plan-hash>` marker and perform a duplicate check
 before applying so re-running the same plan does not post duplicate comments.
 Thread and label actions verify the requested target is present in current PR
 state and skip if it is already in the desired state. Failed-job reruns fetch
-the workflow run first, require its `head_sha` to match the captured PR head
-SHA, and skip non-failed or still-running runs instead of rerunning them.
+the workflow run first, require same-repository head identity, allowed workflow
+events, matching PR head branch/SHA, and a bound workflow-run URL before
+POSTing; non-failed or still-running runs are skipped instead of rerun.
 
 Permission diagnostics are advisory and local. The report records whether
 `GITHUB_TOKEN` or `GH_TOKEN` is visible to the process and lists the GitHub
 permission class expected by the selected action. Actual authorization remains
-with GitHub and failed hosted commands are recorded with stderr excerpts.
+with GitHub and failed hosted commands are recorded with redacted stderr
+excerpts.
+
+## pr readiness
+
+Evaluate whether a PR is ready to close out, rerun failed jobs, or merge:
+
+```bash
+cargo run -q -p codex-dev -- --json pr readiness \
+  --capsule .codex/tasks/<id> \
+  --repo BjornMelin/dev-skills \
+  --number 25 \
+  --poll-attempts 3 \
+  --poll-interval-seconds 60 \
+  --merge
+```
+
+The output schema is `codex-dev.pr-agent-readiness.v1`. The command uses the
+same live or replayed sources as `pr agent`, writes `pr-readiness.json` and
+`pr-readiness.md`, and appends a `decision` evidence row. It evaluates:
+
+- check state, allowlisted conclusions, and GitHub Actions run IDs parsed only
+  from same-repository check URLs;
+- authoritative hosted review-thread state separately from `reviewDecision`;
+- stale/outdated review comments without treating stale comments as unresolved
+  threads;
+- draft state, mergeability, `mergeStateStatus`, head SHA, and branch refs;
+- final status as `ready`, `waiting`, `blocked`, `merged`, or `stopped`.
+
+The command exits successfully only when the final status is `ready` or
+`merged` and no requested hosted action failed. With `--json`, non-ready states
+still emit the full readiness report before exiting nonzero.
+
+Polling is bounded by `--poll-attempts`; there is no daemon mode. Replay mode
+is deterministic and accepts `--source-dir`; apply mode rejects replayed
+sources and must capture current hosted state.
+
+Hosted mutations are opt-in. `--rerun-failed` plans reruns for failed checks
+whose URLs expose GitHub Actions run IDs; adding `--apply` delegates each run to
+the existing `rerun-failed-jobs` hosted action, which rechecks workflow-run
+repository, event, PR binding, head branch, and head SHA before POSTing.
+`--merge` plans a `gh pr merge` command only after a ready final state. Adding
+`--apply` captures fresh live PR state immediately before merging, re-evaluates
+readiness, and only then executes with
+`--match-head-commit <fresh-head-sha>`. Merge uses `--squash` by default and
+supports `--merge-method`, `--delete-branch`, `--merge-subject`, and
+`--merge-body`.
+
+Readiness deliberately distinguishes code fixed from hosted review threads
+resolved. A stale `changes_requested` review decision is only downgraded to a
+warning when authoritative thread state is clean; unresolved hosted threads
+remain blocking even if local code has been patched.
 
 ## pr record
 
@@ -531,13 +584,13 @@ cargo run -q -p codex-dev -- --json pr record \
   --capsule .codex/tasks/<id> \
   --source /tmp/gh-pr-view.json \
   --source-kind gh-pr-view \
-  --source-command "gh pr view 25 --repo BjornMelin/dev-skills --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt"
+  --source-command "gh pr view 25 --repo BjornMelin/dev-skills --json number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels"
 ```
 
 Supported `--source-kind` values:
 
 - `normalized`: existing local `pr.json` fixture shape.
-- `gh-pr-view`: `gh pr view --json number,url,state,isDraft,mergeable,reviewDecision,statusCheckRollup,headRefOid,updatedAt`.
+- `gh-pr-view`: `gh pr view --json number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels`.
 - `gh-pr-checks`: `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow`.
 - `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; supports single arrays and `--paginate --slurp` page arrays, then collapses to each reviewer's latest active state before deriving `review_decision`.
 - `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; supports single-page objects and `--paginate --slurp` page arrays, counts resolved, current unresolved, and outdated threads separately, and is authoritative only when the final `pageInfo.hasNextPage` is false.
@@ -591,6 +644,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr readiness --help
 cargo run -q -p codex-dev -- --json pr record --help
 ```
 
