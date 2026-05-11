@@ -152,6 +152,7 @@ case "$*" in
     fi
     ;;
   api\ --method\ POST\ repos/*/issues/*/comments*) echo '{"id":123,"html_url":"https://example.test/comment"}' ;;
+  api\ --method\ POST\ repos/*/pulls/*/comments/*/replies*) echo '{"id":124,"html_url":"https://example.test/reply"}' ;;
   api\ repos/*/actions/runs/*)
     conclusion="${RUN_CONCLUSION:-success}"
     status="${RUN_STATUS:-completed}"
@@ -959,6 +960,68 @@ fn pr_agent_action_apply_uses_live_gh_and_records_before_after_state() {
         .expect("evidence");
     assert!(evidence.contains("PR agent hosted action issue-comment-001"));
     assert!(evidence.contains("Applied"));
+}
+
+#[cfg(unix)]
+#[test]
+fn pr_agent_action_apply_replies_to_review_comment_path() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(&root, "pr-agent-action-review-reply", "PR review reply");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "agent-action",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--plan-id",
+            "review-reply-001",
+            "--action",
+            "reply-review-comment",
+            "--review-comment-id",
+            "98765",
+            "--body",
+            "Verified against current code.",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("reply json");
+    assert_eq!(json["result"]["execution"]["status"], "applied");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains(
+        "api --paginate --slurp repos/BjornMelin/dev-skills/pulls/48/comments?per_page=100"
+    ));
+    assert!(
+        gh_log.contains(
+            "api --method POST repos/BjornMelin/dev-skills/pulls/48/comments/98765/replies"
+        )
+    );
 }
 
 #[cfg(unix)]

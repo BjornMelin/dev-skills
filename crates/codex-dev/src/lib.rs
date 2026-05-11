@@ -2328,7 +2328,7 @@ fn permission_failure_diagnostic(
         source: source.to_string(),
         severity: PrAgentSeverity::Error,
         message: format!(
-            "hosted GitHub write failed; verify token type and repository permissions for this action{stderr_suffix}"
+            "hosted GitHub command failed; verify token type and repository permissions for this action{stderr_suffix}"
         ),
         command: Some(render_command(command)),
         exit_code,
