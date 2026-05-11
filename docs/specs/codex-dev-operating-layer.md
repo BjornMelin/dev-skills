@@ -267,7 +267,9 @@ subdirectory, or an installed binary with `--repo-root`.
 
 `subagents.json` records delegation evidence. `codex-dev` owns the evidence
 shape only. `subspawn` remains the authority for spawn policy, prompt contracts,
-wait behavior, and synthesis rules.
+wait behavior, and synthesis rules. `codex-dev` derives mechanical batch status
+from recorded rows for scanability, but it does not spawn, wait on, retry, or
+semantically interpret agent output.
 
 ```json
 {
@@ -276,18 +278,58 @@ wait behavior, and synthesis rules.
     {
       "id": "pre-pr-review",
       "status": "completed",
+      "task": "pre-PR branch review",
+      "mode": "read-only",
+      "scope": "current branch diff",
+      "wait_policy": "strict",
+      "rendezvous_required": true,
+      "duplicate_roles_ignored": {
+        "test_runner": [
+          "skills/subagent-creator/templates/agents/test_runner.toml",
+          "skills/subspawn/templates/agents/test_runner.toml"
+        ]
+      },
+      "prompts": [
+        {
+          "role": "docs_aligner",
+          "prompt_id": "pre-pr-review:docs_aligner",
+          "prompt_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        }
+      ],
       "agents": [
         {
           "role": "docs_aligner",
           "task": "pre-PR docs alignment review",
           "status": "completed",
-          "summary": "one required consistency fix found"
+          "summary": "one required consistency fix found",
+          "disposition": "accepted",
+          "human_verified": true,
+          "source_ids": ["docs_aligner:1"],
+          "artifacts": ["review-notes.md"]
         }
-      ]
+      ],
+      "synthesis": {
+        "status": "completed",
+        "summary": "accepted one docs fix and reran links",
+        "human_verified": true,
+        "source_ids": ["synthesis:pre-pr-review"],
+        "artifacts": ["review-summary.md"],
+        "updated_at": "2026-05-09T06:20:00Z"
+      }
     }
   ]
 }
 ```
+
+`codex-dev subagents record-plan` records `subspawn_plan.py --json` output
+without storing raw prompt text. It preserves duplicate-role warnings and
+registry issues, then records stable prompt IDs and deterministic prompt
+SHA-256 hashes. `record-outcome` and `record-synthesis` require human
+verification, source IDs, and artifact references, append `subagent` evidence to
+`evidence.jsonl`, and keep `capsule.json` updated monotonically. Completed
+synthesis is accepted only after every planned role has a terminal
+human-verified outcome and a final disposition. These commands do not execute or
+wait on agents.
 
 ### pr.json
 

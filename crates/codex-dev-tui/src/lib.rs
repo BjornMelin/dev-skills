@@ -622,8 +622,8 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use codex_dev_core::{
-        GateRecord, InitArgs, POLICY_GATES_SCHEMA, PR_SCHEMA, PolicyManifest, PolicyProfile,
-        ReviewThreadSummary, VERIFICATION_SCHEMA, init_capsule,
+        EvidenceSummary, GateRecord, InitArgs, POLICY_GATES_SCHEMA, PR_SCHEMA, PolicyManifest,
+        PolicyProfile, ReviewThreadSummary, VERIFICATION_SCHEMA, init_capsule,
     };
     use tempfile::tempdir;
 
@@ -786,6 +786,10 @@ mod tests {
                 issues: vec![28],
                 pull_requests: vec![35],
                 updated_at: checked_at,
+                evidence: EvidenceSummary {
+                    total: 0,
+                    by_kind: Vec::new(),
+                },
             }),
             verification: Some(Verification {
                 schema: VERIFICATION_SCHEMA.to_string(),
