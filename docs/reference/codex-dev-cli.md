@@ -11,7 +11,7 @@ Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, #42, #43, and #44.
+Tracking: #20, #22, #23, #25, #42, #43, #44, and #55.
 
 ## Installation
 
@@ -19,8 +19,13 @@ From the repository root:
 
 ```bash
 cargo build -p codex-dev
+cargo install --path crates/codex-dev --locked --force
 cargo run -q -p codex-dev -- --help
 ```
+
+Use [Global CLI Workflow](../runbooks/global-cli-workflow.md) for the
+three-binary install/update workflow, completions, manpages, and isolated
+install smokes.
 
 The binary supports `--json` globally for machine-readable command output. With
 `--json`, command errors still print a `codex-dev.output.v1` envelope with
@@ -50,6 +55,8 @@ Top-level commands:
 - `subagents`
 - `policy`
 - `pr`
+- `completions`
+- `manpage`
 
 Capsule subcommands:
 
@@ -82,6 +89,38 @@ PR subcommands:
 - `pr readiness`
 - `pr record`
 - `pr status`
+
+Artifact commands:
+
+- `completions <bash|elvish|fish|powershell|zsh>`
+- `manpage`
+
+## completions
+
+Generate shell completions from the canonical Clap command definition:
+
+```bash
+cargo run -q -p codex-dev -- completions zsh > /tmp/_codex-dev
+codex-dev completions bash > ~/.local/share/dev-skills/completions/bash/codex-dev
+codex-dev completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev.fish
+```
+
+Without `--json`, the command writes the completion script directly to stdout
+and does not modify shell startup files. With global `--json`, the same content
+is wrapped in the standard output envelope at `result.content`.
+
+## manpage
+
+Generate a roff manpage from the canonical Clap command definition:
+
+```bash
+cargo run -q -p codex-dev -- manpage > /tmp/codex-dev.1
+codex-dev manpage > ~/.local/share/man/man1/codex-dev.1
+```
+
+Without `--json`, the command writes roff directly to stdout and does not
+install it automatically. With global `--json`, the same content is wrapped in
+the standard output envelope at `result.content`.
 
 ## capsule init
 

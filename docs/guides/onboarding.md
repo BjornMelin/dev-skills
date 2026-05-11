@@ -67,9 +67,10 @@ cargo install --path crates/codex-research --locked --force
 codex-research --help
 ```
 
-For installing or updating every local Rust CLI, use the
+For installing or updating every local Rust CLI, plus completions and manpages,
+use the [Global CLI Workflow](../runbooks/global-cli-workflow.md). Use
 [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
-runbook.
+before release handoff or Cargo metadata changes.
 
 If you do not install the binary, the skill wrapper can run it from this repo:
 
