@@ -517,7 +517,8 @@ owners:
 - `python3 -m compileall`
 
 The eval lab is not a research evaluator. `codex-research eval` remains the
-owner for research routing, privacy, budgets, evidence, and report contracts.
+owner for research routing, privacy, budgets, evidence, report, and closeout
+bundle contracts.
 
 ## Branch And PR Graph
 

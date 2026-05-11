@@ -61,6 +61,7 @@ Commands:
 - `github`
 - `ledger`
 - `report`
+- `bundle`
 - `cache`
 - `config`
 - `run`
@@ -384,6 +385,38 @@ codex-research report
 codex-research report --ledger .codex/research/ledger.jsonl --out .codex/research/report.md
 ```
 
+## bundle
+
+Build a closeout evidence bundle from run, ledger, cache, and report state:
+
+```bash
+codex-research --json bundle \
+  --run .codex/research/run.json \
+  --ledger .codex/research/ledger.jsonl \
+  --report .codex/research/report.md \
+  --out .codex/research/evidence-bundle.json \
+  --markdown-out .codex/research/evidence-bundle.md \
+  --strict
+```
+
+The output schema is `codex-research.evidence-bundle.v1`. It summarizes:
+
+- run status, sanitized query, profile, topic, cache source IDs, and generated
+  artifacts;
+- total, spent, and remaining provider budgets plus sanitized debit history;
+- redacted provider errors recorded on the run;
+- ledger source/claim IDs and citation coverage;
+- source freshness counts from the cache when source IDs are present there;
+- the report path and whether the Markdown report exists.
+
+The bundle status is `failed` when uncited claims, missing claim source
+references, or unresolved provider errors remain. Without `--strict`, the
+command still writes JSON/Markdown and exits zero so agents can inspect the
+artifact. With `--strict`, those failures and strict-only report/ledger evidence
+gaps exit nonzero after output. Bundle output records metadata only; it sanitizes
+query/debit/error text and does not embed raw provider payloads or cached page
+bodies.
+
 ## cache
 
 Initialize or inspect global cache state.
@@ -413,6 +446,7 @@ provider-readiness smoke checks.
 codex-research eval
 codex-research eval --list
 codex-research --json eval --task evidence-claims-cited --strict
+codex-research --json eval --task evidence-bundle-closeout-shape --strict
 codex-research --json eval --suite crates/codex-research/evals/research/core.json
 codex-research --json eval --live
 ```
@@ -436,6 +470,9 @@ Task kinds:
   ceilings.
 - `evidence-contract`: validates hydrated source IDs, cited claims, and
   confidence warnings.
+- `evidence-bundle`: validates closeout bundle schema, citation coverage,
+  provider-error/failure counts, report status, source freshness, and top-level
+  shape.
 - `report-contract`: validates required report sections and source mentions.
 
 Options:

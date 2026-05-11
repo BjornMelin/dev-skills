@@ -22,6 +22,7 @@ use url::Url;
 const GITHUB_API_VERSION: &str = "2026-03-10";
 const USER_AGENT_VALUE: &str = "codex-research/0.2";
 const DEFAULT_EVAL_SUITE: &str = include_str!("../evals/research/core.json");
+const EVIDENCE_BUNDLE_SCHEMA: &str = "codex-research.evidence-bundle.v1";
 
 #[derive(Parser)]
 #[command(name = "codex-research")]
@@ -76,6 +77,8 @@ enum Commands {
     },
     /// Render a Markdown report from a ledger.
     Report(ReportArgs),
+    /// Build a closeout evidence bundle from run, ledger, cache, and report state.
+    Bundle(BundleArgs),
     /// Initialize or inspect global cache state.
     Cache {
         #[command(subcommand)]
@@ -350,6 +353,31 @@ struct ReportArgs {
     ledger: PathBuf,
     #[arg(long)]
     out: Option<PathBuf>,
+}
+
+#[derive(Args)]
+struct BundleArgs {
+    #[arg(long, value_name = "PATH", default_value = ".codex/research/run.json")]
+    run: PathBuf,
+    #[arg(
+        long,
+        value_name = "PATH",
+        default_value = ".codex/research/ledger.jsonl"
+    )]
+    ledger: PathBuf,
+    #[arg(long, value_name = "PATH", default_value = ".codex/research/report.md")]
+    report: PathBuf,
+    #[arg(long, value_name = "PATH")]
+    out: Option<PathBuf>,
+    #[arg(long = "markdown-out", value_name = "PATH")]
+    markdown_out: Option<PathBuf>,
+    #[arg(long, value_name = "RFC3339")]
+    generated_at: Option<DateTime<Utc>>,
+    #[arg(
+        long,
+        help = "Exit nonzero when citation, provider, report, or ledger evidence is incomplete"
+    )]
+    strict: bool,
 }
 
 #[derive(Subcommand)]
@@ -844,6 +872,98 @@ struct SourceCacheRecord {
     metadata: Value,
 }
 
+#[derive(Debug, Serialize)]
+struct EvidenceBundle {
+    schema: &'static str,
+    generated_at: DateTime<Utc>,
+    status: String,
+    strict: bool,
+    run: EvidenceBundleRun,
+    budget: EvidenceBundleBudget,
+    provider_errors: Vec<EvidenceBundleProviderError>,
+    ledger: EvidenceBundleLedger,
+    citation_coverage: CitationCoverage,
+    source_freshness: SourceFreshnessSummary,
+    report: EvidenceBundleReport,
+    artifacts: Vec<String>,
+    warnings: Vec<String>,
+    failures: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleRun {
+    path: String,
+    query: String,
+    profile: ResearchProfile,
+    topic: TopicKind,
+    status: RunStatus,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    cache_source_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleBudget {
+    total: ProviderBudgets,
+    spent: ProviderBudgets,
+    remaining: ProviderBudgets,
+    debits: Vec<EvidenceBundleDebit>,
+    by_provider: Vec<ProviderBudgetLine>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleDebit {
+    provider: ProviderKind,
+    count: u32,
+    note: Option<String>,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleProviderError {
+    provider: ProviderKind,
+    message: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProviderBudgetLine {
+    provider: &'static str,
+    budget: u32,
+    spent: u32,
+    remaining: u32,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleLedger {
+    path: String,
+    source_count: usize,
+    claim_count: usize,
+    source_ids: Vec<String>,
+    claim_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct CitationCoverage {
+    cited_claims: usize,
+    uncited_claims: usize,
+    uncited_claim_ids: Vec<String>,
+    missing_source_refs: Vec<String>,
+    coverage: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct SourceFreshnessSummary {
+    by_status: BTreeMap<String, usize>,
+    unknown_source_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct EvidenceBundleReport {
+    path: String,
+    exists: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -858,6 +978,7 @@ async fn main() -> Result<()> {
         Commands::Github { command } => handle_github(command, &config, cli.json).await,
         Commands::Ledger { command } => handle_ledger(command, cli.json),
         Commands::Report(args) => render_report(args, cli.json),
+        Commands::Bundle(args) => build_evidence_bundle_command(args, cli.json),
         Commands::Cache { command } => handle_cache(command, cli.json),
         Commands::Config { command } => handle_config(command, loaded_config.path, cli.json),
         Commands::Run { command } => handle_run(command, &config, cli.json),
@@ -1794,6 +1915,639 @@ fn render_report(args: ReportArgs, json_out: bool) -> Result<()> {
     }
 }
 
+fn build_evidence_bundle_command(args: BundleArgs, json_out: bool) -> Result<()> {
+    let generated_at = args.generated_at.unwrap_or_else(Utc::now);
+    let (bundle, markdown) = build_evidence_bundle(&args, generated_at)?;
+    if let Some(out) = &args.out {
+        ensure_parent(out)?;
+        fs::write(out, serde_json::to_vec_pretty(&bundle)?)?;
+    }
+    if let Some(markdown_out) = &args.markdown_out {
+        ensure_parent(markdown_out)?;
+        fs::write(markdown_out, markdown.as_bytes())?;
+    }
+    let failed = args.strict && !bundle.failures.is_empty();
+    if json_out {
+        print_json(&bundle)?;
+    } else if args.markdown_out.is_some() {
+        println!(
+            "bundle: {}",
+            args.markdown_out
+                .as_ref()
+                .expect("markdown path checked")
+                .display()
+        );
+    } else {
+        print!("{markdown}");
+    }
+    if failed {
+        bail!("evidence bundle failed closeout checks");
+    }
+    Ok(())
+}
+
+fn build_evidence_bundle(
+    args: &BundleArgs,
+    generated_at: DateTime<Utc>,
+) -> Result<(EvidenceBundle, String)> {
+    let run = read_run_state(&args.run)?;
+    let ledger_exists = args.ledger.exists();
+    let records = read_ledger_records(&args.ledger)?;
+    let mut sources = Vec::new();
+    let mut claims = Vec::new();
+    for record in records {
+        match record {
+            LedgerRecord::Source(source) => sources.push(source),
+            LedgerRecord::Claim(claim) => claims.push(claim),
+        }
+    }
+
+    let ledger_source_ids = sources
+        .iter()
+        .map(|source| source.id.clone())
+        .collect::<Vec<_>>();
+    let ledger_claim_ids = claims
+        .iter()
+        .map(|claim| claim.id.clone())
+        .collect::<Vec<_>>();
+    let source_id_set = ledger_source_ids.iter().cloned().collect::<BTreeSet<_>>();
+    let citation_coverage = citation_coverage(&claims, &source_id_set);
+    let source_freshness = source_freshness_summary(&sources)?;
+    let remaining = remaining_budgets(&run);
+    let mut warnings = Vec::new();
+    let mut failures = Vec::new();
+
+    if !ledger_exists {
+        let message = format!("ledger path does not exist: {}", args.ledger.display());
+        if args.strict {
+            failures.push(message);
+        } else {
+            warnings.push(message);
+        }
+    }
+    if claims.is_empty() {
+        let message = "ledger has no claims".to_string();
+        if args.strict {
+            failures.push(message);
+        } else {
+            warnings.push(message);
+        }
+    }
+    if sources.is_empty() {
+        let message = "ledger has no sources".to_string();
+        if args.strict {
+            failures.push(message);
+        } else {
+            warnings.push(message);
+        }
+    }
+    if !citation_coverage.uncited_claim_ids.is_empty() {
+        failures.push(format!(
+            "uncited claim(s): {}",
+            citation_coverage.uncited_claim_ids.join(", ")
+        ));
+    }
+    if !citation_coverage.missing_source_refs.is_empty() {
+        failures.push(format!(
+            "claim source reference(s) missing from ledger: {}",
+            citation_coverage.missing_source_refs.join(", ")
+        ));
+    }
+    if !run.provider_errors.is_empty() {
+        failures.push(format!(
+            "{} unresolved provider error(s)",
+            run.provider_errors.len()
+        ));
+    }
+    if !args.report.exists() {
+        let message = format!("report path does not exist: {}", args.report.display());
+        if args.strict {
+            failures.push(message);
+        } else {
+            warnings.push(message);
+        }
+    }
+    for source_id in &run.source_ids {
+        if !source_id_set.contains(source_id) {
+            warnings.push(format!(
+                "run source id `{source_id}` is not represented in the ledger"
+            ));
+        }
+    }
+    if args.strict && !source_freshness.unknown_source_ids.is_empty() {
+        warnings.push(format!(
+            "{} source(s) have no cache freshness record",
+            source_freshness.unknown_source_ids.len()
+        ));
+    }
+
+    let mut artifacts = Vec::new();
+    if let Some(out) = &args.out {
+        artifacts.push(out.display().to_string());
+    }
+    if let Some(markdown_out) = &args.markdown_out {
+        artifacts.push(markdown_out.display().to_string());
+    }
+    if args.report.exists() {
+        artifacts.push(args.report.display().to_string());
+    }
+
+    let status = if failures.is_empty() {
+        "passed"
+    } else {
+        "failed"
+    }
+    .to_string();
+    let bundle = EvidenceBundle {
+        schema: EVIDENCE_BUNDLE_SCHEMA,
+        generated_at,
+        status,
+        strict: args.strict,
+        run: EvidenceBundleRun {
+            path: args.run.display().to_string(),
+            query: bundle_safe_text(&run.query),
+            profile: run.profile,
+            topic: run.topic,
+            status: run.status.clone(),
+            created_at: run.created_at,
+            updated_at: run.updated_at,
+            cache_source_ids: run.source_ids.clone(),
+        },
+        budget: EvidenceBundleBudget {
+            total: run.budgets.clone(),
+            spent: run.spent.clone(),
+            remaining: remaining.clone(),
+            debits: run.debits.iter().map(bundle_safe_debit).collect::<Vec<_>>(),
+            by_provider: provider_budget_lines(&run.budgets, &run.spent, &remaining),
+        },
+        provider_errors: run
+            .provider_errors
+            .iter()
+            .map(bundle_safe_provider_error)
+            .collect::<Vec<_>>(),
+        ledger: EvidenceBundleLedger {
+            path: args.ledger.display().to_string(),
+            source_count: ledger_source_ids.len(),
+            claim_count: ledger_claim_ids.len(),
+            source_ids: ledger_source_ids,
+            claim_ids: ledger_claim_ids,
+        },
+        citation_coverage,
+        source_freshness,
+        report: EvidenceBundleReport {
+            path: args.report.display().to_string(),
+            exists: args.report.exists(),
+        },
+        artifacts,
+        warnings,
+        failures,
+    };
+    let markdown = render_evidence_bundle_markdown(&bundle);
+    Ok((bundle, markdown))
+}
+
+fn citation_coverage(claims: &[ClaimRecord], source_ids: &BTreeSet<String>) -> CitationCoverage {
+    let mut cited_claims = 0;
+    let mut uncited_claim_ids = Vec::new();
+    let mut missing_source_refs = Vec::new();
+    for claim in claims {
+        if claim.sources.is_empty() {
+            uncited_claim_ids.push(claim.id.clone());
+        } else {
+            cited_claims += 1;
+        }
+        for source_id in &claim.sources {
+            if !source_ids.contains(source_id) {
+                missing_source_refs.push(format!("{}->{source_id}", claim.id));
+            }
+        }
+    }
+    let coverage = if claims.is_empty() {
+        0.0
+    } else {
+        cited_claims as f64 / claims.len() as f64
+    };
+    CitationCoverage {
+        cited_claims,
+        uncited_claims: uncited_claim_ids.len(),
+        uncited_claim_ids,
+        missing_source_refs,
+        coverage,
+    }
+}
+
+fn source_freshness_summary(sources: &[SourceRecord]) -> Result<SourceFreshnessSummary> {
+    let paths = research_paths()?;
+    init_db(&paths)?;
+    let mut by_status = BTreeMap::new();
+    let mut unknown_source_ids = Vec::new();
+    for source in sources {
+        if let Some(cached) = cached_source(&paths, &source.id)? {
+            *by_status.entry(cached.freshness_status).or_insert(0) += 1;
+        } else {
+            *by_status.entry("unknown".to_string()).or_insert(0) += 1;
+            unknown_source_ids.push(source.id.clone());
+        }
+    }
+    Ok(SourceFreshnessSummary {
+        by_status,
+        unknown_source_ids,
+    })
+}
+
+fn provider_budget_lines(
+    total: &ProviderBudgets,
+    spent: &ProviderBudgets,
+    remaining: &ProviderBudgets,
+) -> Vec<ProviderBudgetLine> {
+    [
+        (
+            ProviderKind::CodexWeb,
+            total.codex_web_queries,
+            spent.codex_web_queries,
+            remaining.codex_web_queries,
+        ),
+        (
+            ProviderKind::Context7,
+            total.context7_calls,
+            spent.context7_calls,
+            remaining.context7_calls,
+        ),
+        (
+            ProviderKind::Github,
+            total.github_calls,
+            spent.github_calls,
+            remaining.github_calls,
+        ),
+        (
+            ProviderKind::Exa,
+            total.exa_calls,
+            spent.exa_calls,
+            remaining.exa_calls,
+        ),
+        (
+            ProviderKind::Direct,
+            total.direct_fetches,
+            spent.direct_fetches,
+            remaining.direct_fetches,
+        ),
+        (
+            ProviderKind::Browser,
+            total.browser_fetches,
+            spent.browser_fetches,
+            remaining.browser_fetches,
+        ),
+        (
+            ProviderKind::Firecrawl,
+            total.firecrawl_calls,
+            spent.firecrawl_calls,
+            remaining.firecrawl_calls,
+        ),
+    ]
+    .into_iter()
+    .map(|(provider, budget, spent, remaining)| ProviderBudgetLine {
+        provider: provider_name(provider),
+        budget,
+        spent,
+        remaining,
+    })
+    .collect()
+}
+
+fn bundle_safe_debit(debit: &RunDebit) -> EvidenceBundleDebit {
+    EvidenceBundleDebit {
+        provider: debit.provider,
+        count: debit.count,
+        note: debit.note.as_deref().map(bundle_safe_text),
+        created_at: debit.created_at,
+    }
+}
+
+fn bundle_safe_provider_error(error: &ProviderError) -> EvidenceBundleProviderError {
+    EvidenceBundleProviderError {
+        provider: error.provider,
+        message: bundle_safe_text(&error.message),
+        created_at: error.created_at,
+    }
+}
+
+fn bundle_safe_text(value: &str) -> String {
+    redact_standalone_secret_tokens(&redact_secret_assignments(&redact_embedded_urls(
+        &redact_provider_body(value),
+    )))
+}
+
+fn redact_provider_body(value: &str) -> String {
+    let lower = value.to_ascii_lowercase();
+    let Some(index) = lower.find("body=") else {
+        return value.to_string();
+    };
+    let mut redacted = value[..index].to_string();
+    redacted.push_str("body=[redacted]");
+    redacted
+}
+
+fn redact_embedded_urls(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut rest = value;
+    while let Some(index) = find_url_start(rest) {
+        output.push_str(&rest[..index]);
+        let url_and_after = &rest[index..];
+        let token_end = url_and_after
+            .char_indices()
+            .find(|(_, ch)| ch.is_whitespace())
+            .map(|(index, _)| index)
+            .unwrap_or(url_and_after.len());
+        let (url_token, after_token) = url_and_after.split_at(token_end);
+        let trailing_len = url_token
+            .chars()
+            .rev()
+            .take_while(|ch| secret_token_boundary_punctuation(*ch))
+            .map(char::len_utf8)
+            .sum::<usize>();
+        let core_end = url_token.len().saturating_sub(trailing_len);
+        let (url_core, trailing) = url_token.split_at(core_end);
+        output.push_str(&redact_url_query_secrets(url_core));
+        output.push_str(trailing);
+        rest = after_token;
+    }
+    output.push_str(rest);
+    output
+}
+
+fn find_url_start(value: &str) -> Option<usize> {
+    match (value.find("http://"), value.find("https://")) {
+        (Some(http), Some(https)) => Some(http.min(https)),
+        (Some(http), None) => Some(http),
+        (None, Some(https)) => Some(https),
+        (None, None) => None,
+    }
+}
+
+fn redact_secret_assignments(value: &str) -> String {
+    value
+        .split_inclusive(char::is_whitespace)
+        .map(|part| {
+            let split_at = part
+                .char_indices()
+                .find(|(_, ch)| ch.is_whitespace())
+                .map(|(index, _)| index)
+                .unwrap_or(part.len());
+            let (token, suffix) = part.split_at(split_at);
+            format!("{}{}", redact_secret_assignment_token(token), suffix)
+        })
+        .collect()
+}
+
+fn redact_secret_assignment_token(token: &str) -> String {
+    for separator in ['=', ':'] {
+        if let Some(index) = token.find(separator) {
+            let key = token[..index].trim_matches(|ch: char| {
+                matches!(ch, '"' | '\'' | '`' | '{' | '[' | '(' | ',' | ';')
+            });
+            if secret_query_key(key) || key.eq_ignore_ascii_case("body") {
+                let prefix = &token[..=index];
+                let trailing = token[index + 1..]
+                    .chars()
+                    .rev()
+                    .take_while(|ch| matches!(ch, '"' | '\'' | '`' | '}' | ']' | ')' | ',' | ';'))
+                    .count();
+                let suffix_start = token.len()
+                    - token[index + 1..]
+                        .chars()
+                        .rev()
+                        .take(trailing)
+                        .map(char::len_utf8)
+                        .sum::<usize>();
+                return format!("{}[redacted]{}", prefix, &token[suffix_start..]);
+            }
+        }
+    }
+    token.to_string()
+}
+
+fn redact_standalone_secret_tokens(value: &str) -> String {
+    let mut redaction_state = BundleRedactionState::None;
+    let mut output = String::with_capacity(value.len());
+    for part in value.split_inclusive(char::is_whitespace) {
+        let split_at = part
+            .char_indices()
+            .find(|(_, ch)| ch.is_whitespace())
+            .map(|(index, _)| index)
+            .unwrap_or(part.len());
+        let (token, suffix) = part.split_at(split_at);
+        let (leading, core, trailing) = split_secret_token_parts(token);
+        if matches!(redaction_state, BundleRedactionState::AwaitAssignmentValue) {
+            if is_assignment_separator(core) {
+                output.push_str(token);
+                output.push_str(suffix);
+                redaction_state = BundleRedactionState::RedactNext;
+                continue;
+            }
+            redaction_state = BundleRedactionState::None;
+        }
+        if matches!(redaction_state, BundleRedactionState::RedactNext) {
+            if is_bearer_marker(core) || is_assignment_separator(core) {
+                output.push_str(token);
+                output.push_str(suffix);
+                redaction_state = BundleRedactionState::RedactNext;
+                continue;
+            }
+            if !core.is_empty() {
+                output.push_str(leading);
+                output.push_str("[redacted]");
+                output.push_str(trailing);
+                output.push_str(suffix);
+                redaction_state = BundleRedactionState::None;
+                continue;
+            }
+        }
+        if is_secret_context_marker(core) {
+            output.push_str(token);
+            output.push_str(suffix);
+            redaction_state = if secret_context_needs_separator(core) {
+                BundleRedactionState::AwaitAssignmentValue
+            } else {
+                BundleRedactionState::RedactNext
+            };
+            continue;
+        }
+        if secret_token_like(core) {
+            output.push_str(leading);
+            output.push_str("[redacted]");
+            output.push_str(trailing);
+        } else {
+            output.push_str(token);
+        }
+        output.push_str(suffix);
+        redaction_state = BundleRedactionState::None;
+    }
+    output
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BundleRedactionState {
+    None,
+    AwaitAssignmentValue,
+    RedactNext,
+}
+
+fn split_secret_token_parts(token: &str) -> (&str, &str, &str) {
+    let leading_end = token
+        .char_indices()
+        .find(|(_, ch)| !secret_token_boundary_punctuation(*ch))
+        .map(|(index, _)| index)
+        .unwrap_or(token.len());
+    let trailing_len = token[leading_end..]
+        .chars()
+        .rev()
+        .take_while(|ch| secret_token_boundary_punctuation(*ch))
+        .map(char::len_utf8)
+        .sum::<usize>();
+    let core_end = token.len().saturating_sub(trailing_len);
+    (
+        &token[..leading_end],
+        &token[leading_end..core_end],
+        &token[core_end..],
+    )
+}
+
+fn secret_token_boundary_punctuation(ch: char) -> bool {
+    matches!(
+        ch,
+        '"' | '\'' | '`' | '{' | '[' | '(' | '<' | '}' | ']' | ')' | '>' | ',' | ';' | '.'
+    )
+}
+
+fn is_secret_context_marker(value: &str) -> bool {
+    let marker = value.trim_end_matches(':').to_ascii_lowercase();
+    matches!(
+        marker.as_str(),
+        "authorization"
+            | "bearer"
+            | "token"
+            | "access_token"
+            | "auth"
+            | "api_key"
+            | "apikey"
+            | "secret"
+            | "password"
+    )
+}
+
+fn secret_context_needs_separator(value: &str) -> bool {
+    let marker = value.trim_end_matches(':');
+    !(value.ends_with(':')
+        || marker.eq_ignore_ascii_case("authorization")
+        || marker.eq_ignore_ascii_case("bearer"))
+}
+
+fn is_bearer_marker(value: &str) -> bool {
+    value.trim_end_matches(':').eq_ignore_ascii_case("bearer")
+}
+
+fn is_assignment_separator(value: &str) -> bool {
+    matches!(value, "=" | ":" | "=>")
+}
+
+fn secret_token_like(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    let known_prefix = [
+        "ghp_",
+        "gho_",
+        "ghu_",
+        "ghs_",
+        "ghr_",
+        "github_pat_",
+        "sk-",
+        "sk_live_",
+        "sk_test_",
+        "xoxb-",
+        "xoxp-",
+        "xoxa-",
+        "xoxr-",
+        "pk_live_",
+        "pk_test_",
+    ]
+    .iter()
+    .any(|prefix| lower.starts_with(prefix));
+    if known_prefix && value.len() >= 8 {
+        return true;
+    }
+    if value.len() == 20
+        && (value.starts_with("AKIA") || value.starts_with("ASIA"))
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit())
+    {
+        return true;
+    }
+    value.split('.').count() == 3 && value.starts_with("eyJ")
+}
+
+fn render_evidence_bundle_markdown(bundle: &EvidenceBundle) -> String {
+    let mut markdown = String::new();
+    markdown.push_str("# Research Evidence Bundle\n\n");
+    markdown.push_str(&format!("- Status: {}\n", bundle.status));
+    markdown.push_str(&format!("- Generated: {}\n", bundle.generated_at));
+    markdown.push_str(&format!("- Query: {}\n", bundle.run.query));
+    markdown.push_str(&format!("- Run status: {:?}\n", bundle.run.status));
+    markdown.push_str(&format!(
+        "- Claims: {} total, {} cited, {} uncited\n",
+        bundle.ledger.claim_count,
+        bundle.citation_coverage.cited_claims,
+        bundle.citation_coverage.uncited_claims
+    ));
+    markdown.push_str(&format!("- Sources: {}\n", bundle.ledger.source_count));
+    markdown.push_str(&format!(
+        "- Provider errors: {}\n",
+        bundle.provider_errors.len()
+    ));
+    markdown.push_str(&format!(
+        "- Report: {} ({})\n",
+        bundle.report.path,
+        if bundle.report.exists {
+            "exists"
+        } else {
+            "missing"
+        }
+    ));
+    markdown.push_str("\n## Provider Budget\n\n");
+    markdown.push_str("| Provider | Budget | Spent | Remaining |\n");
+    markdown.push_str("| --- | ---: | ---: | ---: |\n");
+    for line in &bundle.budget.by_provider {
+        markdown.push_str(&format!(
+            "| {} | {} | {} | {} |\n",
+            line.provider, line.budget, line.spent, line.remaining
+        ));
+    }
+    markdown.push_str("\n## Source Freshness\n\n");
+    if bundle.source_freshness.by_status.is_empty() {
+        markdown.push_str("- No sources recorded.\n");
+    } else {
+        for (status, count) in &bundle.source_freshness.by_status {
+            markdown.push_str(&format!("- {status}: {count}\n"));
+        }
+    }
+    markdown.push_str("\n## Failures\n\n");
+    if bundle.failures.is_empty() {
+        markdown.push_str("- None.\n");
+    } else {
+        for failure in &bundle.failures {
+            markdown.push_str(&format!("- {failure}\n"));
+        }
+    }
+    markdown.push_str("\n## Warnings\n\n");
+    if bundle.warnings.is_empty() {
+        markdown.push_str("- None.\n");
+    } else {
+        for warning in &bundle.warnings {
+            markdown.push_str(&format!("- {warning}\n"));
+        }
+    }
+    markdown
+}
+
 fn handle_cache(command: CacheCommand, json_out: bool) -> Result<()> {
     let paths = research_paths()?;
     match command {
@@ -2153,6 +2907,7 @@ fn evaluate_eval_task(task: &EvalTask, config: &ResearchConfig) -> EvalAssertion
         "privacy-redaction" => evaluate_privacy_eval(task, &mut assertions, config),
         "budget-plan" => evaluate_budget_eval(task, &mut assertions, config),
         "evidence-contract" => evaluate_evidence_contract_eval(task, &mut assertions),
+        "evidence-bundle" => evaluate_evidence_bundle_eval(task, &mut assertions),
         "report-contract" => evaluate_report_contract_eval(task, &mut assertions),
         other => {
             assertions
@@ -2427,6 +3182,143 @@ fn evaluate_evidence_contract_eval(task: &EvalTask, assertions: &mut EvalAsserti
     Ok(())
 }
 
+fn evaluate_evidence_bundle_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
+    let bundle = task
+        .input
+        .get("bundle")
+        .and_then(Value::as_object)
+        .context("evidence-bundle requires object input `bundle`")?;
+    let schema = bundle
+        .get("schema")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    assert_text_eq(assertions, "schema", EVIDENCE_BUNDLE_SCHEMA, schema);
+
+    let source_count = bundle
+        .get("ledger")
+        .and_then(|ledger| ledger.get("source_count"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let claim_count = bundle
+        .get("ledger")
+        .and_then(|ledger| ledger.get("claim_count"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let uncited_claims = bundle
+        .get("citation_coverage")
+        .and_then(|coverage| coverage.get("uncited_claims"))
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let status = bundle
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let provider_error_count = bundle
+        .get("provider_errors")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default() as u64;
+    let failure_count = bundle
+        .get("failures")
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default() as u64;
+    let report_exists = bundle
+        .get("report")
+        .and_then(|report| report.get("exists"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    assertions
+        .details
+        .insert("source_count".to_string(), json!(source_count));
+    assertions
+        .details
+        .insert("claim_count".to_string(), json!(claim_count));
+    assertions
+        .details
+        .insert("uncited_claims".to_string(), json!(uncited_claims));
+    assertions
+        .details
+        .insert("status".to_string(), json!(status));
+    assertions
+        .details
+        .insert("provider_errors".to_string(), json!(provider_error_count));
+    assertions
+        .details
+        .insert("failures".to_string(), json!(failure_count));
+    assertions
+        .details
+        .insert("report_exists".to_string(), json!(report_exists));
+
+    let min_sources = optional_u64(&task.expected, "min_sources")?.unwrap_or(1);
+    let min_claims = optional_u64(&task.expected, "min_claims")?.unwrap_or(1);
+    let max_uncited_claims = optional_u64(&task.expected, "max_uncited_claims")?.unwrap_or(0);
+    let max_provider_errors = optional_u64(&task.expected, "max_provider_errors")?;
+    let max_failures = optional_u64(&task.expected, "max_failures")?;
+    if source_count < min_sources {
+        assertions.failures.push(format!(
+            "bundle source_count expected at least {min_sources}, got {source_count}"
+        ));
+    }
+    if claim_count < min_claims {
+        assertions.failures.push(format!(
+            "bundle claim_count expected at least {min_claims}, got {claim_count}"
+        ));
+    }
+    if uncited_claims > max_uncited_claims {
+        assertions.failures.push(format!(
+            "bundle uncited_claims expected at most {max_uncited_claims}, got {uncited_claims}"
+        ));
+    }
+    if let Some(expected_status) = optional_str(&task.expected, "status")? {
+        assert_text_eq(assertions, "status", expected_status, status);
+    }
+    if let Some(max_provider_errors) = max_provider_errors
+        && provider_error_count > max_provider_errors
+    {
+        assertions.failures.push(format!(
+            "bundle provider_errors expected at most {max_provider_errors}, got {provider_error_count}"
+        ));
+    }
+    if let Some(max_failures) = max_failures
+        && failure_count > max_failures
+    {
+        assertions.failures.push(format!(
+            "bundle failures expected at most {max_failures}, got {failure_count}"
+        ));
+    }
+    if optional_bool(&task.expected, "report_exists")?.unwrap_or(false) && !report_exists {
+        assertions
+            .failures
+            .push("bundle report.exists expected true".to_string());
+    }
+    let freshness_statuses = bundle
+        .get("source_freshness")
+        .and_then(|freshness| freshness.get("by_status"))
+        .and_then(Value::as_object);
+    for status in optional_str_array(&task.expected, "required_source_freshness_statuses")?
+        .unwrap_or_default()
+    {
+        if !freshness_statuses
+            .map(|statuses| statuses.contains_key(status))
+            .unwrap_or(false)
+        {
+            assertions.failures.push(format!(
+                "bundle source_freshness.by_status missing `{status}`"
+            ));
+        }
+    }
+    for key in optional_str_array(&task.expected, "required_top_level_keys")?.unwrap_or_default() {
+        if !bundle.contains_key(key) {
+            assertions
+                .failures
+                .push(format!("bundle missing top-level key `{key}`"));
+        }
+    }
+    Ok(())
+}
+
 fn evaluate_report_contract_eval(task: &EvalTask, assertions: &mut EvalAssertions) -> Result<()> {
     let report = required_str(&task.input, "report")?;
     for section in optional_str_array(&task.expected, "required_sections")?.unwrap_or_default() {
@@ -2520,6 +3412,16 @@ fn optional_f64(value: &Value, key: &str) -> Result<Option<f64>> {
         .as_f64()
         .map(Some)
         .with_context(|| format!("`{key}` must be a number"))
+}
+
+fn optional_bool(value: &Value, key: &str) -> Result<Option<bool>> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_bool()
+        .map(Some)
+        .with_context(|| format!("`{key}` must be a boolean"))
 }
 
 fn optional_str_array<'a>(value: &'a Value, key: &str) -> Result<Option<Vec<&'a str>>> {
@@ -4411,6 +5313,406 @@ mod tests {
                 .iter()
                 .any(|failure| failure.contains("claim-1.sources[1]"))
         );
+    }
+
+    #[test]
+    fn evidence_bundle_eval_requires_closeout_shape() {
+        let task = EvalTask {
+            id: "bundle-shape".to_string(),
+            kind: "evidence-bundle".to_string(),
+            description: "bundle validation".to_string(),
+            input: json!({
+                "bundle": {
+                    "schema": EVIDENCE_BUNDLE_SCHEMA,
+                    "generated_at": "2026-05-11T12:00:00Z",
+                    "status": "passed",
+                    "strict": true,
+                    "run": {},
+                    "budget": {},
+                    "provider_errors": [],
+                    "ledger": {"source_count": 1, "claim_count": 1},
+                    "citation_coverage": {"uncited_claims": 0},
+                    "source_freshness": {"by_status": {"current": 1}},
+                    "report": {"exists": true},
+                    "artifacts": [],
+                    "warnings": [],
+                    "failures": []
+                }
+            }),
+            expected: json!({
+                "status": "passed",
+                "min_sources": 1,
+                "min_claims": 1,
+                "max_uncited_claims": 0,
+                "max_provider_errors": 0,
+                "max_failures": 0,
+                "report_exists": true,
+                "required_source_freshness_statuses": ["current"],
+                "required_top_level_keys": [
+                    "schema",
+                    "generated_at",
+                    "status",
+                    "strict",
+                    "run",
+                    "budget",
+                    "provider_errors",
+                    "ledger",
+                    "citation_coverage",
+                    "source_freshness",
+                    "report",
+                    "artifacts",
+                    "warnings",
+                    "failures"
+                ]
+            }),
+        };
+        let outcome = evaluate_test_task(&task);
+
+        assert!(outcome.failures.is_empty(), "{:?}", outcome.failures);
+    }
+
+    #[test]
+    fn evidence_bundle_closeout_reports_budget_citations_and_artifacts() -> Result<()> {
+        let dir = temp_path("evidence-bundle-pass");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let ledger_path = dir.join("ledger.jsonl");
+        let report_path = dir.join("report.md");
+        let bundle_path = dir.join("bundle.json");
+        let markdown_path = dir.join("bundle.md");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let source_id = format!("src-{}", short_hash(dir.display().to_string()));
+        let claim_id = format!("claim-{}", short_hash(format!("{source_id}-claim")));
+        let mut budgets = standard_budget();
+        budgets.github_calls = 4;
+        let spent = ProviderBudgets {
+            github_calls: 1,
+            ..ProviderBudgets::default()
+        };
+        let state = ResearchRunState {
+            query: "verify source-backed claim".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::Github,
+            status: RunStatus::Closed,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets,
+            spent,
+            debits: vec![RunDebit {
+                provider: ProviderKind::Github,
+                count: 1,
+                note: Some("github search".to_string()),
+                created_at: generated_at,
+            }],
+            provider_errors: Vec::new(),
+            source_ids: vec![source_id.clone()],
+        };
+        write_run_state(&run_path, &state)?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Source(SourceRecord {
+                id: source_id.clone(),
+                provider: "github".to_string(),
+                url: "https://github.com/openai/codex".to_string(),
+                title: Some("openai/codex".to_string()),
+                route: Some("github".to_string()),
+                fetched_at: generated_at,
+            }),
+        )?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Claim(ClaimRecord {
+                id: claim_id,
+                text: "Repository evidence is source backed.".to_string(),
+                confidence: 0.9,
+                sources: vec![source_id],
+                note: None,
+                created_at: generated_at,
+            }),
+        )?;
+        fs::write(&report_path, "# Research Report\n")?;
+
+        let args = BundleArgs {
+            run: run_path,
+            ledger: ledger_path,
+            report: report_path,
+            out: Some(bundle_path),
+            markdown_out: Some(markdown_path),
+            generated_at: Some(generated_at),
+            strict: true,
+        };
+        let (bundle, markdown) = build_evidence_bundle(&args, generated_at)?;
+        fs::remove_dir_all(&dir)?;
+
+        assert_eq!(bundle.schema, EVIDENCE_BUNDLE_SCHEMA);
+        assert_eq!(bundle.status, "passed");
+        assert_eq!(bundle.ledger.source_count, 1);
+        assert_eq!(bundle.citation_coverage.uncited_claims, 0);
+        assert_eq!(bundle.budget.by_provider[2].provider, "github");
+        assert_eq!(bundle.budget.by_provider[2].spent, 1);
+        assert!(markdown.contains("# Research Evidence Bundle"));
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_bundle_strict_fails_uncited_claims_and_provider_errors() -> Result<()> {
+        let dir = temp_path("evidence-bundle-fail");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let ledger_path = dir.join("ledger.jsonl");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let state = ResearchRunState {
+            query: "verify failed closeout".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::General,
+            status: RunStatus::Open,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets: standard_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: vec![ProviderError {
+                provider: ProviderKind::Github,
+                message: "hydration failed".to_string(),
+                created_at: generated_at,
+            }],
+            source_ids: Vec::new(),
+        };
+        write_run_state(&run_path, &state)?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Claim(ClaimRecord {
+                id: "claim-uncited".to_string(),
+                text: "This claim has no sources.".to_string(),
+                confidence: 0.8,
+                sources: Vec::new(),
+                note: None,
+                created_at: generated_at,
+            }),
+        )?;
+        let args = BundleArgs {
+            run: run_path,
+            ledger: ledger_path,
+            report: dir.join("missing-report.md"),
+            out: None,
+            markdown_out: None,
+            generated_at: Some(generated_at),
+            strict: true,
+        };
+        let (bundle, _) = build_evidence_bundle(&args, generated_at)?;
+        fs::remove_dir_all(&dir)?;
+
+        assert_eq!(bundle.status, "failed");
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("uncited"))
+        );
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("provider error"))
+        );
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("report path"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_bundle_strict_fails_missing_ledger_evidence() -> Result<()> {
+        let dir = temp_path("evidence-bundle-missing-ledger");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let state = ResearchRunState {
+            query: "verify missing ledger".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::General,
+            status: RunStatus::Closed,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets: standard_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: Vec::new(),
+            source_ids: Vec::new(),
+        };
+        write_run_state(&run_path, &state)?;
+        let args = BundleArgs {
+            run: run_path,
+            ledger: dir.join("missing-ledger.jsonl"),
+            report: dir.join("missing-report.md"),
+            out: None,
+            markdown_out: None,
+            generated_at: Some(generated_at),
+            strict: true,
+        };
+        let (bundle, _) = build_evidence_bundle(&args, generated_at)?;
+        fs::remove_dir_all(&dir)?;
+
+        assert_eq!(bundle.status, "failed");
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("ledger path"))
+        );
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("no claims"))
+        );
+        assert!(
+            bundle
+                .failures
+                .iter()
+                .any(|failure| failure.contains("no sources"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_bundle_command_non_strict_reports_failures_without_error() -> Result<()> {
+        let dir = temp_path("evidence-bundle-nonstrict");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let ledger_path = dir.join("ledger.jsonl");
+        let markdown_path = dir.join("bundle.md");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let state = ResearchRunState {
+            query: "verify non-strict exit".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::General,
+            status: RunStatus::Closed,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets: standard_budget(),
+            spent: ProviderBudgets::default(),
+            debits: Vec::new(),
+            provider_errors: Vec::new(),
+            source_ids: Vec::new(),
+        };
+        write_run_state(&run_path, &state)?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Claim(ClaimRecord {
+                id: "claim-uncited".to_string(),
+                text: "This claim has no sources.".to_string(),
+                confidence: 0.8,
+                sources: Vec::new(),
+                note: None,
+                created_at: generated_at,
+            }),
+        )?;
+        let args = BundleArgs {
+            run: run_path,
+            ledger: ledger_path,
+            report: dir.join("missing-report.md"),
+            out: None,
+            markdown_out: Some(markdown_path),
+            generated_at: Some(generated_at),
+            strict: false,
+        };
+        let result = build_evidence_bundle_command(args, false);
+        fs::remove_dir_all(&dir)?;
+
+        assert!(result.is_ok(), "{result:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_bundle_redacts_shareable_freeform_fields() -> Result<()> {
+        let dir = temp_path("evidence-bundle-redacts");
+        fs::create_dir_all(&dir)?;
+        let run_path = dir.join("run.json");
+        let ledger_path = dir.join("ledger.jsonl");
+        let report_path = dir.join("report.md");
+        let generated_at: DateTime<Utc> = "2026-05-11T12:00:00Z".parse()?;
+        let source_id = format!("src-{}", short_hash(dir.display().to_string()));
+        let state = ResearchRunState {
+            query: "check (https://example.com/doc?token=punctuatedsecret), api_key = spacedsecret bearer ghp_FAKEstandaloneToken1234567890".to_string(),
+            profile: ResearchProfile::Standard,
+            topic: TopicKind::General,
+            status: RunStatus::Open,
+            created_at: generated_at,
+            updated_at: generated_at,
+            budgets: standard_budget(),
+            spent: ProviderBudgets::default(),
+            debits: vec![RunDebit {
+                provider: ProviderKind::Context7,
+                count: 1,
+                note: Some("lookup api_key = spacedsecret Authorization: ghp_FAKEstandaloneToken1234567890".to_string()),
+                created_at: generated_at,
+            }],
+            provider_errors: vec![ProviderError {
+                provider: ProviderKind::Context7,
+                message: "Context7 returned status=500; fetch failed: <https://example.com/doc?api_key=punctuatedsecret>; Authorization: Bearer ghp_FAKEstandaloneToken1234567890 body=raw-provider-body token=supersecret"
+                    .to_string(),
+                created_at: generated_at,
+            }],
+            source_ids: vec![source_id.clone()],
+        };
+        write_run_state(&run_path, &state)?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Source(SourceRecord {
+                id: source_id.clone(),
+                provider: "direct".to_string(),
+                url: "https://example.com/doc".to_string(),
+                title: Some("example docs".to_string()),
+                route: Some("direct".to_string()),
+                fetched_at: generated_at,
+            }),
+        )?;
+        append_ledger_record(
+            &ledger_path,
+            &LedgerRecord::Claim(ClaimRecord {
+                id: "claim-cited".to_string(),
+                text: "The claim is cited.".to_string(),
+                confidence: 0.9,
+                sources: vec![source_id],
+                note: None,
+                created_at: generated_at,
+            }),
+        )?;
+        fs::write(&report_path, "# Research Report\n")?;
+        let args = BundleArgs {
+            run: run_path,
+            ledger: ledger_path,
+            report: report_path,
+            out: None,
+            markdown_out: None,
+            generated_at: Some(generated_at),
+            strict: false,
+        };
+        let (bundle, markdown) = build_evidence_bundle(&args, generated_at)?;
+        let json = serde_json::to_string(&bundle)?;
+        fs::remove_dir_all(&dir)?;
+
+        for leaked in [
+            "supersecret",
+            "abc123",
+            "punctuatedsecret",
+            "spacedsecret",
+            "raw-provider-body",
+            "ghp_FAKEstandaloneToken1234567890",
+        ] {
+            assert!(!json.contains(leaked), "JSON leaked {leaked}: {json}");
+            assert!(
+                !markdown.contains(leaked),
+                "Markdown leaked {leaked}: {markdown}"
+            );
+        }
+        assert!(json.contains("[redacted]"));
+        assert!(markdown.contains("[redacted]"));
+        Ok(())
     }
 
     #[test]

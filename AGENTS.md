@@ -72,7 +72,7 @@ cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 
 - Development TUI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-tui --all-targets -- -D warnings`, `cargo check -p codex-dev-tui`, `cargo test -p codex-dev-tui`; run the render-once smoke in `docs/runbooks/validation.md` when TUI rendering or state loading changes.
 - CLI smoke: `codex-research --json doctor`, `codex-research --json eval`
-- Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`
+- Eval suite smoke: `codex-research eval --list`, `codex-research --json eval --task evidence-claims-cited --strict`, `codex-research --json eval --task evidence-bundle-closeout-shape --strict`
 - Docs links: `python3 tools/docs/check_links.py docs README.md AGENTS.md`
 - Final whitespace check: `git diff --check`
 

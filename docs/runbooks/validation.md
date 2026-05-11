@@ -33,6 +33,7 @@ codex-research --json doctor
 codex-research --json eval
 codex-research eval --list
 codex-research --json eval --task evidence-claims-cited --strict
+codex-research --json eval --task evidence-bundle-closeout-shape --strict
 codex-research --json plan "validation smoke" --profile quick
 tmp=$(mktemp -d)
 codex-research --json run init validation-smoke --profile quick --topic github --out "$tmp/run.json"
@@ -49,7 +50,8 @@ codex-research --json eval --live
 Use `cargo run -q -p codex-research -- ...` for these commands before the new
 binary is installed locally. The embedded default eval suite is sourced from
 `crates/codex-research/evals/research/core.json` at build time and covers
-routing, privacy, budgets, cited claims, and report shape.
+routing, privacy, budgets, cited claims, report shape, and bundle closeout
+shape.
 
 ## codex-dev Operating Layer
 
@@ -422,6 +424,7 @@ cargo test -p codex-research
 cargo run -q -p codex-research -- --json doctor
 cargo run -q -p codex-research -- --json eval
 cargo run -q -p codex-research -- --json eval --task evidence-claims-cited --strict
+cargo run -q -p codex-research -- --json eval --task evidence-bundle-closeout-shape --strict
 python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts tools/bootstrap
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
