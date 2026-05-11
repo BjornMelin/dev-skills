@@ -1298,18 +1298,7 @@ fn skills_gates() -> Vec<PolicyGate> {
 
 fn bootstrap_install_gates() -> Vec<PolicyGate> {
     vec![
-        policy_gate(
-            "bootstrap-pack-validate",
-            "validate bootstrap pack manifests",
-            [
-                "python3",
-                "tools/bootstrap/render_bootstrap_pack.py",
-                "--validate",
-            ],
-            "docs/runbooks/validation.md#bootstrap-packs",
-            ["python3"],
-            "Failure means bootstrap pack manifests or templates are invalid.",
-        ),
+        bootstrap_pack_validate_gate(),
         policy_gate(
             "bootstrap-pack-render-smoke",
             "render bootstrap pack smoke fixtures",
@@ -1319,7 +1308,7 @@ fn bootstrap_install_gates() -> Vec<PolicyGate> {
                 "tmp=$(mktemp -d); python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out \"$tmp/codex\" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z && python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out \"$tmp/rust\" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z",
             ],
             "docs/runbooks/validation.md#bootstrap-packs",
-            ["bash", "python3"],
+            ["bash", "python3", "mktemp"],
             "Failure means a bootstrap pack cannot render into a fresh local directory.",
         ),
         policy_gate(
@@ -1402,7 +1391,7 @@ fn release_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
     append_unique_gates(&mut gates, docs_gates());
-    append_unique_gates(&mut gates, vec![bootstrap_install_gates()[0].clone()]);
+    append_unique_gates(&mut gates, vec![bootstrap_pack_validate_gate()]);
     append_unique_gates(&mut gates, skills_gates());
     gates
 }
@@ -1455,6 +1444,21 @@ fn docs_links_gate() -> PolicyGate {
         "docs/runbooks/validation.md#docs",
         ["python3"],
         "Failure means tracked docs contain broken local links or stale anchors.",
+    )
+}
+
+fn bootstrap_pack_validate_gate() -> PolicyGate {
+    policy_gate(
+        "bootstrap-pack-validate",
+        "validate bootstrap pack manifests",
+        [
+            "python3",
+            "tools/bootstrap/render_bootstrap_pack.py",
+            "--validate",
+        ],
+        "docs/runbooks/validation.md#bootstrap-packs",
+        ["python3"],
+        "Failure means bootstrap pack manifests or templates are invalid.",
     )
 }
 
@@ -1576,6 +1580,13 @@ fn resolve_repo_root_from(
 }
 
 fn gate_working_directory(repo_root: &Path, gate: &PolicyGate) -> Result<PathBuf> {
+    if gate.working_directory.trim().is_empty() {
+        bail!(
+            "gate {} has empty working_directory {:?}",
+            gate.id,
+            gate.working_directory
+        );
+    }
     let relative = Path::new(&gate.working_directory);
     if relative.is_absolute()
         || relative.components().any(|component| {
@@ -2348,6 +2359,24 @@ mod tests {
                 .as_deref()
                 .expect("error")
                 .contains("unsafe working_directory")
+        );
+    }
+
+    #[test]
+    fn policy_execution_rejects_blank_working_directory() {
+        let temp = tempdir().expect("tempdir");
+        let mut gate = cargo_fmt_gate();
+        gate.working_directory = " ".to_string();
+
+        let result = execute_gate(&gate, Some(temp.path()));
+
+        assert_eq!(result.status, GateStatus::Failed);
+        assert!(
+            result
+                .error
+                .as_deref()
+                .expect("error")
+                .contains("empty working_directory")
         );
     }
 
