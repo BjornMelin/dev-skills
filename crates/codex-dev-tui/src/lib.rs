@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -5,8 +6,12 @@ use std::time::Duration;
 use anyhow::Result;
 use clap::Parser;
 use codex_dev_core::{
-    CapsuleStatus, CheckRecord, PrEvidence, ReviewThreadSummary, StatusResult, Subagents,
-    ValidationResult, Verification, capsule_status, read_json, render_pr_label, validate_capsule,
+    CapsuleStatus, CheckRecord, EvidenceKind, EvidenceRecord, PR_AGENT_HOSTED_ACTION_SCHEMA,
+    PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA, PrAgentHostedActionReport,
+    PrAgentHostedActionStatus, PrAgentReadinessActionStatus, PrAgentReadinessReport,
+    PrAgentReadinessStatus, PrAgentSeverity, PrAgentStateReport, PrEvidence, ReviewThreadSummary,
+    StatusResult, Subagents, ValidationResult, Verification, capsule_status, read_json,
+    render_pr_label, validate_capsule,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::backend::{Backend, TestBackend};
@@ -16,6 +21,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
+use serde::de::DeserializeOwned;
 
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev-tui")]
@@ -182,6 +188,9 @@ pub enum WorkbenchEvent {
 /// Top-level panel currently rendered in the workbench detail area.
 pub enum Panel {
     Overview,
+    Evidence,
+    Subagents,
+    PrAgent,
     Validation,
     Pr,
     Help,
@@ -190,9 +199,12 @@ pub enum Panel {
 impl Panel {
     fn next(self) -> Self {
         match self {
-            Self::Overview => Self::Validation,
-            Self::Validation => Self::Pr,
-            Self::Pr => Self::Help,
+            Self::Overview => Self::Evidence,
+            Self::Evidence => Self::Subagents,
+            Self::Subagents => Self::Pr,
+            Self::Pr => Self::PrAgent,
+            Self::PrAgent => Self::Validation,
+            Self::Validation => Self::Help,
             Self::Help => Self::Overview,
         }
     }
@@ -200,17 +212,23 @@ impl Panel {
     fn previous(self) -> Self {
         match self {
             Self::Overview => Self::Help,
-            Self::Validation => Self::Overview,
-            Self::Pr => Self::Validation,
-            Self::Help => Self::Pr,
+            Self::Evidence => Self::Overview,
+            Self::Subagents => Self::Evidence,
+            Self::Pr => Self::Subagents,
+            Self::PrAgent => Self::Pr,
+            Self::Validation => Self::PrAgent,
+            Self::Help => Self::Validation,
         }
     }
 
     fn title(self) -> &'static str {
         match self {
             Self::Overview => "Overview",
+            Self::Evidence => "Evidence",
+            Self::Subagents => "Subagents",
             Self::Validation => "Validation",
             Self::Pr => "PR",
+            Self::PrAgent => "PR Agent",
             Self::Help => "Help",
         }
     }
@@ -677,8 +695,14 @@ pub struct WorkbenchState {
     pub capsule_path: PathBuf,
     pub validation: ValidationResult,
     pub capsule: Option<StatusResult>,
+    pub evidence: Vec<EvidenceRecord>,
     pub verification: Option<Verification>,
+    pub subagents: Option<Subagents>,
     pub pr: Option<PrEvidence>,
+    pub pr_agent_state: Option<PrAgentStateReport>,
+    pub pr_readiness: Option<PrAgentReadinessReport>,
+    pub pr_agent_actions: Vec<PrAgentHostedActionReport>,
+    pub diagnostics: Vec<String>,
     pub active_panel: Panel,
     pub last_error: Option<String>,
 }
@@ -688,22 +712,89 @@ impl WorkbenchState {
     pub fn load(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let validation = validate_capsule(&path)?;
-        let (capsule, verification, pr) = if validation.valid {
+        let (
+            capsule,
+            evidence,
+            verification,
+            subagents,
+            pr,
+            pr_agent_state,
+            pr_readiness,
+            pr_agent_actions,
+            diagnostics,
+        ) = if validation.valid {
+            let mut diagnostics = Vec::new();
+            let (capsule, capsule_diagnostics) =
+                load_optional_contract(&path, "capsule", || capsule_status(&path));
+            let (evidence, evidence_diagnostics) = load_evidence_records(&path);
+            let (verification, verification_diagnostics) =
+                load_optional_contract(&path, "verification.json", || {
+                    read_json(&path.join("verification.json"))
+                });
+            let (subagents, subagent_diagnostics) =
+                load_optional_contract(&path, "subagents.json", || {
+                    read_json(&path.join("subagents.json"))
+                });
+            let (pr, pr_diagnostics) =
+                load_optional_contract(&path, "pr.json", || read_json(&path.join("pr.json")));
+            let (pr_agent_state, pr_agent_state_diagnostics) = load_optional_schema_contract(
+                &path,
+                "pr-agent-state.json",
+                PR_AGENT_STATE_SCHEMA,
+                |report: &PrAgentStateReport| &report.schema,
+            );
+            let (pr_readiness, pr_readiness_diagnostics) = load_optional_schema_contract(
+                &path,
+                "pr-readiness.json",
+                PR_AGENT_READINESS_SCHEMA,
+                |report: &PrAgentReadinessReport| &report.schema,
+            );
+            let (pr_agent_actions, action_diagnostics) = load_pr_agent_actions(&path);
+            diagnostics.extend(capsule_diagnostics);
+            diagnostics.extend(evidence_diagnostics);
+            diagnostics.extend(verification_diagnostics);
+            diagnostics.extend(subagent_diagnostics);
+            diagnostics.extend(pr_diagnostics);
+            diagnostics.extend(pr_agent_state_diagnostics);
+            diagnostics.extend(pr_readiness_diagnostics);
+            diagnostics.extend(action_diagnostics);
             (
-                Some(capsule_status(&path)?),
-                read_json(&path.join("verification.json")).ok(),
-                read_json(&path.join("pr.json")).ok(),
+                capsule,
+                evidence,
+                verification,
+                subagents,
+                pr,
+                pr_agent_state,
+                pr_readiness,
+                pr_agent_actions,
+                diagnostics,
             )
         } else {
-            (None, None, None)
+            (
+                None,
+                Vec::new(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+            )
         };
 
         Ok(Self {
             capsule_path: path,
             validation,
             capsule,
+            evidence,
             verification,
+            subagents,
             pr,
+            pr_agent_state,
+            pr_readiness,
+            pr_agent_actions,
+            diagnostics,
             active_panel: Panel::Overview,
             last_error: None,
         })
@@ -741,10 +832,142 @@ impl WorkbenchState {
             errors: vec![message.clone()],
         };
         self.capsule = None;
+        self.evidence.clear();
         self.verification = None;
+        self.subagents = None;
         self.pr = None;
+        self.pr_agent_state = None;
+        self.pr_readiness = None;
+        self.pr_agent_actions.clear();
+        self.diagnostics = vec![message.clone()];
         self.last_error = Some(message);
     }
+}
+
+fn load_optional_schema_contract<T>(
+    path: &Path,
+    file: &str,
+    expected_schema: &'static str,
+    schema: fn(&T) -> &str,
+) -> (Option<T>, Vec<String>)
+where
+    T: DeserializeOwned,
+{
+    let file_path = path.join(file);
+    if !file_path.exists() {
+        return (None, Vec::new());
+    }
+    load_optional_contract(path, file, || {
+        let value: T = read_json(&file_path)?;
+        if schema(&value) != expected_schema {
+            anyhow::bail!("{file} schema must be {expected_schema}");
+        }
+        Ok(value)
+    })
+}
+
+fn load_evidence_records(path: &Path) -> (Vec<EvidenceRecord>, Vec<String>) {
+    let evidence_path = path.join("evidence.jsonl");
+    let text = match fs::read_to_string(&evidence_path) {
+        Ok(text) => text,
+        Err(error) => {
+            return (
+                Vec::new(),
+                vec![format!(
+                    "evidence.jsonl: {}",
+                    redact_path_text(
+                        &format!("failed to read {}: {error}", evidence_path.display()),
+                        path
+                    )
+                )],
+            );
+        }
+    };
+
+    let mut records = Vec::new();
+    let mut diagnostics = Vec::new();
+    for (index, line) in text.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<EvidenceRecord>(line) {
+            Ok(record) => records.push(record),
+            Err(error) => diagnostics.push(format!("evidence.jsonl line {}: {error}", index + 1)),
+        }
+    }
+    (records, diagnostics)
+}
+
+fn load_pr_agent_actions(path: &Path) -> (Vec<PrAgentHostedActionReport>, Vec<String>) {
+    let actions_root = path.join("pr-agent-actions");
+    if !actions_root.exists() {
+        return (Vec::new(), Vec::new());
+    }
+
+    let entries = match fs::read_dir(&actions_root) {
+        Ok(entries) => entries,
+        Err(error) => {
+            return (
+                Vec::new(),
+                vec![format!(
+                    "pr-agent-actions: {}",
+                    redact_path_text(
+                        &format!("failed to read {}: {error}", actions_root.display()),
+                        path
+                    )
+                )],
+            );
+        }
+    };
+
+    let mut reports = Vec::new();
+    let mut diagnostics = Vec::new();
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                diagnostics.push(format!("pr-agent-actions entry: {error}"));
+                continue;
+            }
+        };
+        match entry.file_type() {
+            Ok(file_type) if file_type.is_dir() => {}
+            Ok(_) => continue,
+            Err(error) => {
+                diagnostics.push(format!(
+                    "pr-agent-actions {}: {error}",
+                    entry.file_name().to_string_lossy()
+                ));
+                continue;
+            }
+        }
+        let plan_path = entry.path().join("plan.json");
+        if !plan_path.is_file() {
+            diagnostics.push(format!(
+                "pr-agent-actions/{}: missing plan.json",
+                entry.file_name().to_string_lossy()
+            ));
+            continue;
+        }
+        match read_json::<PrAgentHostedActionReport>(&plan_path) {
+            Ok(report) if report.schema == PR_AGENT_HOSTED_ACTION_SCHEMA => reports.push(report),
+            Ok(_) => diagnostics.push(format!(
+                "pr-agent-actions/{}/plan.json: plan.json schema must be {PR_AGENT_HOSTED_ACTION_SCHEMA}",
+                entry.file_name().to_string_lossy()
+            )),
+            Err(error) => diagnostics.push(format!(
+                "pr-agent-actions/{}/plan.json: {}",
+                entry.file_name().to_string_lossy(),
+                redact_path_text(&format!("{error:#}"), path)
+            )),
+        }
+    }
+    reports.sort_by(|left, right| {
+        left.generated_at
+            .cmp(&right.generated_at)
+            .then_with(|| left.plan_id.cmp(&right.plan_id))
+    });
+    (reports, diagnostics)
 }
 
 /// Restores terminal state exactly once on explicit restore or drop.
@@ -1153,10 +1376,19 @@ fn render_active_panel(state: &WorkbenchState) -> Paragraph<'_> {
         Panel::Overview => Paragraph::new(overview_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
+        Panel::Evidence => Paragraph::new(evidence_text(state))
+            .block(Block::default().title(title).borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
+        Panel::Subagents => Paragraph::new(subagents_text(state))
+            .block(Block::default().title(title).borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
         Panel::Validation => Paragraph::new(validation_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         Panel::Pr => Paragraph::new(pr_text(state))
+            .block(Block::default().title(title).borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
+        Panel::PrAgent => Paragraph::new(pr_agent_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         Panel::Help => Paragraph::new(help_text())
@@ -1194,15 +1426,48 @@ fn overview_items(state: &WorkbenchState) -> Vec<ListItem<'static>> {
             "invalid"
         }
     )));
+    items.push(ListItem::new(format!(
+        "evidence: {} record(s)",
+        state.evidence.len()
+    )));
+    items.push(ListItem::new(format!(
+        "subagents: {}",
+        state
+            .subagents
+            .as_ref()
+            .map(subagents_status_label)
+            .unwrap_or_else(|| "not loaded".to_string())
+    )));
+    items.push(ListItem::new(format!(
+        "pr agent: {}",
+        pr_agent_status_label(state)
+    )));
     items
 }
 
 fn overview_text(state: &WorkbenchState) -> String {
     match &state.capsule {
-        Some(capsule) => format!(
-            "{}\n\ncapsule: {}\n\nThis workbench reads codex-dev-core capsule JSON contracts and does not own policy logic.",
-            capsule.objective, capsule.id
-        ),
+        Some(capsule) => {
+            let mut lines = vec![
+                capsule.objective.clone(),
+                String::new(),
+                format!("capsule: {}", capsule.id),
+                format!("evidence: {} loaded record(s)", state.evidence.len()),
+                format!(
+                    "subagents: {}",
+                    state
+                        .subagents
+                        .as_ref()
+                        .map(subagents_status_label)
+                        .unwrap_or_else(|| "not loaded".to_string())
+                ),
+                format!("pr agent: {}", pr_agent_status_label(state)),
+                String::new(),
+                "This workbench reads codex-dev-core capsule JSON contracts and does not own policy logic.".to_string(),
+            ];
+            append_artifact_diagnostics(&mut lines, state);
+            lines.join("\n")
+        }
         None => format!(
             "Capsule failed validation for the supplied capsule path.\n\n{}",
             validation_text(state)
@@ -1251,6 +1516,140 @@ fn validation_text(state: &WorkbenchState) -> String {
                 .map(|gate| format!("- {} [{}]", gate.name, gate.status)),
         );
     }
+    append_artifact_diagnostics(&mut lines, state);
+    lines.join("\n")
+}
+
+fn evidence_text(state: &WorkbenchState) -> String {
+    let mut lines = vec![format!("loaded records: {}", state.evidence.len())];
+    if let Some(capsule) = &state.capsule {
+        lines.push(format!(
+            "capsule summary: {} total; {}",
+            capsule.evidence.total,
+            evidence_summary_text(&capsule.evidence.by_kind)
+        ));
+    }
+
+    let warnings = evidence_warnings(state);
+    if !warnings.is_empty() {
+        lines.push("warnings:".to_string());
+        lines.extend(warnings.into_iter().map(|warning| format!("- {warning}")));
+    }
+
+    if state.evidence.is_empty() {
+        lines.push("no evidence records loaded".to_string());
+        append_artifact_diagnostics(&mut lines, state);
+        return lines.join("\n");
+    }
+
+    lines.push("by kind:".to_string());
+    for (kind, count) in evidence_kind_counts(&state.evidence) {
+        lines.push(format!("- {}: {count}", evidence_kind_label(kind)));
+    }
+
+    lines.push("recent records:".to_string());
+    for record in state.evidence.iter().rev().take(6) {
+        lines.push(format!(
+            "- {} {}: {}",
+            record.at.to_rfc3339(),
+            evidence_kind_label(record.kind),
+            record.summary
+        ));
+        if !record.source_ids.is_empty() {
+            lines.push(format!("  sources: {}", record.source_ids.join(", ")));
+        }
+        if !record.artifacts.is_empty() {
+            lines.push(format!(
+                "  artifacts: {}",
+                sanitize_list(&record.artifacts, &state.capsule_path)
+            ));
+        }
+        if let Some(confidence) = record.confidence {
+            lines.push(format!("  confidence: {confidence}/100"));
+        }
+        if let Some(residual_risk) = &record.residual_risk {
+            lines.push(format!("  residual risk: {residual_risk}"));
+        }
+    }
+    append_artifact_diagnostics(&mut lines, state);
+    lines.join("\n")
+}
+
+fn subagents_text(state: &WorkbenchState) -> String {
+    let Some(subagents) = &state.subagents else {
+        let mut lines = vec!["no subagent evidence loaded".to_string()];
+        append_artifact_diagnostics(&mut lines, state);
+        return lines.join("\n");
+    };
+
+    let mut lines = vec![
+        format!("schema: {}", subagents.schema),
+        format!("batches: {}", subagents.batches.len()),
+    ];
+    if subagents.batches.is_empty() {
+        lines.push("no subagent batches recorded".to_string());
+        append_artifact_diagnostics(&mut lines, state);
+        return lines.join("\n");
+    }
+
+    for batch in subagents.batches.iter().rev().take(5) {
+        lines.push(format!("- batch {} [{}]", batch.id, batch.status));
+        if let Some(task) = &batch.task {
+            lines.push(format!("  task: {task}"));
+        }
+        if let Some(mode) = &batch.mode {
+            lines.push(format!("  mode: {mode}"));
+        }
+        if let Some(scope) = &batch.scope {
+            lines.push(format!("  scope: {scope}"));
+        }
+        let completed = batch
+            .agents
+            .iter()
+            .filter(|agent| agent.status == "completed")
+            .count();
+        let verified = batch
+            .agents
+            .iter()
+            .filter(|agent| agent.human_verified)
+            .count();
+        lines.push(format!(
+            "  agents: {completed}/{} completed; {verified} human-verified",
+            batch.agents.len()
+        ));
+        if !batch.registry_issues.is_empty() {
+            lines.push(format!(
+                "  registry issues: {}",
+                batch.registry_issues.join("; ")
+            ));
+        }
+        for agent in batch.agents.iter().take(4) {
+            let disposition = agent.disposition.as_deref().unwrap_or("unclassified");
+            lines.push(format!(
+                "  - {} [{}; {disposition}]: {}",
+                agent.role, agent.status, agent.summary
+            ));
+            if !agent.source_ids.is_empty() {
+                lines.push(format!("    sources: {}", agent.source_ids.join(", ")));
+            }
+            if !agent.artifacts.is_empty() {
+                lines.push(format!(
+                    "    artifacts: {}",
+                    sanitize_list(&agent.artifacts, &state.capsule_path)
+                ));
+            }
+        }
+        if let Some(synthesis) = &batch.synthesis {
+            lines.push(format!(
+                "  synthesis [{}; human_verified={}]: {}",
+                synthesis.status, synthesis.human_verified, synthesis.summary
+            ));
+            if !synthesis.source_ids.is_empty() {
+                lines.push(format!("    sources: {}", synthesis.source_ids.join(", ")));
+            }
+        }
+    }
+    append_artifact_diagnostics(&mut lines, state);
     lines.join("\n")
 }
 
@@ -1281,6 +1680,394 @@ fn pr_text(state: &WorkbenchState) -> String {
         lines.extend(pr.checks.iter().map(render_check));
     }
     lines.join("\n")
+}
+
+fn pr_agent_text(state: &WorkbenchState) -> String {
+    let mut lines = Vec::new();
+    if let Some(pr) = &state.pr {
+        lines.push(format!("pr snapshot: {}", render_pr_label(pr)));
+        lines.push(format!("state: {}", pr.state));
+        lines.push(format!(
+            "review threads: {} unresolved of {} total ({})",
+            review_thread_unresolved_label(&pr.review_threads),
+            pr.review_threads.total,
+            if pr.review_threads.authoritative {
+                "authoritative"
+            } else {
+                "not authoritative"
+            }
+        ));
+    }
+
+    match &state.pr_agent_state {
+        Some(report) => append_pr_agent_state(&mut lines, report),
+        None => lines.push("state report: not loaded".to_string()),
+    }
+    match &state.pr_readiness {
+        Some(readiness) => append_pr_readiness(&mut lines, readiness),
+        None => lines.push("readiness report: not loaded".to_string()),
+    }
+    append_pr_agent_actions(&mut lines, &state.pr_agent_actions);
+    append_artifact_diagnostics(&mut lines, state);
+    lines.join("\n")
+}
+
+fn append_pr_agent_state(lines: &mut Vec<String>, report: &PrAgentStateReport) {
+    lines.push(format!(
+        "state report: {}#{} at {} ({})",
+        report.repository,
+        report.number,
+        report.checked_at.to_rfc3339(),
+        if report.dry_run { "dry-run" } else { "live" }
+    ));
+    let captured = report
+        .sources
+        .iter()
+        .filter(|source| matches!(source.status, codex_dev_core::PrAgentSourceStatus::Captured))
+        .count();
+    let failed = report
+        .sources
+        .iter()
+        .filter(|source| matches!(source.status, codex_dev_core::PrAgentSourceStatus::Failed))
+        .count();
+    lines.push(format!(
+        "  sources: {captured} captured, {failed} failed, {} total",
+        report.sources.len()
+    ));
+    if !report.sources.is_empty() {
+        lines.push(format!(
+            "  source ids: {}",
+            report
+                .sources
+                .iter()
+                .map(|source| source.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    let diagnostics = diagnostic_counts(&report.diagnostics);
+    lines.push(format!("  diagnostics: {diagnostics}"));
+    if report.actions.is_empty() {
+        lines.push("  recommended actions: none".to_string());
+    } else {
+        lines.push("  recommended actions:".to_string());
+        lines.extend(report.actions.iter().take(5).map(|action| {
+            format!(
+                "  - {} [{}]: {}",
+                action.id,
+                pr_agent_action_priority_label(action.priority),
+                action.summary
+            )
+        }));
+    }
+}
+
+fn append_pr_readiness(lines: &mut Vec<String>, readiness: &PrAgentReadinessReport) {
+    lines.push(format!(
+        "readiness: {} (ready={}; attempts={}; generated={})",
+        readiness_status_label(readiness.final_status),
+        readiness.ready,
+        readiness.attempts.len(),
+        readiness.generated_at.to_rfc3339()
+    ));
+    lines.push(format!(
+        "  requested: apply={} rerun_failed={} merge={}",
+        readiness.apply_requested, readiness.rerun_failed_requested, readiness.merge_requested
+    ));
+    if let Some(attempt) = readiness.attempts.last() {
+        lines.push(format!(
+            "  latest attempt {}: {} at {}",
+            attempt.attempt,
+            readiness_status_label(attempt.status),
+            attempt.checked_at.to_rfc3339()
+        ));
+        lines.push(format!(
+            "  comments: {} active, {} outdated",
+            attempt.active_review_comments, attempt.outdated_review_comments
+        ));
+        if !attempt.blockers.is_empty() {
+            lines.push(format!("  blockers: {}", attempt.blockers.join("; ")));
+        }
+        if !attempt.wait_reasons.is_empty() {
+            lines.push(format!("  wait: {}", attempt.wait_reasons.join("; ")));
+        }
+        if !attempt.warnings.is_empty() {
+            lines.push(format!("  warnings: {}", attempt.warnings.join("; ")));
+        }
+        if !attempt.failing_checks.is_empty() {
+            lines.push(format!(
+                "  failing checks: {}",
+                attempt
+                    .failing_checks
+                    .iter()
+                    .map(readiness_check_label)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ));
+        }
+        if !attempt.pending_checks.is_empty() {
+            lines.push(format!(
+                "  pending checks: {}",
+                attempt
+                    .pending_checks
+                    .iter()
+                    .map(readiness_check_label)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ));
+        }
+        let diagnostics = diagnostic_counts(&attempt.diagnostics);
+        lines.push(format!("  attempt diagnostics: {diagnostics}"));
+    }
+    if readiness.actions.is_empty() {
+        lines.push("  readiness actions: none".to_string());
+    } else {
+        lines.push("  readiness actions:".to_string());
+        for action in readiness.actions.iter().take(5) {
+            lines.push(format!(
+                "  - {} {} [{}]: {}",
+                action.id,
+                action.kind,
+                readiness_action_status_label(action.status),
+                action.reason
+            ));
+        }
+    }
+}
+
+fn append_pr_agent_actions(lines: &mut Vec<String>, actions: &[PrAgentHostedActionReport]) {
+    if actions.is_empty() {
+        lines.push("hosted action plans: none".to_string());
+        return;
+    }
+    lines.push(format!("hosted action plans: {}", actions.len()));
+    for report in actions.iter().rev().take(5) {
+        let mode = hosted_action_mode(report);
+        lines.push(format!(
+            "- {} {} -> {} [{}]: {}",
+            report.plan_id, report.action.kind, report.action.target, mode, report.action.summary
+        ));
+        lines.push(format!(
+            "  apply_requested={} dry_run={} generated={}",
+            report.apply_requested,
+            report.dry_run,
+            report.generated_at.to_rfc3339()
+        ));
+        if !report.diagnostics.is_empty() {
+            lines.push(format!(
+                "  diagnostics: {}",
+                diagnostic_counts(&report.diagnostics)
+            ));
+        }
+    }
+}
+
+fn evidence_summary_text(summary: &[codex_dev_core::EvidenceKindSummary]) -> String {
+    if summary.is_empty() {
+        return "no kind summary".to_string();
+    }
+    summary
+        .iter()
+        .map(|item| format!("{}={}", evidence_kind_label(item.kind), item.count))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn evidence_warnings(state: &WorkbenchState) -> Vec<String> {
+    let mut warnings = Vec::new();
+    if state.evidence.is_empty() {
+        warnings.push("missing evidence records".to_string());
+        return warnings;
+    }
+    if let Some(capsule) = &state.capsule
+        && capsule.evidence.total != state.evidence.len() as u64
+    {
+        warnings.push(format!(
+            "stale summary: capsule reports {} evidence record(s), loaded {}",
+            capsule.evidence.total,
+            state.evidence.len()
+        ));
+    }
+    let missing_source_context = state
+        .evidence
+        .iter()
+        .filter(|record| {
+            matches!(
+                record.kind,
+                EvidenceKind::Decision
+                    | EvidenceKind::Research
+                    | EvidenceKind::Review
+                    | EvidenceKind::Subagent
+            ) && record.source_ids.is_empty()
+        })
+        .count();
+    if missing_source_context > 0 {
+        warnings.push(format!(
+            "{missing_source_context} decision/research/review/subagent record(s) missing source IDs"
+        ));
+    }
+    if !state
+        .evidence
+        .iter()
+        .any(|record| record.kind == EvidenceKind::Decision)
+    {
+        warnings.push("no decision evidence recorded".to_string());
+    }
+    if !state
+        .evidence
+        .iter()
+        .any(|record| record.kind == EvidenceKind::Research)
+    {
+        warnings.push("no research evidence recorded".to_string());
+    }
+    warnings
+}
+
+fn evidence_kind_counts(records: &[EvidenceRecord]) -> BTreeMap<EvidenceKind, usize> {
+    let mut counts = BTreeMap::new();
+    for record in records {
+        *counts.entry(record.kind).or_default() += 1;
+    }
+    counts
+}
+
+fn evidence_kind_label(kind: EvidenceKind) -> &'static str {
+    match kind {
+        EvidenceKind::Command => "command",
+        EvidenceKind::Subagent => "subagent",
+        EvidenceKind::Review => "review",
+        EvidenceKind::Ci => "ci",
+        EvidenceKind::Decision => "decision",
+        EvidenceKind::Research => "research",
+        EvidenceKind::Manual => "manual",
+        EvidenceKind::Output => "output",
+    }
+}
+
+fn subagents_status_label(subagents: &Subagents) -> String {
+    if subagents.batches.is_empty() {
+        return "none".to_string();
+    }
+    let completed = subagents
+        .batches
+        .iter()
+        .filter(|batch| batch.status == "completed")
+        .count();
+    format!("{completed}/{} completed", subagents.batches.len())
+}
+
+fn pr_agent_status_label(state: &WorkbenchState) -> String {
+    let mut parts = Vec::new();
+    if let Some(report) = &state.pr_agent_state {
+        parts.push(if report.dry_run {
+            "state dry-run"
+        } else {
+            "state live"
+        });
+    }
+    if let Some(readiness) = &state.pr_readiness {
+        parts.push(readiness_status_label(readiness.final_status));
+    }
+    if !state.pr_agent_actions.is_empty() {
+        parts.push("hosted actions");
+    }
+    if parts.is_empty() {
+        "not loaded".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+fn hosted_action_mode(report: &PrAgentHostedActionReport) -> String {
+    match &report.execution {
+        Some(execution) => hosted_action_status_label(execution.status).to_string(),
+        None if report.apply_requested => "apply requested; not executed".to_string(),
+        None => "dry-run plan".to_string(),
+    }
+}
+
+fn hosted_action_status_label(status: PrAgentHostedActionStatus) -> &'static str {
+    match status {
+        PrAgentHostedActionStatus::Applied => "applied",
+        PrAgentHostedActionStatus::SkippedDuplicate => "skipped duplicate",
+        PrAgentHostedActionStatus::Failed => "failed",
+    }
+}
+
+fn readiness_status_label(status: PrAgentReadinessStatus) -> &'static str {
+    match status {
+        PrAgentReadinessStatus::Ready => "ready",
+        PrAgentReadinessStatus::Waiting => "waiting",
+        PrAgentReadinessStatus::Blocked => "blocked",
+        PrAgentReadinessStatus::Merged => "merged",
+        PrAgentReadinessStatus::Stopped => "stopped",
+    }
+}
+
+fn readiness_action_status_label(status: PrAgentReadinessActionStatus) -> &'static str {
+    match status {
+        PrAgentReadinessActionStatus::Planned => "planned",
+        PrAgentReadinessActionStatus::Applied => "applied",
+        PrAgentReadinessActionStatus::Skipped => "skipped",
+        PrAgentReadinessActionStatus::Failed => "failed",
+    }
+}
+
+fn pr_agent_action_priority_label(priority: codex_dev_core::PrAgentActionPriority) -> &'static str {
+    match priority {
+        codex_dev_core::PrAgentActionPriority::Blocked => "blocked",
+        codex_dev_core::PrAgentActionPriority::Required => "required",
+        codex_dev_core::PrAgentActionPriority::Wait => "wait",
+        codex_dev_core::PrAgentActionPriority::Ready => "ready",
+        codex_dev_core::PrAgentActionPriority::Info => "info",
+    }
+}
+
+fn readiness_check_label(check: &codex_dev_core::PrAgentReadinessCheck) -> String {
+    let conclusion = check.conclusion.as_deref().unwrap_or("unknown");
+    format!("{} {} / {}", check.name, check.status, conclusion)
+}
+
+fn diagnostic_counts(diagnostics: &[codex_dev_core::PrAgentDiagnostic]) -> String {
+    if diagnostics.is_empty() {
+        return "none".to_string();
+    }
+    let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
+    for diagnostic in diagnostics {
+        *counts
+            .entry(match diagnostic.severity {
+                PrAgentSeverity::Info => "info",
+                PrAgentSeverity::Warning => "warning",
+                PrAgentSeverity::Error => "error",
+            })
+            .or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .map(|(severity, count)| format!("{severity}={count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn sanitize_list(items: &[String], capsule_path: &Path) -> String {
+    items
+        .iter()
+        .map(|item| redact_path_text(item, capsule_path))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn append_artifact_diagnostics(lines: &mut Vec<String>, state: &WorkbenchState) {
+    if state.diagnostics.is_empty() {
+        return;
+    }
+    lines.push("artifact diagnostics:".to_string());
+    lines.extend(
+        state
+            .diagnostics
+            .iter()
+            .map(|diagnostic| format!("- {}", redact_path_text(diagnostic, &state.capsule_path))),
+    );
 }
 
 fn render_check(check: &CheckRecord) -> String {
@@ -1446,8 +2233,12 @@ mod tests {
 
     use chrono::{TimeZone, Utc};
     use codex_dev_core::{
-        EvidenceSummary, GateRecord, InitArgs, POLICY_GATES_SCHEMA, PR_SCHEMA, PolicyGate,
-        PolicyManifest, PolicyProfile, ReviewThreadSummary, VERIFICATION_SCHEMA, init_capsule,
+        EvidenceSummary, GateRecord, InitArgs, POLICY_GATES_SCHEMA, PR_AGENT_READINESS_SCHEMA,
+        PR_AGENT_STATE_SCHEMA, PR_SCHEMA, PolicyGate, PolicyManifest, PolicyProfile, PrAgentAction,
+        PrAgentActionPriority, PrAgentDiagnostic, PrAgentHostedActionSpec, PrAgentReadinessAction,
+        PrAgentReadinessAttempt, PrAgentReadinessCheck, PrAgentSourceRecord, PrAgentSourceStatus,
+        ReviewThreadSummary, SUBAGENTS_SCHEMA, SubagentBatch, SubagentRecord,
+        SubagentSynthesisRecord, VERIFICATION_SCHEMA, init_capsule,
     };
     use tempfile::tempdir;
 
@@ -1491,11 +2282,13 @@ mod tests {
         state.active_panel = Panel::Overview;
 
         state.next_panel();
-        assert_eq!(state.active_panel, Panel::Validation);
+        assert_eq!(state.active_panel, Panel::Evidence);
+        state.next_panel();
+        assert_eq!(state.active_panel, Panel::Subagents);
         state.next_panel();
         assert_eq!(state.active_panel, Panel::Pr);
         state.previous_panel();
-        assert_eq!(state.active_panel, Panel::Validation);
+        assert_eq!(state.active_panel, Panel::Subagents);
     }
 
     #[test]
@@ -1721,6 +2514,124 @@ mod tests {
     }
 
     #[test]
+    fn evidence_panel_summarizes_records_without_raw_commands() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::Evidence;
+
+        let screen = render_to_string(&state, 120, 32).expect("render");
+
+        assert!(screen.contains("loaded records: 2"));
+        assert!(screen.contains("decision"));
+        assert!(screen.contains("research"));
+        assert!(screen.contains("sources: decision:panel, docs:pr-agent"));
+        assert!(screen.contains("artifacts: <capsule>/pr-agent-state.json"));
+        assert!(!screen.contains("gh api repos"));
+    }
+
+    #[test]
+    fn subagents_panel_summarizes_batches_sources_and_synthesis() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::Subagents;
+
+        let screen = render_to_string(&state, 120, 34).expect("render");
+
+        assert!(screen.contains("batch pre-pr-review"));
+        assert!(screen.contains("runtime_bug_reviewer"));
+        assert!(screen.contains("sources: subagent:runtime"));
+        assert!(screen.contains("synthesis [accepted; human_verified=true]"));
+    }
+
+    #[test]
+    fn pr_agent_panel_distinguishes_dry_run_plans_from_ready_actions() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::PrAgent;
+
+        let screen = render_to_string(&state, 130, 40).expect("render");
+
+        assert!(screen.contains("state report: BjornMelin/dev-skills#28"));
+        assert!(screen.contains("readiness: waiting"));
+        assert!(screen.contains("merge merge [planned]"));
+        assert!(screen.contains("hosted action plans: 1"));
+        assert!(screen.contains("dry-run plan"));
+        assert!(!screen.contains("raw hosted stdout"));
+    }
+
+    #[test]
+    fn optional_pr_agent_artifact_parse_errors_render_as_diagnostics() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let capsule = init_test_capsule(
+            &root,
+            "partial-pr-agent",
+            "Partial PR agent",
+            CapsuleStatus::InReview,
+            0,
+        );
+        fs::write(capsule.path.join("pr-agent-state.json"), "{not valid json")
+            .expect("write invalid optional artifact");
+
+        let mut state = WorkbenchState::load(&capsule.path).expect("state");
+        state.active_panel = Panel::PrAgent;
+        let screen = render_to_string(&state, 120, 32).expect("render");
+
+        assert!(state.validation.valid);
+        assert!(screen.contains("artifact diagnostics:"));
+        assert!(screen.contains("pr-agent-state.json"));
+        assert!(screen.contains("<capsule>"));
+        assert!(!screen.contains(&capsule.path.display().to_string()));
+    }
+
+    #[test]
+    fn optional_pr_agent_schema_mismatches_render_as_diagnostics() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let capsule = init_test_capsule(
+            &root,
+            "stale-pr-agent-schema",
+            "Stale PR agent schema",
+            CapsuleStatus::InReview,
+            0,
+        );
+        let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
+        let pr = fixture_pr(checked_at);
+        let mut state_report = fixture_pr_agent_state(checked_at, pr.clone());
+        state_report.schema = "codex-dev.pr-agent-state.v0".to_string();
+        let mut readiness_report = fixture_pr_readiness(checked_at, pr);
+        readiness_report.schema = "codex-dev.pr-agent-readiness.v0".to_string();
+        let action_dir = capsule.path.join("pr-agent-actions").join("stale-plan");
+        fs::create_dir_all(&action_dir).expect("action dir");
+        let mut action_report = fixture_pr_agent_action(checked_at);
+        action_report.schema = "codex-dev.pr-agent-hosted-action.v0".to_string();
+        fs::write(
+            capsule.path.join("pr-agent-state.json"),
+            serde_json::to_string_pretty(&state_report).expect("state json"),
+        )
+        .expect("write state");
+        fs::write(
+            capsule.path.join("pr-readiness.json"),
+            serde_json::to_string_pretty(&readiness_report).expect("readiness json"),
+        )
+        .expect("write readiness");
+        fs::write(
+            action_dir.join("plan.json"),
+            serde_json::to_string_pretty(&action_report).expect("action json"),
+        )
+        .expect("write action");
+
+        let mut state = WorkbenchState::load(&capsule.path).expect("state");
+        state.active_panel = Panel::PrAgent;
+        let screen = render_to_string(&state, 140, 36).expect("render");
+
+        assert!(state.validation.valid);
+        assert!(state.pr_agent_state.is_none());
+        assert!(state.pr_readiness.is_none());
+        assert!(state.pr_agent_actions.is_empty());
+        assert!(screen.contains("pr-agent-state.json schema must be"));
+        assert!(screen.contains("pr-readiness.json schema must be"));
+        assert!(screen.contains("plan.json schema must be"));
+    }
+
+    #[test]
     fn cli_error_sanitizer_redacts_capsule_path() {
         let temp = tempdir().expect("tempdir");
         let capsule = temp.path().join("private-task-name");
@@ -1855,6 +2766,7 @@ mod tests {
 
     fn fixture_state() -> WorkbenchState {
         let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
+        let pr = fixture_pr(checked_at);
         WorkbenchState {
             capsule_path: PathBuf::from("/tmp/tui-fixture"),
             validation: ValidationResult {
@@ -1874,10 +2786,11 @@ mod tests {
                 pull_requests: vec![35],
                 updated_at: checked_at,
                 evidence: EvidenceSummary {
-                    total: 0,
+                    total: 2,
                     by_kind: Vec::new(),
                 },
             }),
+            evidence: fixture_evidence(checked_at),
             verification: Some(Verification {
                 schema: VERIFICATION_SCHEMA.to_string(),
                 required: vec![GateRecord {
@@ -1889,39 +2802,248 @@ mod tests {
                 optional: Vec::new(),
                 last_checked_at: checked_at,
             }),
-            pr: Some(PrEvidence {
-                schema: PR_SCHEMA.to_string(),
-                repository: Some("BjornMelin/dev-skills".to_string()),
-                number: Some(28),
-                url: Some("https://github.com/BjornMelin/dev-skills/pull/28".to_string()),
-                state: "open".to_string(),
-                is_draft: Some(false),
-                mergeable: Some("mergeable".to_string()),
-                merge_state_status: Some("clean".to_string()),
-                review_decision: Some("approved".to_string()),
-                head_sha: Some("abc123".to_string()),
-                head_ref_name: Some("feat/codex-dev-tui-workbench".to_string()),
-                base_ref_name: Some("main".to_string()),
-                base_ref_oid: Some("def456".to_string()),
-                checks: vec![CheckRecord {
-                    name: "CodeRabbit".to_string(),
-                    status: "completed".to_string(),
-                    conclusion: Some("success".to_string()),
-                    url: None,
-                    checked_at,
-                }],
-                review_threads: ReviewThreadSummary {
-                    unresolved: 0,
-                    total: 0,
-                    resolved: 0,
-                    outdated: 0,
-                    authoritative: false,
-                    last_checked_at: checked_at,
-                },
-                sources: Vec::new(),
-            }),
+            subagents: Some(fixture_subagents(checked_at)),
+            pr: Some(pr.clone()),
+            pr_agent_state: Some(fixture_pr_agent_state(checked_at, pr.clone())),
+            pr_readiness: Some(fixture_pr_readiness(checked_at, pr)),
+            pr_agent_actions: vec![fixture_pr_agent_action(checked_at)],
+            diagnostics: Vec::new(),
             active_panel: Panel::Pr,
             last_error: None,
+        }
+    }
+
+    fn fixture_pr(checked_at: chrono::DateTime<Utc>) -> PrEvidence {
+        PrEvidence {
+            schema: PR_SCHEMA.to_string(),
+            repository: Some("BjornMelin/dev-skills".to_string()),
+            number: Some(28),
+            url: Some("https://github.com/BjornMelin/dev-skills/pull/28".to_string()),
+            state: "open".to_string(),
+            is_draft: Some(false),
+            mergeable: Some("mergeable".to_string()),
+            merge_state_status: Some("clean".to_string()),
+            review_decision: Some("approved".to_string()),
+            head_sha: Some("abc123".to_string()),
+            head_ref_name: Some("feat/codex-dev-tui-workbench".to_string()),
+            base_ref_name: Some("main".to_string()),
+            base_ref_oid: Some("def456".to_string()),
+            checks: vec![CheckRecord {
+                name: "CodeRabbit".to_string(),
+                status: "completed".to_string(),
+                conclusion: Some("success".to_string()),
+                url: None,
+                checked_at,
+            }],
+            review_threads: ReviewThreadSummary {
+                unresolved: 0,
+                total: 0,
+                resolved: 0,
+                outdated: 0,
+                authoritative: false,
+                last_checked_at: checked_at,
+            },
+            sources: Vec::new(),
+        }
+    }
+
+    fn fixture_evidence(checked_at: chrono::DateTime<Utc>) -> Vec<EvidenceRecord> {
+        vec![
+            EvidenceRecord {
+                schema: codex_dev_core::EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Decision,
+                at: checked_at,
+                summary: "Use typed PR-agent artifacts as TUI input".to_string(),
+                command: Some("gh api repos/BjornMelin/dev-skills/pulls/28/raw".to_string()),
+                exit_code: Some(0),
+                source_ids: vec!["decision:panel".to_string(), "docs:pr-agent".to_string()],
+                actor: Some("codex".to_string()),
+                tool: Some("codex-dev".to_string()),
+                confidence: Some(95),
+                residual_risk: None,
+                artifacts: vec!["/tmp/tui-fixture/pr-agent-state.json".to_string()],
+            },
+            EvidenceRecord {
+                schema: codex_dev_core::EVIDENCE_SCHEMA.to_string(),
+                kind: EvidenceKind::Research,
+                at: checked_at,
+                summary: "Checked current capsule contract docs".to_string(),
+                command: None,
+                exit_code: None,
+                source_ids: vec!["docs:codex-dev-cli".to_string()],
+                actor: Some("codex".to_string()),
+                tool: Some("codex-dev".to_string()),
+                confidence: Some(90),
+                residual_risk: Some("fixture only".to_string()),
+                artifacts: vec!["docs/reference/codex-dev-cli.md".to_string()],
+            },
+        ]
+    }
+
+    fn fixture_subagents(checked_at: chrono::DateTime<Utc>) -> Subagents {
+        Subagents {
+            schema: SUBAGENTS_SCHEMA.to_string(),
+            batches: vec![SubagentBatch {
+                id: "pre-pr-review".to_string(),
+                status: "completed".to_string(),
+                task: Some("Review TUI evidence panels".to_string()),
+                mode: Some("read-only".to_string()),
+                scope: Some("crates/codex-dev-tui/src/lib.rs".to_string()),
+                wait_policy: Some("parent waits".to_string()),
+                rendezvous_required: Some(true),
+                registry_issues: Vec::new(),
+                duplicate_roles_ignored: BTreeMap::new(),
+                prompts: Vec::new(),
+                agents: vec![SubagentRecord {
+                    role: "runtime_bug_reviewer".to_string(),
+                    task: "Find render and loading regressions".to_string(),
+                    status: "completed".to_string(),
+                    summary: "No blocking runtime regressions found".to_string(),
+                    prompt_id: Some("prompt-runtime".to_string()),
+                    prompt_hash: Some("abc123".to_string()),
+                    disposition: Some("accepted".to_string()),
+                    human_verified: true,
+                    source_ids: vec!["subagent:runtime".to_string()],
+                    artifacts: vec!["/tmp/tui-fixture/subagents.json".to_string()],
+                    updated_at: Some(checked_at),
+                }],
+                synthesis: Some(SubagentSynthesisRecord {
+                    status: "accepted".to_string(),
+                    summary: "Subagent review is clean".to_string(),
+                    human_verified: true,
+                    source_ids: vec!["subagent:runtime".to_string()],
+                    artifacts: vec!["subagents.json".to_string()],
+                    updated_at: checked_at,
+                }),
+                recorded_at: Some(checked_at),
+                updated_at: Some(checked_at),
+            }],
+        }
+    }
+
+    fn fixture_pr_agent_state(
+        checked_at: chrono::DateTime<Utc>,
+        pr: PrEvidence,
+    ) -> PrAgentStateReport {
+        PrAgentStateReport {
+            schema: PR_AGENT_STATE_SCHEMA.to_string(),
+            repository: "BjornMelin/dev-skills".to_string(),
+            number: 28,
+            checked_at,
+            dry_run: true,
+            pr,
+            sources: vec![PrAgentSourceRecord {
+                id: "gh-pr-view".to_string(),
+                kind: "gh-pr-view".to_string(),
+                command: "gh pr view --json ...".to_string(),
+                path: "pr-agent-sources/20260509/gh-pr-view.json".to_string(),
+                retrieved_at: checked_at,
+                exit_code: Some(0),
+                status: PrAgentSourceStatus::Captured,
+            }],
+            diagnostics: vec![PrAgentDiagnostic {
+                source: "gh-rate-limit".to_string(),
+                severity: PrAgentSeverity::Info,
+                message: "rate limit healthy".to_string(),
+                command: Some("gh api rate_limit".to_string()),
+                exit_code: Some(0),
+                at: checked_at,
+            }],
+            actions: vec![PrAgentAction {
+                id: "wait-coderabbit".to_string(),
+                priority: PrAgentActionPriority::Wait,
+                summary: "Wait for final hosted review state".to_string(),
+                reason: "Review threads are not authoritative yet".to_string(),
+            }],
+        }
+    }
+
+    fn fixture_pr_readiness(
+        checked_at: chrono::DateTime<Utc>,
+        pr: PrEvidence,
+    ) -> PrAgentReadinessReport {
+        PrAgentReadinessReport {
+            schema: PR_AGENT_READINESS_SCHEMA.to_string(),
+            repository: "BjornMelin/dev-skills".to_string(),
+            number: 28,
+            generated_at: checked_at,
+            apply_requested: false,
+            rerun_failed_requested: false,
+            merge_requested: true,
+            ready: false,
+            final_status: PrAgentReadinessStatus::Waiting,
+            attempts: vec![PrAgentReadinessAttempt {
+                attempt: 1,
+                checked_at,
+                status: PrAgentReadinessStatus::Waiting,
+                pr,
+                blockers: Vec::new(),
+                wait_reasons: vec!["CodeRabbit review is still pending".to_string()],
+                warnings: vec!["reviewDecision can lag resolved thread state".to_string()],
+                failing_checks: Vec::new(),
+                pending_checks: vec![PrAgentReadinessCheck {
+                    name: "CodeRabbit".to_string(),
+                    status: "queued".to_string(),
+                    conclusion: None,
+                    url: None,
+                    run_id: None,
+                    diagnostic_command: "gh pr checks 28".to_string(),
+                }],
+                active_review_comments: 0,
+                outdated_review_comments: 1,
+                diagnostics: Vec::new(),
+            }],
+            actions: vec![PrAgentReadinessAction {
+                id: "merge".to_string(),
+                kind: "merge".to_string(),
+                status: PrAgentReadinessActionStatus::Planned,
+                reason: "Merge after readiness turns green".to_string(),
+                command: vec![
+                    "gh".to_string(),
+                    "pr".to_string(),
+                    "merge".to_string(),
+                    "28".to_string(),
+                ],
+                exit_code: None,
+                stdout: Some("raw hosted stdout".to_string()),
+                stderr: None,
+            }],
+            markdown_path: "pr-readiness.md".to_string(),
+            report_path: "pr-readiness.json".to_string(),
+        }
+    }
+
+    fn fixture_pr_agent_action(checked_at: chrono::DateTime<Utc>) -> PrAgentHostedActionReport {
+        PrAgentHostedActionReport {
+            schema: codex_dev_core::PR_AGENT_HOSTED_ACTION_SCHEMA.to_string(),
+            repository: "BjornMelin/dev-skills".to_string(),
+            number: 28,
+            plan_id: "resolve-stale-thread".to_string(),
+            plan_hash: "planhash".to_string(),
+            generated_at: checked_at,
+            dry_run: true,
+            apply_requested: false,
+            action_dir: "pr-agent-actions/resolve-stale-thread".to_string(),
+            before_state_path: "pr-agent-actions/resolve-stale-thread/before-state.json"
+                .to_string(),
+            after_state_path: None,
+            action: PrAgentHostedActionSpec {
+                id: "resolve-stale-thread".to_string(),
+                kind: "resolve-review-thread".to_string(),
+                summary: "Resolve stale review thread after verification".to_string(),
+                reason: "The thread points at outdated code".to_string(),
+                target: "PRRT_example".to_string(),
+                idempotency_key: "idempotency".to_string(),
+                command: vec!["gh".to_string(), "api".to_string(), "graphql".to_string()],
+                duplicate_check_command: Vec::new(),
+                state_check_command: Vec::new(),
+                requires_apply: true,
+                network: true,
+                secrets: false,
+                permission_notes: vec!["Pull requests write".to_string()],
+            },
+            diagnostics: Vec::new(),
+            execution: None,
         }
     }
 }

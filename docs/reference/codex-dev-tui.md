@@ -7,7 +7,7 @@ It reads the existing capsule JSON contracts through `codex-dev-core` and
 renders an operator view for quick scanning. It does not own policy gates, PR
 remediation, or capsule business logic.
 
-Tracking: #20, #28, and #52.
+Tracking: #20, #28, #52, and #53.
 
 ## Ownership Boundary
 
@@ -16,15 +16,22 @@ The TUI consumes:
 - `capsule.json` as the `codex-dev.task-capsule.v1` contract after
   `codex_dev_core::validate_capsule`;
 - `verification.json` as `codex-dev.verification.v1`;
+- `evidence.jsonl` as append-only `codex-dev.evidence.v1` records;
 - `pr.json` as `codex-dev.pr.v1`;
-- `subagents.json` as `codex-dev.subagents.v1` in dashboard mode;
+- `subagents.json` as `codex-dev.subagents.v1`;
+- optional `pr-agent-state.json` as `codex-dev.pr-agent-state.v1`;
+- optional `pr-readiness.json` as `codex-dev.pr-agent-readiness.v1`;
+- optional `pr-agent-actions/<plan-id>/plan.json` files as
+  `codex-dev.pr-agent-hosted-action.v1`;
 - `codex_dev_core::validate_capsule` for validation errors.
 
 The TUI must not scrape Markdown notes or duplicate policy-gate decisions.
 Automation should continue to use `codex-dev --json` and contract files as the
-machine-readable interfaces. Dashboard rendering is intentionally read-only: it
-does not run validation commands, mutate PR state, or execute remediation
-actions.
+machine-readable interfaces. Dashboard and detail rendering are intentionally
+read-only: they do not run validation commands, mutate PR state, execute
+remediation actions, or make live GitHub/provider calls. Optional PR-agent
+artifacts are local evidence only; malformed optional artifacts appear as
+redacted diagnostics instead of panics.
 
 ## Install And Run
 
@@ -72,6 +79,25 @@ count, subagent batch summary, PR state, and last update time. Missing task
 roots, unreadable entries, and invalid capsules are rendered as diagnostics
 instead of panicking or starting command execution.
 
+Single-capsule detail mode has these panels:
+
+- Overview: capsule objective, branch/issue/PR pointers, and loaded artifact
+  summaries.
+- Evidence: local `evidence.jsonl` counts, kind totals, recent evidence
+  records, source IDs, artifact paths, confidence, residual risk, and warnings
+  for missing source context or stale capsule evidence counts. It deliberately
+  hides raw command output and provider dumps.
+- Subagents: delegation batches, mode/scope, completed and human-verified agent
+  counts, agent summaries, source IDs, artifacts, and synthesis status.
+- PR: normalized `pr.json` snapshot, check state, and authoritative vs
+  non-authoritative review-thread status.
+- PR Agent: local PR-agent state/readiness/action artifacts. It distinguishes
+  dry-run plans from apply-requested or executed hosted actions, summarizes
+  readiness blockers, wait reasons, warnings, failing/pending checks, and
+  action status without printing raw stdout/stderr.
+- Validation: required and optional gate summaries plus artifact diagnostics.
+- Help: command and automation reminder.
+
 ## Deterministic Render Smoke
 
 Use `--render-once` for automation, CI logs, and review evidence. It renders
@@ -110,9 +136,11 @@ terminal:
 - state loading tests create a real `codex-dev-core` capsule and read its JSON
   contracts;
 - render snapshot tests assert the `TestBackend` buffer includes capsule,
-  validation, and PR summaries;
+  validation, evidence, subagent, PR, and PR-agent summaries;
 - dashboard tests assert root discovery, invalid-capsule diagnostics, filter
   changes, sort changes, and open-single-capsule behavior;
+- optional PR-agent artifact tests assert malformed local artifacts render as
+  diagnostics and redact capsule paths;
 - cleanup tests prove the restore guard runs exactly once, including on drop.
 
 The exact validation matrix lives in `docs/runbooks/validation.md`. Focused TUI
