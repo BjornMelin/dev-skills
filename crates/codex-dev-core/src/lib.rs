@@ -806,9 +806,9 @@ pub fn record_subagent_synthesis(
         artifacts: args.artifacts.clone(),
         updated_at: args.recorded_at,
     };
-    batch.status = args.status.to_string();
     batch.synthesis = Some(synthesis.clone());
     batch.updated_at = Some(args.recorded_at);
+    apply_synthesis_status(batch, args.status);
     let batch_result = batch.clone();
     let evidence_record = EvidenceRecord {
         schema: EVIDENCE_SCHEMA.to_string(),
@@ -1406,6 +1406,19 @@ fn refresh_batch_status(batch: &mut SubagentBatch) {
         batch.status = "completed".to_string();
     } else {
         batch.status = "partial".to_string();
+    }
+}
+
+fn apply_synthesis_status(batch: &mut SubagentBatch, status: SubagentSynthesisStatus) {
+    refresh_batch_status(batch);
+    match status {
+        SubagentSynthesisStatus::Blocked => {
+            batch.status = "blocked".to_string();
+        }
+        SubagentSynthesisStatus::Partial if batch.status == "completed" => {
+            batch.status = "partial".to_string();
+        }
+        SubagentSynthesisStatus::Partial | SubagentSynthesisStatus::Completed => {}
     }
 }
 
@@ -3094,6 +3107,20 @@ mod tests {
 
         assert_eq!(outcome.batch.status, "blocked");
         assert!(validate_capsule(&capsule).expect("validate").valid);
+
+        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+            capsule,
+            batch_id: "review".to_string(),
+            status: SubagentSynthesisStatus::Partial,
+            summary: "blocked agent still needs user input".to_string(),
+            human_verified: true,
+            source_ids: vec!["synthesis:review".to_string()],
+            artifacts: vec!["review-summary.md".to_string()],
+            recorded_at: "2026-05-09T05:20:00Z".parse().unwrap(),
+        })
+        .expect("record partial synthesis");
+
+        assert_eq!(synthesis.batch.status, "blocked");
     }
 
     #[test]

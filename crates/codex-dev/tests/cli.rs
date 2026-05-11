@@ -624,6 +624,12 @@ fn subagents_record_plan_outcome_and_synthesis() {
             .expect("prompt hash")
             .starts_with("sha256:")
     );
+    assert!(
+        plan_json["result"]["batch"]["prompts"][0]
+            .get("prompt")
+            .is_none(),
+        "raw prompt text must not be returned in batch records"
+    );
     assert_eq!(
         plan_json["result"]["batch"]["duplicate_roles_ignored"]["test_runner"]
             .as_array()
@@ -708,6 +714,12 @@ fn subagents_record_plan_outcome_and_synthesis() {
     .expect("subagents json");
     assert_eq!(subagents["batches"][0]["id"], "pre-pr-review");
     assert_eq!(subagents["batches"][0]["synthesis"]["status"], "partial");
+    assert!(
+        subagents["batches"][0]["prompts"][0]
+            .get("prompt")
+            .is_none(),
+        "raw prompt text must not be persisted in subagents.json"
+    );
 }
 
 #[test]
