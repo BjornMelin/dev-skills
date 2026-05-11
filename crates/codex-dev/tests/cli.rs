@@ -1574,6 +1574,74 @@ fn pr_readiness_blocks_missing_pr_identity_and_still_writes_report() {
 }
 
 #[test]
+fn pr_readiness_blocks_missing_merge_state_status() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 49);
+    std::fs::write(
+        source_dir.join("gh-pr-view.json"),
+        r#"{
+  "number": 49,
+  "url": "https://github.com/BjornMelin/dev-skills/pull/49",
+  "state": "OPEN",
+  "isDraft": false,
+  "mergeable": "MERGEABLE",
+  "reviewDecision": "APPROVED",
+  "headRefOid": "abc123",
+  "headRefName": "feature",
+  "baseRefName": "main",
+  "baseRefOid": "base123",
+  "statusCheckRollup": [],
+  "labels": [{"name": "ready"}]
+}"#,
+    )
+    .expect("write pr view without merge state");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-readiness-missing-merge-state",
+        "PR readiness missing merge state",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "readiness",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "49",
+            "--source-dir",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--poll-interval-seconds",
+            "0",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("readiness json");
+    assert_eq!(json["result"]["final_status"], "blocked");
+    assert!(
+        json["result"]["attempts"][0]["blockers"]
+            .as_array()
+            .expect("blockers")
+            .iter()
+            .any(|blocker| blocker
+                .as_str()
+                .is_some_and(|blocker| blocker.contains("merge state was not captured")))
+    );
+}
+
+#[test]
 fn pr_readiness_distinguishes_stale_review_decision_from_clean_threads() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("tasks");
@@ -1840,6 +1908,10 @@ fn pr_readiness_reports_failing_pending_and_draft_states() {
         .clone();
     let pending_json: Value = serde_json::from_slice(&pending_output).expect("pending json");
     assert_eq!(pending_json["result"]["final_status"], "waiting");
+    assert_eq!(
+        pending_json["result"]["attempts"][0]["pending_checks"][0]["diagnostic_command"],
+        "https://example.test/pending"
+    );
 
     write_pr_checks_fixture(&source_dir, "SUCCESS", "https://example.test/ci");
     write_pr_view_fixture(&source_dir, 49, true, "MERGEABLE", "DRAFT", "APPROVED");

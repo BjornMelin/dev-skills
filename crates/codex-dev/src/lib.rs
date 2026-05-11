@@ -1511,7 +1511,8 @@ pub fn run_pr_readiness_loop(
         if attempt > 1 && args.poll_interval_seconds > 0 {
             sleep(Duration::from_secs(args.poll_interval_seconds));
         }
-        let checked_at = generated_at + TimeDelta::seconds((attempt - 1) as i64);
+        let checked_at =
+            readiness_attempt_checked_at(generated_at, attempt, args.poll_interval_seconds)?;
         let state = run_pr_agent_state(
             PrAgentArgs {
                 capsule: args.capsule.clone(),
@@ -1638,6 +1639,25 @@ pub fn run_pr_readiness_loop(
     Ok(report)
 }
 
+fn readiness_attempt_checked_at(
+    generated_at: DateTime<Utc>,
+    attempt: u64,
+    poll_interval_seconds: u64,
+) -> Result<DateTime<Utc>> {
+    let zero_based_attempt = attempt
+        .checked_sub(1)
+        .context("readiness poll attempts are one-indexed")?;
+    let step_seconds = poll_interval_seconds.max(1);
+    let offset_seconds = zero_based_attempt
+        .checked_mul(step_seconds)
+        .context("readiness poll timestamp offset overflowed")?;
+    let offset_seconds = i64::try_from(offset_seconds)
+        .context("readiness poll timestamp offset exceeds supported range")?;
+    generated_at
+        .checked_add_signed(TimeDelta::seconds(offset_seconds))
+        .context("readiness poll timestamp exceeds supported range")
+}
+
 fn evaluate_pr_readiness_attempt(
     attempt: u64,
     state: &PrAgentStateReport,
@@ -1720,7 +1740,7 @@ fn evaluate_pr_readiness_attempt(
     }
 
     match pr.merge_state_status.as_deref() {
-        Some("clean" | "has_hooks") | None => {}
+        Some("clean" | "has_hooks") => {}
         Some("behind") => blockers.push("head branch is behind the base branch".to_string()),
         Some("blocked" | "dirty" | "draft") => {
             blockers.push(format!(
@@ -1729,6 +1749,7 @@ fn evaluate_pr_readiness_attempt(
             ));
         }
         Some("unknown") => wait_reasons.push("GitHub merge state is not known yet".to_string()),
+        None => blockers.push("GitHub merge state was not captured".to_string()),
         Some("unstable") => warnings.push(
             "GitHub merge state is unstable; check-level evidence determines the blocker"
                 .to_string(),
@@ -1905,7 +1926,7 @@ fn readiness_check_from_check(
     let diagnostic_command = if let Some(run_id) = run_id {
         format!("gh run view {run_id} --log-failed")
     } else if let Some(url) = &check.url {
-        format!("open {url}")
+        url.clone()
     } else {
         format!(
             "gh pr checks --json name,state,link --jq '.[] | select(.name == {:?})'",
@@ -5385,6 +5406,24 @@ mod tests {
         assert!(!excerpt.contains("plain-secret"));
         assert!(!excerpt.contains("github_pat_abc123"));
         assert!(excerpt.contains("[redacted]"));
+    }
+
+    #[test]
+    fn readiness_attempt_checked_at_uses_poll_interval_with_monotonic_floor() {
+        let generated_at: DateTime<Utc> = "2026-05-09T05:05:00Z".parse().expect("timestamp");
+
+        assert_eq!(
+            readiness_attempt_checked_at(generated_at, 1, 60).expect("attempt 1"),
+            generated_at
+        );
+        assert_eq!(
+            readiness_attempt_checked_at(generated_at, 3, 60).expect("attempt 3"),
+            generated_at + TimeDelta::seconds(120)
+        );
+        assert_eq!(
+            readiness_attempt_checked_at(generated_at, 2, 0).expect("zero interval"),
+            generated_at + TimeDelta::seconds(1)
+        );
     }
 
     #[cfg(unix)]
