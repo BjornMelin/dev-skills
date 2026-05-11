@@ -4,8 +4,8 @@
 It is separate from `codex-research`: research evidence stays research-owned,
 while `codex-dev` records the local task capsule for a development branch.
 It also plans or executes repo-native policy gates, captures normalized PR
-evidence, and records those outcomes in the task capsule. Future lanes add
-bootstrap packs and TUI surfaces.
+evidence, and records those outcomes in the task capsule. The optional
+`codex-dev-tui` workbench reads these same contracts for terminal scanning.
 
 Tracking: #20, #22, #23, and #25.
 
@@ -97,6 +97,8 @@ evidence.jsonl
 verification.json
 subagents.json
 pr.json
+policy.json
+output.md
 retrospective.md
 ```
 
@@ -117,6 +119,9 @@ cargo run -q -p codex-dev -- --json capsule validate .codex/tasks/<id>
 
 Invalid capsules exit nonzero. With `--json`, the command still prints a
 `codex-dev.output.v1` envelope with `ok: false` and `result.valid: false`.
+Validation is intentionally strict: every required capsule file must exist, and
+contract files such as `pr.json` and `policy.json` must keep their documented
+schema identifiers.
 
 ## capsule status
 
@@ -231,9 +236,12 @@ is recorded. The accepted input shape is:
 }
 ```
 
-`pr record` writes `pr.json`, appends review evidence to `evidence.jsonl`,
-updates `capsule.json.updated_at`, and adds the PR number to
-`capsule.json.pull_requests` when it is not already present.
+`pr record` requires an already-valid capsule. It writes `pr.json`, appends
+review evidence to `evidence.jsonl`, updates `capsule.json.updated_at`, and
+adds the PR number to `capsule.json.pull_requests` when it is not already
+present. It does not create missing capsule contracts or repair a drifted
+schema name; use `capsule init --force` only when replacing the full local
+capsule layout is intentional.
 
 ## pr status
 

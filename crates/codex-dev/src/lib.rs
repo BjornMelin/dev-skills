@@ -915,7 +915,7 @@ pub fn pr_status(capsule_path: &Path) -> Result<PrStatusResult> {
 }
 
 fn validate_capsule_for_pr_record(capsule_path: &Path) -> Result<()> {
-    let validation = validate_capsule_files(capsule_path, true)?;
+    let validation = validate_capsule(capsule_path)?;
     if !validation.valid {
         bail!(
             "invalid capsule at {}: {}",
@@ -1024,12 +1024,17 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
             },
         },
     )?;
+    write_json(
+        path.join("policy.json"),
+        &policy_manifest(PolicyProfile::CodexDev, created_at),
+    )?;
 
     write_markdown(
         path.join("plan.md"),
         &format!("# Plan\n\n{}\n", capsule.objective),
     )?;
     write_markdown(path.join("decisions.md"), "# Decisions\n\n")?;
+    write_markdown(path.join("output.md"), "# Output\n\n")?;
     write_markdown(path.join("retrospective.md"), "# Retrospective\n\n")?;
 
     let validation = validate_capsule(&path)?;
@@ -1058,14 +1063,16 @@ const REQUIRED_FILES: &[&str] = &[
     "verification.json",
     "subagents.json",
     "pr.json",
+    "policy.json",
+    "output.md",
     "retrospective.md",
 ];
 
 pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
-    validate_capsule_files(path, false)
+    validate_capsule_files(path)
 }
 
-fn validate_capsule_files(path: &Path, allow_missing_pr_json: bool) -> Result<ValidationResult> {
+fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
     let mut errors = Vec::new();
     if !path.is_dir() {
         errors.push(format!(
@@ -1085,9 +1092,6 @@ fn validate_capsule_files(path: &Path, allow_missing_pr_json: bool) -> Result<Va
         .filter(|file| !path.join(file).is_file())
         .collect::<Vec<_>>();
     for file in &missing_files {
-        if allow_missing_pr_json && *file == "pr.json" {
-            continue;
-        }
         errors.push(format!("missing required file: {file}"));
     }
 
@@ -1129,6 +1133,14 @@ fn validate_capsule_files(path: &Path, allow_missing_pr_json: bool) -> Result<Va
         validate_schema_file::<PrEvidence, _>(
             &path.join("pr.json"),
             PR_SCHEMA,
+            |value| &value.schema,
+            &mut errors,
+        );
+    }
+    if !missing_files.contains(&"policy.json") {
+        validate_schema_file::<PolicyManifest, _>(
+            &path.join("policy.json"),
+            POLICY_GATES_SCHEMA,
             |value| &value.schema,
             &mut errors,
         );
@@ -1755,6 +1767,22 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    fn assert_json_keys(value: &Value, expected: &[&str]) {
+        let mut actual = value
+            .as_object()
+            .expect("json object")
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        actual.sort();
+        let mut expected = expected
+            .iter()
+            .map(|key| (*key).to_string())
+            .collect::<Vec<_>>();
+        expected.sort();
+        assert_eq!(actual, expected);
+    }
+
     fn init_args(root: PathBuf) -> InitArgs {
         InitArgs {
             title: "Build capsule CLI".to_string(),
@@ -1784,6 +1812,89 @@ mod tests {
 
         let validation = validate_capsule(&result.path).expect("validate");
         assert!(validation.valid, "{:?}", validation.errors);
+    }
+
+    #[test]
+    fn init_writes_golden_capsule_contract_files() {
+        let temp = tempdir().expect("tempdir");
+        let result = init_capsule(init_args(temp.path().to_path_buf())).expect("init capsule");
+
+        let capsule: Value = read_json(&result.path.join("capsule.json")).expect("capsule json");
+        assert_json_keys(
+            &capsule,
+            &[
+                "schema",
+                "id",
+                "title",
+                "status",
+                "objective",
+                "branch",
+                "base_branch",
+                "issues",
+                "pull_requests",
+                "created_at",
+                "updated_at",
+            ],
+        );
+        assert_eq!(capsule["schema"], CAPSULE_SCHEMA);
+        assert_eq!(capsule["status"], "active");
+        assert_eq!(capsule["created_at"], "2026-05-09T04:00:00Z");
+
+        let evidence = fs::read_to_string(result.path.join("evidence.jsonl")).expect("evidence");
+        let evidence: Value =
+            serde_json::from_str(evidence.lines().next().expect("evidence line")).unwrap();
+        assert_json_keys(&evidence, &["schema", "kind", "at", "summary", "artifacts"]);
+        assert_eq!(evidence["schema"], EVIDENCE_SCHEMA);
+        assert_eq!(evidence["kind"], "manual");
+        assert_eq!(evidence["artifacts"], json!([]));
+
+        let verification: Value =
+            read_json(&result.path.join("verification.json")).expect("verification json");
+        assert_json_keys(
+            &verification,
+            &["schema", "required", "optional", "last_checked_at"],
+        );
+        assert_eq!(verification["schema"], VERIFICATION_SCHEMA);
+        assert_eq!(verification["last_checked_at"], "2026-05-09T04:00:00Z");
+
+        let subagents: Value = read_json(&result.path.join("subagents.json")).expect("subagents");
+        assert_json_keys(&subagents, &["schema", "batches"]);
+        assert_eq!(subagents["schema"], SUBAGENTS_SCHEMA);
+
+        let pr: Value = read_json(&result.path.join("pr.json")).expect("pr json");
+        assert_json_keys(
+            &pr,
+            &[
+                "schema",
+                "repository",
+                "number",
+                "url",
+                "state",
+                "checks",
+                "review_threads",
+            ],
+        );
+        assert_eq!(pr["schema"], PR_SCHEMA);
+        assert_eq!(pr["state"], "not_created");
+        assert_eq!(
+            pr["review_threads"]["last_checked_at"],
+            "2026-05-09T04:00:00Z"
+        );
+
+        let policy: Value = read_json(&result.path.join("policy.json")).expect("policy json");
+        assert_json_keys(&policy, &["schema", "profile", "generated_at", "gates"]);
+        assert_eq!(policy["schema"], POLICY_GATES_SCHEMA);
+        assert_eq!(policy["profile"], "codex_dev");
+        assert_eq!(policy["generated_at"], "2026-05-09T04:00:00Z");
+        assert_json_keys(
+            &policy["gates"][0],
+            &[
+                "id", "name", "command", "source", "required", "network", "secrets",
+            ],
+        );
+
+        let output = fs::read_to_string(result.path.join("output.md")).expect("output");
+        assert_eq!(output, "# Output\n\n");
     }
 
     #[test]
@@ -2138,7 +2249,28 @@ mod tests {
     }
 
     #[test]
-    fn pr_record_can_create_missing_pr_json() {
+    fn validate_rejects_drifted_pr_schema_name() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let mut pr: Value = read_json(&capsule.join("pr.json")).expect("pr json");
+        pr["schema"] = json!("codex-dev.pr-evidence.v1");
+        write_json(capsule.join("pr.json"), &pr).expect("write drifted pr schema");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(!validation.valid);
+        assert!(
+            validation
+                .errors
+                .iter()
+                .any(|error| { error == &format!("pr.json schema must be {PR_SCHEMA}") })
+        );
+    }
+
+    #[test]
+    fn pr_record_rejects_missing_pr_json() {
         let temp = tempdir().expect("tempdir");
         let capsule = init_capsule(init_args(temp.path().join("tasks")))
             .expect("init capsule")
@@ -2158,7 +2290,7 @@ mod tests {
         )
         .expect("write fixture");
 
-        let result = record_pr_snapshot(
+        let error = record_pr_snapshot(
             PrRecordArgs {
                 capsule: capsule.clone(),
                 source,
@@ -2166,10 +2298,10 @@ mod tests {
             },
             "2026-05-09T05:00:00Z".parse().unwrap(),
         )
-        .expect("record pr");
+        .expect_err("missing pr.json rejected");
 
-        assert_eq!(result.pr.number, Some(25));
-        assert!(capsule.join("pr.json").is_file());
+        assert!(error.to_string().contains("missing required file: pr.json"));
+        assert!(!capsule.join("pr.json").exists());
     }
 
     #[test]

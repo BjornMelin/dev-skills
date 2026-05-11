@@ -14,7 +14,7 @@ The TUI consumes:
 - `capsule.json` as the `codex-dev.task-capsule.v1` contract after
   `codex_dev::validate_capsule`;
 - `verification.json` as `codex-dev.verification.v1`;
-- `pr.json` as `codex-dev.pr-evidence.v1`;
+- `pr.json` as `codex-dev.pr.v1`;
 - `codex_dev::validate_capsule` for validation errors.
 
 The TUI must not scrape Markdown notes or duplicate policy-gate decisions.
