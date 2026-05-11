@@ -2,7 +2,7 @@
 
 Status: active implementation.
 
-Tracking: #20 through #28 and #37 through #57.
+Tracking: #20 through #28, parent epic #37, and child issues #38 through #57.
 
 ## Purpose
 
@@ -21,9 +21,9 @@ those tools instead of becoming another research provider.
 
 The next release sequence is tracked by the
 [dev-skills v0.3/v1 Roadmap](dev-skills-v0.3-roadmap.md). That roadmap is the
-canonical issue ledger for the strict-contract, local CLI/TUI-first,
-apply-gated PR-agent, audited local release, and future-surface design work in
-issues #37 through #57.
+canonical issue ledger for parent epic #37 and child issues #38 through #57:
+strict contracts, local CLI/TUI-first work, apply-gated PR-agent behavior,
+audited local release, and future-surface design.
 
 ## Goals
 
@@ -337,8 +337,8 @@ scrape Markdown notes. Deterministic `--render-once` output uses Ratatui's
 Each implementation PR must link its lane issue and #20, include validation
 evidence, document docs impact, and identify residual risks.
 
-Future implementation PRs for the remaining issues #39 through #57 must follow
-the dependency order and branch ledger in the
+After this roadmap PR merges, implementation PRs for the remaining child issues
+from #39 through #57 must follow the dependency order and branch ledger in the
 [dev-skills v0.3/v1 Roadmap](dev-skills-v0.3-roadmap.md). Implement one issue
 per branch and PR, merge into `main`, sync local `main`, and then start the next
 issue.
