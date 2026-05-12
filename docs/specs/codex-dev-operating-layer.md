@@ -270,6 +270,16 @@ Optional evidence metadata:
 - `residual_risk` records known risks.
 - `artifacts` records local paths or stable artifact identifiers.
 
+`research_evidence_import.v1` is the bridge from `codex-research` closeout
+bundles into capsule evidence. `codex-dev research import-bundle` accepts only
+`codex-research.evidence-bundle.v1` metadata, appends one `research` evidence
+row, and returns the imported bundle summary, budget status, source/claim ID
+coverage, report path status, and failure/warning summaries. It does not read
+provider caches, raw source bodies, ledger contents, report Markdown, or hosted
+providers. Because the bundle path is still local untrusted JSON, imported
+free-form text is control-character cleaned, secret-like values are redacted,
+and high-cardinality lists are capped before JSON output or persistence.
+
 Record validity rules:
 
 - `schema` must be `codex-dev.evidence.v1`.

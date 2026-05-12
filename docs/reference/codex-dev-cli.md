@@ -52,6 +52,7 @@ Top-level commands:
 
 - `capsule`
 - `evidence`
+- `research`
 - `subagents`
 - `orchestration`
 - `policy`
@@ -72,6 +73,10 @@ Capsule subcommands:
 Evidence subcommands:
 
 - `evidence append`
+
+Research subcommands:
+
+- `research import-bundle`
 
 Subagent subcommands:
 
@@ -467,6 +472,41 @@ The command also rejects symlinked JSON/JSONL capsule contract files before
 validation or writing. Successful appends update `capsule.json.updated_at`
 monotonically; backfilled evidence does not move the capsule timestamp
 backwards.
+
+## research import-bundle
+
+Import sanitized `codex-research` closeout metadata into a task capsule without
+reading provider payloads, ledger bodies, cache entries, or report Markdown:
+
+```bash
+cargo run -q -p codex-dev -- --json research import-bundle \
+  --capsule .codex/tasks/<id> \
+  --bundle .codex/research/evidence-bundle.json \
+  --source-command "codex-research --json bundle --strict" \
+  --source-exit-code 0
+```
+
+The command accepts `codex-research.evidence-bundle.v1` input and emits
+`research_evidence_import.v1`. It appends one `research` evidence record to
+`evidence.jsonl` with bounded, defensively redacted metadata:
+
+- namespaced source and claim IDs from the bundle ledger;
+- the report path and bundle artifact paths reported by `codex-research`;
+- a bounded confidence score derived from citation coverage and capped when
+  failures, warnings, provider errors, missing reports, or unknown source
+  freshness remain;
+- residual-risk text summarizing bundle failures, warnings, provider errors,
+  unknown source IDs, and uncited claims.
+
+The importer treats the bundle file as untrusted local JSON: accepted free-form
+text fields are trimmed, control-character cleaned, secret-like values redacted,
+and long lists capped before JSON output or evidence persistence.
+
+`--source-command` and `--source-exit-code` describe the source
+`codex-research` command when known; `--source-exit-code` requires
+`--source-command`. `--imported-at <RFC3339>` pins the import timestamp for
+deterministic replay. Wrong bundle schemas, invalid capsules, or invalid
+derived evidence records fail before writing.
 
 ## subagents record-plan
 
