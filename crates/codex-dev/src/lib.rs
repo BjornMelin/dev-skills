@@ -2331,7 +2331,11 @@ fn policy_explain_inner(
                 .filter(|block| block.profiles.contains(&selected_profile))
                 .map(|block| PolicyExplainDocsBlock {
                     status: policy_explain_block_status(block.passed),
-                    error: policy_explain_doc_error(block.error, &block.path),
+                    error: policy_explain_doc_error(
+                        block.error,
+                        &block.path,
+                        args.include_local_paths,
+                    ),
                     path: block.path,
                     marker: block.marker,
                     profiles: block.profiles,
@@ -2546,8 +2550,15 @@ fn policy_explain_required_tool_statuses(
         .collect()
 }
 
-fn policy_explain_doc_error(error: Option<String>, path: &str) -> Option<String> {
+fn policy_explain_doc_error(
+    error: Option<String>,
+    path: &str,
+    include_local_paths: bool,
+) -> Option<String> {
     error.map(|message| {
+        if include_local_paths {
+            return message;
+        }
         if message.starts_with("failed to read ") {
             let reason = message
                 .rsplit_once(": ")
@@ -7805,18 +7816,24 @@ mod tests {
 
     #[test]
     fn policy_explain_doc_error_preserves_sanitized_failure_reason() {
+        let raw_error = "failed to read /home/example/dev-skills/docs/runbooks/validation.md: permission denied";
         let error = policy_explain_doc_error(
-            Some(
-                "failed to read /home/example/dev-skills/docs/runbooks/validation.md: permission denied"
-                    .to_string(),
-            ),
+            Some(raw_error.to_string()),
             "docs/runbooks/validation.md",
+            false,
         );
 
         assert_eq!(
             error.as_deref(),
             Some("failed to read docs/runbooks/validation.md: permission denied")
         );
+
+        let opted_in_error = policy_explain_doc_error(
+            Some(raw_error.to_string()),
+            "docs/runbooks/validation.md",
+            true,
+        );
+        assert_eq!(opted_in_error.as_deref(), Some(raw_error));
     }
 
     #[test]
