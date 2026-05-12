@@ -2350,22 +2350,73 @@ fn policy_explain_error_without_local_paths(
 }
 
 fn policy_explain_redacted_error_message(error: &anyhow::Error) -> String {
-    let message = error.to_string();
-    let reason = if message.starts_with("failed to canonicalize repo root ") {
-        "failed to canonicalize repo root"
-    } else if message.starts_with("repo root must contain Cargo.toml:") {
-        "repo root must contain Cargo.toml"
-    } else if message.starts_with("repo root must contain docs/runbooks/validation.md:") {
-        "repo root must contain docs/runbooks/validation.md"
-    } else if message == "failed to read current directory"
-        || message
-            == "failed to discover repository root from current directory; run from the repo or pass --repo-root"
-    {
-        message.as_str()
-    } else {
-        "failed to inspect policy explain inputs"
-    };
-    format!("{reason}; rerun with --include-local-paths for local path details")
+    let message = redact_local_paths_in_text(&format!("{error:#}"));
+    format!("{message}; rerun with --include-local-paths for local path details")
+}
+
+fn redact_local_paths_in_text(text: &str) -> String {
+    let chars = text.chars().collect::<Vec<_>>();
+    let mut redacted = String::with_capacity(text.len());
+    let mut index = 0;
+    while index < chars.len() {
+        if is_unix_absolute_path_start(&chars, index)
+            || is_windows_absolute_path_start(&chars, index)
+        {
+            let end = local_path_end(&chars, index);
+            redacted.push_str("<local-path>");
+            index = end;
+        } else {
+            redacted.push(chars[index]);
+            index += 1;
+        }
+    }
+    redacted
+}
+
+fn is_unix_absolute_path_start(chars: &[char], index: usize) -> bool {
+    chars[index] == '/'
+        && chars
+            .get(index + 1)
+            .is_some_and(|next| !next.is_whitespace())
+        && !matches!(chars.get(index.wrapping_sub(1)), Some(':' | '/'))
+}
+
+fn is_windows_absolute_path_start(chars: &[char], index: usize) -> bool {
+    is_windows_drive_absolute_path_start(chars, index)
+        || is_windows_unc_or_device_path_start(chars, index)
+}
+
+fn is_windows_drive_absolute_path_start(chars: &[char], index: usize) -> bool {
+    chars[index].is_ascii_alphabetic()
+        && chars.get(index + 1) == Some(&':')
+        && matches!(chars.get(index + 2), Some('\\' | '/'))
+}
+
+fn is_windows_unc_or_device_path_start(chars: &[char], index: usize) -> bool {
+    chars[index] == '\\'
+        && chars.get(index + 1) == Some(&'\\')
+        && chars
+            .get(index + 2)
+            .is_some_and(|next| !next.is_whitespace())
+}
+
+fn local_path_end(chars: &[char], start: usize) -> usize {
+    let mut index = start;
+    while index < chars.len() {
+        let current = chars[index];
+        let next = chars.get(index + 1);
+        if current == ':' && next.is_some_and(|next| next.is_whitespace()) {
+            break;
+        }
+        if matches!(current, '"' | '\'' | '`' | ')' | ']' | '}')
+            || current == '\n'
+            || current == '\r'
+        {
+            break;
+        }
+        index += 1;
+    }
+    index
 }
 
 fn policy_explain_profile_docs_status(
@@ -7630,6 +7681,38 @@ mod tests {
             extract_policy_doc_commands(&contents, POLICY_DOCS_SMOKE_MARKER).expect("commands");
 
         assert_eq!(commands, vec![command]);
+    }
+
+    #[test]
+    fn policy_explain_error_redaction_preserves_reasons() {
+        let error = anyhow::anyhow!(
+            "failed to read /home/example/dev-skills/docs/runbooks/validation.md: permission denied"
+        );
+        let message = policy_explain_redacted_error_message(&error);
+        assert!(message.contains("failed to read <local-path>: permission denied"));
+        assert!(message.contains("--include-local-paths"));
+        assert!(!message.contains("/home/example"));
+
+        let windows_error = anyhow::anyhow!(
+            "failed to read C:\\Users\\example\\dev-skills\\AGENTS.md: access denied"
+        );
+        let windows_message = policy_explain_redacted_error_message(&windows_error);
+        assert!(windows_message.contains("failed to read <local-path>: access denied"));
+        assert!(!windows_message.contains("C:\\Users\\example"));
+
+        let unc_error = anyhow::anyhow!(
+            "failed to read \\\\server\\share\\dev-skills\\AGENTS.md: access denied"
+        );
+        let unc_message = policy_explain_redacted_error_message(&unc_error);
+        assert!(unc_message.contains("failed to read <local-path>: access denied"));
+        assert!(!unc_message.contains("\\\\server\\share"));
+
+        let verbatim_error = anyhow::anyhow!(
+            "failed to read \\\\?\\C:\\Users\\example\\dev-skills\\AGENTS.md: access denied"
+        );
+        let verbatim_message = policy_explain_redacted_error_message(&verbatim_error);
+        assert!(verbatim_message.contains("failed to read <local-path>: access denied"));
+        assert!(!verbatim_message.contains("\\\\?\\C:\\Users\\example"));
     }
 
     #[test]
