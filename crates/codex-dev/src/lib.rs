@@ -14,7 +14,8 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
-    EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA, POLICY_GATES_SCHEMA,
+    EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA,
+    OrchestrationDiagnosticSeverity, OrchestrationRunReport, POLICY_GATES_SCHEMA,
     PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA,
     PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
     PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution, PrAgentHostedActionReport,
@@ -24,11 +25,12 @@ use codex_dev_core::{
     PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrEvidence,
     PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
     RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
-    SubagentSynthesisStatus, TaskRootStatus, Verification, append_evidence, append_jsonl,
-    capsule_status, ensure_regular_contract_files, init_capsule, pr_status, read_json,
-    recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
-    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
-    stable_json_hash, task_export, task_index, task_show, validate_capsule, write_json,
+    SubagentSynthesisStatus, SubagentWaitStatus, TaskRootStatus, Verification, append_evidence,
+    append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule, orchestration_run,
+    pr_status, read_json, recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome,
+    record_subagent_plan, record_subagent_synthesis, render_capsule, render_command,
+    render_pr_label, render_pr_status, stable_json_hash, task_export, task_index, task_show,
+    validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -44,6 +46,7 @@ const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 32;
 const SKILL_INVENTORY_MAX_RESOURCE_DEPTH: usize = 16;
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+const ORCHESTRATION_STALE_AFTER_MINUTES: u64 = 120;
 const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
     "GH_TOKEN",
     "GITHUB_TOKEN",
@@ -112,6 +115,12 @@ impl Cli {
                 SubagentsCommand::Outcome(_) => "subagents record-outcome",
                 SubagentsCommand::Synthesis(_) => "subagents record-synthesis",
             },
+            Commands::Orchestration { command } => match command {
+                OrchestrationCommand::Plan(_) => "orchestration plan",
+                OrchestrationCommand::Record(_) => "orchestration record",
+                OrchestrationCommand::Close(_) => "orchestration close",
+                OrchestrationCommand::Verify(_) => "orchestration verify",
+            },
             Commands::Completions(_) => "completions",
             Commands::Manpage => "manpage",
         }
@@ -159,6 +168,11 @@ enum Commands {
     Subagents {
         #[command(subcommand)]
         command: SubagentsCommand,
+    },
+    /// Record and verify subspawn orchestration runs without spawning agents.
+    Orchestration {
+        #[command(subcommand)]
+        command: OrchestrationCommand,
     },
     /// Generate shell completions for local installation.
     Completions(CompletionArgs),
@@ -253,6 +267,18 @@ enum SubagentsCommand {
     /// Record parent synthesis for a completed subagent batch.
     #[command(name = "record-synthesis")]
     Synthesis(SubagentsRecordSynthesisArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum OrchestrationCommand {
+    /// Record a planned subspawn batch and emit orchestration_run.v1.
+    Plan(SubagentsRecordPlanArgs),
+    /// Record one planned agent outcome and emit orchestration_run.v1.
+    Record(SubagentsRecordOutcomeArgs),
+    /// Record parent synthesis for a batch and emit orchestration_run.v1.
+    Close(SubagentsRecordSynthesisArgs),
+    /// Verify completion coverage for a recorded orchestration run.
+    Verify(OrchestrationVerifyArgs),
 }
 
 #[derive(Args, Debug)]
@@ -547,8 +573,14 @@ pub struct SubagentsRecordOutcomeArgs {
     pub batch_id: String,
     #[arg(long, value_name = "ROLE")]
     pub role: String,
+    #[arg(long = "agent-id", value_name = "AGENT_ID")]
+    pub agent_id: Option<String>,
     #[arg(long, value_name = "STATUS")]
     pub status: SubagentOutcomeStatus,
+    #[arg(long = "wait-status", value_name = "WAIT_STATUS")]
+    pub wait_status: Option<SubagentWaitStatus>,
+    #[arg(long = "wait-elapsed-ms", value_name = "MILLISECONDS")]
+    pub wait_elapsed_ms: Option<u64>,
     #[arg(long)]
     pub summary: String,
     #[arg(long, value_name = "DISPOSITION")]
@@ -572,8 +604,11 @@ impl SubagentsRecordOutcomeArgs {
             capsule: self.capsule,
             batch_id: self.batch_id,
             role: self.role,
+            agent_id: self.agent_id,
             status: self.status,
             summary: self.summary,
+            wait_status: self.wait_status,
+            wait_elapsed_ms: self.wait_elapsed_ms,
             disposition: self.disposition,
             human_verified: self.human_verified,
             source_ids: self.source_ids,
@@ -581,6 +616,23 @@ impl SubagentsRecordOutcomeArgs {
             recorded_at: self.recorded_at.unwrap_or_else(Utc::now),
         }
     }
+}
+
+#[derive(Args, Debug)]
+pub struct OrchestrationVerifyArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long = "batch-id", value_name = "BATCH_ID")]
+    pub batch_id: String,
+    #[arg(long = "checked-at", value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+    #[arg(
+        long = "stale-after-minutes",
+        value_name = "MINUTES",
+        default_value_t = ORCHESTRATION_STALE_AFTER_MINUTES,
+        help = "Warn when incomplete orchestration evidence is older than this threshold"
+    )]
+    pub stale_after_minutes: u64,
 }
 
 #[derive(Args, Debug)]
@@ -1283,6 +1335,60 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Orchestration { command } => match command {
+            OrchestrationCommand::Plan(args) => {
+                let core_args = args.into_core();
+                let capsule = core_args.capsule.clone();
+                let batch_id = core_args.batch_id.clone();
+                let checked_at = core_args.recorded_at;
+                record_subagent_plan(core_args)?;
+                let report = orchestration_run(
+                    &capsule,
+                    &batch_id,
+                    checked_at,
+                    ORCHESTRATION_STALE_AFTER_MINUTES,
+                )?;
+                orchestration_output("orchestration plan", report, false)
+            }
+            OrchestrationCommand::Record(args) => {
+                let core_args = args.into_core();
+                let capsule = core_args.capsule.clone();
+                let batch_id = core_args.batch_id.clone();
+                let checked_at = core_args.recorded_at;
+                record_subagent_outcome(core_args)?;
+                let report = orchestration_run(
+                    &capsule,
+                    &batch_id,
+                    checked_at,
+                    ORCHESTRATION_STALE_AFTER_MINUTES,
+                )?;
+                orchestration_output("orchestration record", report, false)
+            }
+            OrchestrationCommand::Close(args) => {
+                let core_args = args.into_core();
+                let capsule = core_args.capsule.clone();
+                let batch_id = core_args.batch_id.clone();
+                let checked_at = core_args.recorded_at;
+                record_subagent_synthesis(core_args)?;
+                let report = orchestration_run(
+                    &capsule,
+                    &batch_id,
+                    checked_at,
+                    ORCHESTRATION_STALE_AFTER_MINUTES,
+                )?;
+                orchestration_output("orchestration close", report, false)
+            }
+            OrchestrationCommand::Verify(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let report = orchestration_run(
+                    &args.capsule,
+                    &args.batch_id,
+                    checked_at,
+                    args.stale_after_minutes,
+                )?;
+                orchestration_output("orchestration verify", report, true)
+            }
+        },
         Commands::Policy { command } => match command {
             PolicyCommand::Manifest(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
@@ -1619,6 +1725,55 @@ fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
     } else {
         Ok(format!("{}\n", output.human))
     }
+}
+
+fn orchestration_output(
+    command: &'static str,
+    report: OrchestrationRunReport,
+    require_complete: bool,
+) -> Result<CommandOutput> {
+    let blocking = report
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == OrchestrationDiagnosticSeverity::Error)
+        .count();
+    let write_blocking = report.diagnostics.iter().any(|diagnostic| {
+        matches!(
+            diagnostic.code.as_str(),
+            "invalid_capsule" | "invalid_subagents_contract" | "unexpected_agent"
+        )
+    });
+    let complete = blocking == 0 && report.completion.complete && report.synthesis_status.is_some();
+    let human = if complete {
+        format!(
+            "orchestration batch {} complete: {}/{} role(s), synthesis {}",
+            report.batch_id,
+            report.completion.human_verified,
+            report.completion.expected,
+            report.synthesis_status.as_deref().unwrap_or("missing")
+        )
+    } else if require_complete {
+        format!(
+            "orchestration batch {} incomplete: {} blocking diagnostic(s), {}/{} role(s) verified",
+            report.batch_id, blocking, report.completion.human_verified, report.completion.expected
+        )
+    } else {
+        format!(
+            "recorded orchestration batch {} with {} error diagnostic(s), {}/{} role(s) verified",
+            report.batch_id, blocking, report.completion.human_verified, report.completion.expected
+        )
+    };
+    let ok = if require_complete {
+        complete
+    } else {
+        !write_blocking
+    };
+    Ok(CommandOutput {
+        ok,
+        command,
+        human,
+        result: serde_json::to_value(report)?,
+    })
 }
 
 /// Build a read-only machine-readable inventory of tracked skill folders.
@@ -7880,6 +8035,63 @@ mod tests {
         assert!(!excerpt.contains("github_pat_abc123"));
         assert!(excerpt.contains("NOT_GH_TOKEN=kept"));
         assert!(excerpt.contains("[redacted]"));
+    }
+
+    #[test]
+    fn orchestration_output_allows_missing_agent_on_write_commands() {
+        let report = OrchestrationRunReport {
+            schema: "orchestration_run.v1".to_string(),
+            capsule: PathBuf::from("/tmp/capsule"),
+            batch_id: "review".to_string(),
+            status: "planned".to_string(),
+            task: None,
+            mode: None,
+            scope: None,
+            wait_policy: None,
+            rendezvous_required: None,
+            expected_roles: vec!["reviewer".to_string(), "test_runner".to_string()],
+            agents: Vec::new(),
+            completion: codex_dev_core::OrchestrationCompletionReport {
+                expected: 2,
+                recorded: 1,
+                terminal: 1,
+                human_verified: 1,
+                missing: vec!["test_runner".to_string()],
+                extra: Vec::new(),
+                synthesis_completed: false,
+                complete: false,
+            },
+            synthesis_status: None,
+            registry_issues: Vec::new(),
+            diagnostics: vec![codex_dev_core::OrchestrationDiagnostic {
+                severity: OrchestrationDiagnosticSeverity::Error,
+                code: "missing_agent".to_string(),
+                message: "missing expected role: test_runner".to_string(),
+                role: Some("test_runner".to_string()),
+            }],
+            checked_at: "2026-05-09T05:30:00Z".parse().unwrap(),
+            stale_after_minutes: 120,
+        };
+
+        let write_output =
+            orchestration_output("orchestration record", report, false).expect("write output");
+        assert!(write_output.ok);
+        assert!(
+            write_output
+                .human
+                .contains("with 1 error diagnostic(s), 1/2 role(s) verified")
+        );
+
+        let verify_report: OrchestrationRunReport =
+            serde_json::from_value(write_output.result).expect("report json");
+        let verify_output = orchestration_output("orchestration verify", verify_report, true)
+            .expect("verify output");
+        assert!(!verify_output.ok);
+        assert!(
+            verify_output
+                .human
+                .contains("incomplete: 1 blocking diagnostic(s), 1/2 role(s) verified")
+        );
     }
 
     #[test]

@@ -141,9 +141,10 @@ cat > "$tmp/subspawn-plan.json" <<'JSON'
   }
 }
 JSON
-cargo run -q -p codex-dev -- --json subagents record-plan --capsule "$tmp/validation-smoke" --batch-id validation-review --source "$tmp/subspawn-plan.json" --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" --recorded-at 2026-05-09T05:10:00Z
-cargo run -q -p codex-dev -- --json subagents record-outcome --capsule "$tmp/validation-smoke" --batch-id validation-review --role reviewer --status completed --summary "validation smoke reviewed" --disposition accepted --human-verified --source-id reviewer:validation-smoke --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:20:00Z
-cargo run -q -p codex-dev -- --json subagents record-synthesis --capsule "$tmp/validation-smoke" --batch-id validation-review --status completed --summary "subagent evidence smoke complete" --human-verified --source-id synthesis:validation-review --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:30:00Z
+cargo run -q -p codex-dev -- --json orchestration plan --capsule "$tmp/validation-smoke" --batch-id validation-review --source "$tmp/subspawn-plan.json" --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" --recorded-at 2026-05-09T05:10:00Z
+cargo run -q -p codex-dev -- --json orchestration record --capsule "$tmp/validation-smoke" --batch-id validation-review --role reviewer --agent-id agent-validation-reviewer --status completed --wait-status completed --wait-elapsed-ms 1000 --summary "validation smoke reviewed" --disposition accepted --human-verified --source-id reviewer:validation-smoke --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:20:00Z
+cargo run -q -p codex-dev -- --json orchestration close --capsule "$tmp/validation-smoke" --batch-id validation-review --status completed --summary "subagent evidence smoke complete" --human-verified --source-id synthesis:validation-review --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:30:00Z
+cargo run -q -p codex-dev -- --json orchestration verify --capsule "$tmp/validation-smoke" --batch-id validation-review --checked-at 2026-05-09T05:35:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T05:40:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
@@ -151,9 +152,9 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
-The task capsule smoke below covers `evidence append`, subagent plan, outcome,
-and synthesis recording, PR evidence capture, and the follow-up `capsule status`
-summary against a real fixture capsule.
+The task capsule smoke below covers `evidence append`, orchestration
+plan/record/close/verify, PR evidence capture, and the follow-up
+`capsule status` summary against a real fixture capsule.
 
 Run after changing `crates/codex-dev-tui/` or TUI docs:
 
@@ -197,9 +198,10 @@ cat > "$tmp/subspawn-plan.json" <<'JSON'
   }
 }
 JSON
-cargo run -q -p codex-dev -- --json subagents record-plan --capsule "$tmp/validation-smoke" --batch-id validation-review --source "$tmp/subspawn-plan.json" --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" --recorded-at 2026-05-09T05:10:00Z
-cargo run -q -p codex-dev -- --json subagents record-outcome --capsule "$tmp/validation-smoke" --batch-id validation-review --role reviewer --status completed --summary "validation smoke reviewed" --disposition accepted --human-verified --source-id reviewer:validation-smoke --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:20:00Z
-cargo run -q -p codex-dev -- --json subagents record-synthesis --capsule "$tmp/validation-smoke" --batch-id validation-review --status completed --summary "subagent evidence smoke complete" --human-verified --source-id synthesis:validation-review --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:30:00Z
+cargo run -q -p codex-dev -- --json orchestration plan --capsule "$tmp/validation-smoke" --batch-id validation-review --source "$tmp/subspawn-plan.json" --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" --recorded-at 2026-05-09T05:10:00Z
+cargo run -q -p codex-dev -- --json orchestration record --capsule "$tmp/validation-smoke" --batch-id validation-review --role reviewer --agent-id agent-validation-reviewer --status completed --wait-status completed --wait-elapsed-ms 1000 --summary "validation smoke reviewed" --disposition accepted --human-verified --source-id reviewer:validation-smoke --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:20:00Z
+cargo run -q -p codex-dev -- --json orchestration close --capsule "$tmp/validation-smoke" --batch-id validation-review --status completed --summary "subagent evidence smoke complete" --human-verified --source-id synthesis:validation-review --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:30:00Z
+cargo run -q -p codex-dev -- --json orchestration verify --capsule "$tmp/validation-smoke" --batch-id validation-review --checked-at 2026-05-09T05:35:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T05:40:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
@@ -494,6 +496,32 @@ cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T04:30:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cat > "$tmp/subspawn-plan.json" <<'JSON'
+{
+  "task": "validation smoke review",
+  "mode": "read-only",
+  "scope": "fixture capsule",
+  "wait_policy": "strict",
+  "rendezvous_required": true,
+  "roles": [
+    {"name": "reviewer"}
+  ],
+  "prompts": [
+    {"role": "reviewer", "prompt": "Review the validation smoke capsule and report blockers."}
+  ],
+  "registry_issues": [],
+  "duplicate_roles_ignored": {
+    "test_runner": [
+      "skills/subagent-creator/templates/agents/test_runner.toml",
+      "skills/subspawn/templates/agents/test_runner.toml"
+    ]
+  }
+}
+JSON
+cargo run -q -p codex-dev -- --json orchestration plan --capsule "$tmp/validation-smoke" --batch-id validation-review --source "$tmp/subspawn-plan.json" --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json" --recorded-at 2026-05-09T05:10:00Z
+cargo run -q -p codex-dev -- --json orchestration record --capsule "$tmp/validation-smoke" --batch-id validation-review --role reviewer --agent-id agent-validation-reviewer --status completed --wait-status completed --wait-elapsed-ms 1000 --summary "validation smoke reviewed" --disposition accepted --human-verified --source-id reviewer:validation-smoke --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:20:00Z
+cargo run -q -p codex-dev -- --json orchestration close --capsule "$tmp/validation-smoke" --batch-id validation-review --status completed --summary "subagent evidence smoke complete" --human-verified --source-id synthesis:validation-review --artifact "$tmp/subspawn-plan.json" --recorded-at 2026-05-09T05:30:00Z
+cargo run -q -p codex-dev -- --json orchestration verify --capsule "$tmp/validation-smoke" --batch-id validation-review --checked-at 2026-05-09T05:35:00Z
 cat > "$tmp/pr-snapshot.json" <<'JSON'
 {
   "repository": "BjornMelin/dev-skills",
