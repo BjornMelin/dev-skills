@@ -228,6 +228,69 @@ fn local_status_uses_same_contract_with_status_mode() {
     assert_eq!(json["result"]["mode"], "status");
 }
 
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_unknown_capsule_ignore_probe() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let git = bin.join("git");
+    std::fs::write(
+        &git,
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *"check-ignore"*) exit 2 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#,
+    )
+    .expect("write failing git fixture");
+    let mut perms = std::fs::metadata(&git)
+        .expect("failing git metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&git, perms).expect("failing git executable");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "capsule_root_ignore_unknown")
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "capsule_root_not_ignored")
+    );
+}
+
 fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
     std::fs::create_dir_all(source_dir).expect("source dir");
     std::fs::write(

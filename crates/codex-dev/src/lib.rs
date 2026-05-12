@@ -1474,15 +1474,24 @@ fn local_diagnostics(
                 .to_string(),
         });
     }
-    if capsule_root.git_ignored != Some(true) {
-        diagnostics.push(LocalDiagnostic {
+    match capsule_root.git_ignored {
+        Some(true) => {}
+        Some(false) => diagnostics.push(LocalDiagnostic {
             severity: LocalDiagnosticSeverity::Error,
             code: "capsule_root_not_ignored".to_string(),
             message: format!(
                 "local capsule root {} must be ignored by git",
                 capsule_root.path.display()
             ),
-        });
+        }),
+        None => diagnostics.push(LocalDiagnostic {
+            severity: LocalDiagnosticSeverity::Error,
+            code: "capsule_root_ignore_unknown".to_string(),
+            message: format!(
+                "unable to determine whether local capsule root {} is ignored by git",
+                capsule_root.path.display()
+            ),
+        }),
     }
     if diagnostics.is_empty() {
         diagnostics.push(LocalDiagnostic {
@@ -1546,6 +1555,7 @@ fn run_bounded_local_probe(
         if Instant::now() >= deadline {
             let _ = child.kill();
             let _ = child.wait();
+            let _ = reader.join();
             return None;
         }
         sleep(Duration::from_millis(10));
