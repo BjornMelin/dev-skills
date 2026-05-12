@@ -1,3 +1,8 @@
 interface:
+  display_name: "Convex Best Practices"
+  short_description: "Production-ready Convex function, schema, validation, and query guidance"
+  default_prompt: "Use $convex-best-practices when building or reviewing Convex apps for function organization, validators, schema design, TypeScript usage, error handling, and real-time query patterns."
   icon_small: "./assets/small-logo.svg"
   icon_large: "./assets/large-logo.png"
+policy:
+  allow_implicit_invocation: true

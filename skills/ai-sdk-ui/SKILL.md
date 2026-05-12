@@ -294,14 +294,14 @@ Includes: Message bubbles, input fields, tool UIs, and more.
 
 | Reference | Topics |
 |-----------|--------|
-| **[usechat-fundamentals.md](./usechat-fundamentals.md)** | Hook API, transport config, status lifecycle, message state |
-| **[tool-integration.md](./tool-integration.md)** | Tool calling, client/server execution, tool approval, type inference |
-| **[generative-ui.md](./generative-ui.md)** | React components in streams, dynamic UIs, RSC integration |
-| **[persistence.md](./persistence.md)** | Message storage, resume streams, optimistic updates, sync patterns |
-| **[hooks-reference.md](./hooks-reference.md)** | Complete API for useChat/useObject/useCompletion, options reference |
-| **[backend.md](./backend.md)** | Next.js/Node/Fastify/Nest routes, convertToModelMessages, toUIMessageStreamResponse |
-| **[production.md](./production.md)** | Error boundaries, retry strategies, throttling, security best practices |
-| **[migration.md](./migration.md)** | v6 migration guide, breaking changes, codemod usage |
+| **[usechat-fundamentals.md](./references/usechat-fundamentals.md)** | Hook API, transport config, status lifecycle, message state |
+| **[tool-integration.md](./references/tool-integration.md)** | Tool calling, client/server execution, tool approval, type inference |
+| **[generative-ui.md](./references/generative-ui.md)** | React components in streams, dynamic UIs, RSC integration |
+| **[persistence.md](./references/persistence.md)** | Message storage, resume streams, optimistic updates, sync patterns |
+| **[hooks-reference.md](./references/hooks-reference.md)** | Complete API for useChat/useObject/useCompletion, options reference |
+| **[backend.md](./references/backend.md)** | Next.js/Node/Fastify/Nest routes, convertToModelMessages, toUIMessageStreamResponse |
+| **[production.md](./references/production.md)** | Error boundaries, retry strategies, throttling, security best practices |
+| **[migration.md](./references/migration.md)** | v6 migration guide, breaking changes, codemod usage |
 
 ## Event Callbacks
 

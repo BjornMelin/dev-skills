@@ -340,14 +340,16 @@ The packager writes archive entries as `<skill-name>/...`, validates
 `*.skill`, `.codex/`, and local tool caches. It rejects output directories
 nested inside the source skill folder and skips symlinks so the bundle cannot
 package itself or out-of-tree targets. `quick_validate.py` validates only
-`SKILL.md` frontmatter. If
-`agents/openai.yaml` changes, review that metadata explicitly until this repo
-has a dedicated validator for it.
+`SKILL.md` frontmatter. `tools/eval/skill_subagent_eval.py --json` is the
+dedicated offline validator for catalog exposure, local skill links, tracked
+generated-cache exclusion, helper syntax, `.skill` bundle shape, and
+`agents/openai.yaml` metadata. Use `--strict` before publishing bundles when
+ignored local dist artifacts must also be clean.
 
 ## Python Helpers
 
 ```bash
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts tools/bootstrap
+python3 -m compileall -q skills tools subagents/hardened-codex/scripts
 ```
 
 ## Bootstrap Packs
@@ -532,7 +534,7 @@ root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
 (cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
-python3 -m compileall -q skills/deep-researcher/scripts skills/subagent-creator/scripts skills/subspawn/scripts subagents/hardened-codex/scripts tools/bootstrap
+python3 -m compileall -q skills tools subagents/hardened-codex/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
 PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
