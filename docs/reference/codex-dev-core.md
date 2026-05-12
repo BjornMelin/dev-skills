@@ -5,7 +5,7 @@ contracts and read models. It is intentionally small: CLI parsing, terminal UI
 rendering, hosted provider calls, subprocess execution, and merge/review actions
 live outside this crate.
 
-Tracking: #40, #42, #43, #44, #48, #49, and #82.
+Tracking: #40, #42, #43, #44, #48, #49, #82, and #84.
 
 ## Public Boundary
 
@@ -23,6 +23,10 @@ The crate owns:
 - the read-only `task_index.v1` task root contract, including
   `TaskIndexReport`, `TaskRootStatus`, `TaskIndexEntry`, `TaskShowReport`,
   and `TaskExportReport`;
+- the read-only `skill_inventory.v1` skill catalog contract, including
+  `SkillsInventoryReport`, metadata diagnostics, bounded resource counts,
+  README/docs exposure heuristics, package-artifact status, validation status,
+  and non-blocking underbuilt signals;
 - policy and PR evidence data models such as `PolicyManifest`,
   `PolicyGate`, `PrControlPlan`, `PrControlCommand`,
   `PrAgentStateReport`, `PrAgentHostedActionReport`, and

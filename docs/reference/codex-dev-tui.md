@@ -4,13 +4,13 @@
 capsules. By default it opens a read-only dashboard over a `.codex/tasks` root
 so an operator can scan recent capsules before opening one capsule in detail.
 It reads the existing capsule JSON contracts through `codex-dev-core` and stays
-aligned with capsule validation semantics. `task_index.v1` is the shared
-automation contract exposed by `codex-dev task list/show/export`; future TUI
-work can consume that read model directly. The current TUI renders an operator
-view for quick scanning and does not own policy gates, PR remediation, or
-capsule business logic.
+aligned with capsule validation semantics. The dashboard and detail panels are
+composed into the read-only `tui_operator_panels.v1` view from shared core
+contracts such as `skill_inventory.v1`, `task_index.v1`, `orchestration_run.v1`,
+and PR-agent reports. The TUI renders operator state for quick scanning and does
+not own policy gates, PR remediation, or capsule business logic.
 
-Tracking: #20, #28, #52, #53, #55, and #82.
+Tracking: #20, #28, #52, #53, #55, #82, and #84.
 
 ## Ownership Boundary
 
@@ -26,6 +26,12 @@ The TUI consumes:
 - optional `pr-readiness.json` as `codex-dev.pr-agent-readiness.v1`;
 - optional `pr-agent-actions/<plan-id>/plan.json` files as
   `codex-dev.pr-agent-hosted-action.v1`;
+- `skill_inventory.v1` and `task_index.v1` from `codex-dev-core` for dashboard
+  skill health and task root panels;
+- `orchestration_run.v1` from `codex-dev-core` for subspawn batch completion,
+  diagnostics, runtime agent IDs, and wait metadata;
+- `tui_operator_panels.v1` as the TUI-owned composition contract for rendered
+  operator panels and next-action exports;
 - `codex_dev_core::validate_capsule` for validation errors.
 
 The TUI must not scrape Markdown notes or duplicate policy-gate decisions.
@@ -89,9 +95,10 @@ Keys:
 - `q`, escape, or ctrl-c: quit
 
 The dashboard shows task title, capsule state, validation summary, evidence
-count, subagent batch summary, PR state, and last update time. Missing task
-roots, unreadable entries, and invalid capsules are rendered as diagnostics
-instead of panicking or starting command execution.
+count, subagent batch summary, PR state, last update time, task-index totals,
+and skill-health totals from `skill_inventory.v1`. Missing task roots,
+unreadable entries, and invalid capsules are rendered as diagnostics instead of
+panicking or starting command execution.
 
 Single-capsule detail mode has these panels:
 
@@ -103,12 +110,22 @@ Single-capsule detail mode has these panels:
   hides raw command output and provider dumps.
 - Subagents: delegation batches, mode/scope, completed and human-verified agent
   counts, agent summaries, source IDs, artifacts, and synthesis status.
+- Orchestration: `orchestration_run.v1` completion coverage, expected and
+  recorded roles, runtime agent IDs, wait results, synthesis status, stale
+  evidence warnings, registry warnings, and diagnostics.
 - PR: normalized `pr.json` snapshot, check state, and authoritative versus
   non-authoritative review-thread status.
 - PR Agent: local PR-agent state/readiness/action artifacts. It distinguishes
   dry-run plans from apply-requested or executed hosted actions, summarizes
   readiness blockers, wait reasons, warnings, failing/pending checks, and
   action status without printing raw stdout/stderr.
+- Next Actions: render-only commands and action summaries derived from
+  PR-agent state actions, PR-agent readiness/action artifacts, and
+  orchestration diagnostics. The panel does not execute commands or perform
+  hosted writes. For PR-agent hosted actions it renders high-level `codex-dev`
+  invocations instead of body-bearing `gh` mutation commands, and generated
+  command placeholders use shell-safe tokens such as `CAPSULE_DIR` and
+  `SUMMARY`.
 - Validation: required and optional gate summaries plus artifact diagnostics.
 - Help: command and automation reminder.
 
@@ -150,9 +167,11 @@ terminal:
 - state loading tests create a real `codex-dev-core` capsule and read its JSON
   contracts;
 - render snapshot tests assert the `TestBackend` buffer includes capsule,
-  validation, evidence, subagent, PR, and PR-agent summaries;
+  validation, evidence, subagent, orchestration, PR, PR-agent, and next-action
+  summaries;
 - dashboard tests assert root discovery, invalid-capsule diagnostics, filter
-  changes, sort changes, and open-single-capsule behavior;
+  changes, sort changes, skill health, task index, and open-single-capsule
+  behavior;
 - optional PR-agent artifact tests assert malformed local artifacts render as
   diagnostics and redact capsule paths;
 - cleanup tests prove the restore guard runs exactly once, including on drop.
