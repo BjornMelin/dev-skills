@@ -11,7 +11,7 @@ Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, #42, #43, #44, #55, and #80.
+Tracking: #20, #22, #23, #25, #42, #43, #44, #55, #80, and #82.
 
 ## Installation
 
@@ -56,6 +56,7 @@ Top-level commands:
 - `policy`
 - `local`
 - `skills`
+- `task`
 - `pr`
 - `completions`
 - `manpage`
@@ -91,6 +92,12 @@ Local subcommands:
 Skills subcommands:
 
 - `skills inventory`
+
+Task subcommands:
+
+- `task list`
+- `task show`
+- `task export`
 
 PR subcommands:
 
@@ -234,6 +241,63 @@ frontmatter checks used by `tools/skill/quick_validate.py`: required string
 the directory, and non-empty descriptions without angle brackets. The Python
 validator and packager remain the authorities for full spec validation and
 `.skill` archive creation; this command owns the read-only inventory report.
+
+## task list
+
+Emit a read-only machine-readable index of local task capsules under a task
+root:
+
+```bash
+cargo run -q -p codex-dev -- --json task list
+cargo run -q -p codex-dev -- --json task list --root .codex/tasks
+```
+
+The command uses the standard `codex-dev.output.v1` JSON envelope. The task
+index contract lives at `result.schema: "task_index.v1"`. It scans only
+immediate entries under the task root, refuses to traverse symlinked roots or
+task entries, validates each capsule with `codex_dev_core::validate_capsule`,
+and embeds the same status summary used by `capsule status` for valid entries.
+It does not run validation commands, read providers, call GitHub, or mutate the
+capsule directory.
+
+Missing task roots are reported as diagnostics with an empty task list so new
+checkouts can run the smoke command before any local capsule exists. Invalid
+task entries are included in `result.tasks` with `valid: false`, `errors`, and
+no embedded `capsule` status. `ok` is false when any indexed entry is invalid,
+or when the root exists but is unusable, such as a symlinked root or a file
+instead of a directory.
+
+## task show
+
+Show one task capsule by task ID under the root or by explicit path:
+
+```bash
+cargo run -q -p codex-dev -- --json task show <task-id>
+cargo run -q -p codex-dev -- --json task show --root .codex/tasks <task-id>
+cargo run -q -p codex-dev -- --json task show /path/to/task-capsule
+```
+
+The result uses `task_index.v1` and contains one `task` entry with validation
+errors or the embedded status summary. Relative single-segment selectors are
+resolved under `--root`; absolute paths and multi-segment relative paths are
+treated as explicit capsule paths.
+
+## task export
+
+Export one valid task capsule as one JSON object for automation, TUI fixtures,
+or review handoff:
+
+```bash
+cargo run -q -p codex-dev -- --json task export <task-id>
+cargo run -q -p codex-dev -- --json task export --root .codex/tasks <task-id>
+```
+
+The result uses `task_index.v1` and includes the validated task entry plus the
+local contract payloads from `capsule.json`, `evidence.jsonl`,
+`verification.json`, `subagents.json`, `pr.json`, `policy.json`, and the human
+Markdown files `plan.md`, `decisions.md`, `output.md`, and `retrospective.md`.
+`task export` exits nonzero if the selected capsule is invalid because the full
+contract bundle would be incomplete or unsafe to consume.
 
 ## completions
 
@@ -823,6 +887,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
+cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help

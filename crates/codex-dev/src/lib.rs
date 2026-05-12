@@ -28,7 +28,7 @@ use codex_dev_core::{
     ensure_regular_contract_files, init_capsule, pr_status, read_json, recommend_pr_agent_actions,
     record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
     render_capsule, render_command, render_pr_label, render_pr_status, stable_json_hash,
-    validate_capsule, write_json,
+    task_export, task_index, task_show, validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -94,6 +94,11 @@ impl Cli {
             Commands::Skills { command } => match command {
                 SkillsCommand::Inventory(_) => "skills inventory",
             },
+            Commands::Task { command } => match command {
+                TaskCommand::List(_) => "task list",
+                TaskCommand::Show(_) => "task show",
+                TaskCommand::Export(_) => "task export",
+            },
             Commands::Pr { command } => match command {
                 PrCommand::Agent(_) => "pr agent",
                 PrCommand::AgentAction(_) => "pr agent-action",
@@ -139,6 +144,11 @@ enum Commands {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    /// Read local task capsules from a task root.
+    Task {
+        #[command(subcommand)]
+        command: TaskCommand,
     },
     /// Capture hosted PR evidence into task capsules.
     Pr {
@@ -203,6 +213,16 @@ enum LocalCommand {
 enum SkillsCommand {
     /// Emit a read-only machine-readable inventory of tracked skills.
     Inventory(SkillsInventoryArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum TaskCommand {
+    /// List immediate task capsules under a task root.
+    List(TaskRootArgs),
+    /// Show one task capsule by ID or path.
+    Show(TaskSelectorArgs),
+    /// Export one task capsule with all local contract payloads.
+    Export(TaskSelectorArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -1036,6 +1056,30 @@ pub struct PathArgs {
     path: PathBuf,
 }
 
+#[derive(Args, Debug)]
+pub struct TaskRootArgs {
+    #[arg(
+        long,
+        value_name = "TASK_ROOT",
+        default_value = ".codex/tasks",
+        help = "Directory containing local task capsule directories"
+    )]
+    root: PathBuf,
+}
+
+#[derive(Args, Debug)]
+pub struct TaskSelectorArgs {
+    #[arg(
+        long,
+        value_name = "TASK_ROOT",
+        default_value = ".codex/tasks",
+        help = "Directory containing local task capsule directories"
+    )]
+    root: PathBuf,
+    #[arg(value_name = "TASK_ID_OR_DIR")]
+    task: PathBuf,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 struct CommandEnvelope {
     schema: &'static str,
@@ -1342,6 +1386,73 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 Ok(CommandOutput {
                     ok: result.ok,
                     command: "skills inventory",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
+        Commands::Task { command } => match command {
+            TaskCommand::List(args) => {
+                let result = task_index(&args.root)?;
+                let human = if result.diagnostics.is_empty() {
+                    format!(
+                        "listed {} task capsule(s): {} valid, {} invalid",
+                        result.total, result.valid, result.invalid
+                    )
+                } else {
+                    format!(
+                        "listed {} task capsule(s) with {} diagnostic(s): {} valid, {} invalid",
+                        result.total,
+                        result.diagnostics.len(),
+                        result.valid,
+                        result.invalid
+                    )
+                };
+                let root_ok = result.diagnostics.is_empty()
+                    || result
+                        .diagnostics
+                        .iter()
+                        .all(|diagnostic| diagnostic.starts_with("task root does not exist:"));
+                Ok(CommandOutput {
+                    ok: result.invalid == 0 && root_ok,
+                    command: "task list",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            TaskCommand::Show(args) => {
+                let result = task_show(&args.root, &args.task)?;
+                let human = match result.task.capsule.as_ref() {
+                    Some(capsule) => format!(
+                        "{} [{}] on {}; evidence: {}",
+                        capsule.title,
+                        capsule.status,
+                        capsule.branch,
+                        render_evidence_counts(&capsule.evidence.by_kind)
+                    ),
+                    None => format!(
+                        "invalid task capsule at {}: {} issue(s)",
+                        result.task.path.display(),
+                        result.task.errors.len()
+                    ),
+                };
+                Ok(CommandOutput {
+                    ok: result.task.valid,
+                    command: "task show",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            TaskCommand::Export(args) => {
+                let result = task_export(&args.root, &args.task)?;
+                let human = format!(
+                    "exported task capsule {} from {}",
+                    result.capsule.id,
+                    result.task.path.display()
+                );
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "task export",
                     human,
                     result: serde_json::to_value(result)?,
                 })
