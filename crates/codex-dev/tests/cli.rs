@@ -2013,8 +2013,39 @@ fn policy_manifest_and_dry_run_update_capsule() {
     let explain_error_message = explain_error_json["result"]["error"]["message"]
         .as_str()
         .expect("explain error message");
+    assert!(explain_error_message.contains("failed to canonicalize repo root"));
     assert!(explain_error_message.contains("--include-local-paths"));
     assert!(!explain_error_message.contains(bad_repo_root_arg));
+
+    let missing_manifest_root = temp.path().join("policy-explain-missing-manifest-root");
+    std::fs::create_dir(&missing_manifest_root).expect("missing manifest root");
+    let missing_manifest_arg = missing_manifest_root
+        .to_str()
+        .expect("utf8 missing manifest root");
+    let missing_manifest_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            missing_manifest_arg,
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let missing_manifest_json: Value =
+        serde_json::from_slice(&missing_manifest_output).expect("missing manifest error json");
+    let missing_manifest_message = missing_manifest_json["result"]["error"]["message"]
+        .as_str()
+        .expect("missing manifest error message");
+    assert!(missing_manifest_message.contains("repo root must contain Cargo.toml"));
+    assert!(missing_manifest_message.contains("--include-local-paths"));
+    assert!(!missing_manifest_message.contains(missing_manifest_arg));
 
     let init_output = Command::cargo_bin("codex-dev")
         .expect("binary")

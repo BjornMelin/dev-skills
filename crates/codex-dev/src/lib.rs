@@ -2340,10 +2340,27 @@ fn policy_explain_error_without_local_paths(
     if include_local_paths {
         error
     } else {
-        anyhow::anyhow!(
-            "failed to inspect policy explain inputs; rerun with --include-local-paths for local path details"
-        )
+        anyhow::anyhow!("{}", policy_explain_redacted_error_message(&error))
     }
+}
+
+fn policy_explain_redacted_error_message(error: &anyhow::Error) -> String {
+    let message = error.to_string();
+    let reason = if message.starts_with("failed to canonicalize repo root ") {
+        "failed to canonicalize repo root"
+    } else if message.starts_with("repo root must contain Cargo.toml:") {
+        "repo root must contain Cargo.toml"
+    } else if message.starts_with("repo root must contain docs/runbooks/validation.md:") {
+        "repo root must contain docs/runbooks/validation.md"
+    } else if message == "failed to read current directory"
+        || message
+            == "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+    {
+        message.as_str()
+    } else {
+        "failed to inspect policy explain inputs"
+    };
+    format!("{reason}; rerun with --include-local-paths for local path details")
 }
 
 fn policy_explain_profile_docs_status(
