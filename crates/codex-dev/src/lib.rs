@@ -2549,7 +2549,11 @@ fn policy_explain_required_tool_statuses(
 fn policy_explain_doc_error(error: Option<String>, path: &str) -> Option<String> {
     error.map(|message| {
         if message.starts_with("failed to read ") {
-            format!("failed to read {path}")
+            let reason = message
+                .rsplit_once(": ")
+                .map(|(_, reason)| format!(": {reason}"))
+                .unwrap_or_default();
+            format!("failed to read {path}{reason}")
         } else {
             message
         }
@@ -2756,10 +2760,7 @@ fn policy_doc_block_specs() -> [PolicyDocBlockSpec; 5] {
 
 fn check_policy_doc_block(repo_root: &Path, spec: &PolicyDocBlockSpec) -> PolicyDocsBlockResult {
     let profiles = policy_doc_block_profiles(spec.kind);
-    let expected_commands = profiles
-        .iter()
-        .map(|profile| policy_manifest_command(*profile))
-        .collect::<Vec<_>>();
+    let expected_commands = policy_doc_block_expected_commands(spec.kind);
 
     let path = repo_root.join(spec.path);
     let (actual_commands, error) = match fs::read_to_string(&path) {
@@ -2838,8 +2839,24 @@ fn policy_doc_block_profiles(kind: PolicyDocBlockKind) -> Vec<PolicyProfile> {
     }
 }
 
+fn policy_doc_block_expected_commands(kind: PolicyDocBlockKind) -> Vec<String> {
+    policy_doc_block_profiles(kind)
+        .iter()
+        .flat_map(|profile| {
+            [
+                policy_manifest_command(*profile),
+                policy_explain_command(*profile),
+            ]
+        })
+        .collect()
+}
+
 fn policy_manifest_command(profile: PolicyProfile) -> String {
     format!("cargo run -q -p codex-dev -- --json policy manifest --profile {profile}")
+}
+
+fn policy_explain_command(profile: PolicyProfile) -> String {
+    format!("cargo run -q -p codex-dev -- --json policy explain --profile {profile}")
 }
 
 pub fn pr_control_plan(
@@ -7730,10 +7747,7 @@ mod tests {
     fn policy_docs_check_reports_stale_doc_block() {
         let temp = tempdir().expect("tempdir");
         let smoke_commands = vec![policy_manifest_command(PolicyProfile::CodexDev)];
-        let all_commands = all_policy_profiles()
-            .iter()
-            .map(|profile| policy_manifest_command(*profile))
-            .collect::<Vec<_>>();
+        let all_commands = policy_doc_block_expected_commands(PolicyDocBlockKind::AllProfiles);
         write_policy_docs_fixture(temp.path(), &smoke_commands, &all_commands);
 
         let result = policy_docs_check(Some(temp.path())).expect("docs check");
@@ -7772,6 +7786,37 @@ mod tests {
             extract_policy_doc_commands(&contents, POLICY_DOCS_SMOKE_MARKER).expect("commands");
 
         assert_eq!(commands, vec![command]);
+    }
+
+    #[test]
+    fn policy_docs_expected_commands_include_explain_smoke() {
+        let commands = policy_doc_block_expected_commands(PolicyDocBlockKind::Smoke);
+
+        assert_eq!(
+            commands,
+            vec![
+                policy_manifest_command(PolicyProfile::CodexDev),
+                policy_explain_command(PolicyProfile::CodexDev),
+                policy_manifest_command(PolicyProfile::FullLocal),
+                policy_explain_command(PolicyProfile::FullLocal),
+            ]
+        );
+    }
+
+    #[test]
+    fn policy_explain_doc_error_preserves_sanitized_failure_reason() {
+        let error = policy_explain_doc_error(
+            Some(
+                "failed to read /home/example/dev-skills/docs/runbooks/validation.md: permission denied"
+                    .to_string(),
+            ),
+            "docs/runbooks/validation.md",
+        );
+
+        assert_eq!(
+            error.as_deref(),
+            Some("failed to read docs/runbooks/validation.md: permission denied")
+        );
     }
 
     #[test]
@@ -8012,11 +8057,8 @@ mod tests {
             fs::write(root.join(path), &stale_smoke_block).expect("stale smoke docs");
         }
 
-        let all_profile_commands = all_policy_profiles()
-            .iter()
-            .map(|profile| policy_manifest_command(*profile))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let all_profile_commands =
+            policy_doc_block_expected_commands(PolicyDocBlockKind::AllProfiles).join("\n");
         fs::write(
             root.join("docs/runbooks/validation.md"),
             format!(

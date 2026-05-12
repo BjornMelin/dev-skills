@@ -5,9 +5,9 @@ Use this after editing docs, skills, templates, Python helpers, or Rust code.
 ## Validation Matrix Ownership
 
 The Rust policy profiles in `crates/codex-dev/src/lib.rs` are the canonical
-validation matrix for `codex-dev policy manifest`. Markdown snippets marked
-with `codex-dev:policy-manifest-*` are machine-owned mirrors of that Rust
-source and are checked by:
+validation matrix for `codex-dev policy manifest` and `codex-dev policy
+explain`. Markdown snippets marked with `codex-dev:policy-manifest-*` are
+machine-owned mirrors of that Rust source and are checked by:
 
 ```bash
 cargo run -q -p codex-dev -- --json policy docs-check
@@ -102,9 +102,10 @@ cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
-# codex-dev:policy-manifest-smoke:end
 cargo run -q -p codex-dev -- --json policy explain --profile full_local
+# codex-dev:policy-manifest-smoke:end
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
@@ -472,13 +473,21 @@ cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 # codex-dev:policy-manifest-all:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev_tui
+cargo run -q -p codex-dev -- --json policy explain --profile codex_dev_tui
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_research
+cargo run -q -p codex-dev -- --json policy explain --profile codex_research
 cargo run -q -p codex-dev -- --json policy manifest --profile skills
+cargo run -q -p codex-dev -- --json policy explain --profile skills
 cargo run -q -p codex-dev -- --json policy manifest --profile bootstrap_install
+cargo run -q -p codex-dev -- --json policy explain --profile bootstrap_install
 cargo run -q -p codex-dev -- --json policy manifest --profile docs
+cargo run -q -p codex-dev -- --json policy explain --profile docs
 cargo run -q -p codex-dev -- --json policy manifest --profile release
+cargo run -q -p codex-dev -- --json policy explain --profile release
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
 # codex-dev:policy-manifest-all:end
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor

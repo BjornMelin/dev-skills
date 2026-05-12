@@ -619,7 +619,9 @@ Print the built-in repo-native gate manifest:
 ```bash
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
+cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
 # codex-dev:policy-manifest-smoke:end
 ```
 
@@ -667,8 +669,8 @@ when documentation mirror discovery would otherwise be ambiguous.
 
 ## policy docs-check
 
-Check machine-owned Markdown mirrors of policy manifest commands against the
-Rust-owned profile list:
+Check machine-owned Markdown mirrors of policy manifest and policy explain
+commands against the Rust-owned profile list:
 
 ```bash
 cargo run -q -p codex-dev -- --json policy docs-check
