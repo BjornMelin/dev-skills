@@ -53,6 +53,9 @@ out of version control.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning across Overview, Evidence, Subagents,
   PR, PR Agent, Validation, and Help panels.
+- [AI Stack Scanner](reference/ai-stack-scanner.md): offline `ai_stack_scan.v1`
+  scanner for AI SDK, Streamdown, Zod v4, and Supabase TypeScript migration and
+  safety signals.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,

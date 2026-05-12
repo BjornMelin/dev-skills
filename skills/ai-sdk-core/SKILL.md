@@ -188,3 +188,19 @@ const { text } = await generateText({
 
 - Use AI SDK v6+ with matching provider packages.
 - Pin major versions in `package.json` to avoid breaking changes.
+
+## Offline Stack Scanner
+
+Before AI SDK migrations or reviews, run the deterministic scanner from the
+target repository:
+
+```bash
+python3 skills/ai-sdk-core/scripts/ai_stack_scan.py --root <repo> --family ai-sdk-core --pretty
+```
+
+The scanner emits `ai_stack_scan.v1` JSON, performs no network calls, skips
+symlinks, and checks package manifests plus source signals such as legacy
+`maxSteps`, removed stream response helpers, missing `inputSchema`, and MCP
+clients without visible cleanup. Treat every signal as a review prompt, then
+verify with the current AI SDK docs or package source before editing. Keep full
+scanner JSON local; share only specific redacted signals externally.

@@ -299,6 +299,21 @@ if (!result.success) {
 }
 ```
 
+## Offline Stack Scanner
+
+Run the local scanner before Zod migrations or validation reviews:
+
+```bash
+python3 skills/zod-v4/scripts/ai_stack_scan.py --root <repo> --pretty
+```
+
+It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
+flags likely Zod v4 migration signals such as pre-v4 dependency specs,
+deprecated string-format methods, legacy error parameters, `z.nativeEnum`, and
+`error.errors`. Verify each signal against current Zod docs/source before
+editing. Keep full scanner JSON local; share only specific redacted signals
+externally.
+
 ---
 
 ## Reference Files

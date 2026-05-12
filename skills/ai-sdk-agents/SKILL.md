@@ -98,6 +98,20 @@ export type MyAgentUIMessage = InferAgentUIMessage<typeof myAgent>;
 - Use `prepareCall` to select model/tools or inject RAG context once per call.
 - Use `prepareStep` for per-step decisions (budget limits, dynamic tools).
 
+## Offline Stack Scanner
+
+Run the local scanner before agent-loop audits or migrations:
+
+```bash
+python3 skills/ai-sdk-agents/scripts/ai_stack_scan.py --root <repo> --pretty
+```
+
+It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
+flags likely agent-loop risks such as missing explicit `stopWhen` on
+`ToolLoopAgent`. Verify signals against current AI SDK docs/source before
+changing behavior. Keep full scanner JSON local; share only specific redacted
+signals externally.
+
 ## Reference Files
 
 | Reference | When to Use |
