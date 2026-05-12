@@ -343,6 +343,19 @@ description: yes
 "#,
     )
     .expect("boolean alias skill");
+    let timestamp = repo.join("skills/timestamp-skill");
+    std::fs::create_dir_all(&timestamp).expect("timestamp skill dir");
+    std::fs::write(
+        timestamp.join("SKILL.md"),
+        r#"---
+name: timestamp-skill
+description: 2026-05-12
+---
+
+# Timestamp
+"#,
+    )
+    .expect("timestamp skill");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -362,7 +375,7 @@ description: yes
         .clone();
     let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
     assert_eq!(json["ok"], false);
-    assert_eq!(json["result"]["invalid"], 5);
+    assert_eq!(json["result"]["invalid"], 6);
     let invalid_skill = json["result"]["skills"]
         .as_array()
         .expect("skills")
@@ -431,6 +444,19 @@ description: yes
         boolean_alias_skill["validation"]["errors"]
             .as_array()
             .expect("boolean alias errors")
+            .iter()
+            .any(|error| error.as_str().expect("error").contains("must be a string"))
+    );
+    let timestamp_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "timestamp-skill")
+        .expect("timestamp skill entry");
+    assert!(
+        timestamp_skill["validation"]["errors"]
+            .as_array()
+            .expect("timestamp errors")
             .iter()
             .any(|error| error.as_str().expect("error").contains("must be a string"))
     );
@@ -628,6 +654,53 @@ description: Linked skill.
             .expect("diagnostics")
             .iter()
             .any(|diagnostic| diagnostic["code"] == "catalog_input_symlink")
+    );
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "skill_directory_symlink"
+                && diagnostic["skill"] == "linked-skill")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn skills_inventory_reports_catalog_read_errors() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let docs_index = repo.join("docs/index.md");
+    std::fs::set_permissions(&docs_index, std::fs::Permissions::from_mode(0o000))
+        .expect("lock docs index");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    std::fs::set_permissions(&docs_index, std::fs::Permissions::from_mode(0o600))
+        .expect("restore docs index");
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "catalog_input_read_error")
     );
 }
 

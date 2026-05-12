@@ -1535,11 +1535,76 @@ pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryRepo
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             let path = entry.path();
-            if entry.file_name() == "dist" || !regular_dir_exists(&path) {
+            if entry.file_name() == "dist" {
+                continue;
+            }
+            let directory = entry.file_name().to_string_lossy().to_string();
+            let metadata = match fs::symlink_metadata(&path) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: LocalDiagnosticSeverity::Warning,
+                        code: "skill_directory_stat_error".to_string(),
+                        skill: Some(directory),
+                        message: format!(
+                            "failed to inspect skill directory {}: {error}",
+                            path.display()
+                        ),
+                    });
+                    continue;
+                }
+            };
+            if metadata.file_type().is_symlink() {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "skill_directory_symlink".to_string(),
+                    skill: Some(directory),
+                    message: format!("skipping symlinked skill directory: {}", path.display()),
+                });
+                continue;
+            }
+            if !metadata.is_dir() {
                 continue;
             }
             let skill_md = path.join("SKILL.md");
-            if !regular_file_exists(&skill_md) {
+            let skill_md_metadata = match fs::symlink_metadata(&skill_md) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: LocalDiagnosticSeverity::Warning,
+                        code: "skill_entrypoint_stat_error".to_string(),
+                        skill: Some(directory),
+                        message: format!(
+                            "failed to inspect skill entrypoint {}: {error}",
+                            skill_md.display()
+                        ),
+                    });
+                    continue;
+                }
+            };
+            if skill_md_metadata.file_type().is_symlink() {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "skill_entrypoint_symlink".to_string(),
+                    skill: Some(directory),
+                    message: format!(
+                        "skipping symlinked skill entrypoint: {}",
+                        skill_md.display()
+                    ),
+                });
+                continue;
+            }
+            if !skill_md_metadata.is_file() {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "skill_entrypoint_not_regular".to_string(),
+                    skill: Some(directory),
+                    message: format!(
+                        "skipping non-regular skill entrypoint: {}",
+                        skill_md.display()
+                    ),
+                });
                 continue;
             }
             let skill = skill_inventory_entry(
@@ -1995,11 +2060,33 @@ fn looks_like_non_string_yaml_scalar(value: &str) -> bool {
     if value.starts_with('[') || value.starts_with('{') {
         return true;
     }
+    if looks_like_yaml_timestamp(value) || looks_like_yaml_sexagesimal_number(value) {
+        return true;
+    }
     let numberish = value
         .bytes()
         .all(|byte| byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.' | b'_'))
         && value.bytes().any(|byte| byte.is_ascii_digit());
     numberish && value.replace('_', "").parse::<f64>().is_ok()
+}
+
+fn looks_like_yaml_timestamp(value: &str) -> bool {
+    let bytes = value.trim().as_bytes();
+    bytes.len() >= 10
+        && bytes[0..4].iter().all(u8::is_ascii_digit)
+        && bytes[4] == b'-'
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[7] == b'-'
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
+        && (bytes.len() == 10 || matches!(bytes[10], b'T' | b't' | b' '))
+}
+
+fn looks_like_yaml_sexagesimal_number(value: &str) -> bool {
+    let value = value.trim();
+    value.contains(':')
+        && value
+            .split(':')
+            .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
 }
 
 fn parse_frontmatter_list(value: &str, lines: &[&str], index: &mut usize) -> Vec<String> {
@@ -2114,8 +2201,8 @@ fn read_optional_catalog_text(
     path: &Path,
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
 ) -> Result<String> {
-    match read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES)? {
-        Some(text) => {
+    match read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES) {
+        Ok(Some(text)) => {
             if text.truncated {
                 diagnostics.push(SkillInventoryDiagnostic {
                     severity: LocalDiagnosticSeverity::Warning,
@@ -2130,7 +2217,7 @@ fn read_optional_catalog_text(
             }
             Ok(text.text)
         }
-        None => {
+        Ok(None) => {
             if fs::symlink_metadata(path)
                 .map(|metadata| metadata.file_type().is_symlink())
                 .unwrap_or(false)
@@ -2145,6 +2232,15 @@ fn read_optional_catalog_text(
                     ),
                 });
             }
+            Ok(String::new())
+        }
+        Err(error) => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "catalog_input_read_error".to_string(),
+                skill: None,
+                message: format!("failed to read catalog input {}: {error:#}", path.display()),
+            });
             Ok(String::new())
         }
     }
