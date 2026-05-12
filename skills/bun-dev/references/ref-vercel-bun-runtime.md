@@ -679,7 +679,7 @@
 
 Last updated   November 10, 2025
 
-The Bun runtime   is  available  in [Beta](/docs/release-phases#beta)   on  [all  plans](/docs/plans)
+The Bun runtime   is  available  in [Beta](https://vercel.com/docs/release-phases#beta)   on  [all  plans](https://vercel.com/docs/plans)
 
 Bun is a fast, all-in-one JavaScript runtime that serves as an alternative to Node.js.
 
@@ -687,7 +687,7 @@ Bun provides Node.js API compatibility and is generally faster than Node.js for 
 
 ## Configuring the runtime
 
-For all frameworks, including Next.js, you can configure the runtime in your `vercel.json` file using the [`bunVersion`](/docs/project-configuration#bunversion) property.
+For all frameworks, including Next.js, you can configure the runtime in your `vercel.json` file using the [`bunVersion`](https://vercel.com/docs/project-configuration#bunversion) property.
 
 Once you configure the runtime version, Vercel manages the Bun minor and patch versions automatically, meaning you only need to set the major version. Currently, `"1.x"` is the only valid value.
 
@@ -705,7 +705,7 @@ only valid value currently.
 
 ### Next.js
 
-When using Next.js, and [ISR](/docs/incremental-static-regeneration), you must change your `build` and `dev` commands in your package.json file to use the Bun runtime:
+When using Next.js, and [ISR](https://vercel.com/docs/incremental-static-regeneration), you must change your `build` and `dev` commands in your package.json file to use the Bun runtime:
 
  Before:
 
@@ -731,7 +731,7 @@ When using Next.js, and [ISR](/docs/incremental-static-regeneration), you must c
 
 ### Routing Middleware
 
-The Bun runtime works with [Routing Middleware](/docs/routing-middleware) the same way as the Node.js runtime once you set the `bunVersion` in your `vercel.json` file. Note that you&#x27;ll also have to set the runtime config to `nodejs` in your    `middleware . ts`  file.
+The Bun runtime works with [Routing Middleware](https://vercel.com/docs/routing-middleware) the same way as the Node.js runtime once you set the `bunVersion` in your `vercel.json` file. Note that you&#x27;ll also have to set the runtime config to `nodejs` in your    `middleware . ts`  file.
 
 ## Feature support
 
@@ -749,19 +749,19 @@ Node.js Runtime
 
  Node.js APIs
 
-[Fluid compute](/docs/fluid-compute)
+[Fluid compute](https://vercel.com/docs/fluid-compute)
 
-[Active CPU](/docs/functions/usage-and-pricing#active-cpu)
+[Active CPU](https://vercel.com/docs/functions/usage-and-pricing#active-cpu)
 
-[Streaming](/docs/functions/streaming-functions)
+[Streaming](https://vercel.com/docs/functions/streaming-functions)
 
-[`waitUntil`](/docs/functions/functions-api-reference/vercel-functions-package#waituntil)
+[`waitUntil`](https://vercel.com/docs/functions/functions-api-reference/vercel-functions-package#waituntil)
 
-[Logs](/docs/functions/logs)
+[Logs](https://vercel.com/docs/functions/logs)
 
  Automatic source maps
 
-[Bytecode caching](/docs/fluid-compute#bytecode-caching)
+[Bytecode caching](https://vercel.com/docs/fluid-compute#bytecode-caching)
 
  Request metrics (node:http/https)
 
@@ -769,7 +769,7 @@ Node.js Runtime
 
 ## Supported APIs
 
-Vercel Functions using the Bun runtime support [most Node.js APIs](https://bun.sh/docs/runtime/nodejs-apis), including standard Web APIs such as the [Request and Response Objects](/docs/functions/runtimes/node-js#node.js-request-and-response-objects).
+Vercel Functions using the Bun runtime support [most Node.js APIs](https://bun.sh/docs/runtime/nodejs-apis), including standard Web APIs such as the [Request and Response Objects](https://vercel.com/docs/functions/runtimes/node-js#node.js-request-and-response-objects).
 
 ## Using TypeScript with Bun
 
@@ -808,7 +808,7 @@ Consider using Node.js instead if:
 
 - You need request metrics on the  node:http  or  node:https  modules
 
-Both runtimes run on [Fluid compute](/docs/fluid-compute) and support the same core Vercel Functions features.
+Both runtimes run on [Fluid compute](https://vercel.com/docs/fluid-compute) and support the same core Vercel Functions features.
 
 Was this helpful?
 

@@ -198,7 +198,7 @@ dmc.NotificationProvider([
 dmc.NotificationContainer()  # Single component, no nesting
 ```
 
-See [Notification Migration Guide](/migration-notifications) for details.
+See [Notification Migration Guide](https://www.dash-mantine-components.com/migration-notifications) for details.
 
 **Note:** Old components still work but are deprecated and will be removed in future release.
 
@@ -406,9 +406,9 @@ dmc.NotificationContainer(position="top-right")
 
 ## Resources
 
-- [DMC 2.0.0 Release Notes](/release-2-0-0)
+- [DMC 2.0.0 Release Notes](https://www.dash-mantine-components.com/release-2-0-0)
 - [Mantine 8.0.0 Changelog](https://mantine.dev/changelog/8-0-0/)
-- [Notification Migration Guide](/migration-notifications)
+- [Notification Migration Guide](https://www.dash-mantine-components.com/migration-notifications)
 - [DMC GitHub Issues](https://github.com/snehilvj/dash-mantine-components/issues)
 
 ## Getting Help

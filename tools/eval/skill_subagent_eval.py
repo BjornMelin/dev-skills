@@ -27,6 +27,7 @@ import yaml
 SCHEMA = "skill_eval_report.v1"
 TAIL_CHARS = 4000
 CHECK_TIMEOUT_SECONDS = 120
+GIT_LS_FILES_TIMEOUT_SECONDS = 30
 SCRIPT_CHECK_TIMEOUT_SECONDS = 20
 
 GENERATED_DIR_NAMES = {
@@ -478,8 +479,6 @@ def check_skill_local_links(
             if should_skip_link_target(target):
                 continue
             resolved = resolve_markdown_target(root, markdown_file, target)
-            if target.startswith("/") and not resolved.exists():
-                continue
             checked_links += 1
             if not resolved.exists():
                 findings.append(
@@ -911,13 +910,20 @@ def load_quick_validator(
 
 def tracked_files(root: Path, prefix: str) -> set[Path]:
     """Return tracked files below a repo prefix."""
+    command = ["git", "ls-files", "-z", "--", prefix]
     try:
         completed = subprocess.run(  # noqa: S603
-            ["git", "ls-files", "-z", "--", prefix],
+            command,
             cwd=root,
             check=True,
             capture_output=True,
+            timeout=GIT_LS_FILES_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            f"git ls-files timed out for prefix {prefix!r} "
+            f"after {GIT_LS_FILES_TIMEOUT_SECONDS}s"
+        ) from error
     except (OSError, subprocess.CalledProcessError):
         return {path for path in (root / prefix).rglob("*") if path.is_file()}
     files = set()
