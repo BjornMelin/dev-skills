@@ -699,6 +699,13 @@ description: Linked skill.
     assert_eq!(alpha["resources"]["assets"]["capped"], true);
     assert_eq!(alpha["exposure"]["readme_catalog"], false);
     assert!(
+        !alpha["underbuilt_signals"]
+            .as_array()
+            .expect("alpha signals")
+            .iter()
+            .any(|signal| signal.as_str() == Some("missing_readme_catalog"))
+    );
+    assert!(
         json["result"]["diagnostics"]
             .as_array()
             .expect("diagnostics")
@@ -722,6 +729,57 @@ description: Linked skill.
                 |diagnostic| diagnostic["code"] == "resource_directory_symlink"
                     && diagnostic["skill"] == "alpha-skill"
             )
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn skills_inventory_rejects_symlinked_skills_root_without_missing_root_signal() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let external_skills = temp.path().join("external-skills");
+    std::fs::create_dir_all(repo.join("docs/runbooks")).expect("repo dir");
+    std::fs::create_dir_all(&external_skills).expect("external skills dir");
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
+    std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+        .expect("repo validation");
+    symlink(&external_skills, repo.join("skills")).expect("skills root symlink");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["ok"], false);
+    assert_eq!(json["result"]["total"], 0);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "unsafe_skills_root")
+    );
+    assert!(
+        !json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "missing_skills_root")
     );
 }
 
@@ -762,6 +820,15 @@ fn skills_inventory_reports_catalog_read_errors() {
             .iter()
             .any(|diagnostic| diagnostic["code"] == "catalog_input_read_error")
     );
+    for skill in json["result"]["skills"].as_array().expect("skills") {
+        assert!(
+            !skill["underbuilt_signals"]
+                .as_array()
+                .expect("signals")
+                .iter()
+                .any(|signal| signal.as_str() == Some("missing_docs_index_exposure"))
+        );
+    }
 }
 
 #[test]

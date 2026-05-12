@@ -943,6 +943,17 @@ struct BoundedText {
     truncated: bool,
 }
 
+struct CatalogInputText {
+    text: String,
+    reliable_for_missing_signals: bool,
+}
+
+#[derive(Clone, Copy)]
+struct CatalogInputReliability {
+    readme: bool,
+    docs_index: bool,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct PolicyDocsCheckResult {
     pub schema: &'static str,
@@ -1520,114 +1531,172 @@ pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryRepo
     let docs_index =
         read_optional_catalog_text(&repo_root.join("docs/index.md"), &mut diagnostics)?;
     let mut skills = Vec::new();
-    if !regular_dir_exists(&skills_root) {
-        diagnostics.push(SkillInventoryDiagnostic {
-            severity: LocalDiagnosticSeverity::Error,
-            code: "missing_skills_root".to_string(),
-            skill: None,
-            message: format!("skills root does not exist: {}", skills_root.display()),
-        });
-    } else {
-        let mut entries = fs::read_dir(&skills_root)
-            .with_context(|| format!("failed to read skills root {}", skills_root.display()))?
-            .collect::<std::io::Result<Vec<_>>>()
-            .with_context(|| format!("failed to list skills root {}", skills_root.display()))?;
-        entries.sort_by_key(|entry| entry.file_name());
-        for entry in entries {
-            let path = entry.path();
-            if entry.file_name() == "dist" {
-                continue;
-            }
-            let directory = entry.file_name().to_string_lossy().to_string();
-            let metadata = match fs::symlink_metadata(&path) {
-                Ok(metadata) => metadata,
+    match fs::symlink_metadata(&skills_root) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "missing_skills_root".to_string(),
+                skill: None,
+                message: format!("skills root does not exist: {}", skills_root.display()),
+            });
+        }
+        Err(error) => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "skills_root_stat_error".to_string(),
+                skill: None,
+                message: format!(
+                    "failed to inspect skills root {}: {error}",
+                    skills_root.display()
+                ),
+            });
+        }
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "unsafe_skills_root".to_string(),
+                skill: None,
+                message: format!(
+                    "refusing to inventory symlinked skills root: {}",
+                    skills_root.display()
+                ),
+            });
+        }
+        Ok(metadata) if !metadata.is_dir() => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "invalid_skills_root".to_string(),
+                skill: None,
+                message: format!("skills root is not a directory: {}", skills_root.display()),
+            });
+        }
+        Ok(_) => {
+            let mut entries = match fs::read_dir(&skills_root) {
+                Ok(entries) => match entries.collect::<std::io::Result<Vec<_>>>() {
+                    Ok(entries) => entries,
+                    Err(error) => {
+                        diagnostics.push(SkillInventoryDiagnostic {
+                            severity: LocalDiagnosticSeverity::Error,
+                            code: "unreadable_skills_root".to_string(),
+                            skill: None,
+                            message: format!(
+                                "failed to list skills root {}: {error}",
+                                skills_root.display()
+                            ),
+                        });
+                        Vec::new()
+                    }
+                },
                 Err(error) => {
                     diagnostics.push(SkillInventoryDiagnostic {
-                        severity: LocalDiagnosticSeverity::Warning,
-                        code: "skill_directory_stat_error".to_string(),
-                        skill: Some(directory),
+                        severity: LocalDiagnosticSeverity::Error,
+                        code: "unreadable_skills_root".to_string(),
+                        skill: None,
                         message: format!(
-                            "failed to inspect skill directory {}: {error}",
-                            path.display()
+                            "failed to read skills root {}: {error}",
+                            skills_root.display()
                         ),
+                    });
+                    Vec::new()
+                }
+            };
+            entries.sort_by_key(|entry| entry.file_name());
+            for entry in entries {
+                let path = entry.path();
+                if entry.file_name() == "dist" {
+                    continue;
+                }
+                let directory = entry.file_name().to_string_lossy().to_string();
+                let metadata = match fs::symlink_metadata(&path) {
+                    Ok(metadata) => metadata,
+                    Err(error) => {
+                        diagnostics.push(SkillInventoryDiagnostic {
+                            severity: LocalDiagnosticSeverity::Warning,
+                            code: "skill_directory_stat_error".to_string(),
+                            skill: Some(directory),
+                            message: format!(
+                                "failed to inspect skill directory {}: {error}",
+                                path.display()
+                            ),
+                        });
+                        continue;
+                    }
+                };
+                if metadata.file_type().is_symlink() {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: LocalDiagnosticSeverity::Warning,
+                        code: "skill_directory_symlink".to_string(),
+                        skill: Some(directory),
+                        message: format!("skipping symlinked skill directory: {}", path.display()),
                     });
                     continue;
                 }
-            };
-            if metadata.file_type().is_symlink() {
-                diagnostics.push(SkillInventoryDiagnostic {
-                    severity: LocalDiagnosticSeverity::Warning,
-                    code: "skill_directory_symlink".to_string(),
-                    skill: Some(directory),
-                    message: format!("skipping symlinked skill directory: {}", path.display()),
-                });
-                continue;
-            }
-            if !metadata.is_dir() {
-                continue;
-            }
-            let skill_md = path.join("SKILL.md");
-            let skill_md_metadata = match fs::symlink_metadata(&skill_md) {
-                Ok(metadata) => metadata,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => {
+                if !metadata.is_dir() {
+                    continue;
+                }
+                let skill_md = path.join("SKILL.md");
+                let skill_md_metadata = match fs::symlink_metadata(&skill_md) {
+                    Ok(metadata) => metadata,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                    Err(error) => {
+                        diagnostics.push(SkillInventoryDiagnostic {
+                            severity: LocalDiagnosticSeverity::Warning,
+                            code: "skill_entrypoint_stat_error".to_string(),
+                            skill: Some(directory),
+                            message: format!(
+                                "failed to inspect skill entrypoint {}: {error}",
+                                skill_md.display()
+                            ),
+                        });
+                        continue;
+                    }
+                };
+                if skill_md_metadata.file_type().is_symlink() {
                     diagnostics.push(SkillInventoryDiagnostic {
                         severity: LocalDiagnosticSeverity::Warning,
-                        code: "skill_entrypoint_stat_error".to_string(),
+                        code: "skill_entrypoint_symlink".to_string(),
                         skill: Some(directory),
                         message: format!(
-                            "failed to inspect skill entrypoint {}: {error}",
+                            "skipping symlinked skill entrypoint: {}",
                             skill_md.display()
                         ),
                     });
                     continue;
                 }
-            };
-            if skill_md_metadata.file_type().is_symlink() {
-                diagnostics.push(SkillInventoryDiagnostic {
-                    severity: LocalDiagnosticSeverity::Warning,
-                    code: "skill_entrypoint_symlink".to_string(),
-                    skill: Some(directory),
-                    message: format!(
-                        "skipping symlinked skill entrypoint: {}",
-                        skill_md.display()
-                    ),
-                });
-                continue;
+                if !skill_md_metadata.is_file() {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: LocalDiagnosticSeverity::Warning,
+                        code: "skill_entrypoint_not_regular".to_string(),
+                        skill: Some(directory),
+                        message: format!(
+                            "skipping non-regular skill entrypoint: {}",
+                            skill_md.display()
+                        ),
+                    });
+                    continue;
+                }
+                let skill = skill_inventory_entry(
+                    &repo_root,
+                    &path,
+                    &skill_md,
+                    &readme,
+                    &docs_index,
+                    &mut diagnostics,
+                )?;
+                if !skill.validation.valid {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: LocalDiagnosticSeverity::Error,
+                        code: "invalid_skill_metadata".to_string(),
+                        skill: Some(skill.directory.clone()),
+                        message: format!(
+                            "{} has {} metadata validation error(s)",
+                            skill.directory,
+                            skill.validation.errors.len()
+                        ),
+                    });
+                }
+                skills.push(skill);
             }
-            if !skill_md_metadata.is_file() {
-                diagnostics.push(SkillInventoryDiagnostic {
-                    severity: LocalDiagnosticSeverity::Warning,
-                    code: "skill_entrypoint_not_regular".to_string(),
-                    skill: Some(directory),
-                    message: format!(
-                        "skipping non-regular skill entrypoint: {}",
-                        skill_md.display()
-                    ),
-                });
-                continue;
-            }
-            let skill = skill_inventory_entry(
-                &repo_root,
-                &path,
-                &skill_md,
-                &readme,
-                &docs_index,
-                &mut diagnostics,
-            )?;
-            if !skill.validation.valid {
-                diagnostics.push(SkillInventoryDiagnostic {
-                    severity: LocalDiagnosticSeverity::Error,
-                    code: "invalid_skill_metadata".to_string(),
-                    skill: Some(skill.directory.clone()),
-                    message: format!(
-                        "{} has {} metadata validation error(s)",
-                        skill.directory,
-                        skill.validation.errors.len()
-                    ),
-                });
-            }
-            skills.push(skill);
         }
     }
 
@@ -1654,8 +1723,8 @@ fn skill_inventory_entry(
     repo_root: &Path,
     skill_dir: &Path,
     skill_md: &Path,
-    readme: &str,
-    docs_index: &str,
+    readme: &CatalogInputText,
+    docs_index: &CatalogInputText,
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
 ) -> Result<SkillInventoryEntry> {
     let directory = skill_dir
@@ -1689,9 +1758,9 @@ fn skill_inventory_entry(
     let catalog_name = safe_inventory_skill_name(name.as_deref(), &directory);
     let resources = skill_resource_inventory(repo_root, skill_dir, &directory, diagnostics);
     let exposure = SkillExposure {
-        readme_catalog: skill_catalog_present(readme, catalog_name),
-        docs_index: skill_catalog_present(docs_index, catalog_name)
-            || docs_index.contains(&format!("skills/{catalog_name}/")),
+        readme_catalog: skill_catalog_present(&readme.text, catalog_name),
+        docs_index: skill_catalog_present(&docs_index.text, catalog_name)
+            || docs_index.text.contains(&format!("skills/{catalog_name}/")),
     };
     let package_path = format!("skills/dist/{catalog_name}.skill");
     let package = SkillPackageStatus {
@@ -1702,7 +1771,17 @@ fn skill_inventory_entry(
         valid: errors.is_empty(),
         errors,
     };
-    let underbuilt_signals = skill_underbuilt_signals(&resources, &exposure, &package, &validation);
+    let catalog_reliability = CatalogInputReliability {
+        readme: readme.reliable_for_missing_signals,
+        docs_index: docs_index.reliable_for_missing_signals,
+    };
+    let underbuilt_signals = skill_underbuilt_signals(
+        &resources,
+        &exposure,
+        &package,
+        &validation,
+        catalog_reliability,
+    );
 
     Ok(SkillInventoryEntry {
         directory,
@@ -1943,12 +2022,6 @@ fn count_regular_files_bounded(
     Ok((count, capped))
 }
 
-fn regular_dir_exists(path: &Path) -> bool {
-    fs::symlink_metadata(path)
-        .map(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
-        .unwrap_or(false)
-}
-
 fn regular_file_exists(path: &Path) -> bool {
     fs::symlink_metadata(path)
         .map(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
@@ -1973,15 +2046,16 @@ fn skill_underbuilt_signals(
     exposure: &SkillExposure,
     package: &SkillPackageStatus,
     validation: &SkillValidationStatus,
+    catalogs: CatalogInputReliability,
 ) -> Vec<String> {
     let mut signals = Vec::new();
     if !validation.valid {
         signals.push("invalid_frontmatter".to_string());
     }
-    if !exposure.readme_catalog {
+    if catalogs.readme && !exposure.readme_catalog {
         signals.push("missing_readme_catalog".to_string());
     }
-    if !exposure.docs_index {
+    if catalogs.docs_index && !exposure.docs_index {
         signals.push("missing_docs_index_exposure".to_string());
     }
     if !package.present {
@@ -2279,7 +2353,7 @@ fn clean_frontmatter_scalar(value: &str) -> String {
 fn read_optional_catalog_text(
     path: &Path,
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
-) -> Result<String> {
+) -> Result<CatalogInputText> {
     match read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES) {
         Ok(Some(text)) => {
             if text.truncated {
@@ -2294,13 +2368,32 @@ fn read_optional_catalog_text(
                     ),
                 });
             }
-            Ok(text.text)
+            Ok(CatalogInputText {
+                text: text.text,
+                reliable_for_missing_signals: !text.truncated,
+            })
         }
-        Ok(None) => {
-            if fs::symlink_metadata(path)
-                .map(|metadata| metadata.file_type().is_symlink())
-                .unwrap_or(false)
-            {
+        Ok(None) => match fs::symlink_metadata(path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(CatalogInputText {
+                text: String::new(),
+                reliable_for_missing_signals: true,
+            }),
+            Err(error) => {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "catalog_input_stat_error".to_string(),
+                    skill: None,
+                    message: format!(
+                        "failed to inspect catalog input {}: {error}",
+                        path.display()
+                    ),
+                });
+                Ok(CatalogInputText {
+                    text: String::new(),
+                    reliable_for_missing_signals: false,
+                })
+            }
+            Ok(metadata) if metadata.file_type().is_symlink() => {
                 diagnostics.push(SkillInventoryDiagnostic {
                     severity: LocalDiagnosticSeverity::Warning,
                     code: "catalog_input_symlink".to_string(),
@@ -2310,9 +2403,27 @@ fn read_optional_catalog_text(
                         path.display()
                     ),
                 });
+                Ok(CatalogInputText {
+                    text: String::new(),
+                    reliable_for_missing_signals: false,
+                })
             }
-            Ok(String::new())
-        }
+            Ok(_) => {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "catalog_input_not_regular".to_string(),
+                    skill: None,
+                    message: format!(
+                        "skipping non-regular catalog input for skill inventory: {}",
+                        path.display()
+                    ),
+                });
+                Ok(CatalogInputText {
+                    text: String::new(),
+                    reliable_for_missing_signals: false,
+                })
+            }
+        },
         Err(error) => {
             diagnostics.push(SkillInventoryDiagnostic {
                 severity: LocalDiagnosticSeverity::Warning,
@@ -2320,7 +2431,10 @@ fn read_optional_catalog_text(
                 skill: None,
                 message: format!("failed to read catalog input {}: {error:#}", path.display()),
             });
-            Ok(String::new())
+            Ok(CatalogInputText {
+                text: String::new(),
+                reliable_for_missing_signals: false,
+            })
         }
     }
 }
