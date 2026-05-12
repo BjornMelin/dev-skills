@@ -175,7 +175,7 @@ inventory contract lives at `result.schema: "skill_inventory.v1"`. It walks
 immediate non-symlinked `skills/*/SKILL.md` entrypoints, parses bounded shallow
 AgentSkills frontmatter fields, counts optional non-symlinked `references/`,
 `scripts/`, `assets/`, `templates/`, and `agents/` resources with bounded depth
-and file-count caps, checks README and `docs/index.md` mention/link exposure
+and entry-count caps, checks README and `docs/index.md` mention/link exposure
 heuristics from regular non-symlinked files, reports local
 `skills/dist/<skill>.skill` bundle presence using the frontmatter name only
 when it is valid and directory-matching and otherwise falls back to the

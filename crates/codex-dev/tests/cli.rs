@@ -410,6 +410,55 @@ description: Traversal skill.
     assert_eq!(traversal_skill["package"]["present"], false);
 }
 
+#[test]
+fn skills_inventory_accepts_yaml_inline_comments_in_scalars() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let commented = repo.join("skills/commented-skill");
+    std::fs::create_dir_all(&commented).expect("commented skill dir");
+    std::fs::write(
+        commented.join("SKILL.md"),
+        r#"---
+name: commented-skill # catalog identity
+description: Commented skill description. # human note
+---
+
+# Commented
+"#,
+    )
+    .expect("commented skill");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let commented_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "commented-skill")
+        .expect("commented skill entry");
+    assert_eq!(commented_skill["name"], "commented-skill");
+    assert_eq!(
+        commented_skill["description"],
+        "Commented skill description."
+    );
+    assert_eq!(commented_skill["validation"]["valid"], true);
+}
+
 #[cfg(unix)]
 #[test]
 fn skills_inventory_ignores_symlinked_skill_and_resource_paths() {

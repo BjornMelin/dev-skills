@@ -37,7 +37,10 @@ const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
 const SKILL_INVENTORY_SCHEMA: &str = "skill_inventory.v1";
 const SKILL_INVENTORY_MAX_TEXT_BYTES: u64 = 1024 * 1024;
-const SKILL_INVENTORY_MAX_RESOURCE_FILES: usize = 10_000;
+#[cfg(not(test))]
+const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 10_000;
+#[cfg(test)]
+const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 32;
 const SKILL_INVENTORY_MAX_RESOURCE_DEPTH: usize = 16;
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
@@ -1539,7 +1542,14 @@ pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryRepo
             if !regular_file_exists(&skill_md) {
                 continue;
             }
-            let skill = skill_inventory_entry(&repo_root, &path, &skill_md, &readme, &docs_index)?;
+            let skill = skill_inventory_entry(
+                &repo_root,
+                &path,
+                &skill_md,
+                &readme,
+                &docs_index,
+                &mut diagnostics,
+            )?;
             if !skill.validation.valid {
                 diagnostics.push(SkillInventoryDiagnostic {
                     severity: LocalDiagnosticSeverity::Error,
@@ -1581,6 +1591,7 @@ fn skill_inventory_entry(
     skill_md: &Path,
     readme: &str,
     docs_index: &str,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
 ) -> Result<SkillInventoryEntry> {
     let directory = skill_dir
         .file_name()
@@ -1611,7 +1622,7 @@ fn skill_inventory_entry(
 
     let name = frontmatter.and_then(|frontmatter| frontmatter.name.clone());
     let catalog_name = safe_inventory_skill_name(name.as_deref(), &directory);
-    let resources = skill_resource_inventory(repo_root, skill_dir);
+    let resources = skill_resource_inventory(repo_root, skill_dir, &directory, diagnostics);
     let exposure = SkillExposure {
         readme_catalog: skill_catalog_present(readme, catalog_name),
         docs_index: skill_catalog_present(docs_index, catalog_name)
@@ -1723,21 +1734,46 @@ fn is_valid_skill_name(name: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
 }
 
-fn skill_resource_inventory(repo_root: &Path, skill_dir: &Path) -> SkillResourceInventory {
+fn skill_resource_inventory(
+    repo_root: &Path,
+    skill_dir: &Path,
+    skill: &str,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
+) -> SkillResourceInventory {
     SkillResourceInventory {
-        references: skill_resource_status(repo_root, skill_dir, "references"),
-        scripts: skill_resource_status(repo_root, skill_dir, "scripts"),
-        assets: skill_resource_status(repo_root, skill_dir, "assets"),
-        templates: skill_resource_status(repo_root, skill_dir, "templates"),
-        agents: skill_resource_status(repo_root, skill_dir, "agents"),
+        references: skill_resource_status(repo_root, skill_dir, skill, "references", diagnostics),
+        scripts: skill_resource_status(repo_root, skill_dir, skill, "scripts", diagnostics),
+        assets: skill_resource_status(repo_root, skill_dir, skill, "assets", diagnostics),
+        templates: skill_resource_status(repo_root, skill_dir, skill, "templates", diagnostics),
+        agents: skill_resource_status(repo_root, skill_dir, skill, "agents", diagnostics),
     }
 }
 
-fn skill_resource_status(repo_root: &Path, skill_dir: &Path, name: &str) -> SkillResourceStatus {
+fn skill_resource_status(
+    repo_root: &Path,
+    skill_dir: &Path,
+    skill: &str,
+    name: &str,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
+) -> SkillResourceStatus {
     let path = skill_dir.join(name);
     let present = regular_dir_exists(&path);
     let (files, capped) = if present {
-        count_regular_files(&path).unwrap_or((0, false))
+        match count_regular_files(&path) {
+            Ok(counts) => counts,
+            Err(error) => {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "resource_count_failed".to_string(),
+                    skill: Some(skill.to_string()),
+                    message: format!(
+                        "failed to count resource directory {}: {error:#}",
+                        path.display()
+                    ),
+                });
+                (0, true)
+            }
+        }
     } else {
         (0, false)
     };
@@ -1750,7 +1786,7 @@ fn skill_resource_status(repo_root: &Path, skill_dir: &Path, name: &str) -> Skil
 }
 
 fn count_regular_files(path: &Path) -> Result<(usize, bool)> {
-    let mut remaining = SKILL_INVENTORY_MAX_RESOURCE_FILES;
+    let mut remaining = SKILL_INVENTORY_MAX_RESOURCE_ENTRIES;
     count_regular_files_bounded(path, 0, &mut remaining)
 }
 
@@ -1772,6 +1808,7 @@ fn count_regular_files_bounded(
             break;
         }
         let entry = entry?;
+        *remaining = remaining.saturating_sub(1);
         let metadata = fs::symlink_metadata(entry.path())
             .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
         let file_type = metadata.file_type();
@@ -1785,7 +1822,6 @@ fn count_regular_files_bounded(
             capped |= nested_capped;
         } else if file_type.is_file() {
             count += 1;
-            *remaining = remaining.saturating_sub(1);
         }
     }
     Ok((count, capped))
@@ -1933,6 +1969,7 @@ fn validate_string_scalar(field: &str, value: &str) -> std::result::Result<(), S
             "invalid YAML in frontmatter: unterminated quoted string for '{field}'"
         ));
     }
+    let value = strip_yaml_inline_comment(value).trim();
     if looks_like_non_string_yaml_scalar(value) {
         return Err(format!("frontmatter '{field}' must be a string scalar"));
     }
@@ -1978,6 +2015,24 @@ fn parse_frontmatter_list(value: &str, lines: &[&str], index: &mut usize) -> Vec
         .into_iter()
         .filter(|value| !value.is_empty())
         .collect()
+}
+
+fn strip_yaml_inline_comment(value: &str) -> &str {
+    if value.starts_with('"') || value.starts_with('\'') {
+        return value;
+    }
+    for (index, character) in value.char_indices() {
+        if character == '#'
+            && (index == 0
+                || value[..index]
+                    .chars()
+                    .last()
+                    .is_some_and(char::is_whitespace))
+        {
+            return &value[..index];
+        }
+    }
+    value
 }
 
 fn collect_frontmatter_block(lines: &[&str], index: &mut usize, folded: bool) -> String {
@@ -2029,7 +2084,7 @@ fn clean_frontmatter_scalar(value: &str) -> String {
     {
         &value[1..value.len() - 1]
     } else {
-        value
+        strip_yaml_inline_comment(value)
     };
     value.trim().to_string()
 }
@@ -7227,6 +7282,21 @@ mod tests {
             policy_manifest: policy_manifest(PolicyProfile::CodexDev, created_at),
             force: false,
         }
+    }
+
+    #[test]
+    fn skills_inventory_resource_walk_caps_directory_entries() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("resources");
+        fs::create_dir_all(&root).expect("resource root");
+        for index in 0..(SKILL_INVENTORY_MAX_RESOURCE_ENTRIES + 2) {
+            fs::create_dir_all(root.join(format!("dir-{index}"))).expect("resource child dir");
+        }
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        assert_eq!(files, 0);
+        assert!(capped);
     }
 
     #[test]

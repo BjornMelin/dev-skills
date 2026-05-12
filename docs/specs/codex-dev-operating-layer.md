@@ -117,7 +117,9 @@ directory name, shallow frontmatter validation, and non-blocking underbuilt
 signals.
 
 Resource counts carry `capped: true` when the inventory hit its defensive
-resource depth or file-count limit before completing a directory walk.
+resource depth or entry-count limit before completing a directory walk. Count
+failures are reported as warning diagnostics and mark the affected resource
+status as capped.
 
 Validation is deliberately a shallow Rust subset of the durable public rules in
 `tools/skill/quick_validate.py`: frontmatter must exist, use allowed keys, carry
