@@ -77,6 +77,21 @@ class AiStackScanTests(unittest.TestCase):
         ]
         self.assertEqual(message_signals[0]["path"], "a/component.ts")
 
+    def test_repo_level_signals_use_stable_sentinel_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "component.ts").write_text(
+                "import { useChat } from '@ai-sdk/react';\n",
+                encoding="utf-8",
+            )
+
+            data = run_scan(root, "--family", "ai-sdk-ui")
+
+        missing_package = [
+            signal for signal in data["signals"] if signal["id"] == "ai_sdk_ui_missing_react_package"
+        ]
+        self.assertEqual(missing_package[0]["path"], "<repo-root>")
+
     def test_supabase_service_role_public_env_is_redacted(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

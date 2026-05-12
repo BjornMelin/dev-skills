@@ -92,6 +92,7 @@ PUBLIC_ENV_RE = re.compile(r"\b(?:NEXT_PUBLIC|VITE|PUBLIC|EXPO_PUBLIC)_[A-Z0-9_]
 SERVICE_ROLE_NAME_RE = re.compile(r"\b[A-Z0-9_]*SUPABASE[A-Z0-9_]*SERVICE[_-]?ROLE[A-Z0-9_]*\b", re.I)
 JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
 REDACTED = "[redacted]"
+REPO_ROOT_PATH = "<repo-root>"
 
 
 def parse_args() -> argparse.Namespace:
@@ -693,12 +694,11 @@ def add_package_signals(
 def add_cross_file_signals(
     signals: list[dict[str, Any]],
     root: Path,
-    files: dict[str, str],
+    context: dict[str, bool],
     packages: dict[str, list[dict[str, str]]],
     families: set[str],
 ) -> None:
-    all_text = "\n".join(files.values())
-    if "streamdown" in families and has_package(packages, "streamdown") and "streamdown/dist" not in all_text:
+    if "streamdown" in families and has_package(packages, "streamdown") and not context["streamdown_dist_seen"]:
         first_manifest = packages["streamdown"][0]["path"]
         add_signal(
             signals,
@@ -710,20 +710,20 @@ def add_cross_file_signals(
             docs=DOCS["streamdown"]["migration"],
         )
 
-    if "ai-sdk-ui" in families and "@ai-sdk/react" in all_text and not has_package(packages, "@ai-sdk/react"):
+    if "ai-sdk-ui" in families and context["ai_sdk_react_import_seen"] and not has_package(packages, "@ai-sdk/react"):
         add_signal(
             signals,
             family="ai-sdk-ui",
             signal_id="ai_sdk_ui_missing_react_package",
             severity="warning",
-            path=rel(root, root),
+            path=REPO_ROOT_PATH,
             message="Source imports @ai-sdk/react but no package.json dependency was found.",
             docs=DOCS["ai-sdk-ui"]["primary"],
         )
 
     if (
         "streamdown" in families
-        and ("from 'streamdown'" in all_text or 'from "streamdown"' in all_text)
+        and context["streamdown_import_seen"]
         and not has_package(packages, "streamdown")
     ):
         add_signal(
@@ -731,7 +731,7 @@ def add_cross_file_signals(
             family="streamdown",
             signal_id="streamdown_import_missing_dependency",
             severity="warning",
-            path=rel(root, root),
+            path=REPO_ROOT_PATH,
             message="Source imports streamdown but no package.json dependency was found.",
             docs=DOCS["streamdown"]["primary"],
         )
@@ -743,20 +743,28 @@ def scan_sources(
     max_files: int,
     max_dirs: int,
     max_bytes: int,
-) -> tuple[list[dict[str, Any]], dict[str, str]]:
+) -> tuple[list[dict[str, Any]], dict[str, bool]]:
     signals: list[dict[str, Any]] = []
-    files: dict[str, str] = {}
+    context = {
+        "ai_sdk_react_import_seen": False,
+        "streamdown_dist_seen": False,
+        "streamdown_import_seen": False,
+    }
     for path in iter_repo_files(root, max_files=max_files, max_dirs=max_dirs):
         text = read_source(path, max_bytes)
         if text is None:
             continue
         relative = rel(root, path)
-        files[relative] = text
+        context["ai_sdk_react_import_seen"] = context["ai_sdk_react_import_seen"] or "@ai-sdk/react" in text
+        context["streamdown_dist_seen"] = context["streamdown_dist_seen"] or "streamdown/dist" in text
+        context["streamdown_import_seen"] = context["streamdown_import_seen"] or (
+            "from 'streamdown'" in text or 'from "streamdown"' in text
+        )
         scan_ai_sdk(text, relative, signals, families)
         scan_streamdown(text, relative, signals, families)
         scan_zod(text, relative, signals, families)
         scan_supabase(text, relative, signals, families)
-    return signals, files
+    return signals, context
 
 
 def summarize(signals: list[dict[str, Any]], packages: list[dict[str, Any]], families: set[str]) -> dict[str, Any]:
@@ -782,11 +790,11 @@ def main() -> int:
         max_manifests=args.max_manifests,
     )
     packages = package_rows(packages_by_name, families)
-    source_signals, files = scan_sources(root, families, args.max_files, args.max_dirs, args.max_bytes)
+    source_signals, context = scan_sources(root, families, args.max_files, args.max_dirs, args.max_bytes)
     signals: list[dict[str, Any]] = []
     add_package_signals(signals, packages_by_name, packages, families)
     signals.extend(source_signals)
-    add_cross_file_signals(signals, root, files, packages_by_name, families)
+    add_cross_file_signals(signals, root, context, packages_by_name, families)
     signals.sort(key=lambda item: (item["severity"], item["family"], item["path"], item.get("line", 0), item["id"]))
     if not args.include_evidence:
         for signal in signals:

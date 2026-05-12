@@ -16,6 +16,7 @@ python3 skills/ai-sdk-core/scripts/ai_stack_scan.py --root <repo> --pretty
 Skill-local wrappers default to the matching family:
 
 ```bash
+python3 skills/ai-sdk-agents/scripts/ai_stack_scan.py --root <repo> --pretty
 python3 skills/ai-sdk-ui/scripts/ai_stack_scan.py --root <repo> --pretty
 python3 skills/streamdown/scripts/ai_stack_scan.py --root <repo> --pretty
 python3 skills/zod-v4/scripts/ai_stack_scan.py --root <repo> --pretty
