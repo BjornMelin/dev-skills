@@ -158,6 +158,7 @@ cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json task list
+cargo run -q -p codex-dev -- --json research import-bundle --help
 cargo run -q -p codex-dev -- --json orchestration verify --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help

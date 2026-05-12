@@ -33,6 +33,63 @@ fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
+fn write_research_bundle_fixture(root: &std::path::Path, schema: &str) -> std::path::PathBuf {
+    let path = root.join("evidence-bundle.json");
+    std::fs::write(
+        &path,
+        format!(
+            r#"{{
+  "schema": "{schema}",
+  "generated_at": "2026-05-11T12:00:00Z",
+  "status": "passed",
+  "strict": true,
+  "run": {{
+    "path": ".codex/research/run.json",
+    "query": "verify package upgrade behavior",
+    "profile": "deep",
+    "topic": "dependency",
+    "status": "closed",
+    "cache_source_ids": ["src-official-docs"]
+  }},
+  "budget": {{
+    "by_provider": [
+      {{"provider": "github", "budget": 8, "spent": 2, "remaining": 6}},
+      {{"provider": "context7", "budget": 4, "spent": 1, "remaining": 3}}
+    ]
+  }},
+  "provider_errors": [],
+  "ledger": {{
+    "path": ".codex/research/ledger.jsonl",
+    "source_count": 2,
+    "claim_count": 2,
+    "source_ids": ["src-official-docs", "src-github-source"],
+    "claim_ids": ["claim-official-docs-first", "claim-source-hydrated"]
+  }},
+  "citation_coverage": {{
+    "cited_claims": 2,
+    "uncited_claims": 0,
+    "uncited_claim_ids": [],
+    "missing_source_refs": [],
+    "coverage": 1.0
+  }},
+  "source_freshness": {{
+    "by_status": {{"current": 2}},
+    "unknown_source_ids": []
+  }},
+  "report": {{
+    "path": ".codex/research/report.md",
+    "exists": true
+  }},
+  "artifacts": [".codex/research/evidence-bundle.json"],
+  "warnings": [],
+  "failures": []
+}}"#
+        ),
+    )
+    .expect("write research bundle fixture");
+    path
+}
+
 #[test]
 fn codex_dev_generates_shell_completion() {
     Command::cargo_bin("codex-dev")
@@ -4292,6 +4349,362 @@ fn evidence_append_records_typed_entries_and_status_counts() {
         .find(|kind| kind["kind"] == "decision")
         .expect("decision summary");
     assert_eq!(decision["latest_summary"], "Use one typed append command");
+}
+
+#[test]
+fn research_import_bundle_records_sanitized_evidence() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let bundle = write_research_bundle_fixture(temp.path(), "codex-research.evidence-bundle.v1");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Research import smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "research-import-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let import_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "research",
+            "import-bundle",
+            "--capsule",
+            capsule,
+            "--bundle",
+            bundle.to_str().expect("bundle path"),
+            "--source-command",
+            "codex-research --json bundle --strict",
+            "--source-exit-code",
+            "0",
+            "--imported-at",
+            "2026-05-11T13:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let import_json: Value = serde_json::from_slice(&import_output).expect("import json");
+    assert_eq!(import_json["command"], "research import-bundle");
+    assert_eq!(
+        import_json["result"]["schema"],
+        "research_evidence_import.v1"
+    );
+    assert_eq!(import_json["result"]["bundle"]["status"], "passed");
+    assert_eq!(import_json["result"]["bundle"]["budget"]["status"], "spent");
+    assert_eq!(import_json["result"]["bundle"]["source_count"], 2);
+    assert_eq!(import_json["result"]["bundle"]["claim_count"], 2);
+    assert_eq!(import_json["result"]["record"]["kind"], "research");
+    assert_eq!(import_json["result"]["record"]["tool"], "codex-research");
+    assert_eq!(import_json["result"]["record"]["confidence"], 100);
+    assert_eq!(
+        import_json["result"]["record"]["source_ids"][0],
+        "codex-research:claim:claim-official-docs-first"
+    );
+    assert!(
+        import_json["result"]["record"]["source_ids"]
+            .as_array()
+            .expect("source ids")
+            .iter()
+            .any(|source| source == "codex-research:source:src-github-source")
+    );
+    assert!(
+        import_json["result"]["record"]["artifacts"]
+            .as_array()
+            .expect("artifacts")
+            .iter()
+            .any(|artifact| artifact == ".codex/research/report.md")
+    );
+    assert_eq!(import_json["result"]["evidence"]["total"], 2);
+
+    let evidence = std::fs::read_to_string(std::path::Path::new(capsule).join("evidence.jsonl"))
+        .expect("evidence");
+    let research_line = evidence
+        .lines()
+        .find(|line| line.contains("\"kind\":\"research\""))
+        .expect("research evidence line");
+    let research_record: Value = serde_json::from_str(research_line).expect("research record");
+    assert!(
+        research_record["summary"]
+            .as_str()
+            .expect("summary")
+            .contains("Research bundle passed")
+    );
+}
+
+#[test]
+fn research_import_bundle_rejects_wrong_schema_before_writing() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let bundle = write_research_bundle_fixture(
+        temp.path(),
+        "unexpected.v1 token=wrong-schema-secret sk-proj-wrong-schema-secret",
+    );
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Research import invalid schema",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "research-import-invalid",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+    let evidence_before =
+        std::fs::read_to_string(std::path::Path::new(capsule).join("evidence.jsonl"))
+            .expect("evidence before");
+
+    let import_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "research",
+            "import-bundle",
+            "--capsule",
+            capsule,
+            "--bundle",
+            bundle.to_str().expect("bundle path"),
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let import_json: Value = serde_json::from_slice(&import_output).expect("import error json");
+    assert_eq!(import_json["ok"], false);
+    assert_eq!(import_json["command"], "research import-bundle");
+    assert!(
+        import_json["result"]["error"]["message"]
+            .as_str()
+            .expect("error message")
+            .contains("unsupported evidence bundle schema")
+    );
+    let output_text = String::from_utf8(import_output).expect("utf8 error output");
+    assert!(!output_text.contains("wrong-schema-secret"));
+    assert!(output_text.contains("[redacted]"));
+    assert_eq!(
+        std::fs::read_to_string(std::path::Path::new(capsule).join("evidence.jsonl"))
+            .expect("evidence after"),
+        evidence_before
+    );
+}
+
+#[test]
+fn research_import_bundle_redacts_secrets_and_caps_untrusted_arrays() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let bundle = temp.path().join("large-evidence-bundle.json");
+    let source_ids = (0..140)
+        .map(|index| format!("src-{index:03}-token=source-secret"))
+        .collect::<Vec<_>>();
+    let claim_ids = (0..140)
+        .map(|index| format!("claim-{index:03}-api_key=claim-secret"))
+        .collect::<Vec<_>>();
+    let artifacts = (0..80)
+        .map(|index| format!(".codex/research/artifact-{index:03}.json?api_key=artifact-secret"))
+        .collect::<Vec<_>>();
+    let providers = (0..40)
+        .map(|index| {
+            json!({
+                "provider": format!("provider-{index:02}"),
+                "budget": 10,
+                "spent": 1,
+                "remaining": 9
+            })
+        })
+        .collect::<Vec<_>>();
+    let freshness = (0..40)
+        .map(|index| (format!("status-{index:02}-token=fresh-secret"), json!(1)))
+        .collect::<serde_json::Map<_, _>>();
+    let warnings = (0..25)
+        .map(|index| format!("warning {index}: Authorization: Bearer ghp_warningsecret"))
+        .collect::<Vec<_>>();
+    let failures = (0..25)
+        .map(|index| format!("failure {index}: body=raw-provider-payload"))
+        .collect::<Vec<_>>();
+    std::fs::write(
+        &bundle,
+        serde_json::to_vec_pretty(&json!({
+            "schema": "codex-research.evidence-bundle.v1",
+            "generated_at": "2026-05-11T12:00:00Z",
+            "status": "failed",
+            "strict": true,
+            "run": {
+                "query": "audit token=super-secret sk-proj-openai-secret",
+                "profile": "deep",
+                "topic": "dependency",
+                "status": "closed",
+                "cache_source_ids": source_ids.clone()
+            },
+            "budget": {"by_provider": providers},
+            "provider_errors": [
+                {"provider": "github", "message": "body=private-provider-payload OPENAI_API_KEY=openai-secret"}
+            ],
+            "ledger": {
+                "source_count": 140,
+                "claim_count": 140,
+                "source_ids": source_ids.clone(),
+                "claim_ids": claim_ids.clone()
+            },
+            "citation_coverage": {
+                "cited_claims": 120,
+                "uncited_claims": 20,
+                "uncited_claim_ids": claim_ids.clone(),
+                "missing_source_refs": source_ids.clone(),
+                "coverage": 0.85
+            },
+            "source_freshness": {
+                "by_status": freshness,
+                "unknown_source_ids": source_ids
+            },
+            "report": {
+                "path": ".codex/research/report.md?access_token=report-secret",
+                "exists": true
+            },
+            "artifacts": artifacts,
+            "warnings": warnings,
+            "failures": failures
+        }))
+        .expect("serialize large bundle"),
+    )
+    .expect("write large bundle");
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Research import untrusted bundle",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "research-import-untrusted",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let import_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "research",
+            "import-bundle",
+            "--capsule",
+            capsule,
+            "--bundle",
+            bundle.to_str().expect("bundle path"),
+            "--imported-at",
+            "2026-05-11T13:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(import_output.clone()).expect("utf8 output");
+    for secret in [
+        "super-secret",
+        "sk-proj-openai-secret",
+        "source-secret",
+        "claim-secret",
+        "artifact-secret",
+        "fresh-secret",
+        "ghp_warningsecret",
+        "raw-provider-payload",
+        "private-provider-payload",
+        "openai-secret",
+        "report-secret",
+    ] {
+        assert!(
+            !output_text.contains(secret),
+            "output leaked secret fragment: {secret}"
+        );
+    }
+    assert!(output_text.contains("[redacted]"));
+
+    let import_json: Value = serde_json::from_slice(&import_output).expect("import json");
+    assert!(
+        import_json["result"]["record"]["source_ids"]
+            .as_array()
+            .expect("source ids")
+            .len()
+            <= 200
+    );
+    assert!(
+        import_json["result"]["record"]["artifacts"]
+            .as_array()
+            .expect("artifacts")
+            .len()
+            <= 50
+    );
+    assert!(
+        import_json["result"]["bundle"]["budget"]["providers"]
+            .as_array()
+            .expect("providers")
+            .len()
+            <= 32
+    );
+    assert!(
+        import_json["result"]["bundle"]["source_freshness"]
+            .as_object()
+            .expect("freshness")
+            .len()
+            <= 32
+    );
+    assert_eq!(
+        import_json["result"]["bundle"]["warnings"]
+            .as_array()
+            .expect("warnings")
+            .len(),
+        20
+    );
+    assert_eq!(
+        import_json["result"]["bundle"]["failures"]
+            .as_array()
+            .expect("failures")
+            .len(),
+        20
+    );
 }
 
 #[test]

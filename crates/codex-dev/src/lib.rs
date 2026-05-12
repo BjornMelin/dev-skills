@@ -14,7 +14,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use codex_dev_core::{
     AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
-    EvidenceRecord, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA,
+    EvidenceRecord, EvidenceSummary, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA,
     OrchestrationDiagnosticSeverity, OrchestrationRunReport, POLICY_GATES_SCHEMA,
     PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA,
     PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
@@ -37,6 +37,17 @@ use serde_json::{Value, json};
 
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_EXPLAIN_SCHEMA: &str = "policy_explain.v1";
+const RESEARCH_EVIDENCE_IMPORT_SCHEMA: &str = "research_evidence_import.v1";
+const CODEX_RESEARCH_EVIDENCE_BUNDLE_SCHEMA: &str = "codex-research.evidence-bundle.v1";
+const RESEARCH_IMPORT_MAX_TEXT_CHARS: usize = 512;
+const RESEARCH_IMPORT_MAX_RESIDUAL_RISK_CHARS: usize = 1000;
+const RESEARCH_IMPORT_MAX_LIST_ITEMS: usize = 20;
+const RESEARCH_IMPORT_MAX_UNKNOWN_SOURCE_IDS: usize = 50;
+const RESEARCH_IMPORT_MAX_SOURCE_IDS: usize = 100;
+const RESEARCH_IMPORT_MAX_CLAIM_IDS: usize = 100;
+const RESEARCH_IMPORT_MAX_ARTIFACTS: usize = 50;
+const RESEARCH_IMPORT_MAX_BUDGET_PROVIDERS: usize = 32;
+const RESEARCH_IMPORT_MAX_FRESHNESS_STATUSES: usize = 32;
 const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
@@ -78,6 +89,9 @@ impl Cli {
             },
             Commands::Evidence { command } => match command {
                 EvidenceCommand::Append(_) => "evidence append",
+            },
+            Commands::Research { command } => match command {
+                ResearchCommand::ImportBundle(_) => "research import-bundle",
             },
             Commands::Policy { command } => match command {
                 PolicyCommand::Manifest(_) => "policy manifest",
@@ -133,6 +147,11 @@ enum Commands {
     Evidence {
         #[command(subcommand)]
         command: EvidenceCommand,
+    },
+    /// Import sanitized codex-research metadata into task capsules.
+    Research {
+        #[command(subcommand)]
+        command: ResearchCommand,
     },
     /// Plan or run repo-native validation policy gates.
     Policy {
@@ -197,6 +216,13 @@ enum CapsuleCommand {
 enum EvidenceCommand {
     /// Append one typed evidence record to evidence.jsonl.
     Append(EvidenceAppendArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum ResearchCommand {
+    /// Import a codex-research evidence bundle summary into evidence.jsonl.
+    #[command(name = "import-bundle")]
+    ImportBundle(ResearchImportBundleArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -534,6 +560,169 @@ impl EvidenceAppendArgs {
             },
         }
     }
+}
+
+#[derive(Args, Debug)]
+pub struct ResearchImportBundleArgs {
+    #[arg(long, value_name = "CAPSULE_DIR")]
+    pub capsule: PathBuf,
+    #[arg(long, value_name = "EVIDENCE_BUNDLE_JSON")]
+    pub bundle: PathBuf,
+    #[arg(long = "source-command", value_name = "COMMAND")]
+    pub source_command: Option<String>,
+    #[arg(long = "source-exit-code", value_name = "EXIT_CODE")]
+    pub source_exit_code: Option<i32>,
+    #[arg(long = "imported-at", value_name = "RFC3339")]
+    pub imported_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResearchEvidenceImportReport {
+    pub schema: &'static str,
+    pub imported_at: DateTime<Utc>,
+    pub capsule: PathBuf,
+    pub evidence_path: PathBuf,
+    pub bundle_path: PathBuf,
+    pub bundle: ResearchEvidenceImportBundleSummary,
+    pub record: EvidenceRecord,
+    pub evidence: EvidenceSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResearchEvidenceImportBundleSummary {
+    pub schema: String,
+    pub generated_at: DateTime<Utc>,
+    pub status: String,
+    pub strict: bool,
+    pub query: String,
+    pub profile: String,
+    pub topic: String,
+    pub run_status: String,
+    pub source_count: usize,
+    pub claim_count: usize,
+    pub cited_claims: usize,
+    pub uncited_claims: usize,
+    pub missing_source_refs: Vec<String>,
+    pub coverage: f64,
+    pub source_freshness: BTreeMap<String, usize>,
+    pub unknown_source_ids: Vec<String>,
+    pub report_path: String,
+    pub report_exists: bool,
+    pub artifact_paths: Vec<String>,
+    pub budget: ResearchEvidenceImportBudgetSummary,
+    pub provider_error_count: usize,
+    pub warning_count: usize,
+    pub failure_count: usize,
+    pub warnings: Vec<String>,
+    pub failures: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResearchEvidenceImportBudgetSummary {
+    pub status: String,
+    pub spent_total: u32,
+    pub remaining_total: u32,
+    pub providers: Vec<ResearchEvidenceImportBudgetProvider>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResearchEvidenceImportBudgetProvider {
+    pub provider: String,
+    pub budget: u32,
+    pub spent: u32,
+    pub remaining: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleInput {
+    schema: String,
+    generated_at: DateTime<Utc>,
+    status: String,
+    strict: bool,
+    run: ResearchEvidenceBundleRunInput,
+    budget: ResearchEvidenceBundleBudgetInput,
+    #[serde(default)]
+    provider_errors: Vec<ResearchEvidenceBundleProviderErrorInput>,
+    ledger: ResearchEvidenceBundleLedgerInput,
+    citation_coverage: ResearchEvidenceBundleCitationCoverageInput,
+    source_freshness: ResearchEvidenceBundleFreshnessInput,
+    report: ResearchEvidenceBundleReportInput,
+    #[serde(default)]
+    artifacts: Vec<String>,
+    #[serde(default)]
+    warnings: Vec<String>,
+    #[serde(default)]
+    failures: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleRunInput {
+    #[serde(default)]
+    query: String,
+    #[serde(default)]
+    profile: String,
+    #[serde(default)]
+    topic: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    cache_source_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ResearchEvidenceBundleBudgetInput {
+    #[serde(default)]
+    by_provider: Vec<ResearchEvidenceBundleBudgetProviderInput>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleBudgetProviderInput {
+    provider: String,
+    budget: u32,
+    spent: u32,
+    remaining: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleProviderErrorInput {
+    provider: String,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleLedgerInput {
+    source_count: usize,
+    claim_count: usize,
+    #[serde(default)]
+    source_ids: Vec<String>,
+    #[serde(default)]
+    claim_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleCitationCoverageInput {
+    cited_claims: usize,
+    uncited_claims: usize,
+    #[serde(default)]
+    uncited_claim_ids: Vec<String>,
+    #[serde(default)]
+    missing_source_refs: Vec<String>,
+    coverage: f64,
+}
+
+#[derive(Debug, Deserialize, Default)]
+struct ResearchEvidenceBundleFreshnessInput {
+    #[serde(default)]
+    by_status: BTreeMap<String, usize>,
+    #[serde(default)]
+    unknown_source_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ResearchEvidenceBundleReportInput {
+    #[serde(default)]
+    path: String,
+    exists: bool,
 }
 
 #[derive(Args, Debug)]
@@ -1237,6 +1426,23 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                         result.record.kind,
                         result.capsule.display(),
                         result.evidence.total
+                    ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
+        Commands::Research { command } => match command {
+            ResearchCommand::ImportBundle(args) => {
+                let result = import_research_bundle(args, Utc::now())?;
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "research import-bundle",
+                    human: format!(
+                        "imported {} codex-research bundle with {} source(s), {} claim(s), and {} failure(s)",
+                        result.bundle.status,
+                        result.bundle.source_count,
+                        result.bundle.claim_count,
+                        result.bundle.failure_count
                     ),
                     result: serde_json::to_value(result)?,
                 })
@@ -5906,6 +6112,8 @@ fn redact_sensitive_text(text: impl AsRef<str>) -> String {
     redact_prefixed_tokens(
         &text,
         &[
+            "sk-proj-",
+            "sk-",
             "github_pat_",
             "ghp_",
             "gho_",
@@ -6039,6 +6247,405 @@ fn parse_github_repository(repository: &str) -> Result<(&str, &str)> {
         bail!("repository must be in OWNER/REPO form: {repository}");
     }
     Ok((owner, name))
+}
+
+pub fn import_research_bundle(
+    args: ResearchImportBundleArgs,
+    default_imported_at: DateTime<Utc>,
+) -> Result<ResearchEvidenceImportReport> {
+    if args.source_exit_code.is_some() && args.source_command.is_none() {
+        bail!("--source-exit-code requires --source-command");
+    }
+
+    let bundle: ResearchEvidenceBundleInput = read_json(&args.bundle)
+        .with_context(|| format!("failed to read evidence bundle {}", args.bundle.display()))?;
+    if bundle.schema != CODEX_RESEARCH_EVIDENCE_BUNDLE_SCHEMA {
+        let schema = import_clean_text(&bundle.schema);
+        bail!(
+            "unsupported evidence bundle schema {schema} (expected {CODEX_RESEARCH_EVIDENCE_BUNDLE_SCHEMA})"
+        );
+    }
+
+    let imported_at = args.imported_at.unwrap_or(default_imported_at);
+    let bundle_summary = research_import_bundle_summary(&bundle);
+    let record = research_import_evidence_record(&args, &bundle, &bundle_summary, imported_at);
+    let append_result = append_evidence(AppendEvidenceArgs {
+        capsule: args.capsule.clone(),
+        record,
+    })?;
+
+    Ok(ResearchEvidenceImportReport {
+        schema: RESEARCH_EVIDENCE_IMPORT_SCHEMA,
+        imported_at,
+        capsule: append_result.capsule,
+        evidence_path: append_result.evidence_path,
+        bundle_path: args.bundle,
+        bundle: bundle_summary,
+        record: append_result.record,
+        evidence: append_result.evidence,
+    })
+}
+
+fn research_import_bundle_summary(
+    bundle: &ResearchEvidenceBundleInput,
+) -> ResearchEvidenceImportBundleSummary {
+    let source_count = bundle
+        .ledger
+        .source_count
+        .max(bundle.ledger.source_ids.len())
+        .max(bundle.run.cache_source_ids.len());
+    let claim_count = bundle.ledger.claim_count.max(bundle.ledger.claim_ids.len());
+    ResearchEvidenceImportBundleSummary {
+        schema: import_clean_text(&bundle.schema),
+        generated_at: bundle.generated_at,
+        status: import_clean_or(&bundle.status, "unknown"),
+        strict: bundle.strict,
+        query: import_clean_or(&bundle.run.query, "unspecified query"),
+        profile: import_clean_or(&bundle.run.profile, "unknown"),
+        topic: import_clean_or(&bundle.run.topic, "unknown"),
+        run_status: import_clean_or(&bundle.run.status, "unknown"),
+        source_count,
+        claim_count,
+        cited_claims: bundle.citation_coverage.cited_claims,
+        uncited_claims: bundle.citation_coverage.uncited_claims,
+        missing_source_refs: import_clean_vec(
+            &bundle.citation_coverage.missing_source_refs,
+            RESEARCH_IMPORT_MAX_LIST_ITEMS,
+        ),
+        coverage: normalized_coverage(bundle.citation_coverage.coverage),
+        source_freshness: bundle
+            .source_freshness
+            .by_status
+            .iter()
+            .take(RESEARCH_IMPORT_MAX_FRESHNESS_STATUSES)
+            .map(|(status, count)| (import_clean_or(status, "unknown"), *count))
+            .collect(),
+        unknown_source_ids: import_clean_vec(
+            &bundle.source_freshness.unknown_source_ids,
+            RESEARCH_IMPORT_MAX_UNKNOWN_SOURCE_IDS,
+        ),
+        report_path: import_clean_text(&bundle.report.path),
+        report_exists: bundle.report.exists,
+        artifact_paths: research_import_artifact_paths(bundle, None),
+        budget: research_import_budget_summary(bundle),
+        provider_error_count: bundle.provider_errors.len(),
+        warning_count: bundle.warnings.len(),
+        failure_count: bundle.failures.len(),
+        warnings: import_clean_vec(&bundle.warnings, RESEARCH_IMPORT_MAX_LIST_ITEMS),
+        failures: import_clean_vec(&bundle.failures, RESEARCH_IMPORT_MAX_LIST_ITEMS),
+    }
+}
+
+fn research_import_budget_summary(
+    bundle: &ResearchEvidenceBundleInput,
+) -> ResearchEvidenceImportBudgetSummary {
+    let providers = bundle
+        .budget
+        .by_provider
+        .iter()
+        .take(RESEARCH_IMPORT_MAX_BUDGET_PROVIDERS)
+        .map(|provider| ResearchEvidenceImportBudgetProvider {
+            provider: import_clean_or(&provider.provider, "unknown"),
+            budget: provider.budget,
+            spent: provider.spent,
+            remaining: provider.remaining,
+        })
+        .collect::<Vec<_>>();
+    let spent_total = providers.iter().map(|provider| provider.spent).sum();
+    let remaining_total = providers.iter().map(|provider| provider.remaining).sum();
+    let status = if providers.is_empty() {
+        "not_reported"
+    } else if !bundle.provider_errors.is_empty() {
+        "provider_errors"
+    } else if providers
+        .iter()
+        .any(|provider| provider.budget > 0 && provider.remaining == 0)
+    {
+        "exhausted"
+    } else if spent_total > 0 {
+        "spent"
+    } else {
+        "unused"
+    }
+    .to_string();
+
+    ResearchEvidenceImportBudgetSummary {
+        status,
+        spent_total,
+        remaining_total,
+        providers,
+    }
+}
+
+fn research_import_evidence_record(
+    args: &ResearchImportBundleArgs,
+    bundle: &ResearchEvidenceBundleInput,
+    summary: &ResearchEvidenceImportBundleSummary,
+    imported_at: DateTime<Utc>,
+) -> EvidenceRecord {
+    let failure_fragment = if summary.failure_count == 1 {
+        "1 failure".to_string()
+    } else {
+        format!("{} failures", summary.failure_count)
+    };
+    let warning_fragment = if summary.warning_count == 1 {
+        "1 warning".to_string()
+    } else {
+        format!("{} warnings", summary.warning_count)
+    };
+    let summary_text = import_truncate(
+        format!(
+            "Research bundle {}: {}; {} source(s), {} claim(s), {:.0}% citation coverage, {}, {}",
+            summary.status,
+            summary.query,
+            summary.source_count,
+            summary.claim_count,
+            summary.coverage * 100.0,
+            failure_fragment,
+            warning_fragment
+        ),
+        512,
+    );
+
+    EvidenceRecord {
+        schema: EVIDENCE_SCHEMA.to_string(),
+        kind: EvidenceKind::Research,
+        at: imported_at,
+        summary: summary_text,
+        command: args.source_command.as_deref().map(import_clean_text),
+        exit_code: args.source_exit_code,
+        source_ids: research_import_source_ids(bundle),
+        actor: None,
+        tool: Some("codex-research".to_string()),
+        confidence: Some(research_import_confidence(summary)),
+        residual_risk: research_import_residual_risk(bundle, summary),
+        artifacts: research_import_artifact_paths(bundle, Some(&args.bundle)),
+    }
+}
+
+fn research_import_source_ids(bundle: &ResearchEvidenceBundleInput) -> Vec<String> {
+    let mut source_ids = BTreeSet::new();
+    for source_id in bundle
+        .ledger
+        .source_ids
+        .iter()
+        .chain(bundle.run.cache_source_ids.iter())
+        .take(RESEARCH_IMPORT_MAX_SOURCE_IDS)
+    {
+        let source_id = import_clean_text(source_id);
+        if !source_id.is_empty() {
+            source_ids.insert(format!("codex-research:source:{source_id}"));
+        }
+    }
+    for claim_id in bundle
+        .ledger
+        .claim_ids
+        .iter()
+        .take(RESEARCH_IMPORT_MAX_CLAIM_IDS)
+    {
+        let claim_id = import_clean_text(claim_id);
+        if !claim_id.is_empty() {
+            source_ids.insert(format!("codex-research:claim:{claim_id}"));
+        }
+    }
+    source_ids.into_iter().collect()
+}
+
+fn research_import_artifact_paths(
+    bundle: &ResearchEvidenceBundleInput,
+    bundle_path: Option<&Path>,
+) -> Vec<String> {
+    let mut artifacts = Vec::new();
+    if let Some(bundle_path) = bundle_path {
+        push_import_unique(
+            &mut artifacts,
+            bundle_path.display().to_string(),
+            RESEARCH_IMPORT_MAX_ARTIFACTS,
+        );
+    }
+    for artifact in &bundle.artifacts {
+        push_import_unique(&mut artifacts, artifact, RESEARCH_IMPORT_MAX_ARTIFACTS);
+    }
+    if bundle.report.exists {
+        push_import_unique(
+            &mut artifacts,
+            &bundle.report.path,
+            RESEARCH_IMPORT_MAX_ARTIFACTS,
+        );
+    }
+    artifacts
+}
+
+fn research_import_confidence(summary: &ResearchEvidenceImportBundleSummary) -> u8 {
+    let coverage = (summary.coverage * 100.0).round().clamp(0.0, 100.0) as u8;
+    if summary.status != "passed" || summary.failure_count > 0 {
+        coverage.min(50)
+    } else if summary.warning_count > 0
+        || summary.provider_error_count > 0
+        || !summary.report_exists
+        || !summary.unknown_source_ids.is_empty()
+    {
+        coverage.min(80)
+    } else {
+        coverage
+    }
+}
+
+fn research_import_residual_risk(
+    bundle: &ResearchEvidenceBundleInput,
+    summary: &ResearchEvidenceImportBundleSummary,
+) -> Option<String> {
+    let mut parts = Vec::new();
+    if !summary.failures.is_empty() {
+        parts.push(format!(
+            "failures: {}",
+            import_preview_list(&summary.failures, 3)
+        ));
+    }
+    if !summary.warnings.is_empty() {
+        parts.push(format!(
+            "warnings: {}",
+            import_preview_list(&summary.warnings, 3)
+        ));
+    }
+    if !bundle.provider_errors.is_empty() {
+        let provider_errors = bundle
+            .provider_errors
+            .iter()
+            .take(3)
+            .map(|error| {
+                format!(
+                    "{}: {}",
+                    import_clean_or(&error.provider, "unknown"),
+                    import_clean_or(&error.message, "provider error")
+                )
+            })
+            .collect::<Vec<_>>();
+        parts.push(format!(
+            "provider_errors: {}",
+            import_preview_list(&provider_errors, 3)
+        ));
+    }
+    if !summary.unknown_source_ids.is_empty() {
+        parts.push(format!(
+            "unknown_source_ids: {}",
+            import_preview_list(&summary.unknown_source_ids, 5)
+        ));
+    }
+    if !bundle.citation_coverage.uncited_claim_ids.is_empty() {
+        let uncited = import_clean_vec(&bundle.citation_coverage.uncited_claim_ids, 5);
+        parts.push(format!(
+            "uncited_claim_ids: {}",
+            import_preview_list(&uncited, 5)
+        ));
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(import_truncate(
+            parts.join("; "),
+            RESEARCH_IMPORT_MAX_RESIDUAL_RISK_CHARS,
+        ))
+    }
+}
+
+fn normalized_coverage(value: f64) -> f64 {
+    if value.is_finite() {
+        value.clamp(0.0, 1.0)
+    } else {
+        0.0
+    }
+}
+
+fn import_clean_or(value: &str, fallback: &str) -> String {
+    let value = import_clean_text(value);
+    if value.is_empty() {
+        fallback.to_string()
+    } else {
+        value
+    }
+}
+
+fn import_clean_vec(values: &[String], limit: usize) -> Vec<String> {
+    values
+        .iter()
+        .map(|value| import_clean_text(value))
+        .filter(|value| !value.is_empty())
+        .take(limit)
+        .collect()
+}
+
+fn import_preview_list(values: &[String], limit: usize) -> String {
+    let mut preview = values
+        .iter()
+        .take(limit)
+        .map(|value| import_truncate(value, 180))
+        .collect::<Vec<_>>();
+    if values.len() > limit {
+        preview.push(format!("and {} more", values.len() - limit));
+    }
+    preview.join(" | ")
+}
+
+fn push_import_unique(values: &mut Vec<String>, value: impl AsRef<str>, limit: usize) {
+    if values.len() >= limit {
+        return;
+    }
+    let value = import_clean_text(value.as_ref());
+    if !value.is_empty() && !values.contains(&value) {
+        values.push(value);
+    }
+}
+
+fn import_truncate(value: impl Into<String>, max_chars: usize) -> String {
+    let value = value.into();
+    let mut output = String::with_capacity(value.len().min(max_chars));
+    for (index, ch) in value.chars().enumerate() {
+        if index >= max_chars {
+            output.push_str("...");
+            break;
+        }
+        output.push(ch);
+    }
+    output
+}
+
+fn import_clean_text(value: &str) -> String {
+    let cleaned = value
+        .chars()
+        .map(|ch| if ch.is_control() { ' ' } else { ch })
+        .collect::<String>();
+    import_truncate(
+        redact_research_import_sensitive_text(cleaned.trim()),
+        RESEARCH_IMPORT_MAX_TEXT_CHARS,
+    )
+}
+
+fn redact_research_import_sensitive_text(text: &str) -> String {
+    let text = redact_key_assignments(
+        text,
+        &[
+            "OPENAI_API_KEY",
+            "openai_api_key",
+            "ANTHROPIC_API_KEY",
+            "anthropic_api_key",
+            "API_KEY",
+            "api_key",
+            "ACCESS_TOKEN",
+            "access_token",
+            "TOKEN",
+            "token",
+            "SECRET",
+            "secret",
+            "PASSWORD",
+            "password",
+            "AUTHORIZATION",
+            "authorization",
+            "BODY",
+            "body",
+        ],
+    );
+    redact_sensitive_text(text)
 }
 
 pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Result<PolicyRunResult> {

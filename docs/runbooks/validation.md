@@ -111,6 +111,7 @@ cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json task list
+cargo run -q -p codex-dev -- --json research import-bundle --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
@@ -149,14 +150,33 @@ cargo run -q -p codex-dev -- --json orchestration close --capsule "$tmp/validati
 cargo run -q -p codex-dev -- --json orchestration verify --capsule "$tmp/validation-smoke" --batch-id validation-review --checked-at 2026-05-09T05:35:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T05:40:00Z
+cat > "$tmp/evidence-bundle.json" <<'JSON'
+{
+  "schema": "codex-research.evidence-bundle.v1",
+  "generated_at": "2026-05-11T12:00:00Z",
+  "status": "passed",
+  "strict": true,
+  "run": {"query": "validation smoke", "profile": "quick", "topic": "general", "status": "closed", "cache_source_ids": ["src-validation"]},
+  "budget": {"by_provider": [{"provider": "github", "budget": 2, "spent": 1, "remaining": 1}]},
+  "provider_errors": [],
+  "ledger": {"source_count": 1, "claim_count": 1, "source_ids": ["src-validation"], "claim_ids": ["claim-validation"]},
+  "citation_coverage": {"cited_claims": 1, "uncited_claims": 0, "uncited_claim_ids": [], "missing_source_refs": [], "coverage": 1.0},
+  "source_freshness": {"by_status": {"current": 1}, "unknown_source_ids": []},
+  "report": {"path": ".codex/research/report.md", "exists": true},
+  "artifacts": [".codex/research/evidence-bundle.json"],
+  "warnings": [],
+  "failures": []
+}
+JSON
+cargo run -q -p codex-dev -- --json research import-bundle --capsule "$tmp/validation-smoke" --bundle "$tmp/evidence-bundle.json" --source-command "codex-research --json bundle --strict" --source-exit-code 0 --imported-at 2026-05-09T05:45:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
 The task capsule smoke below covers `evidence append`, orchestration
-plan/record/close/verify, PR evidence capture, and the follow-up
-`capsule status` summary against a real fixture capsule.
+plan/record/close/verify, `research import-bundle`, PR evidence capture, and
+the follow-up `capsule status` summary against a real fixture capsule.
 
 Run after changing `crates/codex-dev-tui/` or TUI docs:
 
@@ -509,6 +529,25 @@ cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json evidence append --capsule "$tmp/validation-smoke" --kind decision --summary "fixture decision" --source-id validation:smoke --actor codex --tool codex-dev --confidence 95 --at 2026-05-09T04:30:00Z
+cat > "$tmp/evidence-bundle.json" <<'JSON'
+{
+  "schema": "codex-research.evidence-bundle.v1",
+  "generated_at": "2026-05-11T12:00:00Z",
+  "status": "passed",
+  "strict": true,
+  "run": {"query": "validation smoke", "profile": "quick", "topic": "general", "status": "closed", "cache_source_ids": ["src-validation"]},
+  "budget": {"by_provider": [{"provider": "github", "budget": 2, "spent": 1, "remaining": 1}]},
+  "provider_errors": [],
+  "ledger": {"source_count": 1, "claim_count": 1, "source_ids": ["src-validation"], "claim_ids": ["claim-validation"]},
+  "citation_coverage": {"cited_claims": 1, "uncited_claims": 0, "uncited_claim_ids": [], "missing_source_refs": [], "coverage": 1.0},
+  "source_freshness": {"by_status": {"current": 1}, "unknown_source_ids": []},
+  "report": {"path": ".codex/research/report.md", "exists": true},
+  "artifacts": [".codex/research/evidence-bundle.json"],
+  "warnings": [],
+  "failures": []
+}
+JSON
+cargo run -q -p codex-dev -- --json research import-bundle --capsule "$tmp/validation-smoke" --bundle "$tmp/evidence-bundle.json" --source-command "codex-research --json bundle --strict" --source-exit-code 0 --imported-at 2026-05-09T04:35:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
