@@ -11,7 +11,7 @@ Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, #42, #43, #44, and #55.
+Tracking: #20, #22, #23, #25, #42, #43, #44, #55, and #80.
 
 ## Installation
 
@@ -55,6 +55,7 @@ Top-level commands:
 - `subagents`
 - `policy`
 - `local`
+- `skills`
 - `pr`
 - `completions`
 - `manpage`
@@ -86,6 +87,10 @@ Local subcommands:
 
 - `local doctor`
 - `local status`
+
+Skills subcommands:
+
+- `skills inventory`
 
 PR subcommands:
 
@@ -156,6 +161,74 @@ cargo run -q -p codex-dev -- --json local status
 `local status` uses the same standard JSON envelope and local readiness result
 schema with `result.mode: "status"` so automation can share one parser while
 humans can request a status-oriented readiness summary.
+
+## skills inventory
+
+Emit a read-only machine-readable inventory of tracked skill folders:
+
+```bash
+cargo run -q -p codex-dev -- --json skills inventory
+```
+
+The command uses the standard `codex-dev.output.v1` JSON envelope. The skill
+inventory contract lives at `result.schema: "skill_inventory.v1"`. It walks
+immediate non-symlinked `skills/*/SKILL.md` entrypoints, parses bounded shallow
+AgentSkills frontmatter fields, counts optional non-symlinked `references/`,
+`scripts/`, `assets/`, `templates/`, and `agents/` resources with bounded depth
+and file-count caps, checks README and `docs/index.md` mention/link exposure
+heuristics from regular non-symlinked files, reports local
+`skills/dist/<skill>.skill` bundle presence using the frontmatter name only
+when it is valid and directory-matching and otherwise falls back to the
+directory name, and emits underbuilt signals for planning. The
+`invalid_frontmatter` signal mirrors blocking validation failure; the other
+signals are non-blocking buildout hints. It does not run `quick_validate.py`,
+package skills, write bundles, mutate docs, or execute network checks.
+
+Fixture-friendly options:
+
+```bash
+cargo run -q -p codex-dev -- --json skills inventory \
+  --repo-root /path/to/dev-skills \
+  --checked-at 2026-05-12T08:00:00Z
+```
+
+Compact shape:
+
+```json
+{
+  "schema": "codex-dev.output.v1",
+  "ok": true,
+  "command": "skills inventory",
+  "result": {
+    "schema": "skill_inventory.v1",
+    "total": 55,
+    "valid": 55,
+    "invalid": 0,
+    "skills": [
+      {
+        "name": "subspawn",
+        "path": "skills/subspawn",
+        "skill_md": "skills/subspawn/SKILL.md",
+        "exposure": {
+          "readme_catalog": true,
+          "docs_index": true
+        },
+        "validation": {
+          "valid": true,
+          "errors": []
+        }
+      }
+    ]
+  }
+}
+```
+
+Validation is intentionally a shallow Rust subset of the durable public
+frontmatter checks used by `tools/skill/quick_validate.py`: required string
+`name` and `description`, allowed frontmatter keys, hyphen-case names matching
+the directory, and non-empty descriptions without angle brackets. The Python
+validator and packager remain the authorities for full spec validation and
+`.skill` archive creation; this command owns the read-only inventory report.
 
 ## completions
 
@@ -744,6 +817,7 @@ cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
+cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help

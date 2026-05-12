@@ -153,6 +153,375 @@ fn write_local_doctor_fixture(root: &std::path::Path) -> (std::path::PathBuf, st
     (repo, bin)
 }
 
+fn write_skill_inventory_repo(root: &std::path::Path) -> std::path::PathBuf {
+    let repo = root.join("repo");
+    std::fs::create_dir_all(repo.join("docs/runbooks")).expect("repo docs");
+    std::fs::create_dir_all(repo.join("docs")).expect("docs");
+    std::fs::create_dir_all(repo.join("skills/dist")).expect("dist");
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
+    std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+        .expect("repo validation");
+    std::fs::write(
+        repo.join("README.md"),
+        "| Skill | Description | Source |\n| --- | --- | --- |\n| `alpha-skill` | Alpha. | [skills/alpha-skill/SKILL.md](skills/alpha-skill/SKILL.md) |\n| `beta-skill` | Beta. | [skills/beta-skill/SKILL.md](skills/beta-skill/SKILL.md) |\n",
+    )
+    .expect("readme");
+    std::fs::write(
+        repo.join("docs/index.md"),
+        "- [Alpha](../skills/alpha-skill/SKILL.md)\n",
+    )
+    .expect("docs index");
+    std::fs::write(repo.join("skills/dist/alpha-skill.skill"), "zip fixture\n")
+        .expect("dist bundle");
+
+    let alpha = repo.join("skills/alpha-skill");
+    std::fs::create_dir_all(alpha.join("references/deep")).expect("alpha references");
+    std::fs::create_dir_all(alpha.join("scripts")).expect("alpha scripts");
+    std::fs::create_dir_all(alpha.join("templates")).expect("alpha templates");
+    std::fs::write(
+        alpha.join("SKILL.md"),
+        r#"---
+name: alpha-skill
+description: |
+  Alpha skill description.
+license: MIT
+allowed-tools:
+  - web.run
+  - mcp.github
+metadata:
+  category: test
+---
+
+# Alpha
+"#,
+    )
+    .expect("alpha skill");
+    std::fs::write(alpha.join("references/deep/guide.md"), "# Guide\n").expect("alpha ref");
+    std::fs::write(alpha.join("scripts/check.sh"), "#!/bin/sh\n").expect("alpha script");
+    std::fs::write(alpha.join("templates/prompt.md"), "Prompt\n").expect("alpha template");
+
+    let beta = repo.join("skills/beta-skill");
+    std::fs::create_dir_all(&beta).expect("beta dir");
+    std::fs::write(
+        beta.join("SKILL.md"),
+        r#"---
+name: beta-skill
+description: Beta skill description.
+---
+
+# Beta
+"#,
+    )
+    .expect("beta skill");
+    repo
+}
+
+#[test]
+fn skills_inventory_emits_stable_json_report() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert_eq!(json["command"], "skills inventory");
+    assert_eq!(json["result"]["schema"], "skill_inventory.v1");
+    assert_eq!(json["result"]["checked_at"], "2026-05-12T08:00:00Z");
+    assert_eq!(json["result"]["total"], 2);
+    assert_eq!(json["result"]["valid"], 2);
+    assert_eq!(json["result"]["invalid"], 0);
+    let skills = json["result"]["skills"].as_array().expect("skills array");
+    assert_eq!(skills[0]["name"], "alpha-skill");
+    assert_eq!(skills[0]["path"], "skills/alpha-skill");
+    assert_eq!(skills[0]["resources"]["references"]["files"], 1);
+    assert_eq!(skills[0]["resources"]["references"]["capped"], false);
+    assert_eq!(skills[0]["resources"]["scripts"]["files"], 1);
+    assert_eq!(skills[0]["resources"]["templates"]["files"], 1);
+    assert_eq!(skills[0]["exposure"]["readme_catalog"], true);
+    assert_eq!(skills[0]["exposure"]["docs_index"], true);
+    assert_eq!(skills[0]["package"]["present"], true);
+    assert_eq!(skills[0]["metadata_present"], true);
+    assert!(
+        skills[0]["allowed_tools"]
+            .as_array()
+            .expect("allowed tools")
+            .iter()
+            .any(|tool| tool.as_str() == Some("web.run"))
+    );
+    assert_eq!(skills[1]["name"], "beta-skill");
+    assert_eq!(skills[1]["package"]["present"], false);
+    assert!(
+        skills[1]["underbuilt_signals"]
+            .as_array()
+            .expect("signals")
+            .iter()
+            .any(|signal| signal.as_str() == Some("missing_docs_index_exposure"))
+    );
+}
+
+#[test]
+fn skills_inventory_reports_invalid_frontmatter() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let invalid = repo.join("skills/invalid-skill");
+    std::fs::create_dir_all(&invalid).expect("invalid skill dir");
+    std::fs::write(
+        invalid.join("SKILL.md"),
+        r#"---
+name: different-name
+description: Invalid skill.
+extra: nope
+---
+
+# Invalid
+"#,
+    )
+    .expect("invalid skill");
+    let numeric = repo.join("skills/numeric-skill");
+    std::fs::create_dir_all(&numeric).expect("numeric skill dir");
+    std::fs::write(
+        numeric.join("SKILL.md"),
+        r#"---
+name: 123
+description: 456
+---
+
+# Numeric
+"#,
+    )
+    .expect("numeric skill");
+    let malformed = repo.join("skills/malformed-skill");
+    std::fs::create_dir_all(&malformed).expect("malformed skill dir");
+    std::fs::write(
+        malformed.join("SKILL.md"),
+        r#"---
+name: malformed-skill
+description: "unterminated
+---
+
+# Malformed
+"#,
+    )
+    .expect("malformed skill");
+    let traversal = repo.join("skills/traversal-skill");
+    std::fs::create_dir_all(&traversal).expect("traversal skill dir");
+    std::fs::write(
+        traversal.join("SKILL.md"),
+        r#"---
+name: ../outside
+description: Traversal skill.
+---
+
+# Traversal
+"#,
+    )
+    .expect("traversal skill");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["invalid"], 4);
+    let invalid_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "invalid-skill")
+        .expect("invalid skill entry");
+    let errors = invalid_skill["validation"]["errors"]
+        .as_array()
+        .expect("validation errors");
+    assert!(errors.iter().any(|error| {
+        error
+            .as_str()
+            .expect("error")
+            .contains("unexpected frontmatter key")
+    }));
+    assert!(errors.iter().any(|error| {
+        error
+            .as_str()
+            .expect("error")
+            .contains("must match frontmatter name")
+    }));
+    let numeric_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "numeric-skill")
+        .expect("numeric skill entry");
+    assert!(
+        numeric_skill["validation"]["errors"]
+            .as_array()
+            .expect("numeric errors")
+            .iter()
+            .any(|error| error.as_str().expect("error").contains("must be a string"))
+    );
+    let malformed_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "malformed-skill")
+        .expect("malformed skill entry");
+    assert!(
+        malformed_skill["validation"]["errors"]
+            .as_array()
+            .expect("malformed errors")
+            .iter()
+            .any(|error| error.as_str().expect("error").contains("unterminated"))
+    );
+    let traversal_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "traversal-skill")
+        .expect("traversal skill entry");
+    assert_eq!(
+        traversal_skill["package"]["path"],
+        "skills/dist/traversal-skill.skill"
+    );
+    assert_eq!(traversal_skill["package"]["present"], false);
+}
+
+#[cfg(unix)]
+#[test]
+fn skills_inventory_ignores_symlinked_skill_and_resource_paths() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let external_skill = temp.path().join("external-skill");
+    std::fs::create_dir_all(&external_skill).expect("external skill dir");
+    std::fs::write(
+        external_skill.join("SKILL.md"),
+        r#"---
+name: linked-skill
+description: Linked skill.
+---
+
+# Linked
+"#,
+    )
+    .expect("external skill");
+    symlink(&external_skill, repo.join("skills/linked-skill")).expect("skill symlink");
+
+    let external_assets = temp.path().join("external-assets");
+    std::fs::create_dir_all(&external_assets).expect("external assets dir");
+    std::fs::write(external_assets.join("outside.txt"), "outside").expect("external asset");
+    let alpha_assets = repo.join("skills/alpha-skill/assets");
+    symlink(&external_assets, &alpha_assets).expect("resource symlink");
+    let external_readme = temp.path().join("external-readme.md");
+    std::fs::write(&external_readme, "`alpha-skill`").expect("external readme");
+    std::fs::remove_file(repo.join("README.md")).expect("remove readme");
+    symlink(&external_readme, repo.join("README.md")).expect("readme symlink");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert_eq!(json["result"]["total"], 2);
+    assert!(
+        json["result"]["skills"]
+            .as_array()
+            .expect("skills")
+            .iter()
+            .all(|skill| skill["directory"] != "linked-skill")
+    );
+    let alpha = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "alpha-skill")
+        .expect("alpha skill entry");
+    assert_eq!(alpha["resources"]["assets"]["present"], false);
+    assert_eq!(alpha["resources"]["assets"]["files"], 0);
+    assert_eq!(alpha["exposure"]["readme_catalog"], false);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "catalog_input_symlink")
+    );
+}
+
+#[test]
+fn skills_inventory_marks_capped_resource_counts() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let mut nested = repo.join("skills/beta-skill/references");
+    for index in 0..17 {
+        nested = nested.join(format!("level-{index}"));
+        std::fs::create_dir_all(&nested).expect("nested resource dir");
+    }
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let beta = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "beta-skill")
+        .expect("beta skill entry");
+    assert_eq!(beta["resources"]["references"]["present"], true);
+    assert_eq!(beta["resources"]["references"]["capped"], true);
+}
+
 #[cfg(unix)]
 #[test]
 fn local_doctor_emits_read_only_json_report() {

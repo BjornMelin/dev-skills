@@ -151,6 +151,7 @@ cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
+cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
@@ -183,7 +184,10 @@ validation, and skill packaging rules, see
 
 ## Skill catalog
 
-All skills are stored in `skills/`. The canonical entrypoint for each skill is its `SKILL.md`.
+All skills are stored in `skills/`. The canonical entrypoint for each skill is
+its `SKILL.md`. Machine-readable inventory for automation is available through
+`codex-dev --json skills inventory`; the table below remains the human-facing
+catalog.
 
 | Skill | Description | Source |
 | --- | --- | --- |

@@ -2,7 +2,8 @@
 
 Status: active implementation.
 
-Tracking: #20 through #28, parent epic #37, and child issues #38 through #57.
+Tracking: #20 through #28, parent epic #37, child issues #38 through #57, and
+#80.
 
 ## Purpose
 
@@ -60,7 +61,8 @@ preserve.
 | Task capsule contracts and local read models | `codex-dev-core` | Shared schema and file-helper owner for CLI, TUI, and future PR-agent surfaces. |
 | Policy-gate orchestration and PR/eval/bootstrap evidence appenders | `codex-dev` | CLI/process boundary over `codex-dev-core` contracts. |
 | Local workstation readiness | `codex-dev local doctor/status` | Read-only CLI-owned schema for PATH/tool, GitHub auth class, ignored capsule root, cache root, and policy-profile summaries. |
-| Skill metadata and package validation | `tools/skill`, skill folders | Runs existing validators and records results. |
+| Machine-readable skill inventory | `codex-dev skills inventory` | Read-only CLI-owned schema for skill metadata, bounded resource counts, README/docs exposure heuristics, package-artifact presence, validation status, and underbuilt signals. |
+| Skill metadata and package validation | `tools/skill`, skill folders | Owns validation and package writes; inventory reports shallow status but does not replace validators or packagers. |
 | Custom subagent template validation and installs | `subagent-creator` | Reuses validation/install commands. |
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
 | Hosted PR review remediation | `gh-pr-review-fix`, `review-remediation` | Captures review-pack/CI snapshots and links fixes. |
@@ -94,6 +96,46 @@ stdout capture.
 GitHub config discovery follows `GH_CONFIG_DIR`, then `XDG_CONFIG_HOME/gh`, then
 `HOME/.config/gh`. The global `codex-research` cache path follows
 `XDG_CACHE_HOME/codex-research`, then `HOME/.cache/codex-research`.
+
+## Skill Inventory Contract
+
+`skill_inventory.v1` is the CLI-owned read-only catalog contract for
+`skills/*/SKILL.md`. It describes the current checkout and is intended for
+automation that needs one stable JSON surface before planning packaging,
+validation, docs, or future UI/TUI work.
+
+The command walks immediate non-symlinked skill directories, skips build
+artifacts such as `skills/dist`, and emits one sorted entry per regular
+`SKILL.md`. Each entry includes bounded frontmatter basics (`name`,
+`description`, `license`, simple `allowed-tools`, and whether `metadata` is
+present), repo-relative source paths, non-symlinked resource file counts for
+`references/`, `scripts/`, `assets/`, `templates/`, and `agents/`, README and
+`docs/index.md` mention/link exposure heuristics from regular non-symlinked
+files, local `skills/dist/<skill>.skill` presence using the frontmatter name
+only when it is valid and directory-matching and otherwise falling back to the
+directory name, shallow frontmatter validation, and non-blocking underbuilt
+signals.
+
+Resource counts carry `capped: true` when the inventory hit its defensive
+resource depth or file-count limit before completing a directory walk.
+
+Validation is deliberately a shallow Rust subset of the durable public rules in
+`tools/skill/quick_validate.py`: frontmatter must exist, use allowed keys, carry
+string `name` and `description` values, use hyphen-case names matching the
+directory, and keep descriptions non-empty and free of angle brackets. The
+inventory does not shell out to Python, package skills, update docs, install
+skills, or perform network checks. `tools/skill/quick_validate.py` remains the
+validation authority, and `tools/skill/package_skill.py` remains the
+package-writing authority.
+
+`ok` is false only for error-severity diagnostics such as invalid skill
+frontmatter or a missing skills root. `invalid_frontmatter` is also mirrored in
+`underbuilt_signals` so planning consumers can sort invalid entries without
+reading validation details first. Missing README exposure, missing docs
+exposure, missing `references/`, missing `scripts/`, missing dist bundles, and
+the absence of all three optional buildout directories (`assets/`, `templates/`,
+and `agents/`) are non-blocking `underbuilt_signals` for planning, not
+validation failures.
 
 ## Task Capsule Contract
 

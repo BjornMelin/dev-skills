@@ -35,6 +35,10 @@ use serde_json::{Value, json};
 
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
+const SKILL_INVENTORY_SCHEMA: &str = "skill_inventory.v1";
+const SKILL_INVENTORY_MAX_TEXT_BYTES: u64 = 1024 * 1024;
+const SKILL_INVENTORY_MAX_RESOURCE_FILES: usize = 10_000;
+const SKILL_INVENTORY_MAX_RESOURCE_DEPTH: usize = 16;
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
 const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
@@ -84,6 +88,9 @@ impl Cli {
                 LocalCommand::Doctor(_) => "local doctor",
                 LocalCommand::Status(_) => "local status",
             },
+            Commands::Skills { command } => match command {
+                SkillsCommand::Inventory(_) => "skills inventory",
+            },
             Commands::Pr { command } => match command {
                 PrCommand::Agent(_) => "pr agent",
                 PrCommand::AgentAction(_) => "pr agent-action",
@@ -124,6 +131,11 @@ enum Commands {
     Local {
         #[command(subcommand)]
         command: LocalCommand,
+    },
+    /// Inspect tracked skill metadata and packaging readiness.
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
     },
     /// Capture hosted PR evidence into task capsules.
     Pr {
@@ -182,6 +194,12 @@ enum LocalCommand {
     Doctor(LocalDoctorArgs),
     /// Print a compact read-only local readiness status.
     Status(LocalDoctorArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum SkillsCommand {
+    /// Emit a read-only machine-readable inventory of tracked skills.
+    Inventory(SkillsInventoryArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -651,6 +669,21 @@ pub struct LocalDoctorArgs {
     pub checked_at: Option<DateTime<Utc>>,
 }
 
+/// Arguments for the read-only skill inventory report.
+#[derive(Args, Clone, Debug)]
+pub struct SkillsInventoryArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
 /// Operator intent for a local readiness report.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -771,6 +804,140 @@ pub struct LocalPolicyProfileStatus {
     pub network_gates: usize,
     /// Gates that may require secrets or credentials.
     pub secret_gates: usize,
+}
+
+/// Read-only machine-readable inventory of tracked Agent Skills.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillsInventoryReport {
+    /// Versioned schema identifier for the report payload inside the command envelope.
+    pub schema: &'static str,
+    /// Timestamp at which the report was generated.
+    pub checked_at: DateTime<Utc>,
+    /// Repository root inspected by the report.
+    pub repo_root: PathBuf,
+    /// Skills directory inspected by the report.
+    pub skills_root: PathBuf,
+    /// True when every inventoried skill passed the shallow metadata checks.
+    pub ok: bool,
+    /// Total number of immediate skill directories with `SKILL.md`.
+    pub total: usize,
+    /// Count of entries whose frontmatter passed the shallow metadata checks.
+    pub valid: usize,
+    /// Count of entries with validation errors.
+    pub invalid: usize,
+    /// Human-actionable inventory findings.
+    pub diagnostics: Vec<SkillInventoryDiagnostic>,
+    /// Stable sorted skill entries.
+    pub skills: Vec<SkillInventoryEntry>,
+}
+
+/// Human-actionable skill inventory finding.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillInventoryDiagnostic {
+    /// Severity used to compute the report verdict.
+    pub severity: LocalDiagnosticSeverity,
+    /// Stable machine-readable diagnostic code.
+    pub code: String,
+    /// Optional skill name or directory associated with the finding.
+    pub skill: Option<String>,
+    /// Human-readable remediation hint.
+    pub message: String,
+}
+
+/// One skill's metadata, resources, catalog exposure, package status, and signals.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillInventoryEntry {
+    /// Directory name under `skills/`.
+    pub directory: String,
+    /// Frontmatter name when available.
+    pub name: Option<String>,
+    /// Frontmatter description when available.
+    pub description: Option<String>,
+    /// Frontmatter license when available.
+    pub license: Option<String>,
+    /// Frontmatter `allowed-tools` values when expressed as a simple string list.
+    pub allowed_tools: Vec<String>,
+    /// Whether the optional `metadata` frontmatter key is present.
+    pub metadata_present: bool,
+    /// Repo-relative skill directory path.
+    pub path: String,
+    /// Repo-relative `SKILL.md` path.
+    pub skill_md: String,
+    /// Optional resource directory counts.
+    pub resources: SkillResourceInventory,
+    /// README and docs/index exposure.
+    pub exposure: SkillExposure,
+    /// Local package artifact readiness.
+    pub package: SkillPackageStatus,
+    /// Shallow metadata validation status.
+    pub validation: SkillValidationStatus,
+    /// Non-blocking signals for skills that may need more buildout.
+    pub underbuilt_signals: Vec<String>,
+}
+
+/// Resource directory file counts for one skill.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillResourceInventory {
+    pub references: SkillResourceStatus,
+    pub scripts: SkillResourceStatus,
+    pub assets: SkillResourceStatus,
+    pub templates: SkillResourceStatus,
+    pub agents: SkillResourceStatus,
+}
+
+/// Resource directory status.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillResourceStatus {
+    /// Repo-relative resource directory path.
+    pub path: String,
+    /// Whether the directory exists.
+    pub present: bool,
+    /// Number of regular files under the directory.
+    pub files: usize,
+    /// Whether the count hit the inventory safety cap.
+    pub capped: bool,
+}
+
+/// Human and docs catalog exposure for one skill.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillExposure {
+    /// Whether README contains the skill's catalog row/link.
+    pub readme_catalog: bool,
+    /// Whether docs/index mentions the skill by name or source path.
+    pub docs_index: bool,
+}
+
+/// Local `.skill` bundle presence for one skill.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillPackageStatus {
+    /// Repo-relative expected bundle path.
+    pub path: String,
+    /// Whether `skills/dist/<skill>.skill` exists.
+    pub present: bool,
+}
+
+/// Shallow skill metadata validation status.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct SkillValidationStatus {
+    /// Whether the entry passes the inventory's shallow metadata checks.
+    pub valid: bool,
+    /// Stable, human-readable validation errors.
+    pub errors: Vec<String>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+struct SkillFrontmatter {
+    name: Option<String>,
+    description: Option<String>,
+    license: Option<String>,
+    allowed_tools: Vec<String>,
+    metadata_present: bool,
+    keys: BTreeSet<String>,
+}
+
+struct BoundedText {
+    text: String,
+    truncated: bool,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -1149,6 +1316,21 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Skills { command } => match command {
+            SkillsCommand::Inventory(args) => {
+                let result = skills_inventory(args)?;
+                let human = format!(
+                    "inventoried {} skill(s): {} valid, {} invalid",
+                    result.total, result.valid, result.invalid
+                );
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "skills inventory",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
         Commands::Pr { command } => match command {
             PrCommand::Agent(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
@@ -1315,6 +1497,612 @@ fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
     } else {
         Ok(format!("{}\n", output.human))
     }
+}
+
+/// Build a read-only machine-readable inventory of tracked skill folders.
+pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryReport> {
+    let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+    let cwd = env::current_dir().context("failed to read current directory")?;
+    let repo_root = match args.repo_root {
+        Some(path) => canonicalize_repo_root(&path)?,
+        None => find_repo_root(&cwd).ok_or_else(|| {
+            anyhow::anyhow!(
+                "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+            )
+        })?,
+    };
+    let skills_root = repo_root.join("skills");
+    let mut diagnostics = Vec::new();
+    let readme = read_optional_catalog_text(&repo_root.join("README.md"), &mut diagnostics)?;
+    let docs_index =
+        read_optional_catalog_text(&repo_root.join("docs/index.md"), &mut diagnostics)?;
+    let mut skills = Vec::new();
+    if !regular_dir_exists(&skills_root) {
+        diagnostics.push(SkillInventoryDiagnostic {
+            severity: LocalDiagnosticSeverity::Error,
+            code: "missing_skills_root".to_string(),
+            skill: None,
+            message: format!("skills root does not exist: {}", skills_root.display()),
+        });
+    } else {
+        let mut entries = fs::read_dir(&skills_root)
+            .with_context(|| format!("failed to read skills root {}", skills_root.display()))?
+            .collect::<std::io::Result<Vec<_>>>()
+            .with_context(|| format!("failed to list skills root {}", skills_root.display()))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if entry.file_name() == "dist" || !regular_dir_exists(&path) {
+                continue;
+            }
+            let skill_md = path.join("SKILL.md");
+            if !regular_file_exists(&skill_md) {
+                continue;
+            }
+            let skill = skill_inventory_entry(&repo_root, &path, &skill_md, &readme, &docs_index)?;
+            if !skill.validation.valid {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Error,
+                    code: "invalid_skill_metadata".to_string(),
+                    skill: Some(skill.directory.clone()),
+                    message: format!(
+                        "{} has {} metadata validation error(s)",
+                        skill.directory,
+                        skill.validation.errors.len()
+                    ),
+                });
+            }
+            skills.push(skill);
+        }
+    }
+
+    let valid = skills.iter().filter(|skill| skill.validation.valid).count();
+    let invalid = skills.len().saturating_sub(valid);
+    let ok = diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error);
+    Ok(SkillsInventoryReport {
+        schema: SKILL_INVENTORY_SCHEMA,
+        checked_at,
+        repo_root,
+        skills_root,
+        ok,
+        total: skills.len(),
+        valid,
+        invalid,
+        diagnostics,
+        skills,
+    })
+}
+
+fn skill_inventory_entry(
+    repo_root: &Path,
+    skill_dir: &Path,
+    skill_md: &Path,
+    readme: &str,
+    docs_index: &str,
+) -> Result<SkillInventoryEntry> {
+    let directory = skill_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_string();
+    let skill_text = read_optional_regular_text(skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES)?
+        .ok_or_else(|| anyhow::anyhow!("skill entrypoint is not a regular file"))?;
+    let parsed_frontmatter = parse_skill_frontmatter(&skill_text.text);
+    let frontmatter = parsed_frontmatter.as_ref().ok();
+    let mut errors = Vec::new();
+    if skill_text.truncated {
+        errors.push(format!(
+            "SKILL.md exceeds the {} byte inventory read limit",
+            SKILL_INVENTORY_MAX_TEXT_BYTES
+        ));
+    }
+    errors.extend(
+        parsed_frontmatter
+            .as_ref()
+            .err()
+            .map(|error| vec![error.clone()])
+            .unwrap_or_default(),
+    );
+    if let Some(frontmatter) = frontmatter {
+        validate_skill_frontmatter(&directory, frontmatter, &mut errors);
+    }
+
+    let name = frontmatter.and_then(|frontmatter| frontmatter.name.clone());
+    let catalog_name = safe_inventory_skill_name(name.as_deref(), &directory);
+    let resources = skill_resource_inventory(repo_root, skill_dir);
+    let exposure = SkillExposure {
+        readme_catalog: skill_catalog_present(readme, catalog_name),
+        docs_index: skill_catalog_present(docs_index, catalog_name)
+            || docs_index.contains(&format!("skills/{catalog_name}/")),
+    };
+    let package_path = format!("skills/dist/{catalog_name}.skill");
+    let package = SkillPackageStatus {
+        present: regular_file_exists(&repo_root.join(&package_path)),
+        path: package_path,
+    };
+    let validation = SkillValidationStatus {
+        valid: errors.is_empty(),
+        errors,
+    };
+    let underbuilt_signals = skill_underbuilt_signals(&resources, &exposure, &package, &validation);
+
+    Ok(SkillInventoryEntry {
+        directory,
+        name,
+        description: frontmatter.and_then(|frontmatter| frontmatter.description.clone()),
+        license: frontmatter.and_then(|frontmatter| frontmatter.license.clone()),
+        allowed_tools: frontmatter
+            .map(|frontmatter| frontmatter.allowed_tools.clone())
+            .unwrap_or_default(),
+        metadata_present: frontmatter.is_some_and(|frontmatter| frontmatter.metadata_present),
+        path: repo_relative_string(repo_root, skill_dir),
+        skill_md: repo_relative_string(repo_root, skill_md),
+        resources,
+        exposure,
+        package,
+        validation,
+        underbuilt_signals,
+    })
+}
+
+fn validate_skill_frontmatter(
+    directory: &str,
+    frontmatter: &SkillFrontmatter,
+    errors: &mut Vec<String>,
+) {
+    let allowed_properties = [
+        "allowed-tools",
+        "description",
+        "license",
+        "metadata",
+        "name",
+    ]
+    .into_iter()
+    .collect::<BTreeSet<_>>();
+    for key in frontmatter
+        .keys
+        .iter()
+        .filter(|key| !allowed_properties.contains(key.as_str()))
+    {
+        errors.push(format!("unexpected frontmatter key '{key}'"));
+    }
+
+    let Some(name) = frontmatter.name.as_deref().map(str::trim) else {
+        errors.push("missing 'name' in frontmatter".to_string());
+        return;
+    };
+    if name.is_empty() {
+        errors.push("name cannot be empty".to_string());
+    } else {
+        if !is_valid_skill_name(name) {
+            errors.push(format!(
+                "name '{name}' should be hyphen-case with lowercase letters, digits, and hyphens"
+            ));
+        }
+        if name.len() > 64 {
+            errors.push(format!(
+                "name is too long ({} characters); maximum is 64",
+                name.len()
+            ));
+        }
+        if name != directory {
+            errors.push(format!(
+                "skill directory name '{directory}' must match frontmatter name '{name}'"
+            ));
+        }
+    }
+
+    match frontmatter.description.as_deref().map(str::trim) {
+        Some("") => {
+            errors.push("description cannot be empty".to_string());
+        }
+        Some(description) => {
+            if description.contains('<') || description.contains('>') {
+                errors.push("description cannot contain angle brackets".to_string());
+            }
+            if description.len() > 1024 {
+                errors.push(format!(
+                    "description is too long ({} characters); maximum is 1024",
+                    description.len()
+                ));
+            }
+        }
+        None => errors.push("missing 'description' in frontmatter".to_string()),
+    }
+}
+
+fn is_valid_skill_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && !name.contains("--")
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+fn skill_resource_inventory(repo_root: &Path, skill_dir: &Path) -> SkillResourceInventory {
+    SkillResourceInventory {
+        references: skill_resource_status(repo_root, skill_dir, "references"),
+        scripts: skill_resource_status(repo_root, skill_dir, "scripts"),
+        assets: skill_resource_status(repo_root, skill_dir, "assets"),
+        templates: skill_resource_status(repo_root, skill_dir, "templates"),
+        agents: skill_resource_status(repo_root, skill_dir, "agents"),
+    }
+}
+
+fn skill_resource_status(repo_root: &Path, skill_dir: &Path, name: &str) -> SkillResourceStatus {
+    let path = skill_dir.join(name);
+    let present = regular_dir_exists(&path);
+    let (files, capped) = if present {
+        count_regular_files(&path).unwrap_or((0, false))
+    } else {
+        (0, false)
+    };
+    SkillResourceStatus {
+        path: repo_relative_string(repo_root, &path),
+        present,
+        files,
+        capped,
+    }
+}
+
+fn count_regular_files(path: &Path) -> Result<(usize, bool)> {
+    let mut remaining = SKILL_INVENTORY_MAX_RESOURCE_FILES;
+    count_regular_files_bounded(path, 0, &mut remaining)
+}
+
+fn count_regular_files_bounded(
+    path: &Path,
+    depth: usize,
+    remaining: &mut usize,
+) -> Result<(usize, bool)> {
+    if depth >= SKILL_INVENTORY_MAX_RESOURCE_DEPTH {
+        return Ok((0, true));
+    }
+    let mut count = 0;
+    let mut capped = false;
+    for entry in fs::read_dir(path)
+        .with_context(|| format!("failed to read resource directory {}", path.display()))?
+    {
+        if *remaining == 0 {
+            capped = true;
+            break;
+        }
+        let entry = entry?;
+        let metadata = fs::symlink_metadata(entry.path())
+            .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
+        let file_type = metadata.file_type();
+        if file_type.is_symlink() {
+            continue;
+        }
+        if file_type.is_dir() {
+            let (nested_count, nested_capped) =
+                count_regular_files_bounded(&entry.path(), depth + 1, remaining)?;
+            count += nested_count;
+            capped |= nested_capped;
+        } else if file_type.is_file() {
+            count += 1;
+            *remaining = remaining.saturating_sub(1);
+        }
+    }
+    Ok((count, capped))
+}
+
+fn regular_dir_exists(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+fn regular_file_exists(path: &Path) -> bool {
+    fs::symlink_metadata(path)
+        .map(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+fn safe_inventory_skill_name<'a>(name: Option<&'a str>, directory: &'a str) -> &'a str {
+    match name {
+        Some(name) if name == directory && is_valid_skill_name(name) => name,
+        _ => directory,
+    }
+}
+
+fn skill_catalog_present(text: &str, name: &str) -> bool {
+    text.contains(&format!("`{name}`"))
+        || text.contains(&format!("skills/{name}/SKILL.md"))
+        || text.contains(&format!("skills/{name}/"))
+}
+
+fn skill_underbuilt_signals(
+    resources: &SkillResourceInventory,
+    exposure: &SkillExposure,
+    package: &SkillPackageStatus,
+    validation: &SkillValidationStatus,
+) -> Vec<String> {
+    let mut signals = Vec::new();
+    if !validation.valid {
+        signals.push("invalid_frontmatter".to_string());
+    }
+    if !exposure.readme_catalog {
+        signals.push("missing_readme_catalog".to_string());
+    }
+    if !exposure.docs_index {
+        signals.push("missing_docs_index_exposure".to_string());
+    }
+    if !package.present {
+        signals.push("missing_dist_package".to_string());
+    }
+    if !resources.references.present {
+        signals.push("missing_references".to_string());
+    }
+    if !resources.scripts.present {
+        signals.push("missing_scripts".to_string());
+    }
+    if !resources.assets.present && !resources.templates.present && !resources.agents.present {
+        signals.push("no_assets_templates_or_agents".to_string());
+    }
+    signals
+}
+
+fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatter, String> {
+    let frontmatter = extract_frontmatter(content)?;
+    let lines = frontmatter.lines().collect::<Vec<_>>();
+    let mut parsed = SkillFrontmatter::default();
+    let mut index = 0;
+    while index < lines.len() {
+        let line = lines[index];
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') || line.starts_with(char::is_whitespace) {
+            index += 1;
+            continue;
+        }
+        let Some((raw_key, raw_value)) = line.split_once(':') else {
+            return Err(format!("invalid frontmatter line '{}'", trimmed));
+        };
+        let key = raw_key.trim().to_string();
+        let value = raw_value.trim();
+        parsed.keys.insert(key.clone());
+        match key.as_str() {
+            "name" => {
+                parsed.name = Some(parse_frontmatter_string_value(
+                    "name", value, &lines, &mut index,
+                )?);
+            }
+            "description" => {
+                parsed.description = Some(parse_frontmatter_string_value(
+                    "description",
+                    value,
+                    &lines,
+                    &mut index,
+                )?);
+            }
+            "license" => {
+                parsed.license = Some(parse_frontmatter_string_value(
+                    "license", value, &lines, &mut index,
+                )?);
+            }
+            "allowed-tools" => {
+                parsed.allowed_tools = parse_frontmatter_list(value, &lines, &mut index);
+            }
+            "metadata" => {
+                parsed.metadata_present = true;
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    Ok(parsed)
+}
+
+fn extract_frontmatter(content: &str) -> std::result::Result<&str, String> {
+    let content = content
+        .strip_prefix("---\n")
+        .ok_or_else(|| "no YAML frontmatter found".to_string())?;
+    let end = content
+        .find("\n---")
+        .ok_or_else(|| "invalid frontmatter format".to_string())?;
+    Ok(&content[..end])
+}
+
+fn parse_frontmatter_string_value(
+    field: &str,
+    value: &str,
+    lines: &[&str],
+    index: &mut usize,
+) -> std::result::Result<String, String> {
+    if value.starts_with('|') {
+        Ok(collect_frontmatter_block(lines, index, false))
+    } else if value.starts_with('>') {
+        Ok(collect_frontmatter_block(lines, index, true))
+    } else {
+        validate_string_scalar(field, value)?;
+        Ok(clean_frontmatter_scalar(value))
+    }
+}
+
+fn validate_string_scalar(field: &str, value: &str) -> std::result::Result<(), String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(());
+    }
+    if has_unterminated_quote(value) {
+        return Err(format!(
+            "invalid YAML in frontmatter: unterminated quoted string for '{field}'"
+        ));
+    }
+    if looks_like_non_string_yaml_scalar(value) {
+        return Err(format!("frontmatter '{field}' must be a string scalar"));
+    }
+    Ok(())
+}
+
+fn has_unterminated_quote(value: &str) -> bool {
+    (value.starts_with('"') && !(value.len() >= 2 && value.ends_with('"')))
+        || (value.starts_with('\'') && !(value.len() >= 2 && value.ends_with('\'')))
+}
+
+fn looks_like_non_string_yaml_scalar(value: &str) -> bool {
+    let value = value.trim();
+    let lower = value.to_ascii_lowercase();
+    if matches!(lower.as_str(), "true" | "false" | "null" | "~") {
+        return true;
+    }
+    if value.starts_with('[') || value.starts_with('{') {
+        return true;
+    }
+    let numberish = value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || matches!(byte, b'+' | b'-' | b'.' | b'_'))
+        && value.bytes().any(|byte| byte.is_ascii_digit());
+    numberish && value.replace('_', "").parse::<f64>().is_ok()
+}
+
+fn parse_frontmatter_list(value: &str, lines: &[&str], index: &mut usize) -> Vec<String> {
+    if value.is_empty() {
+        return collect_frontmatter_sequence(lines, index);
+    }
+    let value = value.trim();
+    if value.starts_with('[') && value.ends_with(']') {
+        return value
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .split(',')
+            .map(clean_frontmatter_scalar)
+            .filter(|value| !value.is_empty())
+            .collect();
+    }
+    vec![clean_frontmatter_scalar(value)]
+        .into_iter()
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn collect_frontmatter_block(lines: &[&str], index: &mut usize, folded: bool) -> String {
+    let mut values = Vec::new();
+    let mut next = *index + 1;
+    while next < lines.len() {
+        let line = lines[next];
+        if !line.trim().is_empty() && !line.starts_with(char::is_whitespace) {
+            break;
+        }
+        values.push(line.trim());
+        next += 1;
+    }
+    *index = next.saturating_sub(1);
+    if folded {
+        values
+            .into_iter()
+            .filter(|line| !line.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ")
+    } else {
+        values.join("\n").trim().to_string()
+    }
+}
+
+fn collect_frontmatter_sequence(lines: &[&str], index: &mut usize) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut next = *index + 1;
+    while next < lines.len() {
+        let line = lines[next];
+        if !line.trim().is_empty() && !line.starts_with(char::is_whitespace) {
+            break;
+        }
+        let trimmed = line.trim();
+        if let Some(value) = trimmed.strip_prefix("- ") {
+            values.push(clean_frontmatter_scalar(value));
+        }
+        next += 1;
+    }
+    *index = next.saturating_sub(1);
+    values
+}
+
+fn clean_frontmatter_scalar(value: &str) -> String {
+    let value = value.trim();
+    let value = if value.len() >= 2
+        && ((value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\'')))
+    {
+        &value[1..value.len() - 1]
+    } else {
+        value
+    };
+    value.trim().to_string()
+}
+
+fn read_optional_catalog_text(
+    path: &Path,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
+) -> Result<String> {
+    match read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES)? {
+        Some(text) => {
+            if text.truncated {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "catalog_input_truncated".to_string(),
+                    skill: None,
+                    message: format!(
+                        "catalog input exceeds the {} byte inventory read limit and was truncated: {}",
+                        SKILL_INVENTORY_MAX_TEXT_BYTES,
+                        path.display()
+                    ),
+                });
+            }
+            Ok(text.text)
+        }
+        None => {
+            if fs::symlink_metadata(path)
+                .map(|metadata| metadata.file_type().is_symlink())
+                .unwrap_or(false)
+            {
+                diagnostics.push(SkillInventoryDiagnostic {
+                    severity: LocalDiagnosticSeverity::Warning,
+                    code: "catalog_input_symlink".to_string(),
+                    skill: None,
+                    message: format!(
+                        "skipping symlinked catalog input for skill inventory: {}",
+                        path.display()
+                    ),
+                });
+            }
+            Ok(String::new())
+        }
+    }
+}
+
+fn read_optional_regular_text(path: &Path, max_bytes: u64) -> Result<Option<BoundedText>> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => {
+            return Err(error).with_context(|| format!("failed to stat {}", path.display()));
+        }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Ok(None);
+    }
+    let mut file =
+        fs::File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.by_ref()
+        .take(max_bytes)
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("failed to read {}", path.display()))?;
+    Ok(Some(BoundedText {
+        text: String::from_utf8_lossy(&bytes).into_owned(),
+        truncated: metadata.len() > max_bytes,
+    }))
+}
+
+fn repo_relative_string(repo_root: &Path, path: &Path) -> String {
+    path.strip_prefix(repo_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 
 fn render_evidence_counts(by_kind: &[EvidenceKindSummary]) -> String {
@@ -5354,6 +6142,24 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
         ),
         policy_docs_check_gate(),
         policy_gate(
+            "codex-dev-skills-inventory-smoke",
+            "codex-dev skills inventory smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "skills",
+                "inventory",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the skill inventory JSON contract regressed.",
+        ),
+        policy_gate(
             "codex-dev-pr-plan-smoke",
             "codex-dev PR control-plan smoke",
             [
@@ -6818,6 +7624,7 @@ mod tests {
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
+                "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -6897,6 +7704,7 @@ mod tests {
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
+                "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -6948,6 +7756,7 @@ mod tests {
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-docs-check",
+                "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
