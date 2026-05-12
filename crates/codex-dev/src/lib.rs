@@ -1408,6 +1408,7 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
     })
 }
 
+/// Render the local readiness report as a compact human-facing summary.
 fn render_local_report_human(report: &LocalDoctorReport) -> String {
     let errors = report
         .diagnostics
@@ -1437,6 +1438,7 @@ fn render_local_report_human(report: &LocalDoctorReport) -> String {
     )
 }
 
+/// Inspect one executable expected on PATH.
 fn local_tool_status(name: &str, required: bool, include_version: bool) -> LocalToolStatus {
     let path = find_executable_on_path(name);
     let version = path
@@ -1452,6 +1454,7 @@ fn local_tool_status(name: &str, required: bool, include_version: bool) -> Local
     }
 }
 
+/// Detect GitHub CLI availability and categorical authentication source hints.
 fn local_github_status() -> LocalGithubStatus {
     let gh_path = find_executable_on_path("gh");
     let token_sources = ["GH_TOKEN", "GITHUB_TOKEN"]
@@ -1481,24 +1484,28 @@ fn local_github_status() -> LocalGithubStatus {
     }
 }
 
+/// Read a path-valued environment variable when it is present and non-empty.
 fn non_empty_env_path(name: &str) -> Option<PathBuf> {
     env::var_os(name)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
 }
 
+/// Resolve the GitHub CLI config directory using GitHub CLI environment precedence.
 fn gh_config_dir() -> Option<PathBuf> {
     non_empty_env_path("GH_CONFIG_DIR")
         .or_else(|| non_empty_env_path("XDG_CONFIG_HOME").map(|path| path.join("gh")))
         .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".config/gh")))
 }
 
+/// Resolve the codex-research cache directory using XDG cache precedence.
 fn codex_cache_dir() -> Option<PathBuf> {
     non_empty_env_path("XDG_CACHE_HOME")
         .map(|path| path.join("codex-research"))
         .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".cache/codex-research")))
 }
 
+/// Inspect a repository-local path and its git-ignore state.
 fn local_path_status(repo_root: &Path, name: &str, relative: &str) -> LocalPathStatus {
     let path = repo_root.join(relative);
     let ignore_probe = if relative == ".codex/tasks"
@@ -1517,6 +1524,7 @@ fn local_path_status(repo_root: &Path, name: &str, relative: &str) -> LocalPathS
     }
 }
 
+/// Convert collected local readiness facts into actionable diagnostics.
 fn local_diagnostics(
     binaries: &[LocalToolStatus],
     tools: &[LocalToolStatus],
@@ -1602,12 +1610,17 @@ fn local_diagnostics(
     diagnostics
 }
 
+/// Captured result from a bounded local subprocess probe.
 struct LocalProbeOutput {
+    /// Whether the subprocess exited successfully.
     success: bool,
+    /// Numeric process exit code when the platform reported one.
     code: Option<i32>,
+    /// Bounded standard output captured from the subprocess.
     stdout: Vec<u8>,
 }
 
+/// Return true when a path is a usable executable file for the current platform.
 fn is_executable_file(path: &Path) -> bool {
     if !path.is_file() {
         return false;
@@ -1625,6 +1638,7 @@ fn is_executable_file(path: &Path) -> bool {
     }
 }
 
+/// Run a local command without inherited environment and with bounded output/time.
 fn run_bounded_local_probe(
     command: &Path,
     args: &[&str],
@@ -1666,6 +1680,7 @@ fn run_bounded_local_probe(
     })
 }
 
+/// Build executable file-name candidates for PATH lookup on the current platform.
 fn executable_candidates(command: &str) -> Vec<OsString> {
     #[cfg(windows)]
     {
@@ -1698,6 +1713,7 @@ fn executable_candidates(command: &str) -> Vec<OsString> {
     }
 }
 
+/// Resolve the first executable candidate found on PATH.
 fn find_executable_on_path(command: &str) -> Option<PathBuf> {
     let paths = env::var_os("PATH")?;
     let candidates = executable_candidates(command);
@@ -1709,6 +1725,7 @@ fn find_executable_on_path(command: &str) -> Option<PathBuf> {
     })
 }
 
+/// Read and redact the first line of a command's `--version` output.
 fn command_version(command: &Path) -> Option<String> {
     let output = run_bounded_local_probe(command, &["--version"], None)?;
     if !output.success {
@@ -1725,6 +1742,7 @@ fn command_version(command: &Path) -> Option<String> {
         .filter(|line| !line.is_empty())
 }
 
+/// Check whether a repository-relative path is ignored by git.
 fn git_check_ignored(repo_root: &Path, relative: &str) -> Option<bool> {
     let git = find_executable_on_path("git")?;
     let repo = repo_root.to_string_lossy().to_string();
@@ -4919,6 +4937,7 @@ fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
     Some(truncated)
 }
 
+/// Redact credential-looking content before returning command output in reports.
 fn redact_sensitive_text(text: impl AsRef<str>) -> String {
     let text = redact_authorization_lines(text.as_ref());
     let text = redact_key_assignments(&text, &["GH_TOKEN", "GITHUB_TOKEN"]);
