@@ -617,7 +617,7 @@ def _redacted_spec(spec: Any) -> str | None:
     return text
 
 
-def _recommendation_for_issue(code: str, detail: str) -> str:
+def _recommendation_for_issue(code: str, _detail: str) -> str:
     mapping = {
         "deprecated_api": (
             "Migrate deprecated Streamlit APIs to stable equivalents."
