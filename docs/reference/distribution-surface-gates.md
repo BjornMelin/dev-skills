@@ -149,6 +149,14 @@ python3 tools/docs/check_links.py docs README.md AGENTS.md
 git diff --check
 ```
 
+References:
+
+- GitHub release asset integrity:
+  <https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/verifying-the-integrity-of-a-release>
+- Sigstore/Cosign signing overview:
+  <https://docs.sigstore.dev/cosign/signing/overview/>
+- SLSA provenance: <https://slsa.dev/spec/v1.2/provenance>
+
 ## `cargo_vet_attestation`
 
 `cargo-vet` stays deferred while this repo is local-first. The tool is useful
