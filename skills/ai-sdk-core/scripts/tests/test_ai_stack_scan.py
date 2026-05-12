@@ -87,6 +87,23 @@ class AiStackScanTests(unittest.TestCase):
         self.assertEqual(data["package_manifests"], [])
         self.assertEqual(data["signals"], [])
 
+    def test_oversized_package_json_is_ignored(self) -> None:
+        """Manifest parsing respects the per-file byte cap."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = (
+                '{"dependencies":{"zod":"^3.22.0"},"padding":"'
+                + ("x" * 128)
+                + '"}'
+            )
+            (root / "package.json").write_text(manifest, encoding="utf-8")
+
+            data = run_scan(root, "--family", "zod-v4", "--max-bytes", "64")
+
+        self.assertEqual(data["package_manifests"], [])
+        self.assertEqual(data["packages"], [])
+        self.assertEqual(data["signals"], [])
+
     def test_capped_traversal_is_sorted(self) -> None:
         """File caps preserve deterministic sorted traversal order."""
         with tempfile.TemporaryDirectory() as tmp:

@@ -424,6 +424,7 @@ def collect_manifests(
     max_files: int,
     max_dirs: int,
     max_manifests: int,
+    max_bytes: int,
 ) -> tuple[list[dict[str, Any]], dict[str, list[dict[str, str]]]]:
     """Collect package manifests and dependency indexes.
 
@@ -432,6 +433,7 @@ def collect_manifests(
         max_files: Maximum files to inspect while locating manifests.
         max_dirs: Maximum directories to visit while locating manifests.
         max_manifests: Maximum package manifests to parse.
+        max_bytes: Maximum bytes per manifest file.
 
     Returns:
         A tuple of manifest summaries and package-name indexes.
@@ -451,6 +453,11 @@ def collect_manifests(
             or path.is_symlink()
             or not path_is_within_root(path, root)
         ):
+            continue
+        try:
+            if path.stat().st_size > max_bytes:
+                continue
+        except OSError:
             continue
         data = read_json(path)
         if not data:
@@ -1290,6 +1297,7 @@ def main() -> int:
         max_files=args.max_files,
         max_dirs=args.max_dirs,
         max_manifests=args.max_manifests,
+        max_bytes=args.max_bytes,
     )
     packages = package_rows(packages_by_name, families)
     source_signals, context = scan_sources(
