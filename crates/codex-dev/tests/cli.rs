@@ -582,6 +582,55 @@ fn skills_inventory_accepts_crlf_frontmatter_fences() {
     assert_eq!(crlf_skill["validation"]["valid"], true);
 }
 
+#[test]
+fn skills_inventory_accepts_indented_frontmatter_keys() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let indented = repo.join("skills/indented-skill");
+    std::fs::create_dir_all(&indented).expect("indented skill dir");
+    std::fs::write(
+        indented.join("SKILL.md"),
+        r#"---
+  name: indented-skill
+  description: Indented skill description.
+  metadata:
+    category: test
+---
+
+# Indented
+"#,
+    )
+    .expect("indented skill");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let indented_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "indented-skill")
+        .expect("indented skill entry");
+    assert_eq!(indented_skill["name"], "indented-skill");
+    assert_eq!(indented_skill["description"], "Indented skill description.");
+    assert_eq!(indented_skill["validation"]["valid"], true);
+    assert_eq!(indented_skill["metadata_present"], true);
+}
+
 #[cfg(unix)]
 #[test]
 fn skills_inventory_ignores_symlinked_skill_and_resource_paths() {
@@ -645,8 +694,9 @@ description: Linked skill.
         .iter()
         .find(|skill| skill["directory"] == "alpha-skill")
         .expect("alpha skill entry");
-    assert_eq!(alpha["resources"]["assets"]["present"], false);
+    assert_eq!(alpha["resources"]["assets"]["present"], true);
     assert_eq!(alpha["resources"]["assets"]["files"], 0);
+    assert_eq!(alpha["resources"]["assets"]["capped"], true);
     assert_eq!(alpha["exposure"]["readme_catalog"], false);
     assert!(
         json["result"]["diagnostics"]
@@ -662,6 +712,16 @@ description: Linked skill.
             .iter()
             .any(|diagnostic| diagnostic["code"] == "skill_directory_symlink"
                 && diagnostic["skill"] == "linked-skill")
+    );
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(
+                |diagnostic| diagnostic["code"] == "resource_directory_symlink"
+                    && diagnostic["skill"] == "alpha-skill"
+            )
     );
 }
 

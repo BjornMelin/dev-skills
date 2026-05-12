@@ -1822,29 +1822,80 @@ fn skill_resource_status(
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
 ) -> SkillResourceStatus {
     let path = skill_dir.join(name);
-    let present = regular_dir_exists(&path);
-    let (files, capped) = if present {
-        match count_regular_files(&path) {
-            Ok(counts) => counts,
-            Err(error) => {
-                diagnostics.push(SkillInventoryDiagnostic {
-                    severity: LocalDiagnosticSeverity::Warning,
-                    code: "resource_count_failed".to_string(),
-                    skill: Some(skill.to_string()),
-                    message: format!(
-                        "failed to count resource directory {}: {error:#}",
-                        path.display()
-                    ),
-                });
-                (0, true)
-            }
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return SkillResourceStatus {
+                path: repo_relative_string(repo_root, &path),
+                present: false,
+                files: 0,
+                capped: false,
+            };
         }
-    } else {
-        (0, false)
+        Err(error) => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "resource_directory_stat_error".to_string(),
+                skill: Some(skill.to_string()),
+                message: format!(
+                    "failed to inspect resource directory {}: {error}",
+                    path.display()
+                ),
+            });
+            return SkillResourceStatus {
+                path: repo_relative_string(repo_root, &path),
+                present: true,
+                files: 0,
+                capped: true,
+            };
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        diagnostics.push(SkillInventoryDiagnostic {
+            severity: LocalDiagnosticSeverity::Warning,
+            code: "resource_directory_symlink".to_string(),
+            skill: Some(skill.to_string()),
+            message: format!("skipping symlinked resource directory: {}", path.display()),
+        });
+        return SkillResourceStatus {
+            path: repo_relative_string(repo_root, &path),
+            present: true,
+            files: 0,
+            capped: true,
+        };
+    }
+    if !metadata.is_dir() {
+        diagnostics.push(SkillInventoryDiagnostic {
+            severity: LocalDiagnosticSeverity::Warning,
+            code: "resource_directory_not_regular".to_string(),
+            skill: Some(skill.to_string()),
+            message: format!("skipping non-directory resource path: {}", path.display()),
+        });
+        return SkillResourceStatus {
+            path: repo_relative_string(repo_root, &path),
+            present: true,
+            files: 0,
+            capped: true,
+        };
+    }
+    let (files, capped) = match count_regular_files(&path) {
+        Ok(counts) => counts,
+        Err(error) => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "resource_count_failed".to_string(),
+                skill: Some(skill.to_string()),
+                message: format!(
+                    "failed to count resource directory {}: {error:#}",
+                    path.display()
+                ),
+            });
+            (0, true)
+        }
     };
     SkillResourceStatus {
         path: repo_relative_string(repo_root, &path),
-        present,
+        present: true,
         files,
         capped,
     }
@@ -1950,7 +2001,21 @@ fn skill_underbuilt_signals(
 
 fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatter, String> {
     let frontmatter = extract_frontmatter(content)?;
-    let lines = frontmatter.lines().collect::<Vec<_>>();
+    let raw_lines = frontmatter.lines().collect::<Vec<_>>();
+    let base_indent = frontmatter_base_indent(&raw_lines);
+    let base_indent_prefix = " ".repeat(base_indent);
+    let normalized_lines = raw_lines
+        .iter()
+        .map(|line| {
+            line.strip_prefix(&base_indent_prefix)
+                .unwrap_or(line)
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    let lines = normalized_lines
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
     let mut parsed = SkillFrontmatter::default();
     let mut index = 0;
     while index < lines.len() {
@@ -1996,6 +2061,20 @@ fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatte
         index += 1;
     }
     Ok(parsed)
+}
+
+fn frontmatter_base_indent(lines: &[&str]) -> usize {
+    lines
+        .iter()
+        .filter_map(|line| {
+            if line.trim().is_empty() || line.trim_start().starts_with('#') {
+                None
+            } else {
+                Some(line.len() - line.trim_start().len())
+            }
+        })
+        .min()
+        .unwrap_or(0)
 }
 
 fn extract_frontmatter(content: &str) -> std::result::Result<&str, String> {
