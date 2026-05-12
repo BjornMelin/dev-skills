@@ -298,8 +298,11 @@ cargo build -p codex-research
 Use [docs/runbooks/validation.md](docs/runbooks/validation.md) for the
 canonical validation matrix and
 [docs/runbooks/local-release-supply-chain.md](docs/runbooks/local-release-supply-chain.md)
-for the audited local install and release baseline. README intentionally stays a
-portal so command lists do not drift from the runbooks. Use
+for the audited local install and release baseline. Use
+[docs/reference/distribution-surface-gates.md](docs/reference/distribution-surface-gates.md)
+before opening crates.io publication, signed-binary, cargo-vet, Tauri desktop,
+or Axum local-service implementation work. README intentionally stays a portal
+so command lists do not drift from the runbooks. Use
 [docs/reference/subagent-templates.md](docs/reference/subagent-templates.md) for
 the subagent template authority model and duplicate-role expectations.
 

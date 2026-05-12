@@ -2,7 +2,7 @@
 
 Status: deferred design gate.
 
-Tracking: #37 and #57.
+Tracking: #37, #57, #78, and #90.
 
 This record evaluates two possible future surfaces for the dev-skills local
 agent platform:
@@ -14,6 +14,11 @@ The current decision is to build neither surface in the v0.3/v1 release wave.
 The local CLI, shared `codex-dev-core` contracts, read-only Ratatui TUI,
 apply-gated PR-agent model, and audited local release baseline remain the
 priority.
+
+Distribution and local-surface escalations use the stable
+[`distribution_surface_gate.v1`](../reference/distribution-surface-gates.md)
+contract. A future Tauri or Axum implementation issue must include that contract
+and clear the relevant gate before code or dependency work starts.
 
 ## Decision
 
@@ -42,6 +47,11 @@ The future candidates must be rescored from current code and current upstream
 docs before any implementation issue is opened. A future Tauri or Axum issue
 should proceed only if its implementation plan reaches 9.0 or higher without
 weakening the CLI/TUI contracts.
+
+Current gate IDs:
+
+- Tauri desktop: `tauri_v2_desktop`
+- Axum local service: `axum_local_service`
 
 ## Product Fit
 
@@ -81,6 +91,10 @@ true:
   issues must use the release or `full_local` policy profile and the
   [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
   runbook unless they document an explicit, reviewed deviation.
+- The future issue includes a complete
+  [`distribution_surface_gate.v1`](../reference/distribution-surface-gates.md)
+  block with current scores, evidence links, security review scope, validation
+  commands, owner, and rollback plan.
 - Local token posture is explicit: no raw GitHub, OpenAI, or provider tokens in
   UI state, browser storage, logs, screenshots, capsules, or update metadata.
 - The threat model for local untrusted content is accepted. Branch names, PR
@@ -89,8 +103,10 @@ true:
 
 ## Tauri Gate
 
-Open a Tauri issue only when the prerequisites pass and a native desktop
-workbench has a concrete job the terminal TUI cannot do well.
+Open a Tauri issue only when the prerequisites pass, the
+[`tauri_v2_desktop`](../reference/distribution-surface-gates.md#tauri_v2_desktop)
+gate clears, and a native desktop workbench has a concrete job the terminal TUI
+cannot do well.
 
 Required design constraints:
 
@@ -129,8 +145,10 @@ Useful official references:
 
 ## Axum Gate
 
-Open an Axum issue only when the prerequisites pass and local HTTP unlocks a
-real workflow that the CLI/TUI cannot satisfy.
+Open an Axum issue only when the prerequisites pass, the
+[`axum_local_service`](../reference/distribution-surface-gates.md#axum_local_service)
+gate clears, and local HTTP unlocks a real workflow that the CLI/TUI cannot
+satisfy.
 
 Required design constraints:
 
@@ -203,6 +221,8 @@ Before opening a future Tauri or Axum implementation issue, include:
 
 - the concrete workflow the terminal TUI cannot satisfy;
 - current weighted decision scores;
+- the completed `distribution_surface_gate.v1` block for `tauri_v2_desktop` or
+  `axum_local_service`;
 - exact contract files and `codex-dev-core` read models to consume;
 - command/write boundaries and mutation safeguards;
 - security review checklist;
