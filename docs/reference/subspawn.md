@@ -215,7 +215,8 @@ If a role/model override is rejected:
 `subspawn` remains the planning and delegation-policy owner. `codex-dev`
 records local capsule evidence only; it must not spawn, wait on, retry, or
 semantically interpret agent output on its own. It may derive mechanical batch
-status from recorded agent statuses so the capsule can be scanned quickly.
+status and `orchestration_run.v1` completion diagnostics from recorded agent
+statuses so the capsule can be scanned quickly.
 
 Record a planned batch after generating planner JSON:
 
@@ -232,6 +233,11 @@ cargo run -q -p codex-dev -- --json subagents record-plan \
   --source /tmp/pre-pr-review-plan.json \
   --command "python3 skills/subspawn/scripts/subspawn_plan.py plan --preset review --json"
 ```
+
+For operator-facing verification, prefer the equivalent `orchestration`
+commands. They still write only `subagents.json` and `evidence.jsonl`, but they
+return a stable `orchestration_run.v1` report with expected roles, runtime agent
+IDs, wait status, stale evidence warnings, and completion coverage.
 
 Then record agent outcomes as the parent session verifies them:
 
@@ -263,7 +269,9 @@ cargo run -q -p codex-dev -- --json subagents record-synthesis \
 
 The bridge stores role names, duplicate-template warnings, registry issues,
 stable prompt IDs, SHA-256 prompt hashes, human-verified dispositions, and
-short summaries. Completed synthesis requires every planned role to have a
+short summaries. Registry issues are preserved on the batch and emitted as
+`registry_issue` warnings in `orchestration_run.v1`. Completed synthesis requires
+every planned role to have a
 terminal status, `human_verified: true`, and a final disposition of `accepted`,
 `rejected`, `mixed`, or `informational`; `pending` is not final. The bridge does
 not store raw prompt text in `subagents.json` and does not store raw long

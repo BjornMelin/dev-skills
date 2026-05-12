@@ -53,6 +53,7 @@ Top-level commands:
 - `capsule`
 - `evidence`
 - `subagents`
+- `orchestration`
 - `policy`
 - `local`
 - `skills`
@@ -77,6 +78,13 @@ Subagent subcommands:
 - `subagents record-plan`
 - `subagents record-outcome`
 - `subagents record-synthesis`
+
+Orchestration subcommands:
+
+- `orchestration plan`
+- `orchestration record`
+- `orchestration close`
+- `orchestration verify`
 
 Policy subcommands:
 
@@ -496,7 +504,10 @@ cargo run -q -p codex-dev -- --json subagents record-outcome \
   --capsule .codex/tasks/<id> \
   --batch-id pre-pr-review \
   --role reviewer \
+  --agent-id agent-reviewer-1 \
   --status completed \
+  --wait-status completed \
+  --wait-elapsed-ms 1500 \
   --summary "no blocking findings" \
   --disposition accepted \
   --human-verified \
@@ -510,7 +521,9 @@ Supported outcome statuses are `planned`, `running`, `completed`, `failed`,
 `rejected`, `mixed`, `informational`, and `pending`. The command requires
 `--human-verified` so capsules distinguish agent output from parent-session
 judgment. `--source-id` and `--artifact` must each be provided at least once so
-the capsule can prove what output or artifact was assessed.
+the capsule can prove what output or artifact was assessed. `--agent-id`,
+`--wait-status`, and `--wait-elapsed-ms` are optional metadata used by the
+`orchestration_run.v1` projection.
 
 ## subagents record-synthesis
 
@@ -536,6 +549,66 @@ final disposition. Outcome and synthesis commands require at least one
 evidence to `evidence.jsonl`, and update `capsule.json.updated_at`
 monotonically. They reject invalid capsules and symlinked JSON/JSONL contract
 files before validation or writing.
+
+## orchestration plan/record/close/verify
+
+`orchestration` is the stable operator-facing projection over the local
+subspawn ledger. It records the same capsule evidence as `subagents record-*`,
+then emits `result.schema: "orchestration_run.v1"` with expected roles, recorded
+agent IDs, wait results, completion coverage, synthesis status, registry issues,
+registry issue diagnostics, stale-evidence warnings, and missing-agent
+diagnostics.
+
+```bash
+cargo run -q -p codex-dev -- --json orchestration plan \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --source /tmp/pre-pr-review-plan.json \
+  --recorded-at 2026-05-09T06:00:00Z
+
+cargo run -q -p codex-dev -- --json orchestration record \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --role reviewer \
+  --agent-id agent-reviewer-1 \
+  --status completed \
+  --wait-status completed \
+  --wait-elapsed-ms 1500 \
+  --summary "no blocking findings" \
+  --disposition accepted \
+  --human-verified \
+  --source-id reviewer:1 \
+  --artifact review-notes.md
+
+cargo run -q -p codex-dev -- --json orchestration close \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review \
+  --status completed \
+  --summary "review batch clean" \
+  --human-verified \
+  --source-id synthesis:pre-pr-review \
+  --artifact review-summary.md
+
+cargo run -q -p codex-dev -- --json orchestration verify \
+  --capsule .codex/tasks/<id> \
+  --batch-id pre-pr-review
+```
+
+The command family is local and explicit: it does not spawn agents, wait on
+agents, call hosted APIs, or resolve GitHub review state. `plan`, `record`, and
+`close` succeed when the write is valid even if the run is not complete yet.
+`verify` exits nonzero until every expected role has a terminal
+human-verified outcome and the parent synthesis is `completed`. Incomplete runs
+include blocking diagnostics such as `incomplete_agent` and `missing_synthesis`;
+older incomplete runs also include `stale_orchestration_evidence` warnings based
+on `--stale-after-minutes` (default: 120). Planner-level `registry_issues` are
+preserved and also emitted as `registry_issue` warnings.
+
+Supported wait statuses are `pending_init`, `running`, `completed`, `errored`,
+`interrupted`, `shutdown`, `not_found`, `timed_out`, and `not_waited`. Runtime
+agent IDs are optional while a run is planned, but any non-`planned` role
+without `--agent-id` produces a `missing_agent_id` warning in
+`orchestration_run.v1`.
 
 ## policy manifest
 
@@ -896,6 +969,7 @@ cargo run -q -p codex-dev -- --json pr readiness --help
 cargo run -q -p codex-dev -- --json pr record --help
 ```
 
-Use [Validation](../runbooks/validation.md) for the canonical local matrix and
-task capsule smoke. Use [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
+Use [Validation](../runbooks/validation.md) for the canonical local matrix,
+including the `orchestration plan/record/close/verify` fixture smoke and task
+capsule smoke. Use [Local Release and Supply Chain](../runbooks/local-release-supply-chain.md)
 for release/install supply-chain evidence.

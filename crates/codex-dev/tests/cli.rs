@@ -1,5 +1,5 @@
 use assert_cmd::Command;
-use serde_json::Value;
+use serde_json::{Value, json};
 use tempfile::tempdir;
 
 fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
@@ -4313,6 +4313,214 @@ fn subagents_record_plan_outcome_and_synthesis() {
             .is_none(),
         "raw prompt text must not be persisted in subagents.json"
     );
+}
+
+#[test]
+fn orchestration_plan_record_close_and_verify() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let plan = write_subspawn_plan_fixture(temp.path());
+
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Orchestration ledger smoke",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "orchestration-smoke",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    let plan_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "orchestration",
+            "plan",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--source",
+            plan.to_str().expect("utf8 plan path"),
+            "--recorded-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let plan_json: Value = serde_json::from_slice(&plan_output).expect("plan json");
+    assert_eq!(plan_json["command"], "orchestration plan");
+    assert_eq!(plan_json["result"]["schema"], "orchestration_run.v1");
+    assert_eq!(plan_json["result"]["completion"]["expected"], 2);
+    assert!(
+        plan_json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "incomplete_agent")
+    );
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "orchestration",
+            "verify",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--checked-at",
+            "2026-05-09T06:00:00Z",
+        ])
+        .assert()
+        .failure();
+
+    for (role, agent_id) in [
+        ("reviewer", "agent-reviewer-1"),
+        ("test_runner", "agent-test-runner-1"),
+    ] {
+        Command::cargo_bin("codex-dev")
+            .expect("binary")
+            .args([
+                "--json",
+                "orchestration",
+                "record",
+                "--capsule",
+                capsule,
+                "--batch-id",
+                "pre-pr-review",
+                "--role",
+                role,
+                "--agent-id",
+                agent_id,
+                "--status",
+                "completed",
+                "--wait-status",
+                "completed",
+                "--wait-elapsed-ms",
+                "1500",
+                "--summary",
+                "no blocking findings",
+                "--disposition",
+                "accepted",
+                "--human-verified",
+                "--source-id",
+                role,
+                "--artifact",
+                "review-notes.md",
+                "--recorded-at",
+                "2026-05-09T05:10:00Z",
+            ])
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "orchestration",
+            "record",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--role",
+            "reviewer",
+            "--status",
+            "completed",
+            "--summary",
+            "no blocking findings after follow-up",
+            "--disposition",
+            "accepted",
+            "--human-verified",
+            "--source-id",
+            "reviewer",
+            "--artifact",
+            "review-notes.md",
+            "--recorded-at",
+            "2026-05-09T05:15:00Z",
+        ])
+        .assert()
+        .success();
+
+    let close_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "orchestration",
+            "close",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--status",
+            "completed",
+            "--summary",
+            "review batch clean",
+            "--human-verified",
+            "--source-id",
+            "synthesis:pre-pr-review",
+            "--artifact",
+            "review-summary.md",
+            "--recorded-at",
+            "2026-05-09T05:20:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let close_json: Value = serde_json::from_slice(&close_output).expect("close json");
+    assert_eq!(close_json["command"], "orchestration close");
+    assert_eq!(close_json["result"]["completion"]["complete"], true);
+    let reviewer = close_json["result"]["agents"]
+        .as_array()
+        .expect("agents")
+        .iter()
+        .find(|agent| agent["role"] == "reviewer")
+        .expect("reviewer agent");
+    assert_eq!(reviewer["agent_id"], "agent-reviewer-1");
+    assert_eq!(reviewer["wait_status"], "completed");
+
+    let verify_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "orchestration",
+            "verify",
+            "--capsule",
+            capsule,
+            "--batch-id",
+            "pre-pr-review",
+            "--checked-at",
+            "2026-05-09T06:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let verify_json: Value = serde_json::from_slice(&verify_output).expect("verify json");
+    assert_eq!(verify_json["command"], "orchestration verify");
+    assert_eq!(verify_json["result"]["diagnostics"], json!([]));
 }
 
 #[test]

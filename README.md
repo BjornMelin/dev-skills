@@ -95,13 +95,13 @@ operating layer:
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports,
   closeout bundles, cache, doctor, and evals.
 - `codex-dev-core`: shared contract/read-model crate for task capsules,
-  validation, rendered summaries, policy manifest data, and PR evidence
-  snapshots.
+  validation, rendered summaries, orchestration run projections, policy
+  manifest data, and PR evidence snapshots.
 - `codex-dev`: current CLI for local task capsule lifecycle, structured
-  evidence appenders, subspawn plan/outcome/synthesis capture, repo-native
-  policy gates, read-only local workstation readiness checks, and PR evidence
-  capture. It depends on `codex-dev-core` and keeps Clap parsing plus process
-  execution at the CLI boundary.
+  evidence appenders, subspawn plan/outcome/synthesis capture, orchestration
+  run verification, repo-native policy gates, read-only local workstation
+  readiness checks, and PR evidence capture. It depends on `codex-dev-core` and
+  keeps Clap parsing plus process execution at the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
   JSON contracts through `codex-dev-core` without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for the full skill catalog,
@@ -154,11 +154,16 @@ cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json task list
+cargo run -q -p codex-dev -- --json orchestration verify --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
 cargo run -q -p codex-dev -- --json pr readiness --help
 ```
+
+Run the canonical task capsule fixture in
+[Validation](docs/runbooks/validation.md) when changing orchestration
+plan/record/close/verify behavior.
 
 For release handoff and safe updates from any directory, use the
 [Global CLI Workflow](docs/runbooks/global-cli-workflow.md) and

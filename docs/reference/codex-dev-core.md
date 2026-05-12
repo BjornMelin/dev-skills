@@ -18,8 +18,8 @@ The crate owns:
 - local capsule helpers including `init_capsule`, `validate_capsule`,
   `capsule_status`, `render_capsule`, `append_evidence`,
   `record_subagent_plan`, `record_subagent_outcome`,
-  `record_subagent_synthesis`, `record_pr_snapshot`, `pr_status`,
-  `task_index`, `task_show`, and `task_export`;
+  `record_subagent_synthesis`, `orchestration_run`, `record_pr_snapshot`,
+  `pr_status`, `task_index`, `task_show`, and `task_export`;
 - the read-only `task_index.v1` task root contract, including
   `TaskIndexReport`, `TaskRootStatus`, `TaskIndexEntry`, `TaskShowReport`,
   and `TaskExportReport`;
@@ -32,6 +32,10 @@ The crate owns:
 - subagent plan/outcome/synthesis data models for recording `subspawn` planner
   output, prompt IDs/hashes, duplicate-role warnings, human-verified
   dispositions, and synthesis notes;
+- the read-only `orchestration_run.v1` projection, including
+  `OrchestrationRunReport`, expected roles, recorded runtime agent IDs, wait
+  results, completion coverage, synthesis status, stale evidence warnings,
+  registry issue warnings, and missing-agent diagnostics;
 - evidence summaries used by status/render output, including total count,
   count by kind, and latest record by kind;
 - narrow JSON/JSONL file helpers used by `codex-dev` when recording policy
