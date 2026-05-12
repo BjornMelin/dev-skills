@@ -37,6 +37,12 @@ const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
+];
 const GH_PR_VIEW_JSON_FIELDS: &str = "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels";
 const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
 const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
@@ -1457,10 +1463,10 @@ fn local_tool_status(name: &str, required: bool, include_version: bool) -> Local
 /// Detect GitHub CLI availability and categorical authentication source hints.
 fn local_github_status() -> LocalGithubStatus {
     let gh_path = find_executable_on_path("gh");
-    let token_sources = ["GH_TOKEN", "GITHUB_TOKEN"]
-        .into_iter()
-        .filter(|name| env::var_os(name).is_some_and(|value| !value.is_empty()))
-        .map(str::to_string)
+    let token_sources = GITHUB_TOKEN_ENV_VARS
+        .iter()
+        .filter(|name| env::var_os(*name).is_some_and(|value| !value.is_empty()))
+        .map(|name| (*name).to_string())
         .collect::<Vec<_>>();
     let config_present = gh_config_dir()
         .map(|config_dir| config_dir.join("hosts.yml").is_file())
@@ -4149,12 +4155,14 @@ fn permission_diagnostics(
     args: &PrAgentActionArgs,
     generated_at: DateTime<Utc>,
 ) -> Vec<PrAgentDiagnostic> {
-    let message = if env::var_os("GITHUB_TOKEN").is_some() {
-        "GITHUB_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
-    } else if env::var_os("GH_TOKEN").is_some() {
-        "GH_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
+    let message = if env::var_os("GITHUB_TOKEN").is_some()
+        || env::var_os("GITHUB_ENTERPRISE_TOKEN").is_some()
+    {
+        "GITHUB_TOKEN or GITHUB_ENTERPRISE_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
+    } else if env::var_os("GH_TOKEN").is_some() || env::var_os("GH_ENTERPRISE_TOKEN").is_some() {
+        "GH_TOKEN or GH_ENTERPRISE_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
     } else {
-        "no GH_TOKEN or GITHUB_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
+        "no GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, or GITHUB_ENTERPRISE_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
     };
     vec![PrAgentDiagnostic {
         source: "github-auth".to_string(),
@@ -4953,7 +4961,7 @@ fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
 /// Redact credential-looking content before returning command output in reports.
 fn redact_sensitive_text(text: impl AsRef<str>) -> String {
     let text = redact_authorization_lines(text.as_ref());
-    let text = redact_key_assignments(&text, &["GH_TOKEN", "GITHUB_TOKEN"]);
+    let text = redact_key_assignments(&text, GITHUB_TOKEN_ENV_VARS);
     redact_prefixed_tokens(
         &text,
         &[
@@ -6376,13 +6384,15 @@ mod tests {
     #[test]
     fn hosted_diagnostics_redact_token_like_values() {
         let excerpt = diagnostic_excerpt(
-            b"Authorization: Bearer ghp_secret123\nexport GH_TOKEN=plain-secret\nGITHUB_TOKEN = spaced-secret\nNOT_GH_TOKEN=kept github_pat_abc123",
+            b"Authorization: Bearer ghp_secret123\nexport GH_TOKEN=plain-secret\nGITHUB_TOKEN = spaced-secret\nGH_ENTERPRISE_TOKEN=enterprise-secret\nGITHUB_ENTERPRISE_TOKEN = enterprise-spaced-secret\nNOT_GH_TOKEN=kept github_pat_abc123",
         )
         .expect("excerpt");
 
         assert!(!excerpt.contains("ghp_secret123"));
         assert!(!excerpt.contains("plain-secret"));
         assert!(!excerpt.contains("spaced-secret"));
+        assert!(!excerpt.contains("enterprise-secret"));
+        assert!(!excerpt.contains("enterprise-spaced-secret"));
         assert!(!excerpt.contains("github_pat_abc123"));
         assert!(excerpt.contains("NOT_GH_TOKEN=kept"));
         assert!(excerpt.contains("[redacted]"));

@@ -91,7 +91,7 @@ fn write_fake_local_tool(bin_dir: &std::path::Path, name: &str) {
     let script = bin_dir.join(name);
     let body = if name == "git" {
         r#"#!/bin/sh
-if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
   echo "token env leaked into git probe" >&2
   exit 7
 fi
@@ -103,7 +103,7 @@ esac
 "#
     } else {
         r#"#!/bin/sh
-if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
   echo "token env leaked into probe" >&2
   exit 7
 fi
@@ -167,6 +167,9 @@ fn local_doctor_emits_read_only_json_report() {
         .env("PATH", bin)
         .env("HOME", home)
         .env("GH_TOKEN", "fixture-secret-token")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
         .args([
             "--json",
             "local",
@@ -187,7 +190,15 @@ fn local_doctor_emits_read_only_json_report() {
     assert_eq!(json["result"]["mode"], "doctor");
     assert_eq!(json["result"]["ok"], true);
     assert_eq!(json["result"]["github"]["auth_class"], "env_token");
-    assert_eq!(json["result"]["github"]["token_sources"][0], "GH_TOKEN");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_TOKEN")),
+        "local doctor should report GH_TOKEN as the categorical token source"
+    );
     assert!(
         !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
         "local doctor output must not include token values"
@@ -213,6 +224,9 @@ fn local_status_uses_same_contract_with_status_mode() {
         .env("PATH", bin)
         .env("HOME", temp.path().join("home"))
         .env("GH_TOKEN", "fixture-secret-token")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
         .args([
             "--json",
             "local",
@@ -232,10 +246,63 @@ fn local_status_uses_same_contract_with_status_mode() {
     assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
     assert_eq!(json["result"]["mode"], "status");
     assert_eq!(json["result"]["github"]["auth_class"], "env_token");
-    assert_eq!(json["result"]["github"]["token_sources"][0], "GH_TOKEN");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_TOKEN")),
+        "local status should report GH_TOKEN as the categorical token source"
+    );
     assert!(
         !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
         "local status output must not include token values"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_enterprise_token_source_without_value() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN")
+        .env("GH_ENTERPRISE_TOKEN", "fixture-enterprise-secret-token")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_ENTERPRISE_TOKEN")),
+        "local doctor should report GH_ENTERPRISE_TOKEN as the categorical token source"
+    );
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-enterprise-secret-token"),
+        "local doctor output must not include enterprise token values"
     );
 }
 
