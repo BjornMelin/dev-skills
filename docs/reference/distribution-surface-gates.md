@@ -45,7 +45,7 @@ block with these fields:
 }
 ```
 
-Use the repo-wide major-choice weights from AGENTS.md:
+Use these major-choice weights when scoring a gate:
 
 | Criterion | Weight |
 | --- | ---: |
@@ -55,7 +55,7 @@ Use the repo-wide major-choice weights from AGENTS.md:
 | Architectural adaptability | 10% |
 
 Implementation may start only when the weighted score is at least 9.0 and no
-required evidence field is `UNVERIFIED`. If a gate cannot reach 9.0, open a
+`required_evidence` item is `UNVERIFIED`. If a gate cannot reach 9.0, open a
 docs/planning issue or keep the existing surface.
 
 ## Gate Ledger
