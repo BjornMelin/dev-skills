@@ -1495,7 +1495,20 @@ fn non_empty_env_path(name: &str) -> Option<PathBuf> {
 fn gh_config_dir() -> Option<PathBuf> {
     non_empty_env_path("GH_CONFIG_DIR")
         .or_else(|| non_empty_env_path("XDG_CONFIG_HOME").map(|path| path.join("gh")))
+        .or(windows_appdata_gh_config_dir())
         .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".config/gh")))
+}
+
+/// Resolve the Windows GitHub CLI config fallback from APPDATA.
+fn windows_appdata_gh_config_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        non_empty_env_path("APPDATA").map(|path| path.join("GitHub CLI"))
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
 }
 
 /// Resolve the codex-research cache directory using XDG cache precedence.
