@@ -2239,21 +2239,44 @@ pub fn bootstrap_plan(
     }));
 
     let repo_root_display = bootstrap_local_path_display(&repo_root, args.include_local_paths);
-    let output_root = normalize_output_root(&args.out)?;
-    let output_root_display = if args.include_local_paths {
-        output_root.display().to_string()
-    } else {
-        "<bootstrap-out>".to_string()
-    };
     let mut action_counts = BTreeMap::new();
     let mut files = Vec::new();
+    let (output_root, output_root_display) = match normalize_output_root(&args.out) {
+        Ok(output_root) => {
+            let display = if args.include_local_paths {
+                output_root.display().to_string()
+            } else {
+                "<bootstrap-out>".to_string()
+            };
+            (Some(output_root), display)
+        }
+        Err(error) => {
+            let message = if args.include_local_paths {
+                format!(
+                    "failed to resolve bootstrap output root {}: {error}",
+                    args.out.display()
+                )
+            } else {
+                "failed to resolve bootstrap output root".to_string()
+            };
+            diagnostics.push(bootstrap_error("invalid_bootstrap_output_root", message));
+            let display = if args.include_local_paths {
+                args.out.display().to_string()
+            } else {
+                "<bootstrap-out>".to_string()
+            };
+            (None, display)
+        }
+    };
 
-    if pack.valid {
+    if pack.valid
+        && let Some(output_root) = &output_root
+    {
         for file in &pack.files {
             let target = safe_bootstrap_relative_path(&file.target, &pack.path, "files[].target")
                 .map(PathBuf::from)
                 .map_err(anyhow::Error::msg)?;
-            let target_path = match resolve_bootstrap_output_target(&output_root, &target) {
+            let target_path = match resolve_bootstrap_output_target(output_root, &target) {
                 Ok(path) => path,
                 Err(error) => {
                     diagnostics.push(bootstrap_error("output_target_escape", error));
@@ -2343,7 +2366,7 @@ fn bootstrap_pack_paths(
     if !pack_root.is_dir() {
         diagnostics.push(bootstrap_error(
             "missing_bootstrap_pack_root",
-            "bootstrap pack root does not exist: bootstrap/packs".to_string(),
+            "bootstrap pack root is not a directory: bootstrap/packs".to_string(),
         ));
         return Vec::new();
     }
@@ -2372,10 +2395,7 @@ fn bootstrap_pack_paths(
                     }
                     Err(error) => diagnostics.push(bootstrap_error(
                         "bootstrap_pack_entry_read_error",
-                        format!(
-                            "failed to read bootstrap pack entry in {}: {error}",
-                            pack_root.display()
-                        ),
+                        format!("failed to read bootstrap pack entry in bootstrap/packs: {error}"),
                     )),
                 }
             }
@@ -2722,8 +2742,12 @@ fn resolve_bootstrap_output_target(
     target: &Path,
 ) -> std::result::Result<PathBuf, String> {
     let candidate = output_root.join(target);
-    let resolved = resolve_path_allow_missing(&candidate)
-        .map_err(|error| format!("failed to resolve bootstrap output target: {error}"))?;
+    let resolved = resolve_path_allow_missing(&candidate).map_err(|_| {
+        format!(
+            "failed to resolve bootstrap output target: {}",
+            target.display()
+        )
+    })?;
     if path_within(&resolved, output_root) {
         Ok(resolved)
     } else {

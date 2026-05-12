@@ -741,7 +741,51 @@ fn bootstrap_status_redacts_malformed_pack_root_diagnostics() {
     assert_eq!(json["ok"], false);
     assert_eq!(
         json["result"]["diagnostics"][0]["message"],
-        "bootstrap pack root does not exist: bootstrap/packs"
+        "bootstrap pack root is not a directory: bootstrap/packs"
+    );
+}
+
+#[test]
+fn bootstrap_plan_reports_output_root_errors_inside_contract() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env_remove("HOME")
+        .args([
+            "--json",
+            "bootstrap",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--pack",
+            "codex-agent-repo",
+            "--out",
+            "~/preview",
+            "--checked-at",
+            "2026-05-12T10:10:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(repo.to_str().expect("repo path")),
+        "output-root diagnostics must redact local repo paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap plan json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["schema"], "bootstrap_plan.v1");
+    assert_eq!(json["result"]["output_root"], "<bootstrap-out>");
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "invalid_bootstrap_output_root")
     );
 }
 
