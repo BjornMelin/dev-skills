@@ -1666,11 +1666,47 @@ fn run_bounded_local_probe(
     })
 }
 
+fn executable_candidates(command: &str) -> Vec<OsString> {
+    #[cfg(windows)]
+    {
+        if Path::new(command).extension().is_some() {
+            return vec![OsString::from(command)];
+        }
+        let mut names = vec![OsString::from(command)];
+        let pathext =
+            env::var_os("PATHEXT").unwrap_or_else(|| OsString::from(".COM;.EXE;.BAT;.CMD"));
+        names.extend(
+            pathext
+                .to_string_lossy()
+                .split(';')
+                .map(str::trim)
+                .filter(|extension| !extension.is_empty())
+                .map(|extension| {
+                    if extension.starts_with('.') {
+                        format!("{command}{extension}")
+                    } else {
+                        format!("{command}.{extension}")
+                    }
+                })
+                .map(OsString::from),
+        );
+        names
+    }
+    #[cfg(not(windows))]
+    {
+        vec![OsString::from(command)]
+    }
+}
+
 fn find_executable_on_path(command: &str) -> Option<PathBuf> {
     let paths = env::var_os("PATH")?;
-    env::split_paths(&paths)
-        .map(|path| path.join(command))
-        .find(|path| is_executable_file(path))
+    let candidates = executable_candidates(command);
+    env::split_paths(&paths).find_map(|dir| {
+        candidates
+            .iter()
+            .map(|candidate| dir.join(candidate))
+            .find(|path| is_executable_file(path))
+    })
 }
 
 fn command_version(command: &Path) -> Option<String> {

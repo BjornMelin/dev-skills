@@ -212,6 +212,7 @@ fn local_status_uses_same_contract_with_status_mode() {
         .expect("binary")
         .env("PATH", bin)
         .env("HOME", temp.path().join("home"))
+        .env("GH_TOKEN", "fixture-secret-token")
         .args([
             "--json",
             "local",
@@ -230,6 +231,81 @@ fn local_status_uses_same_contract_with_status_mode() {
     assert_eq!(json["command"], "local status");
     assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
     assert_eq!(json["result"]["mode"], "status");
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    assert_eq!(json["result"]["github"]["token_sources"][0], "GH_TOKEN");
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
+        "local status output must not include token values"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_strict_global_binaries_upgrades_missing_binary_to_error() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    std::fs::remove_file(bin.join("codex-dev-tui")).expect("remove global binary fixture");
+
+    let default_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", &bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let default_json: Value =
+        serde_json::from_slice(&default_output).expect("default local doctor json");
+    let default_diagnostics = default_json["result"]["diagnostics"]
+        .as_array()
+        .expect("default diagnostics");
+    let default_missing_binary = default_diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "missing_optional_codex_dev_tui")
+        .expect("default missing binary warning");
+    assert_eq!(default_json["result"]["ok"], true);
+    assert_eq!(default_missing_binary["severity"], "warning");
+
+    let strict_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", &bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--strict-global-binaries",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let strict_json: Value =
+        serde_json::from_slice(&strict_output).expect("strict local doctor json");
+    let strict_diagnostics = strict_json["result"]["diagnostics"]
+        .as_array()
+        .expect("strict diagnostics");
+    let strict_missing_binary = strict_diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "missing_codex_dev_tui")
+        .expect("strict missing binary error");
+    assert_eq!(strict_json["result"]["ok"], false);
+    assert_eq!(strict_missing_binary["severity"], "error");
 }
 
 #[cfg(unix)]
