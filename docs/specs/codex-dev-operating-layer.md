@@ -91,6 +91,10 @@ values or run `gh auth status` as a network/auth probe. Subprocess probes run
 through resolved executable paths with a sanitized environment and bounded
 stdout capture.
 
+GitHub config discovery follows `GH_CONFIG_DIR`, then `XDG_CONFIG_HOME/gh`, then
+`HOME/.config/gh`. The global `codex-research` cache path follows
+`XDG_CACHE_HOME/codex-research`, then `HOME/.cache/codex-research`.
+
 ## Task Capsule Contract
 
 Task capsules are local development artifacts. The default root is:

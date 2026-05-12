@@ -625,6 +625,7 @@ pub struct PolicyRunArgs {
 }
 
 #[derive(Args, Clone, Debug)]
+/// Arguments shared by the local readiness subcommands.
 pub struct LocalDoctorArgs {
     #[arg(
         long,
@@ -643,12 +644,16 @@ pub struct LocalDoctorArgs {
 
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+/// Operator intent for a local readiness report.
 pub enum LocalReportMode {
+    /// Full local preflight report.
     Doctor,
+    /// Compact status-oriented local readiness report.
     Status,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Read-only workstation and checkout readiness report.
 pub struct LocalDoctorReport {
     pub schema: &'static str,
     pub mode: LocalReportMode,
@@ -666,6 +671,7 @@ pub struct LocalDoctorReport {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Human-actionable local readiness finding.
 pub struct LocalDiagnostic {
     pub severity: LocalDiagnosticSeverity,
     pub code: String,
@@ -674,6 +680,7 @@ pub struct LocalDiagnostic {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+/// Severity for local readiness diagnostics.
 pub enum LocalDiagnosticSeverity {
     Info,
     Warning,
@@ -681,6 +688,7 @@ pub enum LocalDiagnosticSeverity {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Availability and optional version data for a local executable.
 pub struct LocalToolStatus {
     pub name: String,
     pub required: bool,
@@ -690,6 +698,7 @@ pub struct LocalToolStatus {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Categorical GitHub CLI authentication posture without credential values.
 pub struct LocalGithubStatus {
     pub gh_available: bool,
     pub gh_path: Option<PathBuf>,
@@ -699,6 +708,7 @@ pub struct LocalGithubStatus {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Local path existence and git-ignore status.
 pub struct LocalPathStatus {
     pub name: String,
     pub path: PathBuf,
@@ -707,6 +717,7 @@ pub struct LocalPathStatus {
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
+/// Summary of built-in policy gate counts for one profile.
 pub struct LocalPolicyProfileStatus {
     pub profile: PolicyProfile,
     pub gates: usize,
@@ -1271,6 +1282,7 @@ fn render_evidence_counts(by_kind: &[EvidenceKindSummary]) -> String {
         .join(", ")
 }
 
+/// Build a read-only local readiness report for the current workstation and checkout.
 pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<LocalDoctorReport> {
     let checked_at = args.checked_at.unwrap_or_else(Utc::now);
     let cwd = env::current_dir().context("failed to read current directory")?;
@@ -1310,11 +1322,11 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
             "target/codex-dev-install-smoke",
         ),
     ];
-    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+    if let Some(global_cache) = codex_cache_dir() {
         cache_roots.push(LocalPathStatus {
             name: "global_codex_cache".to_string(),
-            path: home.join(".cache/codex-research"),
-            exists: home.join(".cache/codex-research").exists(),
+            exists: global_cache.exists(),
+            path: global_cache,
             git_ignored: None,
         });
     }
@@ -1333,7 +1345,7 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
         })
         .collect::<Vec<_>>();
 
-    let diagnostics = local_diagnostics(&binaries, &tools, &github, &capsule_root);
+    let diagnostics = local_diagnostics(&binaries, &tools, &github, &capsule_root, &cache_roots);
     let ok = diagnostics
         .iter()
         .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error);
@@ -1406,9 +1418,8 @@ fn local_github_status() -> LocalGithubStatus {
         .filter(|name| env::var_os(name).is_some_and(|value| !value.is_empty()))
         .map(str::to_string)
         .collect::<Vec<_>>();
-    let config_present = env::var_os("HOME")
-        .map(PathBuf::from)
-        .map(|home| home.join(".config/gh/hosts.yml").is_file())
+    let config_present = gh_config_dir()
+        .map(|config_dir| config_dir.join("hosts.yml").is_file())
         .unwrap_or(false);
     let auth_class = if !token_sources.is_empty() {
         "env_token"
@@ -1429,9 +1440,30 @@ fn local_github_status() -> LocalGithubStatus {
     }
 }
 
+fn non_empty_env_path(name: &str) -> Option<PathBuf> {
+    env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+fn gh_config_dir() -> Option<PathBuf> {
+    non_empty_env_path("GH_CONFIG_DIR")
+        .or_else(|| non_empty_env_path("XDG_CONFIG_HOME").map(|path| path.join("gh")))
+        .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".config/gh")))
+}
+
+fn codex_cache_dir() -> Option<PathBuf> {
+    non_empty_env_path("XDG_CACHE_HOME")
+        .map(|path| path.join("codex-research"))
+        .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".cache/codex-research")))
+}
+
 fn local_path_status(repo_root: &Path, name: &str, relative: &str) -> LocalPathStatus {
     let path = repo_root.join(relative);
-    let ignore_probe = if relative == ".codex/tasks" || relative.starts_with("target/") {
+    let ignore_probe = if relative == ".codex/tasks"
+        || relative == ".codex/research"
+        || relative.starts_with("target/")
+    {
         format!("{relative}/probe")
     } else {
         relative.to_string()
@@ -1449,6 +1481,7 @@ fn local_diagnostics(
     tools: &[LocalToolStatus],
     github: &LocalGithubStatus,
     capsule_root: &LocalPathStatus,
+    cache_roots: &[LocalPathStatus],
 ) -> Vec<LocalDiagnostic> {
     let mut diagnostics = Vec::new();
     for status in binaries.iter().chain(tools.iter()) {
@@ -1492,6 +1525,30 @@ fn local_diagnostics(
                 capsule_root.path.display()
             ),
         }),
+    }
+    for cache_root in cache_roots
+        .iter()
+        .filter(|cache_root| cache_root.name != "global_codex_cache")
+    {
+        match cache_root.git_ignored {
+            Some(true) => {}
+            Some(false) => diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: format!("{}_not_ignored", cache_root.name),
+                message: format!(
+                    "local cache root {} must be ignored by git",
+                    cache_root.path.display()
+                ),
+            }),
+            None => diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: format!("{}_ignore_unknown", cache_root.name),
+                message: format!(
+                    "unable to determine whether local cache root {} is ignored by git",
+                    cache_root.path.display()
+                ),
+            }),
+        }
     }
     if diagnostics.is_empty() {
         diagnostics.push(LocalDiagnostic {

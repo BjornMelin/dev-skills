@@ -128,7 +128,11 @@ fn write_local_doctor_fixture(root: &std::path::Path) -> (std::path::PathBuf, st
     std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
     std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
         .expect("repo validation");
-    std::fs::write(repo.join(".gitignore"), ".codex/tasks/\n").expect("repo gitignore");
+    std::fs::write(
+        repo.join(".gitignore"),
+        ".codex/tasks/\n.codex/research/\n/target/\n",
+    )
+    .expect("repo gitignore");
 
     let bin = root.join("bin");
     std::fs::create_dir_all(&bin).expect("fake bin");
@@ -289,6 +293,115 @@ esac
             .iter()
             .any(|diagnostic| diagnostic["code"] == "capsule_root_not_ignored")
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_unignored_cache_roots() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let git = bin.join("git");
+    std::fs::write(
+        &git,
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *".codex/tasks/probe"*) exit 0 ;;
+  *".codex/research/probe"*) exit 1 ;;
+  *"target/codex-dev-install-smoke/probe"*) exit 0 ;;
+  *"check-ignore"*) exit 0 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#,
+    )
+    .expect("write cache git fixture");
+    let mut perms = std::fs::metadata(&git)
+        .expect("cache git metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&git, perms).expect("cache git executable");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "research_cache_not_ignored")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_honors_gh_config_dir_and_xdg_cache_home() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let gh_config = temp.path().join("gh-config");
+    let xdg_cache_home = temp.path().join("xdg-cache");
+    let codex_cache = xdg_cache_home.join("codex-research");
+    std::fs::create_dir_all(&gh_config).expect("gh config dir");
+    std::fs::create_dir_all(&codex_cache).expect("codex cache dir");
+    std::fs::write(gh_config.join("hosts.yml"), "github.com: {}\n").expect("gh hosts");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("GH_CONFIG_DIR", &gh_config)
+        .env("XDG_CACHE_HOME", &xdg_cache_home)
+        .env_remove("HOME")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["result"]["github"]["auth_class"], "gh_config");
+    let cache_roots = json["result"]["cache_roots"]
+        .as_array()
+        .expect("cache roots");
+    let global_cache = cache_roots
+        .iter()
+        .find(|root| root["name"] == "global_codex_cache")
+        .expect("global cache root");
+    assert_eq!(
+        global_cache["path"].as_str().expect("global cache path"),
+        codex_cache.to_str().expect("cache path utf8")
+    );
+    assert_eq!(global_cache["exists"], true);
 }
 
 fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {

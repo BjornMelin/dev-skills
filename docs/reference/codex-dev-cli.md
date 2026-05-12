@@ -120,6 +120,10 @@ with a sanitized environment; JSON output intentionally includes local absolute
 paths for diagnostics and should be treated as workstation evidence, not a
 public artifact.
 
+GitHub config discovery follows `GH_CONFIG_DIR`, then `XDG_CONFIG_HOME/gh`, then
+`HOME/.config/gh`. The global `codex-research` cache path follows
+`XDG_CACHE_HOME/codex-research`, then `HOME/.cache/codex-research`.
+
 Fixture-friendly options:
 
 ```bash
