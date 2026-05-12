@@ -10,6 +10,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover
+    tomllib = None  # type: ignore[assignment]
 
 SCRIPT = Path(__file__).resolve().parents[1] / "audit_streamlit_project.py"
 
@@ -95,6 +99,28 @@ class StreamlitUiAuditTests(unittest.TestCase):
         self.assertEqual(finding["locations"][0]["line"], 2)
         self.assertNotEqual(finding["locations"][0]["path"], "st.beta_columns")
 
+    def test_windows_locations_under_scan_root_are_relative(self) -> None:
+        """Windows paths under a Windows scan root stay root-relative."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "audit_streamlit_project",
+            SCRIPT,
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+
+        location = module._ui_location(
+            Path(r"C:\repo\app"),
+            r"C:\repo\app\pages\Home.py:7",
+        )
+
+        self.assertEqual(location, {"path": "pages/Home.py", "line": 7})
+
+    @unittest.skipIf(tomllib is None, "pyproject TOML parsing requires tomllib")
     def test_dependency_specs_redact_direct_urls(self) -> None:
         """UI audit observations do not expose direct dependency URL specs."""
         with tempfile.TemporaryDirectory() as tmp:

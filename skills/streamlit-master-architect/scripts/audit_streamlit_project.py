@@ -476,7 +476,15 @@ def _ui_location(root: Path, raw: str) -> JsonDict:
 
     windows_path = PureWindowsPath(path_text)
     if windows_path.drive and windows_path.root:
-        path_text = windows_path.name or "<unknown>"
+        root_text = str(root)
+        windows_root = PureWindowsPath(root_text)
+        if windows_root.drive and windows_root.root:
+            try:
+                path_text = windows_path.relative_to(windows_root).as_posix()
+            except ValueError:
+                path_text = windows_path.name or "<unknown>"
+        else:
+            path_text = windows_path.name or "<unknown>"
         location: JsonDict = {"path": path_text}
         if line is not None:
             location["line"] = line
