@@ -53,9 +53,17 @@ source excerpts or private research context.
 Inspect local readiness:
 
 ```bash
+codex-dev --json local doctor
+codex-dev --json local status
 codex-research doctor
 codex-research --json doctor
 ```
+
+`codex-dev local doctor` checks the development workstation and checkout:
+required local tools, ignored capsule roots, GitHub auth source class, policy
+profiles, and installed CLI posture. `codex-dev local status` emits the same
+contract with a status-oriented mode. `codex-research doctor` remains scoped to
+research-provider readiness.
 
 ## Build and Install the CLI
 

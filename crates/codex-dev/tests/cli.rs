@@ -84,6 +84,481 @@ fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String
         .to_string()
 }
 
+#[cfg(unix)]
+fn write_fake_local_tool(bin_dir: &std::path::Path, name: &str) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let script = bin_dir.join(name);
+    let body = if name == "git" {
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *"check-ignore"*) exit 0 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#
+    } else {
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
+  echo "token env leaked into probe" >&2
+  exit 7
+fi
+if [ "$1" = "--version" ]; then
+  name="${0##*/}"
+  printf '%s fixture\n' "$name"
+fi
+"#
+    };
+    std::fs::write(&script, body).expect("write fake local tool");
+    let mut perms = std::fs::metadata(&script)
+        .expect("fake local tool metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&script, perms).expect("fake local tool executable");
+}
+
+#[cfg(unix)]
+fn write_local_doctor_fixture(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
+    let repo = root.join("repo");
+    std::fs::create_dir_all(repo.join("docs/runbooks")).expect("repo docs");
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
+    std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+        .expect("repo validation");
+    std::fs::write(
+        repo.join(".gitignore"),
+        ".codex/tasks/\n.codex/research/\n/target/\n",
+    )
+    .expect("repo gitignore");
+
+    let bin = root.join("bin");
+    std::fs::create_dir_all(&bin).expect("fake bin");
+    for name in [
+        "codex-dev",
+        "codex-dev-tui",
+        "codex-research",
+        "cargo",
+        "rustc",
+        "git",
+        "gh",
+        "python3",
+        "cargo-deny",
+        "cargo-audit",
+    ] {
+        write_fake_local_tool(&bin, name);
+    }
+    (repo, bin)
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_emits_read_only_json_report() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let home = temp.path().join("home");
+    std::fs::create_dir_all(home.join(".config/gh")).expect("gh config dir");
+    std::fs::write(home.join(".config/gh/hosts.yml"), "github.com: {}\n").expect("gh config");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", home)
+        .env("GH_TOKEN", "fixture-secret-token")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["command"], "local doctor");
+    assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
+    assert_eq!(json["result"]["mode"], "doctor");
+    assert_eq!(json["result"]["ok"], true);
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_TOKEN")),
+        "local doctor should report GH_TOKEN as the categorical token source"
+    );
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
+        "local doctor output must not include token values"
+    );
+    assert_eq!(json["result"]["capsule_root"]["git_ignored"], true);
+    assert!(
+        json["result"]["policy_profiles"]
+            .as_array()
+            .expect("profiles")
+            .iter()
+            .any(|profile| profile["profile"] == "full_local")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_status_uses_same_contract_with_status_mode() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .env("GH_TOKEN", "fixture-secret-token")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .args([
+            "--json",
+            "local",
+            "status",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local status json");
+    assert_eq!(json["command"], "local status");
+    assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
+    assert_eq!(json["result"]["mode"], "status");
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_TOKEN")),
+        "local status should report GH_TOKEN as the categorical token source"
+    );
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
+        "local status output must not include token values"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_enterprise_token_source_without_value() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN")
+        .env("GH_ENTERPRISE_TOKEN", "fixture-enterprise-secret-token")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    let token_sources = json["result"]["github"]["token_sources"]
+        .as_array()
+        .expect("token sources");
+    assert!(
+        token_sources
+            .iter()
+            .any(|source| source.as_str() == Some("GH_ENTERPRISE_TOKEN")),
+        "local doctor should report GH_ENTERPRISE_TOKEN as the categorical token source"
+    );
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-enterprise-secret-token"),
+        "local doctor output must not include enterprise token values"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_strict_global_binaries_upgrades_missing_binary_to_error() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    std::fs::remove_file(bin.join("codex-dev-tui")).expect("remove global binary fixture");
+
+    let default_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", &bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let default_json: Value =
+        serde_json::from_slice(&default_output).expect("default local doctor json");
+    let default_diagnostics = default_json["result"]["diagnostics"]
+        .as_array()
+        .expect("default diagnostics");
+    let default_missing_binary = default_diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "missing_optional_codex_dev_tui")
+        .expect("default missing binary warning");
+    assert_eq!(default_json["result"]["ok"], true);
+    assert_eq!(default_missing_binary["severity"], "warning");
+
+    let strict_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", &bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--strict-global-binaries",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let strict_json: Value =
+        serde_json::from_slice(&strict_output).expect("strict local doctor json");
+    let strict_diagnostics = strict_json["result"]["diagnostics"]
+        .as_array()
+        .expect("strict diagnostics");
+    let strict_missing_binary = strict_diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic["code"] == "missing_codex_dev_tui")
+        .expect("strict missing binary error");
+    assert_eq!(strict_json["result"]["ok"], false);
+    assert_eq!(strict_missing_binary["severity"], "error");
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_unknown_capsule_ignore_probe() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let git = bin.join("git");
+    std::fs::write(
+        &git,
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *"check-ignore"*) exit 2 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#,
+    )
+    .expect("write failing git fixture");
+    let mut perms = std::fs::metadata(&git)
+        .expect("failing git metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&git, perms).expect("failing git executable");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "capsule_root_ignore_unknown")
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "capsule_root_not_ignored")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_reports_unignored_cache_roots() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let git = bin.join("git");
+    std::fs::write(
+        &git,
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *".codex/tasks/probe"*) exit 0 ;;
+  *".codex/research/probe"*) exit 1 ;;
+  *".local-cache/codex-research/probe"*) exit 1 ;;
+  *"target/codex-dev-install-smoke/probe"*) exit 0 ;;
+  *"check-ignore"*) exit 0 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#,
+    )
+    .expect("write cache git fixture");
+    let mut perms = std::fs::metadata(&git)
+        .expect("cache git metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&git, perms).expect("cache git executable");
+    let xdg_cache_home = std::path::PathBuf::from(".local-cache");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .env("XDG_CACHE_HOME", &xdg_cache_home)
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "research_cache_not_ignored")
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "global_codex_cache_not_ignored")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_honors_gh_config_dir_and_xdg_cache_home() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let gh_config = temp.path().join("gh-config");
+    let xdg_cache_home = temp.path().join("xdg-cache");
+    let codex_cache = xdg_cache_home.join("codex-research");
+    std::fs::create_dir_all(&gh_config).expect("gh config dir");
+    std::fs::create_dir_all(&codex_cache).expect("codex cache dir");
+    std::fs::write(gh_config.join("hosts.yml"), "github.com: {}\n").expect("gh hosts");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("GH_CONFIG_DIR", &gh_config)
+        .env("XDG_CACHE_HOME", &xdg_cache_home)
+        .env_remove("HOME")
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["result"]["github"]["auth_class"], "gh_config");
+    let cache_roots = json["result"]["cache_roots"]
+        .as_array()
+        .expect("cache roots");
+    let global_cache = cache_roots
+        .iter()
+        .find(|root| root["name"] == "global_codex_cache")
+        .expect("global cache root");
+    assert_eq!(
+        global_cache["path"].as_str().expect("global cache path"),
+        codex_cache.to_str().expect("cache path utf8")
+    );
+    assert_eq!(global_cache["exists"], true);
+}
+
 fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
     std::fs::create_dir_all(source_dir).expect("source dir");
     std::fs::write(

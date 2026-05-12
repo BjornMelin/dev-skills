@@ -2,10 +2,11 @@ use std::collections::BTreeSet;
 use std::env;
 use std::ffi::OsString;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, Stdio};
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
@@ -33,8 +34,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
+const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
+const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "GITHUB_ENTERPRISE_TOKEN",
+];
 const GH_PR_VIEW_JSON_FIELDS: &str = "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels";
 const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
 const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
@@ -72,6 +80,10 @@ impl Cli {
                 PolicyCommand::DocsCheck(_) => "policy docs-check",
                 PolicyCommand::Run(_) => "policy run",
             },
+            Commands::Local { command } => match command {
+                LocalCommand::Doctor(_) => "local doctor",
+                LocalCommand::Status(_) => "local status",
+            },
             Commands::Pr { command } => match command {
                 PrCommand::Agent(_) => "pr agent",
                 PrCommand::AgentAction(_) => "pr agent-action",
@@ -107,6 +119,11 @@ enum Commands {
     Policy {
         #[command(subcommand)]
         command: PolicyCommand,
+    },
+    /// Inspect local workstation readiness without mutating state.
+    Local {
+        #[command(subcommand)]
+        command: LocalCommand,
     },
     /// Capture hosted PR evidence into task capsules.
     Pr {
@@ -157,6 +174,14 @@ enum PolicyCommand {
     DocsCheck(PolicyDocsCheckArgs),
     /// Plan or execute gates and record capsule evidence.
     Run(PolicyRunArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum LocalCommand {
+    /// Run a read-only local preflight for this repository.
+    Doctor(LocalDoctorArgs),
+    /// Print a compact read-only local readiness status.
+    Status(LocalDoctorArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -605,6 +630,149 @@ pub struct PolicyRunArgs {
     pub checked_at: Option<DateTime<Utc>>,
 }
 
+/// Arguments shared by the local readiness subcommands.
+#[derive(Args, Clone, Debug)]
+pub struct LocalDoctorArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Whether missing globally installed codex-dev binaries should fail the report.
+    #[arg(
+        long,
+        help = "Treat missing globally installed codex-dev binaries as errors instead of warnings"
+    )]
+    pub strict_global_binaries: bool,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Operator intent for a local readiness report.
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalReportMode {
+    /// Full local preflight report.
+    Doctor,
+    /// Compact status-oriented local readiness report.
+    Status,
+}
+
+/// Read-only workstation and checkout readiness report.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalDoctorReport {
+    /// Versioned schema identifier for the report payload inside the command envelope.
+    pub schema: &'static str,
+    /// Subcommand intent that produced this report.
+    pub mode: LocalReportMode,
+    /// Timestamp at which the report was generated.
+    pub checked_at: DateTime<Utc>,
+    /// Current working directory of the process that generated the report.
+    pub cwd: PathBuf,
+    /// Repository root inspected by the report.
+    pub repo_root: PathBuf,
+    /// True when no error-severity diagnostics were emitted.
+    pub ok: bool,
+    /// Human-actionable readiness findings.
+    pub diagnostics: Vec<LocalDiagnostic>,
+    /// Globally installed Codex binary posture.
+    pub binaries: Vec<LocalToolStatus>,
+    /// Required and optional development tool posture.
+    pub tools: Vec<LocalToolStatus>,
+    /// GitHub CLI and categorical authentication posture.
+    pub github: LocalGithubStatus,
+    /// Local task-capsule root state.
+    pub capsule_root: LocalPathStatus,
+    /// Local cache and install-smoke roots that should not become tracked artifacts.
+    pub cache_roots: Vec<LocalPathStatus>,
+    /// Built-in policy profile gate counts.
+    pub policy_profiles: Vec<LocalPolicyProfileStatus>,
+}
+
+/// Human-actionable local readiness finding.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalDiagnostic {
+    /// Severity used to compute the report verdict.
+    pub severity: LocalDiagnosticSeverity,
+    /// Stable machine-readable diagnostic code.
+    pub code: String,
+    /// Human-readable remediation hint.
+    pub message: String,
+}
+
+/// Severity for local readiness diagnostics.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LocalDiagnosticSeverity {
+    /// Informational diagnostic that does not require action.
+    Info,
+    /// Non-blocking readiness concern.
+    Warning,
+    /// Blocking readiness failure.
+    Error,
+}
+
+/// Availability and optional version data for a local executable.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalToolStatus {
+    /// Command name as searched on PATH.
+    pub name: String,
+    /// Whether absence of the command is an error.
+    pub required: bool,
+    /// Whether an executable file was found on PATH.
+    pub available: bool,
+    /// Resolved executable path when available.
+    pub path: Option<PathBuf>,
+    /// Redacted first-line version output when probed.
+    pub version: Option<String>,
+}
+
+/// Categorical GitHub CLI authentication posture without credential values.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalGithubStatus {
+    /// Whether the `gh` executable was found on PATH.
+    pub gh_available: bool,
+    /// Resolved `gh` executable path when available.
+    pub gh_path: Option<PathBuf>,
+    /// Names of non-empty GitHub token environment variables, never their values.
+    pub token_sources: Vec<String>,
+    /// Whether a GitHub CLI hosts configuration file was detected.
+    pub config_present: bool,
+    /// Coarse authentication source class for local readiness reporting.
+    pub auth_class: String,
+}
+
+/// Local path existence and git-ignore status.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalPathStatus {
+    /// Stable path role name used in diagnostics.
+    pub name: String,
+    /// Absolute path inspected by the report.
+    pub path: PathBuf,
+    /// Whether the path exists on disk.
+    pub exists: bool,
+    /// Git ignore result, or `None` when the probe could not determine it.
+    pub git_ignored: Option<bool>,
+}
+
+/// Summary of built-in policy gate counts for one profile.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct LocalPolicyProfileStatus {
+    /// Policy profile summarized by this row.
+    pub profile: PolicyProfile,
+    /// Total built-in gates in the profile.
+    pub gates: usize,
+    /// Gates that must pass for the profile to pass.
+    pub required_gates: usize,
+    /// Gates that may require network access.
+    pub network_gates: usize,
+    /// Gates that may require secrets or credentials.
+    pub secret_gates: usize,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct PolicyDocsCheckResult {
     pub schema: &'static str,
@@ -959,6 +1127,28 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Local { command } => match command {
+            LocalCommand::Doctor(args) => {
+                let result = local_doctor(args, LocalReportMode::Doctor)?;
+                let human = render_local_report_human(&result);
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "local doctor",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            LocalCommand::Status(args) => {
+                let result = local_doctor(args, LocalReportMode::Status)?;
+                let human = render_local_report_human(&result);
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "local status",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
         Commands::Pr { command } => match command {
             PrCommand::Agent(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
@@ -1137,6 +1327,492 @@ fn render_evidence_counts(by_kind: &[EvidenceKindSummary]) -> String {
         .map(|summary| format!("{}={}", summary.kind, summary.count))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// Build a read-only local readiness report for the current workstation and checkout.
+pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<LocalDoctorReport> {
+    let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+    let cwd = env::current_dir().context("failed to read current directory")?;
+    let repo_root = match args.repo_root {
+        Some(path) => canonicalize_repo_root(&path)?,
+        None => find_repo_root(&cwd).ok_or_else(|| {
+            anyhow::anyhow!(
+                "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+            )
+        })?,
+    };
+
+    let binaries = ["codex-dev", "codex-dev-tui", "codex-research"]
+        .into_iter()
+        .map(|name| local_tool_status(name, args.strict_global_binaries, false))
+        .collect::<Vec<_>>();
+    let tools = [
+        ("cargo", true, true),
+        ("rustc", true, true),
+        ("git", true, true),
+        ("gh", true, true),
+        ("python3", true, true),
+        ("cargo-deny", false, true),
+        ("cargo-audit", false, true),
+    ]
+    .into_iter()
+    .map(|(name, required, version)| local_tool_status(name, required, version))
+    .collect::<Vec<_>>();
+
+    let github = local_github_status();
+    let capsule_root = local_path_status(&repo_root, "capsule_root", ".codex/tasks");
+    let mut cache_roots = vec![
+        local_path_status(&repo_root, "research_cache", ".codex/research"),
+        local_path_status(
+            &repo_root,
+            "install_smoke_target",
+            "target/codex-dev-install-smoke",
+        ),
+    ];
+    if let Some(path) = codex_cache_dir() {
+        cache_roots.push(global_cache_status(
+            &repo_root,
+            normalize_local_path(&repo_root, path),
+        ));
+    }
+
+    let policy_profiles = all_policy_profiles()
+        .into_iter()
+        .map(|profile| {
+            let gates = built_in_gates(profile);
+            LocalPolicyProfileStatus {
+                profile,
+                gates: gates.len(),
+                required_gates: gates.iter().filter(|gate| gate.required).count(),
+                network_gates: gates.iter().filter(|gate| gate.network).count(),
+                secret_gates: gates.iter().filter(|gate| gate.secrets).count(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let diagnostics = local_diagnostics(
+        &binaries,
+        &tools,
+        &github,
+        &capsule_root,
+        &repo_root,
+        &cache_roots,
+    );
+    let ok = diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error);
+
+    Ok(LocalDoctorReport {
+        schema: LOCAL_DOCTOR_SCHEMA,
+        mode,
+        checked_at,
+        cwd,
+        repo_root,
+        ok,
+        diagnostics,
+        binaries,
+        tools,
+        github,
+        capsule_root,
+        cache_roots,
+        policy_profiles,
+    })
+}
+
+/// Render the local readiness report as a compact human-facing summary.
+fn render_local_report_human(report: &LocalDoctorReport) -> String {
+    let errors = report
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == LocalDiagnosticSeverity::Error)
+        .count();
+    let warnings = report
+        .diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == LocalDiagnosticSeverity::Warning)
+        .count();
+    let binaries = report
+        .binaries
+        .iter()
+        .filter(|binary| binary.available)
+        .count();
+    let tools = report.tools.iter().filter(|tool| tool.available).count();
+    format!(
+        "local {:?}: {} error(s), {} warning(s), {}/{} global binary(s), {}/{} tool(s)",
+        report.mode,
+        errors,
+        warnings,
+        binaries,
+        report.binaries.len(),
+        tools,
+        report.tools.len()
+    )
+}
+
+/// Inspect one executable expected on PATH.
+fn local_tool_status(name: &str, required: bool, include_version: bool) -> LocalToolStatus {
+    let path = find_executable_on_path(name);
+    let version = path
+        .as_ref()
+        .filter(|_| include_version)
+        .and_then(|path| command_version(path));
+    LocalToolStatus {
+        name: name.to_string(),
+        required,
+        available: path.is_some(),
+        path,
+        version,
+    }
+}
+
+/// Detect GitHub CLI availability and categorical authentication source hints.
+fn local_github_status() -> LocalGithubStatus {
+    let gh_path = find_executable_on_path("gh");
+    let token_sources = GITHUB_TOKEN_ENV_VARS
+        .iter()
+        .filter(|name| non_empty_env_var(name))
+        .map(|name| (*name).to_string())
+        .collect::<Vec<_>>();
+    let config_present = gh_config_dir()
+        .map(|config_dir| config_dir.join("hosts.yml").is_file())
+        .unwrap_or(false);
+    let auth_class = if !token_sources.is_empty() {
+        "env_token"
+    } else if config_present {
+        "gh_config"
+    } else if gh_path.is_some() {
+        "gh_available_no_auth_hint"
+    } else {
+        "gh_missing"
+    }
+    .to_string();
+    LocalGithubStatus {
+        gh_available: gh_path.is_some(),
+        gh_path,
+        token_sources,
+        config_present,
+        auth_class,
+    }
+}
+
+/// Read a path-valued environment variable when it is present and non-empty.
+fn non_empty_env_path(name: &str) -> Option<PathBuf> {
+    env::var_os(name)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Return true when an environment variable is present and non-empty.
+fn non_empty_env_var(name: &str) -> bool {
+    env::var_os(name).is_some_and(|value| !value.is_empty())
+}
+
+/// Resolve the GitHub CLI config directory using GitHub CLI environment precedence.
+fn gh_config_dir() -> Option<PathBuf> {
+    non_empty_env_path("GH_CONFIG_DIR")
+        .or_else(|| non_empty_env_path("XDG_CONFIG_HOME").map(|path| path.join("gh")))
+        .or(windows_appdata_gh_config_dir())
+        .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".config/gh")))
+}
+
+/// Resolve the Windows GitHub CLI config fallback from APPDATA.
+fn windows_appdata_gh_config_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        non_empty_env_path("APPDATA").map(|path| path.join("GitHub CLI"))
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// Resolve the codex-research cache directory using XDG cache precedence.
+fn codex_cache_dir() -> Option<PathBuf> {
+    non_empty_env_path("XDG_CACHE_HOME")
+        .map(|path| path.join("codex-research"))
+        .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".cache/codex-research")))
+}
+
+/// Resolve relative environment-derived paths against the inspected repository.
+fn normalize_local_path(repo_root: &Path, path: PathBuf) -> PathBuf {
+    let path = if path.is_absolute() {
+        path
+    } else {
+        repo_root.join(path)
+    };
+    path.canonicalize().unwrap_or(path)
+}
+
+/// Inspect a repository-local path and its git-ignore state.
+fn local_path_status(repo_root: &Path, name: &str, relative: &str) -> LocalPathStatus {
+    let path = repo_root.join(relative);
+    LocalPathStatus {
+        name: name.to_string(),
+        path,
+        exists: repo_root.join(relative).exists(),
+        git_ignored: git_check_ignored(repo_root, &directory_ignore_probe(relative)),
+    }
+}
+
+/// Inspect a cache path that may be outside the repository.
+fn global_cache_status(repo_root: &Path, path: PathBuf) -> LocalPathStatus {
+    let git_ignored = repo_relative_path_for_git(repo_root, &path)
+        .and_then(|relative| git_check_ignored(repo_root, &directory_ignore_probe(&relative)));
+    LocalPathStatus {
+        name: "global_codex_cache".to_string(),
+        exists: path.exists(),
+        path,
+        git_ignored,
+    }
+}
+
+/// Convert a repository-local path into the slash-separated form expected by git.
+fn repo_relative_path_for_git(repo_root: &Path, path: &Path) -> Option<String> {
+    let relative = path.strip_prefix(repo_root).ok()?;
+    if relative.as_os_str().is_empty() {
+        return None;
+    }
+    Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
+/// Probe a directory-style path so ignore rules for the directory and its contents apply.
+fn directory_ignore_probe(relative: &str) -> String {
+    format!("{}/probe", relative.trim_end_matches('/'))
+}
+
+/// Convert collected local readiness facts into actionable diagnostics.
+fn local_diagnostics(
+    binaries: &[LocalToolStatus],
+    tools: &[LocalToolStatus],
+    github: &LocalGithubStatus,
+    capsule_root: &LocalPathStatus,
+    repo_root: &Path,
+    cache_roots: &[LocalPathStatus],
+) -> Vec<LocalDiagnostic> {
+    let mut diagnostics = Vec::new();
+    for status in binaries.iter().chain(tools.iter()) {
+        if status.required && !status.available {
+            diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: format!("missing_{}", status.name.replace('-', "_")),
+                message: format!("required command `{}` was not found on PATH", status.name),
+            });
+        } else if !status.required && !status.available {
+            diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: format!("missing_optional_{}", status.name.replace('-', "_")),
+                message: format!("optional command `{}` was not found on PATH", status.name),
+            });
+        }
+    }
+    if github.gh_available && github.auth_class == "gh_available_no_auth_hint" {
+        diagnostics.push(LocalDiagnostic {
+            severity: LocalDiagnosticSeverity::Warning,
+            code: "github_auth_unverified".to_string(),
+            message: "`gh` is installed, but no env token or gh hosts config was detected"
+                .to_string(),
+        });
+    }
+    match capsule_root.git_ignored {
+        Some(true) => {}
+        Some(false) => diagnostics.push(LocalDiagnostic {
+            severity: LocalDiagnosticSeverity::Error,
+            code: "capsule_root_not_ignored".to_string(),
+            message: format!(
+                "local capsule root {} must be ignored by git",
+                capsule_root.path.display()
+            ),
+        }),
+        None => diagnostics.push(LocalDiagnostic {
+            severity: LocalDiagnosticSeverity::Error,
+            code: "capsule_root_ignore_unknown".to_string(),
+            message: format!(
+                "unable to determine whether local capsule root {} is ignored by git",
+                capsule_root.path.display()
+            ),
+        }),
+    }
+    for cache_root in cache_roots {
+        match cache_root.git_ignored {
+            Some(true) => {}
+            Some(false) => diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: format!("{}_not_ignored", cache_root.name),
+                message: format!(
+                    "local cache root {} must be ignored by git",
+                    cache_root.path.display()
+                ),
+            }),
+            None if cache_root.name == "global_codex_cache"
+                && repo_relative_path_for_git(repo_root, &cache_root.path).is_none() => {}
+            None => diagnostics.push(LocalDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: format!("{}_ignore_unknown", cache_root.name),
+                message: format!(
+                    "unable to determine whether local cache root {} is ignored by git",
+                    cache_root.path.display()
+                ),
+            }),
+        }
+    }
+    if diagnostics.is_empty() {
+        diagnostics.push(LocalDiagnostic {
+            severity: LocalDiagnosticSeverity::Info,
+            code: "local_ready".to_string(),
+            message: "required local development tools and ignored capsule root are present"
+                .to_string(),
+        });
+    }
+    diagnostics
+}
+
+/// Captured result from a bounded local subprocess probe.
+struct LocalProbeOutput {
+    /// Whether the subprocess exited successfully.
+    success: bool,
+    /// Numeric process exit code when the platform reported one.
+    code: Option<i32>,
+    /// Bounded standard output captured from the subprocess.
+    stdout: Vec<u8>,
+}
+
+/// Return true when a path is a usable executable file for the current platform.
+fn is_executable_file(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::metadata(path)
+            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
+            .unwrap_or(false)
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+/// Run a local command without inherited environment and with bounded output/time.
+fn run_bounded_local_probe(
+    command: &Path,
+    args: &[&str],
+    max_stdout_bytes: Option<u64>,
+) -> Option<LocalProbeOutput> {
+    let mut child = Command::new(command)
+        .args(args)
+        .env_clear()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let limit = max_stdout_bytes.unwrap_or(4096);
+    let reader = std::thread::spawn(move || {
+        let mut buffer = Vec::new();
+        let _ = stdout.by_ref().take(limit).read_to_end(&mut buffer);
+        buffer
+    });
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let status = loop {
+        if let Some(status) = child.try_wait().ok()? {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = reader.join();
+            return None;
+        }
+        sleep(Duration::from_millis(10));
+    };
+    let stdout = reader.join().ok()?;
+    Some(LocalProbeOutput {
+        success: status.success(),
+        code: status.code(),
+        stdout,
+    })
+}
+
+/// Build executable file-name candidates for PATH lookup on the current platform.
+fn executable_candidates(command: &str) -> Vec<OsString> {
+    #[cfg(windows)]
+    {
+        if Path::new(command).extension().is_some() {
+            return vec![OsString::from(command)];
+        }
+        let mut names = vec![OsString::from(command)];
+        let pathext =
+            env::var_os("PATHEXT").unwrap_or_else(|| OsString::from(".COM;.EXE;.BAT;.CMD"));
+        names.extend(
+            pathext
+                .to_string_lossy()
+                .split(';')
+                .map(str::trim)
+                .filter(|extension| !extension.is_empty())
+                .map(|extension| {
+                    if extension.starts_with('.') {
+                        format!("{command}{extension}")
+                    } else {
+                        format!("{command}.{extension}")
+                    }
+                })
+                .map(OsString::from),
+        );
+        names
+    }
+    #[cfg(not(windows))]
+    {
+        vec![OsString::from(command)]
+    }
+}
+
+/// Resolve the first executable candidate found on PATH.
+fn find_executable_on_path(command: &str) -> Option<PathBuf> {
+    let paths = env::var_os("PATH")?;
+    let candidates = executable_candidates(command);
+    env::split_paths(&paths).find_map(|dir| {
+        candidates
+            .iter()
+            .map(|candidate| dir.join(candidate))
+            .find(|path| is_executable_file(path))
+    })
+}
+
+/// Read and redact the first line of a command's `--version` output.
+fn command_version(command: &Path) -> Option<String> {
+    let output = run_bounded_local_probe(command, &["--version"], None)?;
+    if !output.success {
+        return None;
+    }
+    String::from_utf8(output.stdout)
+        .ok()
+        .map(|text| {
+            redact_sensitive_text(text.lines().next().unwrap_or("").trim())
+                .chars()
+                .take(240)
+                .collect::<String>()
+        })
+        .filter(|line| !line.is_empty())
+}
+
+/// Check whether a repository-relative path is ignored by git.
+fn git_check_ignored(repo_root: &Path, relative: &str) -> Option<bool> {
+    let git = find_executable_on_path("git")?;
+    let repo = repo_root.to_string_lossy().to_string();
+    let output = run_bounded_local_probe(
+        &git,
+        &["-C", &repo, "check-ignore", "-q", "--", relative],
+        Some(1024),
+    )?;
+    match output.code {
+        Some(0) => Some(true),
+        Some(1) => Some(false),
+        _ => None,
+    }
 }
 
 pub fn policy_manifest(profile: PolicyProfile, generated_at: DateTime<Utc>) -> PolicyManifest {
@@ -3517,12 +4193,18 @@ fn permission_diagnostics(
     args: &PrAgentActionArgs,
     generated_at: DateTime<Utc>,
 ) -> Vec<PrAgentDiagnostic> {
-    let message = if env::var_os("GITHUB_TOKEN").is_some() {
-        "GITHUB_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
-    } else if env::var_os("GH_TOKEN").is_some() {
-        "GH_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
+    let has_github_token = ["GITHUB_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]
+        .iter()
+        .any(|name| non_empty_env_var(name));
+    let has_gh_token = ["GH_TOKEN", "GH_ENTERPRISE_TOKEN"]
+        .iter()
+        .any(|name| non_empty_env_var(name));
+    let message = if has_github_token {
+        "GITHUB_TOKEN or GITHUB_ENTERPRISE_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
+    } else if has_gh_token {
+        "GH_TOKEN or GH_ENTERPRISE_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
     } else {
-        "no GH_TOKEN or GITHUB_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
+        "no GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, or GITHUB_ENTERPRISE_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
     };
     vec![PrAgentDiagnostic {
         source: "github-auth".to_string(),
@@ -4318,9 +5000,10 @@ fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
     Some(truncated)
 }
 
+/// Redact credential-looking content before returning command output in reports.
 fn redact_sensitive_text(text: impl AsRef<str>) -> String {
     let text = redact_authorization_lines(text.as_ref());
-    let text = redact_key_assignments(&text, &["GH_TOKEN", "GITHUB_TOKEN"]);
+    let text = redact_key_assignments(&text, GITHUB_TOKEN_ENV_VARS);
     redact_prefixed_tokens(
         &text,
         &[
@@ -5743,13 +6426,15 @@ mod tests {
     #[test]
     fn hosted_diagnostics_redact_token_like_values() {
         let excerpt = diagnostic_excerpt(
-            b"Authorization: Bearer ghp_secret123\nexport GH_TOKEN=plain-secret\nGITHUB_TOKEN = spaced-secret\nNOT_GH_TOKEN=kept github_pat_abc123",
+            b"Authorization: Bearer ghp_secret123\nexport GH_TOKEN=plain-secret\nGITHUB_TOKEN = spaced-secret\nGH_ENTERPRISE_TOKEN=enterprise-secret\nGITHUB_ENTERPRISE_TOKEN = enterprise-spaced-secret\nNOT_GH_TOKEN=kept github_pat_abc123",
         )
         .expect("excerpt");
 
         assert!(!excerpt.contains("ghp_secret123"));
         assert!(!excerpt.contains("plain-secret"));
         assert!(!excerpt.contains("spaced-secret"));
+        assert!(!excerpt.contains("enterprise-secret"));
+        assert!(!excerpt.contains("enterprise-spaced-secret"));
         assert!(!excerpt.contains("github_pat_abc123"));
         assert!(excerpt.contains("NOT_GH_TOKEN=kept"));
         assert!(excerpt.contains("[redacted]"));
