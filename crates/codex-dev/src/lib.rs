@@ -2284,10 +2284,11 @@ pub fn policy_explain(
     args: PolicyExplainArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<PolicyExplainReport> {
-    let manifest = policy_manifest(args.profile, checked_at);
+    let selected_profile = args.profile;
+    let manifest = policy_manifest(selected_profile, checked_at);
     let docs_check = policy_docs_check(args.repo_root.as_deref())?;
-    let docs_mirror_status = policy_explain_profile_docs_status(args.profile, &docs_check);
-    let docs_mirror_passed = policy_explain_profile_docs_passed(args.profile, &docs_check);
+    let docs_mirror_status = policy_explain_profile_docs_status(selected_profile, &docs_check);
+    let docs_mirror_passed = policy_explain_profile_docs_passed(selected_profile, &docs_check);
     let tool_statuses =
         policy_explain_required_tool_statuses(&manifest.gates, args.include_local_paths);
     let missing_local_prerequisites =
@@ -2297,7 +2298,7 @@ pub fn policy_explain(
         .iter()
         .map(|gate| {
             let gate_docs_mirror_status =
-                policy_explain_gate_docs_status(args.profile, gate, &docs_check);
+                policy_explain_gate_docs_status(selected_profile, gate, &docs_check);
             policy_explain_gate(gate, &tool_statuses, &gate_docs_mirror_status)
         })
         .collect::<Vec<_>>();
@@ -2321,6 +2322,7 @@ pub fn policy_explain(
             blocks: docs_check
                 .blocks
                 .into_iter()
+                .filter(|block| block.profiles.contains(&selected_profile))
                 .map(|block| PolicyExplainDocsBlock {
                     status: policy_explain_block_status(block.passed),
                     error: policy_explain_doc_error(block.error, &block.path),
@@ -7862,6 +7864,14 @@ mod tests {
         .expect("profile-scoped policy explain");
         assert_eq!(report.docs_mirror.status, "current");
         assert!(report.docs_mirror.passed);
+        assert!(
+            report
+                .docs_mirror
+                .blocks
+                .iter()
+                .all(|block| block.profiles.contains(&PolicyProfile::CodexDevTui))
+        );
+        assert_eq!(report.docs_mirror.blocks.len(), 1);
     }
 
     #[test]
