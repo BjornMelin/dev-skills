@@ -89,6 +89,7 @@ Orchestration subcommands:
 Policy subcommands:
 
 - `policy manifest`
+- `policy explain`
 - `policy docs-check`
 - `policy run`
 
@@ -639,6 +640,28 @@ required tools, required/network/secrets flags, and failure interpretation.
 Built-in profiles are local by default and do not require secrets or network
 access; networked advisory checks stay explicit in the release runbook.
 
+## policy explain
+
+Explain a policy profile without executing gates:
+
+```bash
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
+```
+
+The output is wrapped in the standard `codex-dev.output.v1` envelope and uses
+`result.schema: "policy_explain.v1"`. It is read-only: it reuses the Rust-owned
+manifest, reads the documentation mirror, probes required tools on `PATH`, and
+does not run any policy gate command. Local absolute repository and tool paths
+are omitted by default; pass `--include-local-paths` only when diagnosing local
+workstation setup and the JSON will not be pasted into hosted review evidence.
+
+The report includes the gate purpose, source, rendered command, required tools,
+missing local prerequisites, network/secrets posture, expected artifacts, docs
+mirror status, and failure interpretation for each gate. Use it before
+`policy run --execute` when deciding which profile fits a branch or when an
+installed binary is being used outside the checkout; pass `--repo-root <path>`
+when documentation mirror discovery would otherwise be ambiguous.
+
 ## policy docs-check
 
 Check machine-owned Markdown mirrors of policy manifest commands against the
@@ -958,6 +981,7 @@ cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> --kind decision --summary "fixture decision"
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status

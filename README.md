@@ -151,6 +151,7 @@ cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-smoke:end
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status

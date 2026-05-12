@@ -1956,6 +1956,66 @@ fn policy_manifest_and_dry_run_update_capsule() {
         .expect("docs-links gate");
     assert_eq!(docs_gate["network"], false);
 
+    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let explain_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            repo_root.to_str().expect("utf8 repo root"),
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let explain_json: Value = serde_json::from_slice(&explain_output).expect("explain json");
+    assert_eq!(explain_json["command"], "policy explain");
+    assert_eq!(explain_json["result"]["schema"], "policy_explain.v1");
+    assert_eq!(explain_json["result"]["docs_mirror"]["status"], "current");
+    assert!(
+        explain_json["result"]["gates"]
+            .as_array()
+            .expect("explain gates")
+            .iter()
+            .any(|gate| gate["id"] == "codex-dev-policy-explain")
+    );
+
+    let bad_repo_root = repo_root.join("no-such-policy-explain-root");
+    let bad_repo_root_arg = bad_repo_root.to_str().expect("utf8 bad repo root");
+    let explain_error_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            bad_repo_root_arg,
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let explain_error_json: Value =
+        serde_json::from_slice(&explain_error_output).expect("explain error json");
+    let explain_error_message = explain_error_json["result"]["error"]["message"]
+        .as_str()
+        .expect("explain error message");
+    assert!(explain_error_message.contains("--include-local-paths"));
+    assert!(!explain_error_message.contains(bad_repo_root_arg));
+
     let init_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args([

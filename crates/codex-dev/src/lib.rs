@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsString;
 use std::fs;
@@ -36,6 +36,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
+const POLICY_EXPLAIN_SCHEMA: &str = "policy_explain.v1";
 const LOCAL_DOCTOR_SCHEMA: &str = "codex-dev.local-doctor.v1";
 const POLICY_DOCS_SMOKE_MARKER: &str = "policy-manifest-smoke";
 const POLICY_DOCS_ALL_MARKER: &str = "policy-manifest-all";
@@ -80,6 +81,7 @@ impl Cli {
             },
             Commands::Policy { command } => match command {
                 PolicyCommand::Manifest(_) => "policy manifest",
+                PolicyCommand::Explain(_) => "policy explain",
                 PolicyCommand::DocsCheck(_) => "policy docs-check",
                 PolicyCommand::Run(_) => "policy run",
             },
@@ -201,6 +203,8 @@ enum EvidenceCommand {
 enum PolicyCommand {
     /// Print a machine-readable gate manifest.
     Manifest(PolicyManifestArgs),
+    /// Explain a policy profile without executing gates.
+    Explain(PolicyExplainArgs),
     /// Check machine-owned documentation mirrors for policy manifest commands.
     #[command(name = "docs-check")]
     DocsCheck(PolicyDocsCheckArgs),
@@ -679,6 +683,29 @@ pub struct PolicyManifestArgs {
 }
 
 #[derive(Args, Debug)]
+pub struct PolicyExplainArgs {
+    #[arg(
+        long,
+        default_value_t = PolicyProfile::CodexDev,
+        help = "Policy profile: codex_dev, codex_dev_tui, codex_research, skills, bootstrap_install, docs, release, or full_local"
+    )]
+    pub profile: PolicyProfile,
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root containing the checked documentation mirror"
+    )]
+    pub repo_root: Option<PathBuf>,
+    #[arg(
+        long,
+        help = "Include absolute local repo and tool paths in the JSON report"
+    )]
+    pub include_local_paths: bool,
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Args, Debug)]
 pub struct PolicyDocsCheckArgs {
     #[arg(
         long,
@@ -892,6 +919,79 @@ pub struct PolicyDocsBlockResult {
     pub passed: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainReport {
+    pub schema: &'static str,
+    pub profile: PolicyProfile,
+    pub checked_at: DateTime<Utc>,
+    pub manifest_schema: String,
+    pub gate_count: usize,
+    pub required_gate_count: usize,
+    pub network_gate_count: usize,
+    pub secret_gate_count: usize,
+    pub docs_mirror: PolicyExplainDocsMirror,
+    pub required_tools: Vec<PolicyExplainToolStatus>,
+    pub missing_local_prerequisites: Vec<PolicyExplainMissingPrerequisite>,
+    pub gates: Vec<PolicyExplainGate>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainDocsMirror {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repo_root: Option<PathBuf>,
+    pub status: String,
+    pub passed: bool,
+    pub blocks: Vec<PolicyExplainDocsBlock>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainDocsBlock {
+    pub path: String,
+    pub marker: String,
+    pub profiles: Vec<PolicyProfile>,
+    pub status: String,
+    pub expected_commands: Vec<String>,
+    pub actual_commands: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainToolStatus {
+    pub name: String,
+    pub available: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<PathBuf>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainMissingPrerequisite {
+    pub tool: String,
+    pub gate_ids: Vec<String>,
+    pub detail: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct PolicyExplainGate {
+    pub id: String,
+    pub name: String,
+    pub purpose: String,
+    pub source: String,
+    pub command: Vec<String>,
+    pub command_display: String,
+    pub working_directory: String,
+    pub required: bool,
+    pub required_tools: Vec<PolicyExplainToolStatus>,
+    pub missing_required_tools: Vec<String>,
+    pub network: bool,
+    pub network_posture: String,
+    pub secrets: bool,
+    pub secrets_posture: String,
+    pub docs_mirror_status: String,
+    pub expected_artifacts: Vec<String>,
+    pub failure_interpretation: String,
 }
 
 #[derive(Args, Debug)]
@@ -1247,6 +1347,31 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                         result.gates.len(),
                         result.profile
                     ),
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            PolicyCommand::Explain(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let include_local_paths = args.include_local_paths;
+                let result = policy_explain(args, checked_at).map_err(|error| {
+                    policy_explain_error_without_local_paths(error, include_local_paths)
+                })?;
+                let missing = result.missing_local_prerequisites.len();
+                let human = if missing == 0 {
+                    format!(
+                        "explained {} policy gate(s) for {}",
+                        result.gate_count, result.profile
+                    )
+                } else {
+                    format!(
+                        "explained {} policy gate(s) for {} with {} missing prerequisite(s)",
+                        result.gate_count, result.profile, missing
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "policy explain",
+                    human,
                     result: serde_json::to_value(result)?,
                 })
             }
@@ -2152,6 +2277,262 @@ pub fn policy_docs_check(explicit_repo_root: Option<&Path>) -> Result<PolicyDocs
         repo_root,
         passed,
         blocks,
+    })
+}
+
+pub fn policy_explain(
+    args: PolicyExplainArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<PolicyExplainReport> {
+    let manifest = policy_manifest(args.profile, checked_at);
+    let docs_check = policy_docs_check(args.repo_root.as_deref())?;
+    let docs_mirror_status = policy_explain_profile_docs_status(args.profile, &docs_check);
+    let tool_statuses =
+        policy_explain_required_tool_statuses(&manifest.gates, args.include_local_paths);
+    let missing_local_prerequisites =
+        policy_explain_missing_prerequisites(&manifest.gates, &tool_statuses);
+    let gates = manifest
+        .gates
+        .iter()
+        .map(|gate| policy_explain_gate(gate, &tool_statuses, &docs_mirror_status))
+        .collect::<Vec<_>>();
+    let docs_repo_root = args
+        .include_local_paths
+        .then(|| docs_check.repo_root.clone());
+
+    Ok(PolicyExplainReport {
+        schema: POLICY_EXPLAIN_SCHEMA,
+        profile: manifest.profile,
+        checked_at,
+        manifest_schema: manifest.schema,
+        gate_count: manifest.gates.len(),
+        required_gate_count: manifest.gates.iter().filter(|gate| gate.required).count(),
+        network_gate_count: manifest.gates.iter().filter(|gate| gate.network).count(),
+        secret_gate_count: manifest.gates.iter().filter(|gate| gate.secrets).count(),
+        docs_mirror: PolicyExplainDocsMirror {
+            repo_root: docs_repo_root,
+            status: docs_mirror_status,
+            passed: docs_check.passed,
+            blocks: docs_check
+                .blocks
+                .into_iter()
+                .map(|block| PolicyExplainDocsBlock {
+                    status: policy_explain_block_status(block.passed),
+                    error: policy_explain_doc_error(block.error, &block.path),
+                    path: block.path,
+                    marker: block.marker,
+                    profiles: block.profiles,
+                    expected_commands: block.expected_commands,
+                    actual_commands: block.actual_commands,
+                })
+                .collect(),
+        },
+        required_tools: tool_statuses,
+        missing_local_prerequisites,
+        gates,
+    })
+}
+
+fn policy_explain_error_without_local_paths(
+    error: anyhow::Error,
+    include_local_paths: bool,
+) -> anyhow::Error {
+    if include_local_paths {
+        error
+    } else {
+        anyhow::anyhow!(
+            "failed to inspect policy explain inputs; rerun with --include-local-paths for local path details"
+        )
+    }
+}
+
+fn policy_explain_profile_docs_status(
+    profile: PolicyProfile,
+    docs_check: &PolicyDocsCheckResult,
+) -> String {
+    let relevant_blocks = docs_check
+        .blocks
+        .iter()
+        .filter(|block| block.profiles.contains(&profile))
+        .collect::<Vec<_>>();
+    if relevant_blocks.is_empty() {
+        "not_mirrored".to_string()
+    } else if relevant_blocks.iter().all(|block| block.passed) {
+        "current".to_string()
+    } else {
+        "stale_or_missing".to_string()
+    }
+}
+
+fn policy_explain_block_status(passed: bool) -> String {
+    if passed {
+        "current"
+    } else {
+        "stale_or_missing"
+    }
+    .to_string()
+}
+
+fn policy_explain_required_tool_statuses(
+    gates: &[PolicyGate],
+    include_local_paths: bool,
+) -> Vec<PolicyExplainToolStatus> {
+    gates
+        .iter()
+        .flat_map(|gate| gate.required_tools.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|name| {
+            let path = find_executable_on_path(&name);
+            PolicyExplainToolStatus {
+                name,
+                available: path.is_some(),
+                path: include_local_paths.then_some(path).flatten(),
+            }
+        })
+        .collect()
+}
+
+fn policy_explain_doc_error(error: Option<String>, path: &str) -> Option<String> {
+    error.map(|message| {
+        if message.starts_with("failed to read ") {
+            format!("failed to read {path}")
+        } else {
+            message
+        }
+    })
+}
+
+fn policy_explain_missing_prerequisites(
+    gates: &[PolicyGate],
+    tool_statuses: &[PolicyExplainToolStatus],
+) -> Vec<PolicyExplainMissingPrerequisite> {
+    let unavailable = tool_statuses
+        .iter()
+        .filter(|tool| !tool.available)
+        .map(|tool| tool.name.as_str())
+        .collect::<BTreeSet<_>>();
+    if unavailable.is_empty() {
+        return Vec::new();
+    }
+
+    let mut gate_ids_by_tool = BTreeMap::<String, Vec<String>>::new();
+    for gate in gates {
+        for tool in &gate.required_tools {
+            if unavailable.contains(tool.as_str()) {
+                gate_ids_by_tool
+                    .entry(tool.clone())
+                    .or_default()
+                    .push(gate.id.clone());
+            }
+        }
+    }
+
+    gate_ids_by_tool
+        .into_iter()
+        .map(|(tool, gate_ids)| PolicyExplainMissingPrerequisite {
+            detail: format!("required command `{tool}` was not found on PATH"),
+            tool,
+            gate_ids,
+        })
+        .collect()
+}
+
+fn policy_explain_gate(
+    gate: &PolicyGate,
+    tool_statuses: &[PolicyExplainToolStatus],
+    docs_mirror_status: &str,
+) -> PolicyExplainGate {
+    let required_tools = gate
+        .required_tools
+        .iter()
+        .filter_map(|name| {
+            tool_statuses
+                .iter()
+                .find(|tool| tool.name == *name)
+                .map(|tool| PolicyExplainToolStatus {
+                    name: tool.name.clone(),
+                    available: tool.available,
+                    path: tool.path.clone(),
+                })
+        })
+        .collect::<Vec<_>>();
+    let missing_required_tools = required_tools
+        .iter()
+        .filter(|tool| !tool.available)
+        .map(|tool| tool.name.clone())
+        .collect::<Vec<_>>();
+
+    PolicyExplainGate {
+        id: gate.id.clone(),
+        name: gate.name.clone(),
+        purpose: policy_gate_purpose(gate),
+        source: gate.source.clone(),
+        command: gate.command.clone(),
+        command_display: render_command(&gate.command),
+        working_directory: gate.working_directory.clone(),
+        required: gate.required,
+        required_tools,
+        missing_required_tools,
+        network: gate.network,
+        network_posture: if gate.network {
+            "requires_explicit_allow_network"
+        } else {
+            "local_only"
+        }
+        .to_string(),
+        secrets: gate.secrets,
+        secrets_posture: if gate.secrets {
+            "requires_explicit_allow_secrets"
+        } else {
+            "no_secrets_required"
+        }
+        .to_string(),
+        docs_mirror_status: docs_mirror_status.to_string(),
+        expected_artifacts: policy_gate_expected_artifacts(gate),
+        failure_interpretation: gate.failure_interpretation.clone(),
+    }
+}
+
+fn policy_gate_purpose(gate: &PolicyGate) -> String {
+    let consequence = gate
+        .failure_interpretation
+        .strip_prefix("Failure means ")
+        .unwrap_or(gate.failure_interpretation.as_str());
+    format!("Validate {}; {consequence}", gate.name)
+}
+
+fn policy_gate_expected_artifacts(gate: &PolicyGate) -> Vec<String> {
+    if gate.command.iter().any(|part| part == "completions") {
+        vec!["shell completion text on stdout".to_string()]
+    } else if gate.command.iter().any(|part| part == "manpage") {
+        vec!["roff manpage text on stdout".to_string()]
+    } else if command_contains_sequence(&gate.command, &["policy", "manifest"]) {
+        vec!["policy gate manifest JSON on stdout".to_string()]
+    } else if command_contains_sequence(&gate.command, &["policy", "explain"]) {
+        vec!["policy_explain.v1 JSON on stdout".to_string()]
+    } else if command_contains_sequence(&gate.command, &["policy", "docs-check"]) {
+        vec!["policy docs-check JSON on stdout".to_string()]
+    } else if command_contains_sequence(&gate.command, &["skills", "inventory"]) {
+        vec!["skill_inventory.v1 JSON on stdout".to_string()]
+    } else if command_contains_sequence(&gate.command, &["pr", "plan"]) {
+        vec!["pr_control_plan.v1 JSON on stdout".to_string()]
+    } else if gate.command.iter().any(|part| part == "--list") {
+        vec!["catalog listing on stdout".to_string()]
+    } else {
+        vec!["stdout/stderr validation output; no tracked artifact expected".to_string()]
+    }
+}
+
+fn command_contains_sequence(command: &[String], sequence: &[&str]) -> bool {
+    if sequence.is_empty() || command.len() < sequence.len() {
+        return false;
+    }
+    command.windows(sequence.len()).any(|window| {
+        window
+            .iter()
+            .map(String::as_str)
+            .eq(sequence.iter().copied())
     })
 }
 
@@ -5667,6 +6048,26 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             ["cargo"],
             "Failure means the codex_dev policy profile cannot be emitted as JSON.",
         ),
+        policy_gate(
+            "codex-dev-policy-explain",
+            "codex-dev policy explain smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "policy",
+                "explain",
+                "--profile",
+                "codex_dev",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the codex_dev policy explanation contract cannot be emitted as JSON.",
+        ),
         policy_docs_check_gate(),
         policy_gate(
             "codex-dev-skills-inventory-smoke",
@@ -7153,6 +7554,113 @@ mod tests {
     }
 
     #[test]
+    fn policy_explain_reports_read_only_gate_context() {
+        let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = crate_dir
+            .parent()
+            .and_then(Path::parent)
+            .expect("repo root")
+            .to_path_buf();
+        let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
+
+        let report = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::CodexDev,
+                repo_root: Some(repo_root.clone()),
+                include_local_paths: false,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect("policy explain");
+        let manifest = policy_manifest(PolicyProfile::CodexDev, checked_at);
+
+        assert_eq!(report.schema, POLICY_EXPLAIN_SCHEMA);
+        assert_eq!(report.profile, PolicyProfile::CodexDev);
+        assert_eq!(report.checked_at, checked_at);
+        assert_eq!(report.manifest_schema, POLICY_GATES_SCHEMA);
+        assert_eq!(report.gate_count, manifest.gates.len());
+        assert_eq!(report.docs_mirror.repo_root, None);
+        assert_eq!(report.docs_mirror.status, "current");
+        assert!(report.docs_mirror.passed);
+        assert!(!report.required_tools.is_empty());
+        assert!(report.required_tools.iter().all(|tool| tool.path.is_none()));
+        assert!(report.gates.iter().all(|gate| !gate.purpose.is_empty()
+            && !gate.expected_artifacts.is_empty()
+            && gate.network_posture == "local_only"
+            && gate.secrets_posture == "no_secrets_required"));
+
+        let explain_gate = report
+            .gates
+            .iter()
+            .find(|gate| gate.id == "codex-dev-policy-explain")
+            .expect("policy explain gate");
+        assert_eq!(explain_gate.docs_mirror_status, "current");
+        assert!(
+            explain_gate
+                .expected_artifacts
+                .contains(&"policy_explain.v1 JSON on stdout".to_string())
+        );
+
+        let report_with_paths = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::CodexDev,
+                repo_root: Some(repo_root.clone()),
+                include_local_paths: true,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect("policy explain with paths");
+        assert_eq!(report_with_paths.docs_mirror.repo_root, Some(repo_root));
+        assert!(
+            report_with_paths
+                .required_tools
+                .iter()
+                .any(|tool| tool.available && tool.path.is_some())
+        );
+    }
+
+    #[test]
+    fn policy_explain_missing_prerequisites_groups_gate_ids() {
+        let gates = vec![
+            policy_gate(
+                "first",
+                "first",
+                ["missing-tool-for-test", "--flag"],
+                "test-source",
+                ["missing-tool-for-test"],
+                "Failure means first failed.",
+            ),
+            policy_gate(
+                "second",
+                "second",
+                ["missing-tool-for-test", "subcommand"],
+                "test-source",
+                ["missing-tool-for-test"],
+                "Failure means second failed.",
+            ),
+        ];
+        let statuses = vec![PolicyExplainToolStatus {
+            name: "missing-tool-for-test".to_string(),
+            available: false,
+            path: None,
+        }];
+
+        let missing = policy_explain_missing_prerequisites(&gates, &statuses);
+
+        assert_eq!(
+            missing,
+            vec![PolicyExplainMissingPrerequisite {
+                tool: "missing-tool-for-test".to_string(),
+                gate_ids: vec!["first".to_string(), "second".to_string()],
+                detail: "required command `missing-tool-for-test` was not found on PATH"
+                    .to_string(),
+            }]
+        );
+    }
+
+    #[test]
     fn policy_manifest_profiles_are_explicit_local_gates() {
         for profile in all_policy_profiles() {
             let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
@@ -7207,6 +7715,7 @@ mod tests {
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",
@@ -7287,6 +7796,7 @@ mod tests {
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",
@@ -7339,6 +7849,7 @@ mod tests {
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
                 "codex-dev-policy-manifest",
+                "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
                 "codex-dev-pr-plan-smoke",

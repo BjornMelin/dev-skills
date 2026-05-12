@@ -104,6 +104,7 @@ cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-smoke:end
+cargo run -q -p codex-dev -- --json policy explain --profile full_local
 cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
@@ -313,6 +314,9 @@ tools, network/secrets expectation, and failure interpretation. Built-in
 profiles are local and do not require provider credentials; live provider checks
 stay explicit in their owning runbooks. Executed gates marked `network` require
 `--allow-network`; executed gates marked `secrets` require `--allow-secrets`.
+Use `cargo run -q -p codex-dev -- --json policy explain --profile <profile>` to
+inspect gate purpose, expected artifacts, missing local prerequisites, and docs
+mirror status without executing any gate.
 
 Keep `codex-research` gates scoped to research changes.
 
