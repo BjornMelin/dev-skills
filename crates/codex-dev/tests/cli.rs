@@ -381,6 +381,66 @@ description: Beta skill description.
     repo
 }
 
+fn write_bootstrap_repo(root: &std::path::Path) -> std::path::PathBuf {
+    let repo = root.join("bootstrap-repo");
+    std::fs::create_dir_all(repo.join("docs/runbooks")).expect("repo docs");
+    std::fs::create_dir_all(repo.join("bootstrap/packs")).expect("pack root");
+    std::fs::create_dir_all(repo.join("bootstrap/templates/generic")).expect("generic templates");
+    std::fs::create_dir_all(repo.join("bootstrap/templates/rust-cli")).expect("rust templates");
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
+    std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+        .expect("repo validation");
+    for template in [
+        "generic/AGENTS.md.tmpl",
+        "generic/agent-bootstrap.md.tmpl",
+        "generic/codex-agents-readme.md.tmpl",
+        "generic/gitignore.tmpl",
+        "rust-cli/rust-agent-workflow.md.tmpl",
+    ] {
+        std::fs::write(
+            repo.join("bootstrap/templates").join(template),
+            "template\n",
+        )
+        .expect("template fixture");
+    }
+    std::fs::write(
+        repo.join("bootstrap/packs/codex-agent-repo.json"),
+        r#"{
+  "schema": "dev-skills.bootstrap-pack.v1",
+  "name": "codex-agent-repo",
+  "description": "Generic Codex-ready repository bootstrap.",
+  "composes": {
+    "skills": ["deep-researcher", "subspawn"],
+    "subagent_sources": ["subagents/hardened-codex/agents/global"]
+  },
+  "files": [
+    {"target": "AGENTS.md", "template": "generic/AGENTS.md.tmpl"},
+    {"target": "docs/agent-bootstrap.md", "template": "generic/agent-bootstrap.md.tmpl"}
+  ],
+  "advisory_host_checks": ["git diff --check"]
+}"#,
+    )
+    .expect("codex pack");
+    std::fs::write(
+        repo.join("bootstrap/packs/rust-cli-agent-repo.json"),
+        r#"{
+  "schema": "dev-skills.bootstrap-pack.v1",
+  "name": "rust-cli-agent-repo",
+  "description": "Rust CLI repository bootstrap.",
+  "composes": {
+    "skills": ["rust-expert", "rust-cli-clap"],
+    "subagent_sources": ["subagents/hardened-codex/agents/global"]
+  },
+  "files": [
+    {"target": "docs/rust-agent-workflow.md", "template": "rust-cli/rust-agent-workflow.md.tmpl"}
+  ],
+  "advisory_host_checks": ["cargo test", "git diff --check"]
+}"#,
+    )
+    .expect("rust pack");
+    repo
+}
+
 #[test]
 fn skills_inventory_emits_stable_json_report() {
     let temp = tempdir().expect("tempdir");
@@ -437,6 +497,337 @@ fn skills_inventory_emits_stable_json_report() {
             .expect("signals")
             .iter()
             .any(|signal| signal.as_str() == Some("missing_docs_index_exposure"))
+    );
+}
+
+#[test]
+fn bootstrap_status_emits_stable_json_report() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bootstrap",
+            "status",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(repo.to_str().expect("repo path")),
+        "bootstrap status must redact local repo paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap status json");
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "bootstrap status");
+    assert_eq!(json["result"]["schema"], "bootstrap_status.v1");
+    assert_eq!(json["result"]["checked_at"], "2026-05-12T09:00:00Z");
+    assert_eq!(json["result"]["pack_root"], "bootstrap/packs");
+    assert_eq!(json["result"]["template_root"], "bootstrap/templates");
+    assert_eq!(json["result"]["total"], 2);
+    assert_eq!(json["result"]["valid"], 2);
+    assert_eq!(json["result"]["invalid"], 0);
+    assert_eq!(json["result"]["diagnostics"], json!([]));
+    assert_eq!(
+        json["result"]["policy_gates"]["profile"],
+        "bootstrap_install"
+    );
+    assert!(
+        json["result"]["policy_gates"]["gate_ids"]
+            .as_array()
+            .expect("gate ids")
+            .iter()
+            .any(|gate| gate.as_str() == Some("codex-dev-bootstrap-status"))
+    );
+    let packs = json["result"]["packs"].as_array().expect("packs");
+    assert_eq!(packs[0]["name"], "codex-agent-repo");
+    assert_eq!(packs[0]["path"], "bootstrap/packs/codex-agent-repo.json");
+    assert_eq!(packs[0]["schema"], "dev-skills.bootstrap-pack.v1");
+    assert_eq!(packs[0]["valid"], true);
+    assert_eq!(packs[0]["file_count"], 2);
+    assert_eq!(
+        packs[0]["files"][0]["template"],
+        "bootstrap/templates/generic/AGENTS.md.tmpl"
+    );
+    assert_eq!(packs[0]["composes"]["skills"][0], "deep-researcher");
+    assert_eq!(packs[0]["advisory_host_checks"][0], "git diff --check");
+}
+
+#[test]
+fn bootstrap_plan_emits_redacted_dry_run_actions() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+    let out = temp.path().join("preview");
+    std::fs::create_dir_all(&out).expect("preview root");
+    std::fs::write(out.join("AGENTS.md"), "existing\n").expect("existing target");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bootstrap",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--pack",
+            "codex-agent-repo",
+            "--out",
+            out.to_str().expect("out path"),
+            "--repo-name",
+            "codex-smoke",
+            "--primary-language",
+            "rust",
+            "--checked-at",
+            "2026-05-12T09:30:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(out.to_str().expect("out path")),
+        "bootstrap plan must redact local output paths by default"
+    );
+    assert!(
+        !output_text.contains(repo.to_str().expect("repo path")),
+        "bootstrap plan must redact local repo paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap plan json");
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["command"], "bootstrap plan");
+    assert_eq!(json["result"]["schema"], "bootstrap_plan.v1");
+    assert_eq!(json["result"]["checked_at"], "2026-05-12T09:30:00Z");
+    assert_eq!(json["result"]["pack"]["name"], "codex-agent-repo");
+    assert_eq!(json["result"]["dry_run"], true);
+    assert_eq!(json["result"]["output_root"], "<bootstrap-out>");
+    assert_eq!(json["result"]["repo_name"], "codex-smoke");
+    assert_eq!(json["result"]["primary_language"], "rust");
+    assert_eq!(json["result"]["target_count"], 2);
+    assert_eq!(json["result"]["action_counts"]["would_overwrite"], 1);
+    assert_eq!(json["result"]["action_counts"]["would_write"], 1);
+    assert_eq!(
+        json["result"]["advisory_host_checks"][0],
+        "git diff --check"
+    );
+    let files = json["result"]["files"].as_array().expect("planned files");
+    assert_eq!(files[0]["target"], "AGENTS.md");
+    assert_eq!(files[0]["action"], "would_overwrite");
+    assert!(files[0].get("target_path").is_none());
+    assert_eq!(files[1]["target"], "docs/agent-bootstrap.md");
+    assert_eq!(files[1]["action"], "would_write");
+}
+
+#[test]
+fn bootstrap_plan_expands_home_paths_like_renderer() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+    let home = temp.path().join("home");
+    let preview = home.join("preview");
+    std::fs::create_dir_all(&preview).expect("preview root");
+    std::fs::write(preview.join("AGENTS.md"), "existing\n").expect("existing target");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("HOME", &home)
+        .args([
+            "--json",
+            "bootstrap",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--pack",
+            "codex-agent-repo",
+            "--out",
+            "~/preview",
+            "--checked-at",
+            "2026-05-12T09:45:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(home.to_str().expect("home path")),
+        "bootstrap plan must redact expanded home paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap plan json");
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["result"]["action_counts"]["would_overwrite"], 1);
+    assert_eq!(json["result"]["files"][0]["action"], "would_overwrite");
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_status_rejects_symlinked_pack_root() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+    let outside = temp.path().join("outside-packs");
+    std::fs::create_dir_all(&outside).expect("outside packs");
+    std::fs::remove_dir_all(repo.join("bootstrap/packs")).expect("remove pack root");
+    std::os::unix::fs::symlink(&outside, repo.join("bootstrap/packs")).expect("pack symlink");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bootstrap",
+            "status",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T10:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap status json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(
+        json["result"]["diagnostics"][0]["code"],
+        "invalid_bootstrap_pack_root"
+    );
+    assert!(
+        json["result"]["diagnostics"][0]["message"]
+            .as_str()
+            .expect("diagnostic")
+            .contains("symlink")
+    );
+}
+
+#[test]
+fn bootstrap_status_redacts_malformed_pack_root_diagnostics() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+    std::fs::remove_dir_all(repo.join("bootstrap/packs")).expect("remove pack root");
+    std::fs::write(repo.join("bootstrap/packs"), "not a directory\n").expect("pack root file");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bootstrap",
+            "status",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T10:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(repo.to_str().expect("repo path")),
+        "malformed pack-root diagnostics must redact local repo paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap status json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(
+        json["result"]["diagnostics"][0]["message"],
+        "bootstrap pack root is not a directory: bootstrap/packs"
+    );
+}
+
+#[test]
+fn bootstrap_plan_reports_output_root_errors_inside_contract() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env_remove("HOME")
+        .args([
+            "--json",
+            "bootstrap",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--pack",
+            "codex-agent-repo",
+            "--out",
+            "~/preview",
+            "--checked-at",
+            "2026-05-12T10:10:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let output_text = String::from_utf8(output.clone()).expect("utf8 output");
+    assert!(
+        !output_text.contains(repo.to_str().expect("repo path")),
+        "output-root diagnostics must redact local repo paths by default"
+    );
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap plan json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["schema"], "bootstrap_plan.v1");
+    assert_eq!(json["result"]["output_root"], "<bootstrap-out>");
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "invalid_bootstrap_output_root")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn bootstrap_plan_rejects_output_target_symlink_escape() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_bootstrap_repo(temp.path());
+    let out = temp.path().join("preview");
+    let outside = temp.path().join("outside");
+    std::fs::create_dir_all(&out).expect("preview root");
+    std::fs::create_dir_all(&outside).expect("outside root");
+    std::os::unix::fs::symlink(&outside, out.join("docs")).expect("docs symlink");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bootstrap",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--pack",
+            "codex-agent-repo",
+            "--out",
+            out.to_str().expect("out path"),
+            "--checked-at",
+            "2026-05-12T10:15:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("bootstrap plan json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "output_target_escape")
     );
 }
 

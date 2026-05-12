@@ -388,6 +388,9 @@ Validate pack manifests, render into temp directories, and prove ignored local
 subagent boundaries stay ignored:
 
 ```bash
+cargo run -q -p codex-dev -- --json bootstrap status
+tmp_plan=$(mktemp -d)
+cargo run -q -p codex-dev -- --json bootstrap plan --pack codex-agent-repo --out "$tmp_plan/codex" --repo-name codex-smoke --primary-language rust
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
@@ -491,6 +494,7 @@ cargo test -p codex-dev
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
+cargo run -q -p codex-dev -- --json bootstrap status
 # codex-dev:policy-manifest-all:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
@@ -592,8 +596,10 @@ cargo run -q -p codex-dev -- --json pr record --capsule "$tmp/validation-smoke" 
 cargo run -q -p codex-dev -- pr status --capsule "$tmp/validation-smoke"
 cargo run -q -p codex-dev-tui -- --root "$tmp" --render-once --width 100 --height 24
 cargo run -q -p codex-dev-tui -- --capsule "$tmp/validation-smoke" --render-once --width 100 --height 24
+cargo run -q -p codex-dev -- --json bootstrap status
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp_bootstrap=$(mktemp -d)
+cargo run -q -p codex-dev -- --json bootstrap plan --pack codex-agent-repo --out "$tmp_bootstrap/codex-plan" --repo-name codex-smoke --primary-language rust
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp_bootstrap/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
 python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp_bootstrap/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
 cargo clippy -p codex-research --all-targets -- -D warnings

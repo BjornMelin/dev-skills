@@ -179,6 +179,8 @@ Preview a repo bootstrap pack:
 
 ```bash
 tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json bootstrap status
+cargo run -q -p codex-dev -- --json bootstrap plan --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke
 python3 tools/bootstrap/render_bootstrap_pack.py --list
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --dry-run
 ```
