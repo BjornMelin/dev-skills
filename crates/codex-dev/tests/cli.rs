@@ -427,6 +427,19 @@ description: Commented skill description. # human note
 "#,
     )
     .expect("commented skill");
+    let quoted = repo.join("skills/quoted-comment-skill");
+    std::fs::create_dir_all(&quoted).expect("quoted commented skill dir");
+    std::fs::write(
+        quoted.join("SKILL.md"),
+        r#"---
+name: "quoted-comment-skill" # catalog identity
+description: 'Quoted skill description.' # human note
+---
+
+# Quoted Commented
+"#,
+    )
+    .expect("quoted commented skill");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -457,6 +470,15 @@ description: Commented skill description. # human note
         "Commented skill description."
     );
     assert_eq!(commented_skill["validation"]["valid"], true);
+    let quoted_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "quoted-comment-skill")
+        .expect("quoted skill entry");
+    assert_eq!(quoted_skill["name"], "quoted-comment-skill");
+    assert_eq!(quoted_skill["description"], "Quoted skill description.");
+    assert_eq!(quoted_skill["validation"]["valid"], true);
 }
 
 #[test]

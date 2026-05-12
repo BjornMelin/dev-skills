@@ -1966,12 +1966,12 @@ fn validate_string_scalar(field: &str, value: &str) -> std::result::Result<(), S
     if value.is_empty() {
         return Ok(());
     }
+    let value = strip_yaml_inline_comment(value).trim();
     if has_unterminated_quote(value) {
         return Err(format!(
             "invalid YAML in frontmatter: unterminated quoted string for '{field}'"
         ));
     }
-    let value = strip_yaml_inline_comment(value).trim();
     if looks_like_non_string_yaml_scalar(value) {
         return Err(format!("frontmatter '{field}' must be a string scalar"));
     }
@@ -2020,21 +2020,37 @@ fn parse_frontmatter_list(value: &str, lines: &[&str], index: &mut usize) -> Vec
 }
 
 fn strip_yaml_inline_comment(value: &str) -> &str {
-    if value.starts_with('"') || value.starts_with('\'') {
-        return value;
-    }
+    let mut quote = None;
+    let mut escaped = false;
     for (index, character) in value.char_indices() {
-        if character == '#'
-            && (index == 0
-                || value[..index]
-                    .chars()
-                    .last()
-                    .is_some_and(char::is_whitespace))
-        {
+        if let Some(quote_character) = quote {
+            if quote_character == '"' && character == '\\' && !escaped {
+                escaped = true;
+                continue;
+            }
+            if character == quote_character && !escaped {
+                quote = None;
+            }
+            escaped = false;
+            continue;
+        }
+        if character == '"' || character == '\'' {
+            quote = Some(character);
+            continue;
+        }
+        if character == '#' && preceding_character_is_whitespace(value, index) {
             return &value[..index];
         }
     }
     value
+}
+
+fn preceding_character_is_whitespace(value: &str, index: usize) -> bool {
+    index == 0
+        || value[..index]
+            .chars()
+            .last()
+            .is_some_and(char::is_whitespace)
 }
 
 fn collect_frontmatter_block(lines: &[&str], index: &mut usize, folded: bool) -> String {
@@ -2079,7 +2095,7 @@ fn collect_frontmatter_sequence(lines: &[&str], index: &mut usize) -> Vec<String
 }
 
 fn clean_frontmatter_scalar(value: &str) -> String {
-    let value = value.trim();
+    let value = strip_yaml_inline_comment(value.trim()).trim();
     let value = if value.len() >= 2
         && ((value.starts_with('"') && value.ends_with('"'))
             || (value.starts_with('\'') && value.ends_with('\'')))
