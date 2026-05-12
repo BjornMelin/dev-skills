@@ -743,6 +743,15 @@ def _to_markdown(report: JsonDict) -> str:
 
 
 def main() -> int:
+    """Run the Streamlit project audit CLI.
+
+    Returns:
+        Process exit code: 0 when the report is emitted successfully.
+
+    Raises:
+        FileNotFoundError: If the requested scan root does not exist.
+        OSError: If reading project files or writing the requested output fails.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Audit a Streamlit project for version, deps, and "
@@ -768,12 +777,12 @@ def main() -> int:
     parser.add_argument(
         "--check-latest",
         action="store_true",
-        help="(deprecated) Enable latest Streamlit version check (default on).",
+        help="Enable PyPI latest-version check.",
     )
     parser.add_argument(
         "--no-check-latest",
         action="store_true",
-        help="Disable PyPI latest-version check.",
+        help="Deprecated alias; latest-version checks are disabled by default.",
     )
     parser.add_argument(
         "--top", type=int, default=30, help="Top N Streamlit calls to include."
@@ -784,7 +793,7 @@ def main() -> int:
     if not root.exists():
         raise FileNotFoundError(f"Root not found: {root}")
 
-    check_latest = not args.no_check_latest
+    check_latest = args.check_latest and not args.no_check_latest
 
     installed = _installed_streamlit_version()
     locked = _locked_streamlit_version(root)

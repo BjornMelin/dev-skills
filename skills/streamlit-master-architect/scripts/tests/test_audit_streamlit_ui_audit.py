@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import contextlib
+import importlib.util
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 try:
     import tomllib
@@ -43,6 +47,24 @@ def run_audit(root: Path) -> dict:
         text=True,
     )
     return json.loads(output)
+
+
+def load_audit_module() -> object:
+    """Load the Streamlit audit script as a test module.
+
+    Returns:
+        Imported module object for direct helper and CLI entrypoint tests.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "audit_streamlit_project",
+        SCRIPT,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 class StreamlitUiAuditTests(unittest.TestCase):
@@ -101,17 +123,7 @@ class StreamlitUiAuditTests(unittest.TestCase):
 
     def test_windows_locations_under_scan_root_are_relative(self) -> None:
         """Windows paths under a Windows scan root stay root-relative."""
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location(
-            "audit_streamlit_project",
-            SCRIPT,
-        )
-        self.assertIsNotNone(spec)
-        self.assertIsNotNone(spec.loader)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = module
-        spec.loader.exec_module(module)
+        module = load_audit_module()
 
         location = module._ui_location(
             Path(r"C:\repo\app"),
@@ -119,6 +131,32 @@ class StreamlitUiAuditTests(unittest.TestCase):
         )
 
         self.assertEqual(location, {"path": "pages/Home.py", "line": 7})
+
+    def test_latest_version_check_is_opt_in(self) -> None:
+        """Default CLI execution does not perform live PyPI lookups."""
+        module = load_audit_module()
+        stdout = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text(
+                "import streamlit as st\nst.write('ok')\n",
+                encoding="utf-8",
+            )
+            argv = [str(SCRIPT), "--root", str(root), "--format", "json"]
+            with (
+                mock.patch.object(sys, "argv", argv),
+                mock.patch.object(
+                    module,
+                    "_pypi_latest_streamlit_version",
+                    side_effect=AssertionError("unexpected PyPI lookup"),
+                ),
+                contextlib.redirect_stdout(stdout),
+            ):
+                exit_code = module.main()
+
+        self.assertEqual(exit_code, 0)
+        data = json.loads(stdout.getvalue())
+        self.assertIsNone(data["streamlit"]["latest_version"])
 
     @unittest.skipIf(tomllib is None, "pyproject TOML parsing requires tomllib")
     def test_dependency_specs_redact_direct_urls(self) -> None:
