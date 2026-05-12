@@ -274,6 +274,20 @@ type MessagePart =
 })}
 ```
 
+## Offline Stack Scanner
+
+Run the local scanner before chat UI migrations or reviews:
+
+```bash
+python3 skills/ai-sdk-ui/scripts/ai_stack_scan.py --root <repo> --pretty
+```
+
+It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
+flags likely UI migration risks such as `message.content`, legacy `useChat`
+helpers, missing `@ai-sdk/react` dependencies, and obsolete stream response
+helpers. Verify each signal against current AI SDK docs/source before editing.
+Keep full scanner JSON local; share only specific redacted signals externally.
+
 ## Framework Support
 
 | Framework | Package | Hooks |

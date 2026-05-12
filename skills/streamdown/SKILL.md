@@ -263,6 +263,21 @@ import { harden } from 'rehype-harden';
 <Streamdown mode="static">{blogContent}</Streamdown>
 ```
 
+## Offline Stack Scanner
+
+Run the local scanner before Streamdown migrations or chat-markdown reviews:
+
+```bash
+python3 skills/streamdown/scripts/ai_stack_scan.py --root <repo> --pretty
+```
+
+It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
+flags likely migration gaps such as `react-markdown` in AI streaming surfaces,
+Streamdown usage without `isAnimating`, missing `streamdown` dependencies, and
+missing Tailwind `streamdown/dist` source/content configuration in config or
+CSS. Verify signals against current Streamdown docs/source before editing. Keep
+full scanner JSON local; share only specific redacted signals externally.
+
 ## Built-in Features
 
 - **GFM**: Tables, task lists, strikethrough, autolinks

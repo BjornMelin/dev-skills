@@ -186,6 +186,22 @@ const parsed = z.array(ItemSchema).parse(data);
 | `postgres_changes` for chat | Use broadcast channels |
 | Caching auth responses (`'use cache'`) | Keep auth routes dynamic |
 
+## Offline Stack Scanner
+
+Run the local scanner before Supabase SSR/auth reviews:
+
+```bash
+python3 skills/supabase-ts/scripts/ai_stack_scan.py --root <repo> --pretty
+```
+
+It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
+flags likely Supabase risks such as legacy auth-helper packages, server-side
+`getSession()` authorization checks, public service-role env names,
+service-role JWT literals, explicit browser service-role references, and direct
+`auth.uid()` RLS calls. Verify each signal against current Supabase docs/source
+before editing. Keep full scanner JSON local; share only specific redacted
+signals externally.
+
 ## CLI Quick Reference
 
 ```bash
