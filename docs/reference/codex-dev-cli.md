@@ -253,19 +253,20 @@ cargo run -q -p codex-dev -- --json task list --root .codex/tasks
 ```
 
 The command uses the standard `codex-dev.output.v1` JSON envelope. The task
-index contract lives at `result.schema: "task_index.v1"`. It scans only
-immediate entries under the task root, refuses to traverse symlinked roots or
-task entries, validates each capsule with `codex_dev_core::validate_capsule`,
-and embeds the same status summary used by `capsule status` for valid entries.
-It does not run validation commands, read providers, call GitHub, or mutate the
-capsule directory.
+index contract lives at `result.schema: "task_index.v1"` and exposes a
+structured `result.root_status` value of `ready`, `missing`, or `unusable`. It
+scans only immediate entries under a ready task root, refuses to traverse
+symlinked roots or task entries, validates each capsule with
+`codex_dev_core::validate_capsule`, and embeds the same status summary used by
+`capsule status` for valid entries. It does not run validation commands, read
+providers, call GitHub, or mutate the capsule directory.
 
 Missing task roots are reported as diagnostics with an empty task list so new
 checkouts can run the smoke command before any local capsule exists. Invalid
 task entries are included in `result.tasks` with `valid: false`, `errors`, and
-no embedded `capsule` status. `ok` is false when any indexed entry is invalid,
-or when the root exists but is unusable, such as a symlinked root or a file
-instead of a directory.
+no embedded `capsule` status. `ok` is false when any indexed entry is invalid
+or `root_status` is `unusable`; a missing root remains `ok: true` for fresh
+checkout smoke compatibility.
 
 ## task show
 

@@ -109,6 +109,7 @@ fn task_commands_emit_stable_json_reports() {
     assert_eq!(list_json["ok"], true);
     assert_eq!(list_json["command"], "task list");
     assert_eq!(list_json["result"]["schema"], "task_index.v1");
+    assert_eq!(list_json["result"]["root_status"], "ready");
     assert_eq!(list_json["result"]["total"], 2);
     assert_eq!(list_json["result"]["valid"], 2);
     assert_eq!(
@@ -182,6 +183,7 @@ fn task_commands_emit_stable_json_reports() {
     let file_root_json: Value =
         serde_json::from_slice(&file_root_output).expect("task list file-root json");
     assert_eq!(file_root_json["ok"], false);
+    assert_eq!(file_root_json["result"]["root_status"], "unusable");
     assert!(
         file_root_json["result"]["diagnostics"][0]
             .as_str()

@@ -24,11 +24,11 @@ use codex_dev_core::{
     PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrEvidence,
     PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
     RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
-    SubagentSynthesisStatus, Verification, append_evidence, append_jsonl, capsule_status,
-    ensure_regular_contract_files, init_capsule, pr_status, read_json, recommend_pr_agent_actions,
-    record_pr_snapshot, record_subagent_outcome, record_subagent_plan, record_subagent_synthesis,
-    render_capsule, render_command, render_pr_label, render_pr_status, stable_json_hash,
-    task_export, task_index, task_show, validate_capsule, write_json,
+    SubagentSynthesisStatus, TaskRootStatus, Verification, append_evidence, append_jsonl,
+    capsule_status, ensure_regular_contract_files, init_capsule, pr_status, read_json,
+    recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
+    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
+    stable_json_hash, task_export, task_index, task_show, validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -1408,13 +1408,8 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                         result.invalid
                     )
                 };
-                let root_ok = result.diagnostics.is_empty()
-                    || result
-                        .diagnostics
-                        .iter()
-                        .all(|diagnostic| diagnostic.starts_with("task root does not exist:"));
                 Ok(CommandOutput {
-                    ok: result.invalid == 0 && root_ok,
+                    ok: result.invalid == 0 && result.root_status != TaskRootStatus::Unusable,
                     command: "task list",
                     human,
                     result: serde_json::to_value(result)?,

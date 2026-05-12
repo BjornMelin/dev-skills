@@ -21,8 +21,8 @@ The crate owns:
   `record_subagent_synthesis`, `record_pr_snapshot`, `pr_status`,
   `task_index`, `task_show`, and `task_export`;
 - the read-only `task_index.v1` task root contract, including
-  `TaskIndexReport`, `TaskIndexEntry`, `TaskShowReport`, and
-  `TaskExportReport`;
+  `TaskIndexReport`, `TaskRootStatus`, `TaskIndexEntry`, `TaskShowReport`,
+  and `TaskExportReport`;
 - policy and PR evidence data models such as `PolicyManifest`,
   `PolicyGate`, `PrControlPlan`, `PrControlCommand`,
   `PrAgentStateReport`, `PrAgentHostedActionReport`, and
@@ -47,9 +47,12 @@ The crate does not own:
 - compatibility shims for obsolete capsule layouts.
 
 Task index helpers scan immediate task-root entries only, reject symlinked
-roots or entries, and never perform provider/network calls. `task_export` emits
-the existing local capsule contract payloads plus Markdown notes as one
-automation-friendly bundle, but only after the selected capsule validates.
+roots or entries, and never perform provider/network calls. `TaskRootStatus`
+keeps missing-root smoke behavior distinct from unusable roots without requiring
+callers to parse diagnostic text. `task_export` emits the existing local capsule
+contract payloads plus Markdown notes as one automation-friendly bundle, but
+only after the selected capsule validates. Contract JSON, JSONL, and Markdown
+reads use no-follow file opens where the platform supports it.
 
 ## Dependency Policy
 

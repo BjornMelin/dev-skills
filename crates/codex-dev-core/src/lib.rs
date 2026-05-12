@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, ErrorKind, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Component;
@@ -920,11 +920,20 @@ pub struct RenderResult {
 pub struct TaskIndexReport {
     pub schema: String,
     pub root: PathBuf,
+    pub root_status: TaskRootStatus,
     pub total: u64,
     pub valid: u64,
     pub invalid: u64,
     pub diagnostics: Vec<String>,
     pub tasks: Vec<TaskIndexEntry>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskRootStatus {
+    Ready,
+    Missing,
+    Unusable,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1724,6 +1733,7 @@ pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
             return Ok(TaskIndexReport {
                 schema: TASK_INDEX_SCHEMA.to_string(),
                 root: root.to_path_buf(),
+                root_status: TaskRootStatus::Missing,
                 total: 0,
                 valid: 0,
                 invalid: 0,
@@ -1739,6 +1749,7 @@ pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
             return Ok(TaskIndexReport {
                 schema: TASK_INDEX_SCHEMA.to_string(),
                 root: root.to_path_buf(),
+                root_status: TaskRootStatus::Unusable,
                 total: 0,
                 valid: 0,
                 invalid: 0,
@@ -1756,6 +1767,7 @@ pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
         return Ok(TaskIndexReport {
             schema: TASK_INDEX_SCHEMA.to_string(),
             root: root.to_path_buf(),
+            root_status: TaskRootStatus::Unusable,
             total: 0,
             valid: 0,
             invalid: 0,
@@ -1769,6 +1781,7 @@ pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
         return Ok(TaskIndexReport {
             schema: TASK_INDEX_SCHEMA.to_string(),
             root: root.to_path_buf(),
+            root_status: TaskRootStatus::Unusable,
             total: 0,
             valid: 0,
             invalid: 0,
@@ -1796,6 +1809,7 @@ pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
     Ok(TaskIndexReport {
         schema: TASK_INDEX_SCHEMA.to_string(),
         root: root.to_path_buf(),
+        root_status: TaskRootStatus::Ready,
         total,
         valid,
         invalid: total.saturating_sub(valid),
@@ -1973,8 +1987,10 @@ fn read_markdown_exports(path: &Path) -> Result<BTreeMap<String, String>> {
                 file_path.display()
             );
         }
-        let content = fs::read_to_string(&file_path)
-            .with_context(|| format!("failed to open {}", file_path.display()))?;
+        let mut content = String::new();
+        open_read_no_follow(&file_path)?
+            .read_to_string(&mut content)
+            .with_context(|| format!("failed to read {}", file_path.display()))?;
         markdown.insert(file.to_string(), content);
     }
     Ok(markdown)
@@ -3713,7 +3729,7 @@ fn for_each_evidence_record(
     path: &Path,
     mut visit: impl FnMut(usize, EvidenceRecord) -> Result<()>,
 ) -> Result<()> {
-    let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let file = open_read_no_follow(path)?;
     let reader = BufReader::new(file);
     for (index, line) in reader.lines().enumerate() {
         let line = line?;
@@ -3824,8 +3840,17 @@ pub fn read_json<T>(path: &Path) -> Result<T>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let file = open_read_no_follow(path)?;
     serde_json::from_reader(file).with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn open_read_no_follow(path: &Path) -> Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    configure_no_follow(&mut options);
+    options
+        .open(path)
+        .with_context(|| format!("failed to open {}", path.display()))
 }
 
 fn validate_capsule_id(id: &str) -> Result<()> {
@@ -4414,6 +4439,7 @@ mod tests {
         let report = task_index(&root).expect("task index");
 
         assert_eq!(report.schema, TASK_INDEX_SCHEMA);
+        assert_eq!(report.root_status, TaskRootStatus::Ready);
         assert_eq!(report.total, 2);
         assert_eq!(report.valid, 1);
         assert_eq!(report.invalid, 1);
@@ -4564,6 +4590,20 @@ mod tests {
             format!("{error:#}").contains("symlinked capsule contract file"),
             "{error:#}"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_json_rejects_symlinked_file() {
+        let temp = tempdir().expect("tempdir");
+        let target = temp.path().join("target.json");
+        let link = temp.path().join("link.json");
+        fs::write(&target, r#"{"value": true}"#).expect("target json");
+        std::os::unix::fs::symlink(&target, &link).expect("symlink json");
+
+        let error = read_json::<Value>(&link).expect_err("symlinked read rejected");
+
+        assert!(format!("{error:#}").contains("failed to open"), "{error:#}");
     }
 
     #[test]
