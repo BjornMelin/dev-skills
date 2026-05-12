@@ -27,7 +27,7 @@ import yaml
 SCHEMA = "skill_eval_report.v1"
 TAIL_CHARS = 4000
 CHECK_TIMEOUT_SECONDS = 120
-NODE_CHECK_TIMEOUT_SECONDS = 20
+SCRIPT_CHECK_TIMEOUT_SECONDS = 20
 
 GENERATED_DIR_NAMES = {
     "__pycache__",
@@ -323,7 +323,9 @@ def run_command_check(check: EvalCheck, root: Path) -> dict[str, Any]:
     }
 
 
-def run_native_check(check: EvalCheck, root: Path, strict: bool) -> dict[str, Any]:
+def run_native_check(
+    check: EvalCheck, root: Path, strict: bool
+) -> dict[str, Any]:
     """Run one Python-backed aggregate eval check."""
     if check.runner is None:
         raise ValueError(f"check {check.id} does not define a runner")
@@ -332,7 +334,11 @@ def run_native_check(check: EvalCheck, root: Path, strict: bool) -> dict[str, An
     try:
         findings, details = runner(root)
     except Exception as error:  # noqa: BLE001
-        findings = [finding("error", None, f"runner raised {type(error).__name__}: {error}")]
+        findings = [
+            finding(
+                "error", None, f"runner raised {type(error).__name__}: {error}"
+            )
+        ]
         details = {}
     duration_ms = elapsed_ms(started)
     error_count = count_findings(findings, "error")
@@ -372,7 +378,9 @@ def native_runners() -> dict[str, NativeRunner]:
     }
 
 
-def check_all_skill_frontmatter(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def check_all_skill_frontmatter(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Validate every skill through the canonical quick validator."""
     skill_count = 0
     findings: list[dict[str, Any]] = []
@@ -383,11 +391,15 @@ def check_all_skill_frontmatter(root: Path) -> tuple[list[dict[str, Any]], dict[
         if not valid:
             findings.append(finding("error", skill.skill_md, message))
     if skill_count == 0:
-        findings.append(finding("error", root / "skills", "no skill directories found"))
+        findings.append(
+            finding("error", root / "skills", "no skill directories found")
+        )
     return findings, {"skills": skill_count}
 
 
-def check_readme_catalog_exposure(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def check_readme_catalog_exposure(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Ensure the top-level catalog names every skill."""
     readme_path = root / "README.md"
     text = read_text(readme_path)
@@ -409,10 +421,15 @@ def check_readme_catalog_exposure(root: Path) -> tuple[list[dict[str, Any]], dic
                     f"{skill.path.name}",
                 )
             )
-    return findings, {"skills": len(skills), "catalog": relative_path(readme_path, root)}
+    return findings, {
+        "skills": len(skills),
+        "catalog": relative_path(readme_path, root),
+    }
 
 
-def check_docs_reference_exposure(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def check_docs_reference_exposure(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Ensure expected reference docs are linked from the docs portal."""
     docs_index = root / "docs" / "index.md"
     text = read_text(docs_index)
@@ -443,10 +460,14 @@ def check_docs_reference_exposure(root: Path) -> tuple[list[dict[str, Any]], dic
     )
 
 
-def check_skill_local_links(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Check tracked Markdown links under skills against the local filesystem."""
+def check_skill_local_links(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Check tracked skill Markdown links against the local filesystem."""
     tracked = tracked_files(root, "skills")
-    markdown_files = sorted(path for path in tracked if path.suffix.lower() == ".md")
+    markdown_files = sorted(
+        path for path in tracked if path.suffix.lower() == ".md"
+    )
     findings: list[dict[str, Any]] = []
     checked_links = 0
     for markdown_file in markdown_files:
@@ -487,15 +508,21 @@ def check_skill_local_links(root: Path) -> tuple[list[dict[str, Any]], dict[str,
     )
 
 
-def check_skill_script_syntax(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Check syntax for tracked helper scripts where local parsers are available."""
+def check_skill_script_syntax(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Check tracked helper script syntax with local parsers."""
     tracked = tracked_files(root, "skills")
     findings: list[dict[str, Any]] = []
     python_files = sorted(path for path in tracked if path.suffix == ".py")
-    js_files = sorted(path for path in tracked if path.suffix in {".js", ".mjs"})
+    js_files = sorted(
+        path for path in tracked if path.suffix in {".js", ".mjs"}
+    )
     shell_files = sorted(path for path in tracked if path.suffix == ".sh")
 
-    with tempfile.TemporaryDirectory(prefix="dev-skills-eval-pycompile-") as pycache_dir:
+    with tempfile.TemporaryDirectory(
+        prefix="dev-skills-eval-pycompile-"
+    ) as pycache_dir:
         previous_pycache_prefix = sys.pycache_prefix
         sys.pycache_prefix = pycache_dir
         try:
@@ -504,7 +531,11 @@ def check_skill_script_syntax(root: Path) -> tuple[list[dict[str, Any]], dict[st
                     py_compile.compile(str(script), doraise=True)
                 except py_compile.PyCompileError as error:
                     findings.append(
-                        finding("error", script, f"Python syntax check failed: {error.msg}")
+                        finding(
+                            "error",
+                            script,
+                            f"Python syntax check failed: {error.msg}",
+                        )
                     )
         finally:
             sys.pycache_prefix = previous_pycache_prefix
@@ -515,28 +546,20 @@ def check_skill_script_syntax(root: Path) -> tuple[list[dict[str, Any]], dict[st
             finding(
                 "warning",
                 None,
-                "node is unavailable; JavaScript helper syntax checks were skipped",
+                "node is unavailable; "
+                "JavaScript helper syntax checks were skipped",
             )
         )
     elif node_path:
         for script in js_files:
-            completed = subprocess.run(  # noqa: S603
+            error = run_script_syntax_command(
+                root,
                 [node_path, "--check", str(script)],
-                cwd=root,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=NODE_CHECK_TIMEOUT_SECONDS,
+                script,
+                "JavaScript",
             )
-            if completed.returncode != 0:
-                findings.append(
-                    finding(
-                        "error",
-                        script,
-                        "JavaScript syntax check failed: "
-                        + tail(completed.stderr or completed.stdout, root),
-                    )
-                )
+            if error is not None:
+                findings.append(error)
 
     bash_path = shutil.which("bash")
     if shell_files and bash_path is None:
@@ -549,23 +572,14 @@ def check_skill_script_syntax(root: Path) -> tuple[list[dict[str, Any]], dict[st
         )
     elif bash_path:
         for script in shell_files:
-            completed = subprocess.run(  # noqa: S603
+            error = run_script_syntax_command(
+                root,
                 [bash_path, "-n", str(script)],
-                cwd=root,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=NODE_CHECK_TIMEOUT_SECONDS,
+                script,
+                "shell",
             )
-            if completed.returncode != 0:
-                findings.append(
-                    finding(
-                        "error",
-                        script,
-                        "shell syntax check failed: "
-                        + tail(completed.stderr or completed.stdout, root),
-                    )
-                )
+            if error is not None:
+                findings.append(error)
 
     return (
         findings,
@@ -577,25 +591,82 @@ def check_skill_script_syntax(root: Path) -> tuple[list[dict[str, Any]], dict[st
     )
 
 
-def check_generated_cache_exclusion(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def run_script_syntax_command(
+    root: Path,
+    command: list[str],
+    script: Path,
+    label: str,
+) -> dict[str, Any] | None:
+    """Run one script syntax command and return a finding on failure."""
+    try:
+        completed = subprocess.run(  # noqa: S603
+            command,
+            cwd=root,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=SCRIPT_CHECK_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        output = decoded_output(error.stderr) or decoded_output(error.stdout)
+        message = (
+            f"{label} syntax check timed out after "
+            f"{SCRIPT_CHECK_TIMEOUT_SECONDS}s"
+        )
+        if output:
+            message += ": " + tail(output, root)
+        return finding("error", script, message)
+    if completed.returncode == 0:
+        return None
+    output = completed.stderr or completed.stdout
+    return finding(
+        "error",
+        script,
+        f"{label} syntax check failed: " + tail(output, root),
+    )
+
+
+def decoded_output(value: str | bytes | None) -> str:
+    """Return subprocess output as text."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def check_generated_cache_exclusion(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Ensure generated cache artifacts are not tracked in skill folders."""
     tracked = tracked_files(root, "skills")
     findings: list[dict[str, Any]] = []
     for path in sorted(tracked):
         relative = path.relative_to(root)
-        if path.name in GENERATED_FILE_NAMES or path.suffix in GENERATED_SUFFIXES:
-            findings.append(finding("error", path, "generated cache file is tracked"))
+        if (
+            path.name in GENERATED_FILE_NAMES
+            or path.suffix in GENERATED_SUFFIXES
+        ):
+            findings.append(
+                finding("error", path, "generated cache file is tracked")
+            )
             continue
         if any(part in GENERATED_DIR_NAMES for part in relative.parts):
-            findings.append(finding("error", path, "generated cache directory is tracked"))
+            findings.append(
+                finding("error", path, "generated cache directory is tracked")
+            )
     return findings, {"tracked_skill_files": len(tracked)}
 
 
-def check_dist_package_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Inspect local `.skill` bundle shape without requiring every skill bundled."""
+def check_dist_package_metadata(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Inspect local `.skill` bundles without requiring every skill bundled."""
     dist = root / "skills" / "dist"
     tracked_bundles = {
-        path for path in tracked_files(root, "skills/dist") if path.suffix == ".skill"
+        path
+        for path in tracked_files(root, "skills/dist")
+        if path.suffix == ".skill"
     }
     bundles = sorted(dist.glob("*.skill")) if dist.exists() else []
     findings: list[dict[str, Any]] = []
@@ -607,7 +678,9 @@ def check_dist_package_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
                 names = archive.namelist()
         except zipfile.BadZipFile:
             findings.append(
-                finding(bundle_severity, bundle, "bundle is not a valid zip archive")
+                finding(
+                    bundle_severity, bundle, "bundle is not a valid zip archive"
+                )
             )
             continue
         if not names:
@@ -620,7 +693,9 @@ def check_dist_package_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
             invalid_message = invalid_archive_name_message(name)
             if invalid_message:
                 invalid_names = True
-                findings.append(finding(bundle_severity, bundle, invalid_message))
+                findings.append(
+                    finding(bundle_severity, bundle, invalid_message)
+                )
                 continue
             parts = PurePosixPath(name).parts
             roots.add(parts[0])
@@ -644,10 +719,16 @@ def check_dist_package_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
         else:
             try:
                 with zipfile.ZipFile(bundle) as archive:
-                    skill_content = archive.read(skill_entry).decode("utf-8-sig")
+                    skill_content = archive.read(skill_entry).decode(
+                        "utf-8-sig"
+                    )
             except (KeyError, UnicodeDecodeError, OSError) as error:
                 findings.append(
-                    finding(bundle_severity, bundle, f"could not read SKILL.md: {error}")
+                    finding(
+                        bundle_severity,
+                        bundle,
+                        f"could not read SKILL.md: {error}",
+                    )
                 )
             else:
                 findings.extend(
@@ -684,7 +765,9 @@ def check_dist_package_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
     )
 
 
-def check_openai_agent_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def check_openai_agent_metadata(
+    root: Path,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Validate supported `agents/openai.yaml` metadata shapes."""
     paths = sorted((root / "skills").glob("*/agents/openai.yaml"))
     findings: list[dict[str, Any]] = []
@@ -696,7 +779,9 @@ def check_openai_agent_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
             findings.append(finding("error", path, f"invalid YAML: {error}"))
             continue
         if not isinstance(data, dict):
-            findings.append(finding("error", path, "metadata must be a YAML mapping"))
+            findings.append(
+                finding("error", path, "metadata must be a YAML mapping")
+            )
             continue
         shape = openai_metadata_shape(data)
         if shape is None:
@@ -704,7 +789,8 @@ def check_openai_agent_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
                 finding(
                     "error",
                     path,
-                    "metadata must use interface, direct, or legacy required fields",
+                    "metadata must use interface, direct, "
+                    "or legacy required fields",
                 )
             )
         else:
@@ -712,7 +798,9 @@ def check_openai_agent_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
         policy = data.get("policy")
         if policy is not None:
             if not isinstance(policy, dict):
-                findings.append(finding("error", path, "policy must be a mapping"))
+                findings.append(
+                    finding("error", path, "policy must be a mapping")
+                )
             elif "allow_implicit_invocation" in policy and not isinstance(
                 policy["allow_implicit_invocation"],
                 bool,
@@ -726,8 +814,13 @@ def check_openai_agent_metadata(root: Path) -> tuple[list[dict[str, Any]], dict[
                 )
         dependencies = data.get("dependencies")
         if dependencies is not None and not isinstance(dependencies, dict):
-            findings.append(finding("error", path, "dependencies must be a mapping"))
-        if data.get("name") is not None and data.get("name") != path.parents[1].name:
+            findings.append(
+                finding("error", path, "dependencies must be a mapping")
+            )
+        if (
+            data.get("name") is not None
+            and data.get("name") != path.parents[1].name
+        ):
             findings.append(
                 finding(
                     "warning",
@@ -756,9 +849,14 @@ def openai_metadata_shape(data: dict[str, Any]) -> str | None:
     return None
 
 
-def required_string_fields(data: dict[str, Any], fields: tuple[str, ...]) -> bool:
+def required_string_fields(
+    data: dict[str, Any], fields: tuple[str, ...]
+) -> bool:
     """Return whether all required fields exist as non-empty strings."""
-    return all(isinstance(data.get(field), str) and data[field].strip() for field in fields)
+    return all(
+        isinstance(data.get(field), str) and data[field].strip()
+        for field in fields
+    )
 
 
 def discover_skills(root: Path) -> list[SkillRecord]:
@@ -772,8 +870,16 @@ def discover_skills(root: Path) -> list[SkillRecord]:
         if not skill_md.is_file() or skill_md.is_symlink():
             continue
         frontmatter = read_frontmatter(skill_md)
-        name = frontmatter.get("name") if isinstance(frontmatter.get("name"), str) else path.name
-        records.append(SkillRecord(name=name, path=path, skill_md=skill_md, frontmatter=frontmatter))
+        name = (
+            frontmatter.get("name")
+            if isinstance(frontmatter.get("name"), str)
+            else path.name
+        )
+        records.append(
+            SkillRecord(
+                name=name, path=path, skill_md=skill_md, frontmatter=frontmatter
+            )
+        )
     return records
 
 
@@ -791,7 +897,9 @@ def parse_frontmatter(content: str) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def load_quick_validator(root: Path) -> Callable[[str | Path], tuple[bool, str]]:
+def load_quick_validator(
+    root: Path,
+) -> Callable[[str | Path], tuple[bool, str]]:
     """Import the repo-owned quick validator."""
     skill_tools = str(root / "tools" / "skill")
     if skill_tools not in sys.path:
@@ -830,7 +938,7 @@ def normalize_markdown_target(raw_target: str) -> str:
 
 
 def should_skip_link_target(target: str) -> bool:
-    """Return whether a Markdown link target is outside local path validation."""
+    """Return whether a link target is outside local path validation."""
     if not target or target.startswith("#"):
         return True
     if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", target):
@@ -838,11 +946,15 @@ def should_skip_link_target(target: str) -> bool:
     return False
 
 
-def resolve_markdown_target(root: Path, markdown_file: Path, target: str) -> Path:
+def resolve_markdown_target(
+    root: Path, markdown_file: Path, target: str
+) -> Path:
     """Resolve a Markdown link target relative to its source file."""
     path_part = re.split(r"[?#]", target, 1)[0]
     absolute = Path(path_part)
-    if absolute.is_absolute() and (path_part.startswith(str(root)) or absolute.exists()):
+    if absolute.is_absolute() and (
+        path_part.startswith(str(root)) or absolute.exists()
+    ):
         return absolute.resolve()
     if path_part.startswith("/"):
         return root / path_part.lstrip("/")
@@ -863,7 +975,7 @@ def owning_skill_root(root: Path, path: Path) -> Path | None:
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
-    """Return whether path is at or below parent on Python versions that vary."""
+    """Return whether path is at or below parent."""
     try:
         path.resolve().relative_to(parent.resolve())
     except ValueError:
@@ -873,7 +985,9 @@ def is_relative_to(path: Path, parent: Path) -> bool:
 
 def skill_catalog_section(text: str) -> str:
     """Extract the README skill catalog section."""
-    match = re.search(r"^## Skill catalog\n(?P<body>.*?)(?=^## |\Z)", text, re.M | re.S)
+    match = re.search(
+        r"^## Skill catalog\n(?P<body>.*?)(?=^## |\Z)", text, re.M | re.S
+    )
     return match.group("body") if match else ""
 
 
@@ -889,7 +1003,10 @@ def invalid_archive_name_message(name: str) -> str | None:
     if not parts or any(part in {"", ".", ".."} for part in parts):
         return f"bundle entry uses a traversal or empty path component: {name}"
     if len(parts) < 2 and not name.endswith("/"):
-        return f"bundle includes a root-level entry outside the skill directory: {name}"
+        return (
+            "bundle includes a root-level entry outside "
+            f"the skill directory: {name}"
+        )
     return None
 
 
@@ -910,7 +1027,9 @@ def bundle_skill_metadata_findings(
                 f"{bundle.stem} != {root_name}",
             )
         )
-    with tempfile.TemporaryDirectory(prefix="dev-skills-bundle-validate-") as tmp:
+    with tempfile.TemporaryDirectory(
+        prefix="dev-skills-bundle-validate-"
+    ) as tmp:
         skill_dir = Path(tmp) / root_name
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text(skill_content, encoding="utf-8")
@@ -986,7 +1105,9 @@ def parse_markdown_destination(text: str, start: int) -> tuple[str, int]:
         index = target_start
         while index < len(text):
             if text[index] == ">" and not is_escaped(text, index):
-                return text[target_start:index], find_link_close(text, index + 1)
+                return text[target_start:index], find_link_close(
+                    text, index + 1
+                )
             index += 1
         return text[target_start:index], index
 
@@ -1068,7 +1189,9 @@ def tail(text: str, root: Path) -> str:
     return "[truncated]\n" + text[-TAIL_CHARS:]
 
 
-def sanitize_findings(findings: list[dict[str, Any]], root: Path) -> list[dict[str, Any]]:
+def sanitize_findings(
+    findings: list[dict[str, Any]], root: Path
+) -> list[dict[str, Any]]:
     """Make finding paths portable."""
     sanitized: list[dict[str, Any]] = []
     for item in findings:
