@@ -11,12 +11,15 @@ Use this skill for read-first Dash audits. It owns Dash callback review, Dash UI
 
 1. Read the repo `AGENTS.md`.
 2. Run `/home/bjorn/.codex/skill-support/bin/ui-audit-preflight dash-callback-map --cwd <repo> --out <json>`.
-3. Read only the Dash references you need:
+3. When machine-readable evidence is useful, adapt the callback map into the
+   shared contract:
+   `python3 <skill_root>/scripts/dash_ui_audit_adapter.py --input <json> --pretty`.
+4. Read only the Dash references you need:
    - `references/dash-callbacks.md` for callback graph and state hazards.
    - `references/dash-ui.md` for layout, responsiveness, accessibility, and interaction review.
-4. Inspect only the files surfaced by the preflight plus any directly implicated layout, component, or callback modules.
-5. Report grouped findings with the highest-risk callback and regression issues first.
-6. If the user asks for fixes, keep remediation scoped and verify the affected path with repo-native commands.
+5. Inspect only the files surfaced by the preflight plus any directly implicated layout, component, or callback modules.
+6. Report grouped findings with the highest-risk callback and regression issues first.
+7. If the user asks for fixes, keep remediation scoped and verify the affected path with repo-native commands.
 
 ## Use When
 
@@ -37,3 +40,14 @@ Use this skill for read-first Dash audits. It owns Dash callback review, Dash UI
 - prioritized fixes
 - callback graph or regression-risk notes when useful
 - scorecard or risk summary when useful
+
+## UI Audit Contract
+
+Use `ui_audit.v1` for structured Dash findings. The adapter treats callback map
+rows as `observations` and emits actionable `findings` only when the preflight
+evidence indicates a likely callback registration issue, such as a callback
+decorator with no detected `Output`.
+
+Keep absolute repository roots redacted as `<scan-root>` in shared evidence.
+Use the full JSON locally; paste only the specific redacted findings needed for
+review comments or issue updates.

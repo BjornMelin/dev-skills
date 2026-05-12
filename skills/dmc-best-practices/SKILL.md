@@ -100,3 +100,24 @@ Definitive best practices for building Dash applications with Dash Mantine Compo
 ## Full Reference
 
 See [AGENTS.md](AGENTS.md) for the complete compiled reference with all rules expanded.
+
+## UI Audit Contract
+
+When DMC review output needs machine-readable evidence, shape findings as
+`ui_audit.v1`:
+
+- `target.framework`: `dmc`
+- `id`: `dmc.<rule-id>` such as `dmc.arch-mantine-provider`
+- `category`: map DMC rule families deterministically:
+  `architecture` -> `layout`, `callbacks` -> `state`, `styling` -> `layout`,
+  `data` -> `state`, `performance` -> `performance`, `forms` ->
+  `interaction`, `theming` -> `visual`, `migration` -> `migration`, and
+  `accessibility` -> `accessibility`
+- `severity`: `CRITICAL` and `HIGH` rules become `error`; `MEDIUM-HIGH` and
+  `MEDIUM` rules become `warning`; lower-risk notes become `info`
+- `locations`: repo-relative files or components when known
+- `docs`: the relevant rule markdown path plus external component docs when the
+  rule cites them
+
+Use `observations` for inventory facts such as detected DMC version, theme
+configuration, or callback counts that do not by themselves require a fix.

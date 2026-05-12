@@ -20,6 +20,8 @@ When the user asks for the “latest” Streamlit APIs/best-practices, or when u
 
 1) Detect what the project actually uses (run the script from this skill package):
    - `python3 <skill_root>/scripts/audit_streamlit_project.py --root <project_root> --format md`
+   - Use `--format ui-audit-json` when another tool, task capsule, or TUI needs
+     the shared `ui_audit.v1` contract.
 2) Pull the latest docs index (and optionally pages) from `llms.txt`:
    - `python3 <skill_root>/scripts/sync_streamlit_docs.py --out /tmp/streamlit-docs`
 3) Treat **official docs + installed signatures** as truth:
@@ -55,6 +57,13 @@ Goal: never guess APIs from memory; always adapt code to the installed version (
 - `scripts/sync_streamlit_docs.py` — pull `llms.txt` and (optionally) fetch doc pages
 - `scripts/audit_streamlit_project.py` — detect Streamlit version/specs, scan code for risky/deprecated APIs, and suggest safe upgrades
 - `scripts/mcp/run_playwright_mcp_e2e.py` — start Streamlit + Playwright MCP and run a smoke flow
+
+## UI Audit Contract
+
+`audit_streamlit_project.py --format ui-audit-json` emits `ui_audit.v1`.
+Streamlit `high` findings map to `error`, `medium` to `warning`, and `low` to
+`info`. The output redacts the scan root as `<scan-root>`, keeps source snippets
+out of the payload, and includes non-actionable inventory in `observations`.
 
 ## Reference map (load only what you need)
 
