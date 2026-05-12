@@ -1573,22 +1573,24 @@ pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryRepo
             });
         }
         Ok(_) => {
-            let mut entries = match fs::read_dir(&skills_root) {
-                Ok(entries) => match entries.collect::<std::io::Result<Vec<_>>>() {
-                    Ok(entries) => entries,
-                    Err(error) => {
-                        diagnostics.push(SkillInventoryDiagnostic {
-                            severity: LocalDiagnosticSeverity::Error,
-                            code: "unreadable_skills_root".to_string(),
-                            skill: None,
-                            message: format!(
-                                "failed to list skills root {}: {error}",
-                                skills_root.display()
-                            ),
-                        });
-                        Vec::new()
+            let mut entries = Vec::new();
+            match fs::read_dir(&skills_root) {
+                Ok(read_dir) => {
+                    for entry in read_dir {
+                        match entry {
+                            Ok(entry) => entries.push(entry),
+                            Err(error) => diagnostics.push(SkillInventoryDiagnostic {
+                                severity: LocalDiagnosticSeverity::Warning,
+                                code: "skills_root_entry_read_error".to_string(),
+                                skill: None,
+                                message: format!(
+                                    "failed to read one skills root entry in {}: {error}",
+                                    skills_root.display()
+                                ),
+                            }),
+                        }
                     }
-                },
+                }
                 Err(error) => {
                     diagnostics.push(SkillInventoryDiagnostic {
                         severity: LocalDiagnosticSeverity::Error,
@@ -1599,9 +1601,8 @@ pub fn skills_inventory(args: SkillsInventoryArgs) -> Result<SkillsInventoryRepo
                             skills_root.display()
                         ),
                     });
-                    Vec::new()
                 }
-            };
+            }
             entries.sort_by_key(|entry| entry.file_name());
             for entry in entries {
                 let path = entry.path();
