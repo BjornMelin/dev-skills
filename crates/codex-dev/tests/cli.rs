@@ -459,6 +459,45 @@ description: Commented skill description. # human note
     assert_eq!(commented_skill["validation"]["valid"], true);
 }
 
+#[test]
+fn skills_inventory_accepts_crlf_frontmatter_fences() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let crlf = repo.join("skills/crlf-skill");
+    std::fs::create_dir_all(&crlf).expect("crlf skill dir");
+    std::fs::write(
+        crlf.join("SKILL.md"),
+        "---\r\nname: crlf-skill\r\ndescription: CRLF skill description.\r\n---\r\n\r\n# CRLF\r\n",
+    )
+    .expect("crlf skill");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let crlf_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "crlf-skill")
+        .expect("crlf skill entry");
+    assert_eq!(crlf_skill["name"], "crlf-skill");
+    assert_eq!(crlf_skill["validation"]["valid"], true);
+}
+
 #[cfg(unix)]
 #[test]
 fn skills_inventory_ignores_symlinked_skill_and_resource_paths() {

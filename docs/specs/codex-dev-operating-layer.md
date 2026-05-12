@@ -3,7 +3,7 @@
 Status: active implementation.
 
 Tracking: #20 through #28, parent epic #37, child issues #38 through #57, and
-#80.
+issue `#80`.
 
 ## Purpose
 

@@ -1935,10 +1935,12 @@ fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatte
 
 fn extract_frontmatter(content: &str) -> std::result::Result<&str, String> {
     let content = content
-        .strip_prefix("---\n")
+        .strip_prefix("---\r\n")
+        .or_else(|| content.strip_prefix("---\n"))
         .ok_or_else(|| "no YAML frontmatter found".to_string())?;
     let end = content
-        .find("\n---")
+        .find("\r\n---")
+        .or_else(|| content.find("\n---"))
         .ok_or_else(|| "invalid frontmatter format".to_string())?;
     Ok(&content[..end])
 }
