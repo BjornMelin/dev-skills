@@ -3,10 +3,13 @@
 Use this runbook before handing off local installs, release assets, or any PR
 that changes workspace Cargo metadata. Pair it with the
 [Global CLI Workflow](global-cli-workflow.md) when installing, updating, or
-generating shell artifacts for the local binaries. It is intentionally
-Cargo-native: the repo records policy in `Cargo.toml`, `Cargo.lock`,
-`deny.toml`, and `codex-dev` policy profiles instead of adding a separate
-release framework.
+generating shell artifacts for the local binaries. Pair any request for public
+registry publication, signed binary artifacts, `cargo-vet`, Tauri desktop, or
+Axum local-service work with the
+[`distribution_surface_gate.v1`](../reference/distribution-surface-gates.md)
+contract before implementation starts. This runbook is intentionally
+Cargo-native: the repo records policy in `Cargo.toml`, `Cargo.lock`, `deny.toml`,
+and `codex-dev` policy profiles instead of adding a separate release framework.
 
 References:
 
@@ -34,6 +37,10 @@ References:
 - Path dependencies between workspace crates include package versions so
   `cargo package --list` and cargo-deny wildcard checks exercise publish-like
   metadata without actually publishing anything.
+- Distribution escalation is gate-driven. A future issue must use
+  [`distribution_surface_gate.v1`](../reference/distribution-surface-gates.md)
+  before changing `publish`, adding release signing, adopting `cargo-vet`, or
+  building new local app surfaces.
 
 ## Release Baseline Gates
 
@@ -83,10 +90,21 @@ On a dirty working tree, add `--allow-dirty` for a pre-commit package preview.
 Final release evidence should run without `--allow-dirty` after the release
 branch is committed so Cargo proves the packaged contents match versioned files.
 
-Before any real registry publication, run a dedicated release PR that adds
-registry-specific package metadata, confirms archive contents, and documents the
-publishing account, token handling, and rollback plan. This repo currently
-supports local installation handoff, not crates.io publication.
+Before any real registry publication, run a dedicated release PR that clears the
+[`crates_io_publish`](../reference/distribution-surface-gates.md#crates_io_publish)
+gate, adds registry-specific package metadata, confirms archive contents, and
+documents the publishing account, token handling, SemVer owner, and rollback
+plan. This repo currently supports local installation handoff, not crates.io
+publication.
+
+## Signed Binary Status
+
+Signed downloadable binaries are deferred. The repo does not yet have a release
+owner, artifact signing key policy, checksum/provenance workflow, target matrix,
+or rollback process that justifies binary distribution. Adopt signed artifacts
+only in a dedicated issue that clears the
+[`signed_binary_release`](../reference/distribution-surface-gates.md#signed_binary_release)
+gate.
 
 ## Duplicate Dependency Baseline
 
@@ -112,8 +130,10 @@ outweighs churn.
 
 `cargo-vet` is deferred. The repo does not yet have an owned audit database, a
 publisher rotation, or a public registry release process that justifies local
-audit attestation maintenance. Adopt it in a dedicated issue when distribution
-moves beyond local installs or release assets, and include:
+audit attestation maintenance. Adopt it in a dedicated issue that clears the
+[`cargo_vet_attestation`](../reference/distribution-surface-gates.md#cargo_vet_attestation)
+gate when distribution moves beyond local installs or release assets, and
+include:
 
 - owner for audit decisions;
 - `cargo vet init` output and policy config;

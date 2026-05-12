@@ -58,6 +58,9 @@ out of version control.
   safety signals.
 - [UI Audit Schema](reference/ui-audit-schema.md): shared `ui_audit.v1`
   contract for Dash, DMC, Streamlit, and browser-workbench audit evidence.
+- [Distribution Surface Gates](reference/distribution-surface-gates.md):
+  `distribution_surface_gate.v1` contract for crates.io, signed binaries,
+  cargo-vet, Tauri, and Axum escalation decisions.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
