@@ -3,11 +3,14 @@
 `codex-dev-tui` is an optional Ratatui workbench for local `codex-dev` task
 capsules. By default it opens a read-only dashboard over a `.codex/tasks` root
 so an operator can scan recent capsules before opening one capsule in detail.
-It reads the existing capsule JSON contracts through `codex-dev-core` and
-renders an operator view for quick scanning. It does not own policy gates, PR
-remediation, or capsule business logic.
+It reads the existing capsule JSON contracts through `codex-dev-core` and stays
+aligned with capsule validation semantics. `task_index.v1` is the shared
+automation contract exposed by `codex-dev task list/show/export`; future TUI
+work can consume that read model directly. The current TUI renders an operator
+view for quick scanning and does not own policy gates, PR remediation, or
+capsule business logic.
 
-Tracking: #20, #28, #52, #53, and #55.
+Tracking: #20, #28, #52, #53, #55, and #82.
 
 ## Ownership Boundary
 

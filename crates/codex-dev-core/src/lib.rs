@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Write as _};
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufRead, BufReader, ErrorKind, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Component;
@@ -26,6 +26,7 @@ pub const PR_AGENT_HOSTED_ACTION_SCHEMA: &str = "codex-dev.pr-agent-hosted-actio
 pub const PR_AGENT_READINESS_SCHEMA: &str = "codex-dev.pr-agent-readiness.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
+pub const TASK_INDEX_SCHEMA: &str = "task_index.v1";
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -915,6 +916,56 @@ pub struct RenderResult {
     pub markdown: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskIndexReport {
+    pub schema: String,
+    pub root: PathBuf,
+    pub root_status: TaskRootStatus,
+    pub total: u64,
+    pub valid: u64,
+    pub invalid: u64,
+    pub diagnostics: Vec<String>,
+    pub tasks: Vec<TaskIndexEntry>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskRootStatus {
+    Ready,
+    Missing,
+    Unusable,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskIndexEntry {
+    pub path: PathBuf,
+    pub valid: bool,
+    pub errors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capsule: Option<StatusResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskShowReport {
+    pub schema: String,
+    pub root: PathBuf,
+    pub task: TaskIndexEntry,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TaskExportReport {
+    pub schema: String,
+    pub root: PathBuf,
+    pub task: TaskIndexEntry,
+    pub capsule: Capsule,
+    pub evidence: Vec<EvidenceRecord>,
+    pub verification: Verification,
+    pub subagents: Subagents,
+    pub pr: PrEvidence,
+    pub policy: PolicyManifest,
+    pub markdown: BTreeMap<String, String>,
+}
+
 pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Result<PrRecordResult> {
     validate_capsule_for_pr_record(&args.capsule)?;
 
@@ -1433,7 +1484,7 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
     for file in &missing_files {
         errors.push(format!("missing required file: {file}"));
     }
-    let invalid_contract_files = validate_contract_file_paths(path, &mut errors);
+    let invalid_contract_files = validate_required_file_paths(path, &mut errors);
 
     if can_validate_contract_file("capsule.json", &missing_files, &invalid_contract_files) {
         match read_json::<Capsule>(&path.join("capsule.json")) {
@@ -1497,13 +1548,9 @@ fn can_validate_contract_file(
     !missing_files.contains(&file) && !invalid_contract_files.contains(file)
 }
 
-fn validate_contract_file_paths(path: &Path, errors: &mut Vec<String>) -> BTreeSet<String> {
+fn validate_required_file_paths(path: &Path, errors: &mut Vec<String>) -> BTreeSet<String> {
     let mut invalid = BTreeSet::new();
-    for file in REQUIRED_FILES
-        .iter()
-        .copied()
-        .filter(|file| file.ends_with(".json") || file.ends_with(".jsonl"))
-    {
+    for file in REQUIRED_FILES.iter().copied() {
         let file_path = path.join(file);
         let metadata = match file_path.symlink_metadata() {
             Ok(metadata) => metadata,
@@ -1673,6 +1720,280 @@ pub fn render_capsule(path: &Path) -> Result<RenderResult> {
         path: path.to_path_buf(),
         markdown,
     })
+}
+
+pub fn task_index(root: &Path) -> Result<TaskIndexReport> {
+    let mut diagnostics = Vec::new();
+    let mut tasks = Vec::new();
+
+    let metadata = match root.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            diagnostics.push(format!("task root does not exist: {}", root.display()));
+            return Ok(TaskIndexReport {
+                schema: TASK_INDEX_SCHEMA.to_string(),
+                root: root.to_path_buf(),
+                root_status: TaskRootStatus::Missing,
+                total: 0,
+                valid: 0,
+                invalid: 0,
+                diagnostics,
+                tasks,
+            });
+        }
+        Err(error) => {
+            diagnostics.push(format!(
+                "failed to inspect task root {}: {error}",
+                root.display()
+            ));
+            return Ok(TaskIndexReport {
+                schema: TASK_INDEX_SCHEMA.to_string(),
+                root: root.to_path_buf(),
+                root_status: TaskRootStatus::Unusable,
+                total: 0,
+                valid: 0,
+                invalid: 0,
+                diagnostics,
+                tasks,
+            });
+        }
+    };
+
+    if metadata.file_type().is_symlink() {
+        diagnostics.push(format!(
+            "refusing to scan symlinked task root: {}",
+            root.display()
+        ));
+        return Ok(TaskIndexReport {
+            schema: TASK_INDEX_SCHEMA.to_string(),
+            root: root.to_path_buf(),
+            root_status: TaskRootStatus::Unusable,
+            total: 0,
+            valid: 0,
+            invalid: 0,
+            diagnostics,
+            tasks,
+        });
+    }
+
+    if !metadata.is_dir() {
+        diagnostics.push(format!("task root is not a directory: {}", root.display()));
+        return Ok(TaskIndexReport {
+            schema: TASK_INDEX_SCHEMA.to_string(),
+            root: root.to_path_buf(),
+            root_status: TaskRootStatus::Unusable,
+            total: 0,
+            valid: 0,
+            invalid: 0,
+            diagnostics,
+            tasks,
+        });
+    }
+
+    let mut paths = fs::read_dir(root)
+        .with_context(|| format!("failed to read task root {}", root.display()))?
+        .map(|entry| {
+            entry
+                .map(|entry| entry.path())
+                .with_context(|| format!("failed to read task root entry in {}", root.display()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    paths.sort();
+
+    for path in paths {
+        tasks.push(task_index_entry(&path));
+    }
+
+    let valid = tasks.iter().filter(|task| task.valid).count() as u64;
+    let total = tasks.len() as u64;
+    Ok(TaskIndexReport {
+        schema: TASK_INDEX_SCHEMA.to_string(),
+        root: root.to_path_buf(),
+        root_status: TaskRootStatus::Ready,
+        total,
+        valid,
+        invalid: total.saturating_sub(valid),
+        diagnostics,
+        tasks,
+    })
+}
+
+pub fn task_show(root: &Path, selector: &Path) -> Result<TaskShowReport> {
+    let path = resolve_task_selector(root, selector)?;
+    Ok(TaskShowReport {
+        schema: TASK_INDEX_SCHEMA.to_string(),
+        root: root.to_path_buf(),
+        task: task_index_entry(&path),
+    })
+}
+
+pub fn task_export(root: &Path, selector: &Path) -> Result<TaskExportReport> {
+    let show = task_show(root, selector)?;
+    if !show.task.valid {
+        bail!(
+            "invalid task capsule at {}: {}",
+            show.task.path.display(),
+            show.task.errors.join("; ")
+        );
+    }
+
+    let task_path = show.task.path.clone();
+    Ok(TaskExportReport {
+        schema: TASK_INDEX_SCHEMA.to_string(),
+        root: show.root,
+        task: show.task,
+        capsule: read_json(&task_path.join("capsule.json"))?,
+        evidence: read_evidence_records(&task_path.join("evidence.jsonl"))?,
+        verification: read_json(&task_path.join("verification.json"))?,
+        subagents: read_json(&task_path.join("subagents.json"))?,
+        pr: read_json(&task_path.join("pr.json"))?,
+        policy: read_json(&task_path.join("policy.json"))?,
+        markdown: read_markdown_exports(&task_path)?,
+    })
+}
+
+fn task_index_entry(path: &Path) -> TaskIndexEntry {
+    let metadata = match path.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            return TaskIndexEntry {
+                path: path.to_path_buf(),
+                valid: false,
+                errors: vec![format!("failed to inspect task entry: {error}")],
+                capsule: None,
+            };
+        }
+    };
+
+    if metadata.file_type().is_symlink() {
+        return TaskIndexEntry {
+            path: path.to_path_buf(),
+            valid: false,
+            errors: vec![format!(
+                "refusing to scan symlinked task entry: {}",
+                path.display()
+            )],
+            capsule: None,
+        };
+    }
+
+    if !metadata.is_dir() {
+        return TaskIndexEntry {
+            path: path.to_path_buf(),
+            valid: false,
+            errors: vec![format!("task entry is not a directory: {}", path.display())],
+            capsule: None,
+        };
+    }
+
+    let validation = match validate_capsule(path) {
+        Ok(validation) => validation,
+        Err(error) => {
+            return TaskIndexEntry {
+                path: path.to_path_buf(),
+                valid: false,
+                errors: vec![format!("{error:#}")],
+                capsule: None,
+            };
+        }
+    };
+
+    if !validation.valid {
+        return TaskIndexEntry {
+            path: path.to_path_buf(),
+            valid: false,
+            errors: validation.errors,
+            capsule: None,
+        };
+    }
+
+    match capsule_status(path) {
+        Ok(status) => TaskIndexEntry {
+            path: path.to_path_buf(),
+            valid: true,
+            errors: Vec::new(),
+            capsule: Some(status),
+        },
+        Err(error) => TaskIndexEntry {
+            path: path.to_path_buf(),
+            valid: false,
+            errors: vec![format!("{error:#}")],
+            capsule: None,
+        },
+    }
+}
+
+fn resolve_task_selector(root: &Path, selector: &Path) -> Result<PathBuf> {
+    if selector.is_absolute() {
+        return Ok(selector.to_path_buf());
+    }
+    if is_single_normal_component(selector) {
+        validate_task_root_for_selector(root)?;
+        Ok(root.join(selector))
+    } else {
+        Ok(selector.to_path_buf())
+    }
+}
+
+fn is_single_normal_component(path: &Path) -> bool {
+    let mut components = path.components();
+    matches!(components.next(), Some(Component::Normal(_))) && components.next().is_none()
+}
+
+fn validate_task_root_for_selector(root: &Path) -> Result<()> {
+    let metadata = match root.symlink_metadata() {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            bail!("task root does not exist: {}", root.display());
+        }
+        Err(error) => {
+            bail!("failed to inspect task root {}: {error}", root.display());
+        }
+    };
+    if metadata.file_type().is_symlink() {
+        bail!("refusing to scan symlinked task root: {}", root.display());
+    }
+    if !metadata.is_dir() {
+        bail!("task root is not a directory: {}", root.display());
+    }
+    Ok(())
+}
+
+fn read_evidence_records(path: &Path) -> Result<Vec<EvidenceRecord>> {
+    let mut records = Vec::new();
+    for_each_evidence_record(path, |_, record| {
+        records.push(record);
+        Ok(())
+    })?;
+    Ok(records)
+}
+
+fn read_markdown_exports(path: &Path) -> Result<BTreeMap<String, String>> {
+    let mut markdown = BTreeMap::new();
+    for file in ["plan.md", "decisions.md", "output.md", "retrospective.md"] {
+        let file_path = path.join(file);
+        let metadata = file_path
+            .symlink_metadata()
+            .with_context(|| format!("failed to inspect {}", file_path.display()))?;
+        if metadata.file_type().is_symlink() {
+            bail!(
+                "refusing to read symlinked capsule markdown file: {}",
+                file_path.display()
+            );
+        }
+        if !metadata.is_file() {
+            bail!(
+                "capsule markdown path is not a file: {}",
+                file_path.display()
+            );
+        }
+        let mut content = String::new();
+        open_read_no_follow(&file_path)?
+            .read_to_string(&mut content)
+            .with_context(|| format!("failed to read {}", file_path.display()))?;
+        markdown.insert(file.to_string(), content);
+    }
+    Ok(markdown)
 }
 
 pub fn evidence_summary(capsule_path: &Path) -> Result<EvidenceSummary> {
@@ -3408,7 +3729,7 @@ fn for_each_evidence_record(
     path: &Path,
     mut visit: impl FnMut(usize, EvidenceRecord) -> Result<()>,
 ) -> Result<()> {
-    let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let file = open_read_no_follow(path)?;
     let reader = BufReader::new(file);
     for (index, line) in reader.lines().enumerate() {
         let line = line?;
@@ -3519,8 +3840,17 @@ pub fn read_json<T>(path: &Path) -> Result<T>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let file = open_read_no_follow(path)?;
     serde_json::from_reader(file).with_context(|| format!("failed to parse {}", path.display()))
+}
+
+fn open_read_no_follow(path: &Path) -> Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    configure_no_follow(&mut options);
+    options
+        .open(path)
+        .with_context(|| format!("failed to open {}", path.display()))
 }
 
 fn validate_capsule_id(id: &str) -> Result<()> {
@@ -4097,6 +4427,64 @@ mod tests {
     }
 
     #[test]
+    fn task_index_lists_valid_and_invalid_task_entries() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let mut alpha_args = init_args(root.clone());
+        alpha_args.id = Some("alpha-task".to_string());
+        alpha_args.title = "Alpha task".to_string();
+        let alpha = init_capsule(alpha_args).expect("init alpha");
+        fs::create_dir_all(root.join("broken-task")).expect("broken task dir");
+
+        let report = task_index(&root).expect("task index");
+
+        assert_eq!(report.schema, TASK_INDEX_SCHEMA);
+        assert_eq!(report.root_status, TaskRootStatus::Ready);
+        assert_eq!(report.total, 2);
+        assert_eq!(report.valid, 1);
+        assert_eq!(report.invalid, 1);
+        assert_eq!(report.tasks[0].path, alpha.path);
+        assert!(report.tasks[0].valid);
+        assert_eq!(
+            report.tasks[0].capsule.as_ref().expect("status").title,
+            "Alpha task"
+        );
+        assert!(!report.tasks[1].valid);
+        assert!(
+            report.tasks[1]
+                .errors
+                .iter()
+                .any(|error| error.contains("capsule.json"))
+        );
+    }
+
+    #[test]
+    fn task_show_and_export_resolve_task_ids_from_root() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let mut args = init_args(root.clone());
+        args.id = Some("export-task".to_string());
+        args.title = "Export task".to_string();
+        init_capsule(args).expect("init task");
+
+        let show = task_show(&root, Path::new("export-task")).expect("task show");
+        assert_eq!(show.schema, TASK_INDEX_SCHEMA);
+        assert!(show.task.valid);
+        assert_eq!(
+            show.task.capsule.as_ref().expect("status").id,
+            "export-task"
+        );
+
+        let export = task_export(&root, Path::new("export-task")).expect("task export");
+        assert_eq!(export.schema, TASK_INDEX_SCHEMA);
+        assert_eq!(export.capsule.title, "Export task");
+        assert_eq!(export.evidence.len(), 1);
+        assert_eq!(export.verification.schema, VERIFICATION_SCHEMA);
+        assert!(export.markdown["plan.md"].contains("# Plan"));
+        assert!(export.markdown.contains_key("retrospective.md"));
+    }
+
+    #[test]
     fn validate_reports_missing_files() {
         let temp = tempdir().expect("tempdir");
         let validation = validate_capsule(temp.path()).expect("validate");
@@ -4138,6 +4526,84 @@ mod tests {
             "{joined}"
         );
         assert!(!joined.contains("invalid pr.json"), "{joined}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn validate_rejects_symlinked_markdown_file() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = init_capsule(init_args(temp.path().join("tasks")))
+            .expect("init capsule")
+            .path;
+        let plan_path = capsule.join("plan.md");
+        let outside_path = temp.path().join("outside-plan.md");
+        fs::write(&outside_path, "outside plan\n").expect("write outside plan");
+        fs::remove_file(&plan_path).expect("remove plan");
+        std::os::unix::fs::symlink(&outside_path, &plan_path).expect("symlink plan");
+
+        let validation = validate_capsule(&capsule).expect("validate");
+
+        assert!(!validation.valid);
+        let joined = validation.errors.join("\n");
+        assert!(
+            joined.contains("refusing to validate symlinked capsule contract file"),
+            "{joined}"
+        );
+        assert!(joined.contains("plan.md"), "{joined}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task_show_rejects_task_id_under_symlinked_root() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let mut args = init_args(root.clone());
+        args.id = Some("root-symlink-task".to_string());
+        init_capsule(args).expect("init task");
+        let root_link = temp.path().join("tasks-link");
+        std::os::unix::fs::symlink(&root, &root_link).expect("symlink root");
+
+        let error = task_show(&root_link, Path::new("root-symlink-task"))
+            .expect_err("symlinked root rejected");
+
+        assert!(format!("{error:#}").contains("symlinked task root"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task_export_rejects_symlinked_markdown_file() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("tasks");
+        let mut args = init_args(root.clone());
+        args.id = Some("markdown-symlink-task".to_string());
+        let result = init_capsule(args).expect("init task");
+        let plan_path = result.path.join("plan.md");
+        let outside_path = temp.path().join("outside-plan.md");
+        fs::write(&outside_path, "outside plan\n").expect("write outside plan");
+        fs::remove_file(&plan_path).expect("remove plan");
+        std::os::unix::fs::symlink(&outside_path, &plan_path).expect("symlink plan");
+
+        let error = task_export(&root, Path::new("markdown-symlink-task"))
+            .expect_err("symlinked markdown rejected");
+
+        assert!(
+            format!("{error:#}").contains("symlinked capsule contract file"),
+            "{error:#}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_json_rejects_symlinked_file() {
+        let temp = tempdir().expect("tempdir");
+        let target = temp.path().join("target.json");
+        let link = temp.path().join("link.json");
+        fs::write(&target, r#"{"value": true}"#).expect("target json");
+        std::os::unix::fs::symlink(&target, &link).expect("symlink json");
+
+        let error = read_json::<Value>(&link).expect_err("symlinked read rejected");
+
+        assert!(format!("{error:#}").contains("failed to open"), "{error:#}");
     }
 
     #[test]

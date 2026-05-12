@@ -5,7 +5,7 @@ contracts and read models. It is intentionally small: CLI parsing, terminal UI
 rendering, hosted provider calls, subprocess execution, and merge/review actions
 live outside this crate.
 
-Tracking: #40, #42, #43, #44, #48, and #49.
+Tracking: #40, #42, #43, #44, #48, #49, and #82.
 
 ## Public Boundary
 
@@ -18,7 +18,11 @@ The crate owns:
 - local capsule helpers including `init_capsule`, `validate_capsule`,
   `capsule_status`, `render_capsule`, `append_evidence`,
   `record_subagent_plan`, `record_subagent_outcome`,
-  `record_subagent_synthesis`, `record_pr_snapshot`, and `pr_status`;
+  `record_subagent_synthesis`, `record_pr_snapshot`, `pr_status`,
+  `task_index`, `task_show`, and `task_export`;
+- the read-only `task_index.v1` task root contract, including
+  `TaskIndexReport`, `TaskRootStatus`, `TaskIndexEntry`, `TaskShowReport`,
+  and `TaskExportReport`;
 - policy and PR evidence data models such as `PolicyManifest`,
   `PolicyGate`, `PrControlPlan`, `PrControlCommand`,
   `PrAgentStateReport`, `PrAgentHostedActionReport`, and
@@ -41,6 +45,14 @@ The crate does not own:
 - subprocess execution for policy gates;
 - default executable policy-gate or hosted PR command recipes;
 - compatibility shims for obsolete capsule layouts.
+
+Task index helpers scan immediate task-root entries only, reject symlinked
+roots or entries, and never perform provider/network calls. `TaskRootStatus`
+keeps missing-root smoke behavior distinct from unusable roots without requiring
+callers to parse diagnostic text. `task_export` emits the existing local capsule
+contract payloads plus Markdown notes as one automation-friendly bundle, but
+only after the selected capsule validates. Contract JSON, JSONL, and Markdown
+reads use no-follow file opens where the platform supports it.
 
 ## Dependency Policy
 

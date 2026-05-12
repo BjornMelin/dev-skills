@@ -84,6 +84,114 @@ fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String
         .to_string()
 }
 
+#[test]
+fn task_commands_emit_stable_json_reports() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let alpha = init_capsule_fixture(&root, "alpha-task", "Alpha task");
+    init_capsule_fixture(&root, "beta-task", "Beta task");
+
+    let list_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "task",
+            "list",
+            "--root",
+            root.to_str().expect("task root"),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let list_json: Value = serde_json::from_slice(&list_output).expect("task list json");
+    assert_eq!(list_json["ok"], true);
+    assert_eq!(list_json["command"], "task list");
+    assert_eq!(list_json["result"]["schema"], "task_index.v1");
+    assert_eq!(list_json["result"]["root_status"], "ready");
+    assert_eq!(list_json["result"]["total"], 2);
+    assert_eq!(list_json["result"]["valid"], 2);
+    assert_eq!(
+        list_json["result"]["tasks"][0]["capsule"]["id"],
+        "alpha-task"
+    );
+
+    let show_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "task",
+            "show",
+            "--root",
+            root.to_str().expect("task root"),
+            "alpha-task",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let show_json: Value = serde_json::from_slice(&show_output).expect("task show json");
+    assert_eq!(show_json["ok"], true);
+    assert_eq!(show_json["command"], "task show");
+    assert_eq!(
+        show_json["result"]["task"]["capsule"]["title"],
+        "Alpha task"
+    );
+
+    let export_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["--json", "task", "export", &alpha])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let export_json: Value = serde_json::from_slice(&export_output).expect("task export json");
+    assert_eq!(export_json["ok"], true);
+    assert_eq!(export_json["command"], "task export");
+    assert_eq!(export_json["result"]["schema"], "task_index.v1");
+    assert_eq!(export_json["result"]["capsule"]["id"], "alpha-task");
+    assert_eq!(
+        export_json["result"]["evidence"].as_array().unwrap().len(),
+        1
+    );
+    assert!(
+        export_json["result"]["markdown"]["plan.md"]
+            .as_str()
+            .expect("plan markdown")
+            .contains("# Plan")
+    );
+
+    let file_root = temp.path().join("task-root-file");
+    std::fs::write(&file_root, "not a directory\n").expect("file root");
+    let file_root_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "task",
+            "list",
+            "--root",
+            file_root.to_str().expect("file root"),
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let file_root_json: Value =
+        serde_json::from_slice(&file_root_output).expect("task list file-root json");
+    assert_eq!(file_root_json["ok"], false);
+    assert_eq!(file_root_json["result"]["root_status"], "unusable");
+    assert!(
+        file_root_json["result"]["diagnostics"][0]
+            .as_str()
+            .expect("diagnostic")
+            .contains("task root is not a directory")
+    );
+}
+
 #[cfg(unix)]
 fn write_fake_local_tool(bin_dir: &std::path::Path, name: &str) {
     use std::os::unix::fs::PermissionsExt;
