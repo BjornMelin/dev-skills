@@ -316,7 +316,9 @@ stay explicit in their owning runbooks. Executed gates marked `network` require
 `--allow-network`; executed gates marked `secrets` require `--allow-secrets`.
 Use `cargo run -q -p codex-dev -- --json policy explain --profile <profile>` to
 inspect gate purpose, expected artifacts, missing local prerequisites, and docs
-mirror status without executing any gate.
+mirror status without executing any gate. Aggregated `release` and `full_local`
+profiles include their own explain smokes in addition to inherited `codex_dev`
+coverage.
 
 Keep `codex-research` gates scoped to research changes.
 

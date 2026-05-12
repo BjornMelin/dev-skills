@@ -639,6 +639,9 @@ its tracked runbook source. Each gate records the command, working directory,
 required tools, required/network/secrets flags, and failure interpretation.
 Built-in profiles are local by default and do not require secrets or network
 access; networked advisory checks stay explicit in the release runbook.
+Aggregated profiles keep their inherited gates and add profile-specific
+`policy explain` smokes where inheritance would otherwise only exercise
+`codex_dev`.
 
 ## policy explain
 

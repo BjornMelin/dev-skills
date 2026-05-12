@@ -341,7 +341,9 @@ availability probes. It includes each gate's purpose, required tools, missing
 local prerequisites, network/secrets posture, expected artifacts, docs mirror
 status, and failure interpretation without executing gate commands. Local
 absolute repository and tool paths are omitted unless the caller opts in with
-`--include-local-paths`.
+`--include-local-paths`. Aggregated policy profiles must add a profile-specific
+explain smoke when inherited gates would otherwise only exercise another
+profile's JSON contract.
 
 Executed gates must run from a discovered or explicit repository root so
 repo-relative commands produce stable results whether invoked from the root, a

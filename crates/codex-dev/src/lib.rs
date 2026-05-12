@@ -2455,14 +2455,20 @@ fn policy_explain_gate_docs_status(
     gate: &PolicyGate,
     docs_check: &PolicyDocsCheckResult,
 ) -> String {
-    let source_path = gate
+    let (source_path, source_anchor) = gate
         .source
         .split_once('#')
-        .map_or(gate.source.as_str(), |(path, _)| path);
+        .map_or((gate.source.as_str(), None), |(path, anchor)| {
+            (path, Some(anchor))
+        });
     let matching_blocks = docs_check
         .blocks
         .iter()
-        .filter(|block| block.path == source_path && block.profiles.contains(&profile))
+        .filter(|block| {
+            block.path == source_path
+                && block.profiles.contains(&profile)
+                && policy_doc_block_matches_source_anchor(block, source_anchor)
+        })
         .collect::<Vec<_>>();
 
     if matching_blocks.is_empty() {
@@ -2471,6 +2477,26 @@ fn policy_explain_gate_docs_status(
         "current".to_string()
     } else {
         "stale_or_missing".to_string()
+    }
+}
+
+fn policy_doc_block_matches_source_anchor(
+    block: &PolicyDocsBlockResult,
+    source_anchor: Option<&str>,
+) -> bool {
+    let Some(source_anchor) = source_anchor else {
+        return true;
+    };
+    policy_doc_block_source_anchor(block) == Some(source_anchor)
+}
+
+fn policy_doc_block_source_anchor(block: &PolicyDocsBlockResult) -> Option<&'static str> {
+    match (block.path.as_str(), block.marker.as_str()) {
+        ("docs/runbooks/validation.md", POLICY_DOCS_SMOKE_MARKER) => {
+            Some("codex-dev-operating-layer")
+        }
+        ("docs/runbooks/validation.md", POLICY_DOCS_ALL_MARKER) => Some("full-local-gate"),
+        _ => None,
     }
 }
 
@@ -6180,26 +6206,7 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             ["cargo"],
             "Failure means the codex_dev policy profile cannot be emitted as JSON.",
         ),
-        policy_gate(
-            "codex-dev-policy-explain",
-            "codex-dev policy explain smoke",
-            [
-                "cargo",
-                "run",
-                "-q",
-                "-p",
-                "codex-dev",
-                "--",
-                "--json",
-                "policy",
-                "explain",
-                "--profile",
-                "codex_dev",
-            ],
-            "docs/runbooks/validation.md#codex-dev-operating-layer",
-            ["cargo"],
-            "Failure means the codex_dev policy explanation contract cannot be emitted as JSON.",
-        ),
+        policy_profile_explain_gate(PolicyProfile::CodexDev),
         policy_docs_check_gate(),
         policy_gate(
             "codex-dev-skills-inventory-smoke",
@@ -6664,6 +6671,10 @@ fn docs_gates() -> Vec<PolicyGate> {
 fn release_gates() -> Vec<PolicyGate> {
     let mut gates = Vec::new();
     append_unique_gates(&mut gates, codex_dev_gates());
+    append_unique_gates(
+        &mut gates,
+        vec![policy_profile_explain_gate(PolicyProfile::Release)],
+    );
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
     append_unique_gates(&mut gates, docs_gates());
@@ -6676,6 +6687,10 @@ fn release_gates() -> Vec<PolicyGate> {
 fn full_local_gates() -> Vec<PolicyGate> {
     let mut gates = Vec::new();
     append_unique_gates(&mut gates, codex_dev_gates());
+    append_unique_gates(
+        &mut gates,
+        vec![policy_profile_explain_gate(PolicyProfile::FullLocal)],
+    );
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
     append_unique_gates(&mut gates, local_cli_install_smoke_gates());
@@ -6771,6 +6786,63 @@ fn diff_check_gate() -> PolicyGate {
         ["git"],
         "Failure means the working diff has whitespace or conflict-marker problems.",
     )
+}
+
+fn policy_profile_explain_gate(profile: PolicyProfile) -> PolicyGate {
+    let gate_slug = policy_profile_gate_slug(profile);
+    let profile_arg = profile.to_string();
+    let source = policy_profile_explain_source(profile);
+    PolicyGate {
+        id: format!("{gate_slug}-policy-explain"),
+        name: format!("{gate_slug} policy explain smoke"),
+        command: [
+            "cargo",
+            "run",
+            "-q",
+            "-p",
+            "codex-dev",
+            "--",
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .chain(std::iter::once(profile_arg.clone()))
+        .collect(),
+        source: source.to_string(),
+        working_directory: ".".to_string(),
+        required_tools: vec!["cargo".to_string()],
+        required: true,
+        network: false,
+        secrets: false,
+        failure_interpretation: format!(
+            "Failure means the {profile_arg} policy explanation contract cannot be emitted as JSON."
+        ),
+    }
+}
+
+fn policy_profile_explain_source(profile: PolicyProfile) -> &'static str {
+    match profile {
+        PolicyProfile::Release | PolicyProfile::FullLocal => {
+            "docs/runbooks/validation.md#full-local-gate"
+        }
+        _ => "docs/runbooks/validation.md#codex-dev-operating-layer",
+    }
+}
+
+fn policy_profile_gate_slug(profile: PolicyProfile) -> &'static str {
+    match profile {
+        PolicyProfile::CodexDev => "codex-dev",
+        PolicyProfile::CodexDevTui => "codex-dev-tui",
+        PolicyProfile::CodexResearch => "codex-research",
+        PolicyProfile::Skills => "skills",
+        PolicyProfile::BootstrapInstall => "bootstrap-install",
+        PolicyProfile::Docs => "docs",
+        PolicyProfile::Release => "release",
+        PolicyProfile::FullLocal => "full-local",
+    }
 }
 
 fn supply_chain_gates() -> Vec<PolicyGate> {
@@ -7792,6 +7864,47 @@ mod tests {
                 .expected_artifacts
                 .contains(&"isolated install root under target/codex-dev-install-smoke/codex-dev on filesystem".to_string())
         );
+        let release_report = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::Release,
+                repo_root: Some(repo_root.clone()),
+                include_local_paths: false,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect("release policy explain");
+        let release_explain_gate = release_report
+            .gates
+            .iter()
+            .find(|gate| gate.id == "release-policy-explain")
+            .expect("release policy explain gate");
+        assert_eq!(
+            release_explain_gate.source,
+            "docs/runbooks/validation.md#full-local-gate"
+        );
+        assert_eq!(release_explain_gate.docs_mirror_status, "current");
+        let full_local_explain_gate = full_local_report
+            .gates
+            .iter()
+            .find(|gate| gate.id == "full-local-policy-explain")
+            .expect("full local policy explain gate");
+        assert_eq!(
+            full_local_explain_gate.command,
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "policy",
+                "explain",
+                "--profile",
+                "full_local"
+            ]
+        );
 
         let report_with_paths = policy_explain(
             PolicyExplainArgs {
@@ -7872,6 +7985,84 @@ mod tests {
                 .all(|block| block.profiles.contains(&PolicyProfile::CodexDevTui))
         );
         assert_eq!(report.docs_mirror.blocks.len(), 1);
+    }
+
+    #[test]
+    fn policy_explain_gate_docs_status_matches_validation_anchor() {
+        let docs_check = PolicyDocsCheckResult {
+            schema: POLICY_DOCS_CHECK_SCHEMA,
+            repo_root: PathBuf::from("."),
+            passed: false,
+            blocks: vec![
+                PolicyDocsBlockResult {
+                    path: "docs/runbooks/validation.md".to_string(),
+                    marker: POLICY_DOCS_SMOKE_MARKER.to_string(),
+                    profiles: vec![PolicyProfile::CodexDev, PolicyProfile::FullLocal],
+                    expected_commands: Vec::new(),
+                    actual_commands: Vec::new(),
+                    passed: true,
+                    error: None,
+                },
+                PolicyDocsBlockResult {
+                    path: "docs/runbooks/validation.md".to_string(),
+                    marker: POLICY_DOCS_ALL_MARKER.to_string(),
+                    profiles: all_policy_profiles().to_vec(),
+                    expected_commands: Vec::new(),
+                    actual_commands: Vec::new(),
+                    passed: false,
+                    error: Some("stale all-profiles block".to_string()),
+                },
+            ],
+        };
+        let operating_layer_gate = policy_gate(
+            "operating-layer",
+            "operating layer",
+            ["cargo", "--version"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means test fixture failed.",
+        );
+        let full_local_gate = policy_gate(
+            "full-local",
+            "full local",
+            ["cargo", "--version"],
+            "docs/runbooks/validation.md#full-local-gate",
+            ["cargo"],
+            "Failure means test fixture failed.",
+        );
+        let validation_matrix_gate = policy_gate(
+            "validation-matrix",
+            "validation matrix",
+            ["cargo", "--version"],
+            "docs/runbooks/validation.md#validation-matrix-ownership",
+            ["cargo"],
+            "Failure means test fixture failed.",
+        );
+
+        assert_eq!(
+            policy_explain_gate_docs_status(
+                PolicyProfile::FullLocal,
+                &operating_layer_gate,
+                &docs_check
+            ),
+            "current"
+        );
+        assert_eq!(
+            policy_explain_gate_docs_status(
+                PolicyProfile::FullLocal,
+                &full_local_gate,
+                &docs_check
+            ),
+            "stale_or_missing"
+        );
+        assert_eq!(
+            policy_explain_gate_docs_status(
+                PolicyProfile::FullLocal,
+                &validation_matrix_gate,
+                &docs_check
+            ),
+            "not_mirrored"
+        );
     }
 
     #[test]
@@ -8055,6 +8246,7 @@ mod tests {
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
+                "release-policy-explain",
                 "codex-dev-tui-clippy",
                 "codex-dev-tui-check",
                 "codex-dev-tui-test",
@@ -8108,6 +8300,7 @@ mod tests {
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
+                "full-local-policy-explain",
                 "codex-dev-tui-clippy",
                 "codex-dev-tui-check",
                 "codex-dev-tui-test",
