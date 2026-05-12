@@ -2287,6 +2287,7 @@ pub fn policy_explain(
     let manifest = policy_manifest(args.profile, checked_at);
     let docs_check = policy_docs_check(args.repo_root.as_deref())?;
     let docs_mirror_status = policy_explain_profile_docs_status(args.profile, &docs_check);
+    let docs_mirror_passed = policy_explain_profile_docs_passed(args.profile, &docs_check);
     let tool_statuses =
         policy_explain_required_tool_statuses(&manifest.gates, args.include_local_paths);
     let missing_local_prerequisites =
@@ -2294,7 +2295,11 @@ pub fn policy_explain(
     let gates = manifest
         .gates
         .iter()
-        .map(|gate| policy_explain_gate(gate, &tool_statuses, &docs_mirror_status))
+        .map(|gate| {
+            let gate_docs_mirror_status =
+                policy_explain_gate_docs_status(args.profile, gate, &docs_check);
+            policy_explain_gate(gate, &tool_statuses, &gate_docs_mirror_status)
+        })
         .collect::<Vec<_>>();
     let docs_repo_root = args
         .include_local_paths
@@ -2312,7 +2317,7 @@ pub fn policy_explain(
         docs_mirror: PolicyExplainDocsMirror {
             repo_root: docs_repo_root,
             status: docs_mirror_status,
-            passed: docs_check.passed,
+            passed: docs_mirror_passed,
             blocks: docs_check
                 .blocks
                 .into_iter()
@@ -2375,6 +2380,41 @@ fn policy_explain_profile_docs_status(
     if relevant_blocks.is_empty() {
         "not_mirrored".to_string()
     } else if relevant_blocks.iter().all(|block| block.passed) {
+        "current".to_string()
+    } else {
+        "stale_or_missing".to_string()
+    }
+}
+
+fn policy_explain_profile_docs_passed(
+    profile: PolicyProfile,
+    docs_check: &PolicyDocsCheckResult,
+) -> bool {
+    docs_check
+        .blocks
+        .iter()
+        .filter(|block| block.profiles.contains(&profile))
+        .all(|block| block.passed)
+}
+
+fn policy_explain_gate_docs_status(
+    profile: PolicyProfile,
+    gate: &PolicyGate,
+    docs_check: &PolicyDocsCheckResult,
+) -> String {
+    let source_path = gate
+        .source
+        .split_once('#')
+        .map_or(gate.source.as_str(), |(path, _)| path);
+    let matching_blocks = docs_check
+        .blocks
+        .iter()
+        .filter(|block| block.path == source_path && block.profiles.contains(&profile))
+        .collect::<Vec<_>>();
+
+    if matching_blocks.is_empty() {
+        "not_mirrored".to_string()
+    } else if matching_blocks.iter().all(|block| block.passed) {
         "current".to_string()
     } else {
         "stale_or_missing".to_string()
@@ -2524,6 +2564,8 @@ fn policy_gate_expected_artifacts(gate: &PolicyGate) -> Vec<String> {
         vec!["shell completion text on stdout".to_string()]
     } else if gate.command.iter().any(|part| part == "manpage") {
         vec!["roff manpage text on stdout".to_string()]
+    } else if let Some(artifact) = policy_gate_install_smoke_artifact(gate) {
+        vec![artifact]
     } else if command_contains_sequence(&gate.command, &["policy", "manifest"]) {
         vec!["policy gate manifest JSON on stdout".to_string()]
     } else if command_contains_sequence(&gate.command, &["policy", "explain"]) {
@@ -2539,6 +2581,26 @@ fn policy_gate_expected_artifacts(gate: &PolicyGate) -> Vec<String> {
     } else {
         vec!["stdout/stderr validation output; no tracked artifact expected".to_string()]
     }
+}
+
+fn policy_gate_install_smoke_artifact(gate: &PolicyGate) -> Option<String> {
+    let is_install_smoke = gate.id.starts_with("cargo-install-")
+        || gate
+            .command
+            .iter()
+            .any(|part| part == "install-smoke" || part.contains("target/codex-dev-install-smoke"));
+    if !is_install_smoke {
+        return None;
+    }
+
+    let binary = gate
+        .id
+        .strip_prefix("cargo-install-")
+        .and_then(|name| name.strip_suffix("-smoke"))
+        .unwrap_or("<binary>");
+    Some(format!(
+        "isolated install root under target/codex-dev-install-smoke/{binary} on filesystem"
+    ))
 }
 
 fn command_contains_sequence(command: &[String], sequence: &[&str]) -> bool {
@@ -7618,6 +7680,33 @@ mod tests {
                 .expected_artifacts
                 .contains(&"policy_explain.v1 JSON on stdout".to_string())
         );
+        let completion_gate = report
+            .gates
+            .iter()
+            .find(|gate| gate.id == "codex-dev-completion-zsh")
+            .expect("completion gate");
+        assert_eq!(completion_gate.docs_mirror_status, "not_mirrored");
+
+        let full_local_report = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::FullLocal,
+                repo_root: Some(repo_root.clone()),
+                include_local_paths: false,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect("full local policy explain");
+        let install_gate = full_local_report
+            .gates
+            .iter()
+            .find(|gate| gate.id == "cargo-install-codex-dev-smoke")
+            .expect("cargo install gate");
+        assert!(
+            install_gate
+                .expected_artifacts
+                .contains(&"isolated install root under target/codex-dev-install-smoke/codex-dev on filesystem".to_string())
+        );
 
         let report_with_paths = policy_explain(
             PolicyExplainArgs {
@@ -7636,6 +7725,60 @@ mod tests {
                 .iter()
                 .any(|tool| tool.available && tool.path.is_some())
         );
+    }
+
+    #[test]
+    fn policy_explain_docs_passed_is_scoped_to_profile_blocks() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path();
+        fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::create_dir_all(root.join("docs/reference")).expect("reference docs dir");
+        fs::create_dir_all(root.join("docs/runbooks")).expect("runbook docs dir");
+
+        let stale_smoke_block = format!(
+            "\n# {}\n{}\n# {}\n",
+            policy_doc_marker(POLICY_DOCS_SMOKE_MARKER, "start"),
+            "cargo run -q -p codex-dev -- --json policy manifest --profile stale",
+            policy_doc_marker(POLICY_DOCS_SMOKE_MARKER, "end")
+        );
+        for path in ["AGENTS.md", "README.md", "docs/reference/codex-dev-cli.md"] {
+            fs::write(root.join(path), &stale_smoke_block).expect("stale smoke docs");
+        }
+
+        let all_profile_commands = all_policy_profiles()
+            .iter()
+            .map(|profile| policy_manifest_command(*profile))
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(
+            root.join("docs/runbooks/validation.md"),
+            format!(
+                "\n# {}\n{}\n# {}\n\n# {}\n{}\n# {}\n",
+                policy_doc_marker(POLICY_DOCS_SMOKE_MARKER, "start"),
+                "cargo run -q -p codex-dev -- --json policy manifest --profile stale",
+                policy_doc_marker(POLICY_DOCS_SMOKE_MARKER, "end"),
+                policy_doc_marker(POLICY_DOCS_ALL_MARKER, "start"),
+                all_profile_commands,
+                policy_doc_marker(POLICY_DOCS_ALL_MARKER, "end")
+            ),
+        )
+        .expect("validation docs");
+
+        let docs_check = policy_docs_check(Some(root)).expect("docs check");
+        assert!(!docs_check.passed);
+
+        let report = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::CodexDevTui,
+                repo_root: Some(root.to_path_buf()),
+                include_local_paths: false,
+                checked_at: None,
+            },
+            "2026-05-09T05:00:00Z".parse().unwrap(),
+        )
+        .expect("profile-scoped policy explain");
+        assert_eq!(report.docs_mirror.status, "current");
+        assert!(report.docs_mirror.passed);
     }
 
     #[test]
