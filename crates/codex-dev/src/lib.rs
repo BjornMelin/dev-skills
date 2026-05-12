@@ -2380,7 +2380,15 @@ fn is_unix_absolute_path_start(chars: &[char], index: usize) -> bool {
         && chars
             .get(index + 1)
             .is_some_and(|next| !next.is_whitespace())
-        && !matches!(chars.get(index.wrapping_sub(1)), Some(':' | '/'))
+        && local_path_start_boundary(chars, index)
+}
+
+fn local_path_start_boundary(chars: &[char], index: usize) -> bool {
+    index == 0
+        || matches!(
+            chars.get(index - 1),
+            Some(' ' | '\t' | '\n' | '\r' | '(' | '[' | '{' | '"' | '\'' | '`' | '=')
+        )
 }
 
 fn is_windows_absolute_path_start(chars: &[char], index: usize) -> bool {
@@ -2407,13 +2415,16 @@ fn local_path_end(chars: &[char], start: usize) -> usize {
     while index < chars.len() {
         let current = chars[index];
         let next = chars.get(index + 1);
+        if current.is_whitespace() || matches!(current, ',' | ';') {
+            break;
+        }
         if current == ':' && next.is_some_and(|next| next.is_whitespace()) {
             break;
         }
-        if matches!(current, '"' | '\'' | '`' | ')' | ']' | '}')
-            || current == '\n'
-            || current == '\r'
-        {
+        if current == '.' && next.is_none_or(|next| next.is_whitespace()) {
+            break;
+        }
+        if matches!(current, '"' | '\'' | '`' | ')' | ']' | '}') {
             break;
         }
         index += 1;
@@ -7787,6 +7798,18 @@ mod tests {
         let verbatim_message = policy_explain_redacted_error_message(&verbatim_error);
         assert!(verbatim_message.contains("failed to read <local-path>: access denied"));
         assert!(!verbatim_message.contains("\\\\?\\C:\\Users\\example"));
+
+        let relative_path_error = anyhow::anyhow!(
+            "repo root must contain docs/runbooks/validation.md: /home/example/dev-skills missing"
+        );
+        let relative_path_message = policy_explain_redacted_error_message(&relative_path_error);
+        assert!(
+            relative_path_message.contains(
+                "repo root must contain docs/runbooks/validation.md: <local-path> missing"
+            )
+        );
+        assert!(!relative_path_message.contains("docs<local-path>"));
+        assert!(!relative_path_message.contains("/home/example"));
     }
 
     #[test]
