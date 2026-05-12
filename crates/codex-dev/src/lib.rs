@@ -624,27 +624,30 @@ pub struct PolicyRunArgs {
     pub checked_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Args, Clone, Debug)]
 /// Arguments shared by the local readiness subcommands.
+#[derive(Args, Clone, Debug)]
 pub struct LocalDoctorArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
     #[arg(
         long,
         value_name = "REPO_ROOT",
         help = "Repository root to inspect; defaults to the current git worktree root when available"
     )]
     pub repo_root: Option<PathBuf>,
+    /// Whether missing globally installed codex-dev binaries should fail the report.
     #[arg(
         long,
         help = "Treat missing globally installed codex-dev binaries as errors instead of warnings"
     )]
     pub strict_global_binaries: bool,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
     #[arg(long, value_name = "RFC3339")]
     pub checked_at: Option<DateTime<Utc>>,
 }
 
+/// Operator intent for a local readiness report.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-/// Operator intent for a local readiness report.
 pub enum LocalReportMode {
     /// Full local preflight report.
     Doctor,
@@ -652,77 +655,115 @@ pub enum LocalReportMode {
     Status,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Read-only workstation and checkout readiness report.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalDoctorReport {
+    /// Versioned schema identifier for the report payload inside the command envelope.
     pub schema: &'static str,
+    /// Subcommand intent that produced this report.
     pub mode: LocalReportMode,
+    /// Timestamp at which the report was generated.
     pub checked_at: DateTime<Utc>,
+    /// Current working directory of the process that generated the report.
     pub cwd: PathBuf,
+    /// Repository root inspected by the report.
     pub repo_root: PathBuf,
+    /// True when no error-severity diagnostics were emitted.
     pub ok: bool,
+    /// Human-actionable readiness findings.
     pub diagnostics: Vec<LocalDiagnostic>,
+    /// Globally installed Codex binary posture.
     pub binaries: Vec<LocalToolStatus>,
+    /// Required and optional development tool posture.
     pub tools: Vec<LocalToolStatus>,
+    /// GitHub CLI and categorical authentication posture.
     pub github: LocalGithubStatus,
+    /// Local task-capsule root state.
     pub capsule_root: LocalPathStatus,
+    /// Local cache and install-smoke roots that should not become tracked artifacts.
     pub cache_roots: Vec<LocalPathStatus>,
+    /// Built-in policy profile gate counts.
     pub policy_profiles: Vec<LocalPolicyProfileStatus>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Human-actionable local readiness finding.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalDiagnostic {
+    /// Severity used to compute the report verdict.
     pub severity: LocalDiagnosticSeverity,
+    /// Stable machine-readable diagnostic code.
     pub code: String,
+    /// Human-readable remediation hint.
     pub message: String,
 }
 
+/// Severity for local readiness diagnostics.
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-/// Severity for local readiness diagnostics.
 pub enum LocalDiagnosticSeverity {
+    /// Informational diagnostic that does not require action.
     Info,
+    /// Non-blocking readiness concern.
     Warning,
+    /// Blocking readiness failure.
     Error,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Availability and optional version data for a local executable.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalToolStatus {
+    /// Command name as searched on PATH.
     pub name: String,
+    /// Whether absence of the command is an error.
     pub required: bool,
+    /// Whether an executable file was found on PATH.
     pub available: bool,
+    /// Resolved executable path when available.
     pub path: Option<PathBuf>,
+    /// Redacted first-line version output when probed.
     pub version: Option<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Categorical GitHub CLI authentication posture without credential values.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalGithubStatus {
+    /// Whether the `gh` executable was found on PATH.
     pub gh_available: bool,
+    /// Resolved `gh` executable path when available.
     pub gh_path: Option<PathBuf>,
+    /// Names of non-empty GitHub token environment variables, never their values.
     pub token_sources: Vec<String>,
+    /// Whether a GitHub CLI hosts configuration file was detected.
     pub config_present: bool,
+    /// Coarse authentication source class for local readiness reporting.
     pub auth_class: String,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Local path existence and git-ignore status.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalPathStatus {
+    /// Stable path role name used in diagnostics.
     pub name: String,
+    /// Absolute path inspected by the report.
     pub path: PathBuf,
+    /// Whether the path exists on disk.
     pub exists: bool,
+    /// Git ignore result, or `None` when the probe could not determine it.
     pub git_ignored: Option<bool>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
 /// Summary of built-in policy gate counts for one profile.
+#[derive(Debug, Serialize, PartialEq, Eq)]
 pub struct LocalPolicyProfileStatus {
+    /// Policy profile summarized by this row.
     pub profile: PolicyProfile,
+    /// Total built-in gates in the profile.
     pub gates: usize,
+    /// Gates that must pass for the profile to pass.
     pub required_gates: usize,
+    /// Gates that may require network access.
     pub network_gates: usize,
+    /// Gates that may require secrets or credentials.
     pub secret_gates: usize,
 }
 
