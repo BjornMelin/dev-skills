@@ -1986,7 +1986,10 @@ fn has_unterminated_quote(value: &str) -> bool {
 fn looks_like_non_string_yaml_scalar(value: &str) -> bool {
     let value = value.trim();
     let lower = value.to_ascii_lowercase();
-    if matches!(lower.as_str(), "true" | "false" | "null" | "~") {
+    if matches!(
+        lower.as_str(),
+        "true" | "false" | "yes" | "no" | "on" | "off" | "null" | "~"
+    ) {
         return true;
     }
     if value.starts_with('[') || value.starts_with('{') {
@@ -2003,7 +2006,7 @@ fn parse_frontmatter_list(value: &str, lines: &[&str], index: &mut usize) -> Vec
     if value.is_empty() {
         return collect_frontmatter_sequence(lines, index);
     }
-    let value = value.trim();
+    let value = strip_yaml_inline_comment(value.trim()).trim();
     if value.starts_with('[') && value.ends_with(']') {
         return value
             .trim_start_matches('[')

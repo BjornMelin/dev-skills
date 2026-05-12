@@ -330,6 +330,19 @@ description: Traversal skill.
 "#,
     )
     .expect("traversal skill");
+    let boolean_alias = repo.join("skills/boolean-alias-skill");
+    std::fs::create_dir_all(&boolean_alias).expect("boolean alias skill dir");
+    std::fs::write(
+        boolean_alias.join("SKILL.md"),
+        r#"---
+name: on
+description: yes
+---
+
+# Boolean Alias
+"#,
+    )
+    .expect("boolean alias skill");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -349,7 +362,7 @@ description: Traversal skill.
         .clone();
     let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
     assert_eq!(json["ok"], false);
-    assert_eq!(json["result"]["invalid"], 4);
+    assert_eq!(json["result"]["invalid"], 5);
     let invalid_skill = json["result"]["skills"]
         .as_array()
         .expect("skills")
@@ -408,6 +421,19 @@ description: Traversal skill.
         "skills/dist/traversal-skill.skill"
     );
     assert_eq!(traversal_skill["package"]["present"], false);
+    let boolean_alias_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "boolean-alias-skill")
+        .expect("boolean alias skill entry");
+    assert!(
+        boolean_alias_skill["validation"]["errors"]
+            .as_array()
+            .expect("boolean alias errors")
+            .iter()
+            .any(|error| error.as_str().expect("error").contains("must be a string"))
+    );
 }
 
 #[test]
@@ -421,6 +447,7 @@ fn skills_inventory_accepts_yaml_inline_comments_in_scalars() {
         r#"---
 name: commented-skill # catalog identity
 description: Commented skill description. # human note
+allowed-tools: [bash, python3] # common shells
 ---
 
 # Commented
@@ -468,6 +495,15 @@ description: 'Quoted skill description.' # human note
     assert_eq!(
         commented_skill["description"],
         "Commented skill description."
+    );
+    assert_eq!(
+        commented_skill["allowed_tools"]
+            .as_array()
+            .expect("allowed tools"),
+        &vec![
+            Value::String("bash".into()),
+            Value::String("python3".into())
+        ]
     );
     assert_eq!(commented_skill["validation"]["valid"], true);
     let quoted_skill = json["result"]["skills"]
