@@ -5,15 +5,19 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anyhow::Result;
+use chrono::Utc;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::Shell;
 use codex_dev_core::{
-    CapsuleStatus, CheckRecord, EvidenceKind, EvidenceRecord, PR_AGENT_HOSTED_ACTION_SCHEMA,
-    PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA, PrAgentHostedActionReport,
-    PrAgentHostedActionStatus, PrAgentReadinessActionStatus, PrAgentReadinessReport,
-    PrAgentReadinessStatus, PrAgentSeverity, PrAgentStateReport, PrEvidence, ReviewThreadSummary,
-    StatusResult, Subagents, ValidationResult, Verification, capsule_status, read_json,
-    render_pr_label, validate_capsule,
+    CapsuleStatus, CheckRecord, EvidenceKind, EvidenceRecord, OrchestrationDiagnosticSeverity,
+    OrchestrationRunReport, PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA,
+    PR_AGENT_STATE_SCHEMA, PrAgentHostedActionReport, PrAgentHostedActionStatus,
+    PrAgentReadinessActionStatus, PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity,
+    PrAgentStateReport, PrEvidence, ReviewThreadSummary, SkillInventoryArgs,
+    SkillInventoryDiagnosticSeverity, SkillsInventoryReport, StatusResult, Subagents,
+    TaskIndexEntry, TaskIndexReport, TaskRootStatus, ValidationResult, Verification,
+    capsule_status, orchestration_run, read_json, render_command, render_pr_label,
+    skills_inventory, task_index, validate_capsule,
 };
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::backend::{Backend, TestBackend};
@@ -24,6 +28,10 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
+pub const TUI_OPERATOR_PANELS_SCHEMA: &str = "tui_operator_panels.v1";
+const ORCHESTRATION_STALE_AFTER_MINUTES: u64 = 120;
 
 #[derive(Parser, Debug)]
 #[command(name = "codex-dev-tui")]
@@ -238,7 +246,9 @@ pub enum Panel {
     Overview,
     Evidence,
     Subagents,
+    Orchestration,
     PrAgent,
+    NextActions,
     Validation,
     Pr,
     Help,
@@ -249,9 +259,11 @@ impl Panel {
         match self {
             Self::Overview => Self::Evidence,
             Self::Evidence => Self::Subagents,
-            Self::Subagents => Self::Pr,
+            Self::Subagents => Self::Orchestration,
+            Self::Orchestration => Self::Pr,
             Self::Pr => Self::PrAgent,
-            Self::PrAgent => Self::Validation,
+            Self::PrAgent => Self::NextActions,
+            Self::NextActions => Self::Validation,
             Self::Validation => Self::Help,
             Self::Help => Self::Overview,
         }
@@ -262,9 +274,11 @@ impl Panel {
             Self::Overview => Self::Help,
             Self::Evidence => Self::Overview,
             Self::Subagents => Self::Evidence,
-            Self::Pr => Self::Subagents,
+            Self::Orchestration => Self::Subagents,
+            Self::Pr => Self::Orchestration,
             Self::PrAgent => Self::Pr,
-            Self::Validation => Self::PrAgent,
+            Self::NextActions => Self::PrAgent,
+            Self::Validation => Self::NextActions,
             Self::Help => Self::Validation,
         }
     }
@@ -274,12 +288,41 @@ impl Panel {
             Self::Overview => "Overview",
             Self::Evidence => "Evidence",
             Self::Subagents => "Subagents",
+            Self::Orchestration => "Orchestration",
             Self::Validation => "Validation",
             Self::Pr => "PR",
             Self::PrAgent => "PR Agent",
+            Self::NextActions => "Next Actions",
             Self::Help => "Help",
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+/// Read-only composition contract for operator-focused TUI panels.
+pub struct TuiOperatorPanelsReport {
+    pub schema: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_inventory: Option<SkillsInventoryReport>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_index: Option<TaskIndexReport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub orchestration: Vec<OrchestrationRunReport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub next_actions: Vec<TuiNextActionExport>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+/// Command or operator action rendered by the TUI without executing it.
+pub struct TuiNextActionExport {
+    pub source: String,
+    pub id: String,
+    pub priority: String,
+    pub summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -356,14 +399,12 @@ pub struct DashboardCapsule {
 }
 
 impl DashboardCapsule {
-    fn load(path: PathBuf) -> Self {
-        let validation = match validate_capsule(&path) {
-            Ok(validation) => validation,
-            Err(error) => ValidationResult {
-                path: path.clone(),
-                valid: false,
-                errors: vec![format!("{error:#}")],
-            },
+    fn from_task_index_entry(task: &TaskIndexEntry) -> Self {
+        let path = task.path.clone();
+        let validation = ValidationResult {
+            path: path.clone(),
+            valid: task.valid,
+            errors: task.errors.clone(),
         };
         if !validation.valid {
             let display_title = fallback_dashboard_title(&path);
@@ -381,7 +422,6 @@ impl DashboardCapsule {
             };
         }
 
-        let capsule = load_optional_contract(&path, "capsule", || capsule_status(&path));
         let verification = load_optional_contract(&path, "verification.json", || {
             read_json(&path.join("verification.json"))
         });
@@ -390,22 +430,20 @@ impl DashboardCapsule {
         });
         let pr = load_optional_contract(&path, "pr.json", || read_json(&path.join("pr.json")));
         let mut diagnostics = Vec::new();
-        diagnostics.extend(capsule.1);
         diagnostics.extend(verification.1);
         diagnostics.extend(subagents.1);
         diagnostics.extend(pr.1);
+
+        let capsule = task.capsule.clone();
         let display_title = capsule
-            .0
             .as_ref()
             .map(|capsule| capsule.title.clone())
             .unwrap_or_else(|| fallback_dashboard_title(&path));
         let status_label = capsule
-            .0
             .as_ref()
             .map(|capsule| capsule.status.to_string())
-            .unwrap_or_else(|| "invalid".to_string());
+            .unwrap_or_else(|| "valid".to_string());
         let updated_label = capsule
-            .0
             .as_ref()
             .map(|capsule| capsule.updated_at.to_rfc3339())
             .unwrap_or_else(|| "unknown".to_string());
@@ -416,7 +454,7 @@ impl DashboardCapsule {
             status_label,
             updated_label,
             validation,
-            capsule: capsule.0,
+            capsule,
             verification: verification.0,
             subagents: subagents.0,
             pr: pr.0,
@@ -468,6 +506,7 @@ fn fallback_dashboard_title(path: &Path) -> String {
 pub struct DashboardState {
     pub root: PathBuf,
     pub capsules: Vec<DashboardCapsule>,
+    pub operator: TuiOperatorPanelsReport,
     pub filtered_indices: Vec<usize>,
     pub selected: usize,
     pub filter: DashboardFilter,
@@ -487,44 +526,28 @@ impl DashboardState {
         selected_path: Option<&Path>,
     ) -> Self {
         let root = root.as_ref().to_path_buf();
-        let mut diagnostics = Vec::new();
+        let operator = dashboard_operator_report(&root);
+        let mut diagnostics = operator
+            .task_index
+            .as_ref()
+            .map(|report| report.diagnostics.clone())
+            .unwrap_or_default();
         let mut capsules = Vec::new();
-        match fs::read_dir(&root) {
-            Ok(entries) => {
-                for entry in entries {
-                    match entry {
-                        Ok(entry) => {
-                            let path = entry.path();
-                            match entry.file_type() {
-                                Ok(file_type) if file_type.is_dir() => {
-                                    capsules.push(DashboardCapsule::load(path));
-                                }
-                                Ok(_) => {}
-                                Err(error) => diagnostics
-                                    .push(format!("failed to inspect {}: {error}", path.display())),
-                            }
-                        }
-                        Err(error) => {
-                            diagnostics.push(format!(
-                                "failed to read entry under {}: {error}",
-                                root.display()
-                            ));
-                        }
-                    }
-                }
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                diagnostics.push(format!("dashboard root does not exist: {}", root.display()));
-            }
-            Err(error) => diagnostics.push(format!(
-                "failed to read dashboard root {}: {error}",
-                root.display()
-            )),
+        if let Some(index) = &operator.task_index {
+            capsules.extend(
+                index
+                    .tasks
+                    .iter()
+                    .map(DashboardCapsule::from_task_index_entry),
+            );
+        } else {
+            diagnostics.push("task index report was not loaded".to_string());
         }
         sort_dashboard_capsules(&mut capsules, sort);
         let mut state = Self {
             root,
             capsules,
+            operator,
             filtered_indices: Vec::new(),
             selected: 0,
             filter,
@@ -750,6 +773,7 @@ pub struct WorkbenchState {
     pub pr_agent_state: Option<PrAgentStateReport>,
     pub pr_readiness: Option<PrAgentReadinessReport>,
     pub pr_agent_actions: Vec<PrAgentHostedActionReport>,
+    pub operator: TuiOperatorPanelsReport,
     pub diagnostics: Vec<String>,
     pub active_panel: Panel,
     pub last_error: Option<String>,
@@ -831,6 +855,15 @@ impl WorkbenchState {
             )
         };
 
+        let mut operator = capsule_operator_report(
+            &path,
+            subagents.as_ref(),
+            pr_agent_state.as_ref(),
+            pr_readiness.as_ref(),
+            &pr_agent_actions,
+        );
+        operator.diagnostics.extend(diagnostics.clone());
+
         Ok(Self {
             capsule_path: path,
             validation,
@@ -842,6 +875,7 @@ impl WorkbenchState {
             pr_agent_state,
             pr_readiness,
             pr_agent_actions,
+            operator,
             diagnostics,
             active_panel: Panel::Overview,
             last_error: None,
@@ -887,6 +921,14 @@ impl WorkbenchState {
         self.pr_agent_state = None;
         self.pr_readiness = None;
         self.pr_agent_actions.clear();
+        self.operator = TuiOperatorPanelsReport {
+            schema: TUI_OPERATOR_PANELS_SCHEMA.to_string(),
+            skill_inventory: None,
+            task_index: None,
+            orchestration: Vec::new(),
+            next_actions: Vec::new(),
+            diagnostics: vec![message.clone()],
+        };
         self.diagnostics = vec![message.clone()];
         self.last_error = Some(message);
     }
@@ -1089,6 +1131,329 @@ fn load_pr_agent_actions(path: &Path) -> (Vec<PrAgentHostedActionReport>, Vec<St
     (reports, diagnostics)
 }
 
+fn dashboard_operator_report(root: &Path) -> TuiOperatorPanelsReport {
+    let mut diagnostics = Vec::new();
+    let repo_root = match dashboard_repo_root(root) {
+        Ok(repo_root) => Some(repo_root),
+        Err(error) => {
+            diagnostics.push(format!("repo root: {error:#}"));
+            None
+        }
+    };
+    let skill_inventory = match repo_root {
+        Some(repo_root) => match skills_inventory(SkillInventoryArgs {
+            repo_root: Some(repo_root),
+            checked_at: Some(Utc::now()),
+        }) {
+            Ok(report) => Some(report),
+            Err(error) => {
+                diagnostics.push(format!("skill inventory: {error:#}"));
+                None
+            }
+        },
+        None => None,
+    };
+    let task_index = match task_index(root) {
+        Ok(report) => Some(report),
+        Err(error) => {
+            diagnostics.push(format!("task index: {error:#}"));
+            None
+        }
+    };
+
+    TuiOperatorPanelsReport {
+        schema: TUI_OPERATOR_PANELS_SCHEMA.to_string(),
+        skill_inventory,
+        task_index,
+        orchestration: Vec::new(),
+        next_actions: Vec::new(),
+        diagnostics,
+    }
+}
+
+fn readiness_next_action_command(
+    readiness: &PrAgentReadinessReport,
+    action: &codex_dev_core::PrAgentReadinessAction,
+) -> Option<String> {
+    let pr = &readiness.attempts.last()?.pr;
+    let repo = pr.repository.as_ref()?;
+    let number = pr.number?;
+    let mut command = vec![
+        "codex-dev".to_string(),
+        "pr".to_string(),
+        "readiness".to_string(),
+        "--capsule".to_string(),
+        "CAPSULE_DIR".to_string(),
+        "--repo".to_string(),
+        repo.clone(),
+        "--number".to_string(),
+        number.to_string(),
+    ];
+    match action.kind.as_str() {
+        "merge" => command.push("--merge".to_string()),
+        "rerun_failed_jobs" => command.push("--rerun-failed".to_string()),
+        _ => return None,
+    }
+    if action.status == PrAgentReadinessActionStatus::Planned {
+        command.push("--apply".to_string());
+    }
+    Some(render_command(&command))
+}
+
+fn hosted_action_next_action_command(report: &PrAgentHostedActionReport) -> Option<String> {
+    let mut command = vec![
+        "codex-dev".to_string(),
+        "pr".to_string(),
+        "agent-action".to_string(),
+        "--capsule".to_string(),
+        "CAPSULE_DIR".to_string(),
+        "--repo".to_string(),
+        report.repository.clone(),
+        "--number".to_string(),
+        report.number.to_string(),
+        "--plan-id".to_string(),
+        report.plan_id.clone(),
+        "--action".to_string(),
+        report.action.kind.clone(),
+    ];
+    match report.action.kind.as_str() {
+        "post-issue-comment" => {
+            command.push("--body-file".to_string());
+            command.push("BODY.md".to_string());
+        }
+        "reply-review-comment" => {
+            command.push("--review-comment-id".to_string());
+            command.push(hosted_action_target_value(
+                &report.action.target,
+                "review-comment:",
+                "COMMENT_ID",
+            ));
+            command.push("--body-file".to_string());
+            command.push("BODY.md".to_string());
+        }
+        "resolve-review-thread" | "unresolve-review-thread" => {
+            command.push("--thread-id".to_string());
+            command.push(hosted_action_target_value(
+                &report.action.target,
+                "review-thread:",
+                "THREAD_ID",
+            ));
+        }
+        "add-labels" | "remove-labels" => {
+            let labels = hosted_action_target_value(&report.action.target, "labels:", "LABEL");
+            for label in labels.split(',').filter(|label| !label.is_empty()) {
+                command.push("--label".to_string());
+                command.push(label.to_string());
+            }
+        }
+        "rerun-failed-jobs" => {
+            command.push("--run-id".to_string());
+            command.push(hosted_action_target_value(
+                &report.action.target,
+                "workflow-run:",
+                "RUN_ID",
+            ));
+        }
+        _ => return None,
+    }
+    if report.action.requires_apply && !report.apply_requested {
+        command.push("--apply".to_string());
+    }
+    Some(render_command(&command))
+}
+
+fn hosted_action_target_value(target: &str, prefix: &str, fallback: &str) -> String {
+    target
+        .strip_prefix(prefix)
+        .filter(|value| !value.is_empty())
+        .or_else(|| (!target.is_empty() && !target.contains(':')).then_some(target))
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn dashboard_repo_root(root: &Path) -> Result<PathBuf> {
+    let absolute_root = if root.is_absolute() {
+        root.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(root)
+    };
+    let existing = nearest_existing_ancestor(&absolute_root).ok_or_else(|| {
+        anyhow::anyhow!("failed to find an existing ancestor for the dashboard task root")
+    })?;
+    let canonical = fs::canonicalize(existing)?;
+    let start = if canonical.is_file() {
+        canonical
+            .parent()
+            .ok_or_else(|| {
+                anyhow::anyhow!("dashboard task root resolved to a file without parent")
+            })?
+            .to_path_buf()
+    } else {
+        canonical
+    };
+    start
+        .ancestors()
+        .find(|path| {
+            path.join("Cargo.toml").is_file() && path.join("docs/runbooks/validation.md").is_file()
+        })
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            anyhow::anyhow!("failed to discover repository root from dashboard task root")
+        })
+}
+
+fn nearest_existing_ancestor(path: &Path) -> Option<&Path> {
+    path.ancestors().find(|ancestor| ancestor.exists())
+}
+
+fn capsule_operator_report(
+    capsule_path: &Path,
+    subagents: Option<&Subagents>,
+    pr_agent_state: Option<&PrAgentStateReport>,
+    pr_readiness: Option<&PrAgentReadinessReport>,
+    pr_agent_actions: &[PrAgentHostedActionReport],
+) -> TuiOperatorPanelsReport {
+    let mut diagnostics = Vec::new();
+    let mut orchestration = Vec::new();
+    if let Some(subagents) = subagents {
+        for batch in &subagents.batches {
+            match orchestration_run(
+                capsule_path,
+                &batch.id,
+                Utc::now(),
+                ORCHESTRATION_STALE_AFTER_MINUTES,
+            ) {
+                Ok(report) => orchestration.push(report),
+                Err(error) => diagnostics.push(format!(
+                    "orchestration batch {}: {}",
+                    batch.id,
+                    redact_path_text(&format!("{error:#}"), capsule_path)
+                )),
+            }
+        }
+    }
+
+    let mut next_actions = Vec::new();
+    if let Some(report) = pr_agent_state {
+        next_actions.extend(report.actions.iter().map(|action| TuiNextActionExport {
+            source: "pr-agent-state".to_string(),
+            id: action.id.clone(),
+            priority: pr_agent_action_priority_label(action.priority).to_string(),
+            summary: action.summary.clone(),
+            command: None,
+        }));
+    }
+    if let Some(readiness) = pr_readiness {
+        next_actions.extend(readiness.actions.iter().map(|action| TuiNextActionExport {
+            source: "pr-readiness".to_string(),
+            id: action.id.clone(),
+            priority: readiness_action_status_label(action.status).to_string(),
+            summary: action.reason.clone(),
+            command: readiness_next_action_command(readiness, action),
+        }));
+    }
+    next_actions.extend(pr_agent_actions.iter().map(|report| {
+        TuiNextActionExport {
+            source: "pr-agent-hosted-action".to_string(),
+            id: report.action.id.clone(),
+            priority: if report.action.requires_apply {
+                "requires-apply"
+            } else {
+                "info"
+            }
+            .to_string(),
+            summary: report.action.summary.clone(),
+            command: hosted_action_next_action_command(report),
+        }
+    }));
+    for report in &orchestration {
+        next_actions.extend(orchestration_next_actions(report));
+    }
+    next_actions.sort_by(|left, right| {
+        left.source
+            .cmp(&right.source)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+
+    TuiOperatorPanelsReport {
+        schema: TUI_OPERATOR_PANELS_SCHEMA.to_string(),
+        skill_inventory: None,
+        task_index: None,
+        orchestration,
+        next_actions,
+        diagnostics,
+    }
+}
+
+fn orchestration_next_actions(report: &OrchestrationRunReport) -> Vec<TuiNextActionExport> {
+    let mut actions = Vec::new();
+    for diagnostic in &report.diagnostics {
+        if diagnostic.severity != OrchestrationDiagnosticSeverity::Error {
+            continue;
+        }
+        let Some(role) = diagnostic.role.as_deref() else {
+            if diagnostic.code == "missing_synthesis" || diagnostic.code == "incomplete_synthesis" {
+                actions.push(TuiNextActionExport {
+                    source: "orchestration".to_string(),
+                    id: format!("{}:{}", report.batch_id, diagnostic.code),
+                    priority: "required".to_string(),
+                    summary: diagnostic.message.clone(),
+                    command: Some(orchestration_close_command(&report.batch_id)),
+                });
+            }
+            continue;
+        };
+        actions.push(TuiNextActionExport {
+            source: "orchestration".to_string(),
+            id: format!("{}:{}:{role}", report.batch_id, diagnostic.code),
+            priority: "required".to_string(),
+            summary: diagnostic.message.clone(),
+            command: Some(orchestration_record_command(&report.batch_id, role)),
+        });
+    }
+    actions
+}
+
+fn orchestration_close_command(batch_id: &str) -> String {
+    render_command(&[
+        "codex-dev".to_string(),
+        "--json".to_string(),
+        "orchestration".to_string(),
+        "close".to_string(),
+        "--capsule".to_string(),
+        "CAPSULE_DIR".to_string(),
+        "--batch-id".to_string(),
+        batch_id.to_string(),
+        "--status".to_string(),
+        "completed".to_string(),
+        "--summary".to_string(),
+        "SUMMARY".to_string(),
+        "--human-verified".to_string(),
+    ])
+}
+
+fn orchestration_record_command(batch_id: &str, role: &str) -> String {
+    render_command(&[
+        "codex-dev".to_string(),
+        "--json".to_string(),
+        "orchestration".to_string(),
+        "record".to_string(),
+        "--capsule".to_string(),
+        "CAPSULE_DIR".to_string(),
+        "--batch-id".to_string(),
+        batch_id.to_string(),
+        "--role".to_string(),
+        role.to_string(),
+        "--status".to_string(),
+        "completed".to_string(),
+        "--summary".to_string(),
+        "SUMMARY".to_string(),
+        "--disposition".to_string(),
+        "accepted".to_string(),
+        "--human-verified".to_string(),
+    ])
+}
+
 /// Restores terminal state exactly once on explicit restore or drop.
 pub struct RestoreGuard<F>
 where
@@ -1287,6 +1652,8 @@ fn dashboard_detail_text(state: &DashboardState) -> String {
         }));
         lines.push(String::new());
     }
+    append_dashboard_operator_panels(&mut lines, state);
+    lines.push(String::new());
 
     let Some(capsule) = state.selected_capsule() else {
         lines.push("No capsule selected.".to_string());
@@ -1323,6 +1690,71 @@ fn dashboard_detail_text(state: &DashboardState) -> String {
         );
     }
     lines.join("\n")
+}
+
+fn append_dashboard_operator_panels(lines: &mut Vec<String>, state: &DashboardState) {
+    lines.push(format!("operator schema: {}", state.operator.schema));
+    if let Some(index) = &state.operator.task_index {
+        lines.push(format!(
+            "task index: {} valid, {} invalid, {} total ({})",
+            index.valid,
+            index.invalid,
+            index.total,
+            task_root_status_label(index.root_status)
+        ));
+    } else {
+        lines.push("task index: not loaded".to_string());
+    }
+
+    if let Some(inventory) = &state.operator.skill_inventory {
+        lines.push(format!(
+            "skill health: {} valid, {} invalid, {} total, diagnostics {}",
+            inventory.valid,
+            inventory.invalid,
+            inventory.total,
+            inventory.diagnostics.len()
+        ));
+        let underbuilt = inventory
+            .skills
+            .iter()
+            .filter(|skill| !skill.underbuilt_signals.is_empty())
+            .count();
+        lines.push(format!("underbuilt signals: {underbuilt} skill(s)"));
+        if let Some(diagnostic) = inventory.diagnostics.first() {
+            lines.push(format!(
+                "first skill diagnostic: {} [{}]",
+                diagnostic.code,
+                skill_inventory_severity_label(diagnostic.severity)
+            ));
+        }
+    } else {
+        lines.push("skill health: not loaded".to_string());
+    }
+    if !state.operator.diagnostics.is_empty() {
+        lines.push("operator diagnostics:".to_string());
+        lines.extend(state.operator.diagnostics.iter().map(|diagnostic| {
+            format!(
+                "- {}",
+                redact_path_text_with_placeholder(diagnostic, &state.root, "<tasks-root>")
+            )
+        }));
+    }
+}
+
+fn task_root_status_label(status: TaskRootStatus) -> &'static str {
+    match status {
+        TaskRootStatus::Ready => "ready",
+        TaskRootStatus::Missing => "missing",
+        TaskRootStatus::Unusable => "unusable",
+    }
+}
+
+fn skill_inventory_severity_label(severity: SkillInventoryDiagnosticSeverity) -> &'static str {
+    match severity {
+        SkillInventoryDiagnosticSeverity::Info => "info",
+        SkillInventoryDiagnosticSeverity::Warning => "warning",
+        SkillInventoryDiagnosticSeverity::Error => "error",
+    }
 }
 
 fn validation_summary(capsule: &DashboardCapsule) -> String {
@@ -1506,6 +1938,9 @@ fn render_active_panel(state: &WorkbenchState) -> Paragraph<'_> {
         Panel::Subagents => Paragraph::new(subagents_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
+        Panel::Orchestration => Paragraph::new(orchestration_text(state))
+            .block(Block::default().title(title).borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
         Panel::Validation => Paragraph::new(validation_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
@@ -1513,6 +1948,9 @@ fn render_active_panel(state: &WorkbenchState) -> Paragraph<'_> {
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         Panel::PrAgent => Paragraph::new(pr_agent_text(state))
+            .block(Block::default().title(title).borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
+        Panel::NextActions => Paragraph::new(next_actions_text(state))
             .block(Block::default().title(title).borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         Panel::Help => Paragraph::new(help_text())
@@ -1566,6 +2004,14 @@ fn overview_items(state: &WorkbenchState) -> Vec<ListItem<'static>> {
         "pr agent: {}",
         pr_agent_status_label(state)
     )));
+    items.push(ListItem::new(format!(
+        "orchestration: {} run(s)",
+        state.operator.orchestration.len()
+    )));
+    items.push(ListItem::new(format!(
+        "next actions: {}",
+        state.operator.next_actions.len()
+    )));
     items
 }
 
@@ -1586,6 +2032,8 @@ fn overview_text(state: &WorkbenchState) -> String {
                         .unwrap_or_else(|| "not loaded".to_string())
                 ),
                 format!("pr agent: {}", pr_agent_status_label(state)),
+                format!("orchestration runs: {}", state.operator.orchestration.len()),
+                format!("next actions: {}", state.operator.next_actions.len()),
                 String::new(),
                 "This workbench reads codex-dev-core capsule JSON contracts and does not own policy logic.".to_string(),
             ];
@@ -1774,6 +2222,86 @@ fn subagents_text(state: &WorkbenchState) -> String {
         }
     }
     append_artifact_diagnostics(&mut lines, state);
+    lines.join("\n")
+}
+
+fn orchestration_text(state: &WorkbenchState) -> String {
+    let mut lines = vec![format!("schema: {}", state.operator.schema)];
+    if state.operator.orchestration.is_empty() {
+        lines.push("no orchestration run reports loaded".to_string());
+        append_operator_diagnostics(&mut lines, &state.operator, &state.capsule_path);
+        return lines.join("\n");
+    }
+
+    for report in state.operator.orchestration.iter().rev().take(5) {
+        lines.push(format!(
+            "- batch {} [{}] complete={} roles {}/{} synthesis={}",
+            report.batch_id,
+            report.status,
+            report.completion.complete,
+            report.completion.human_verified,
+            report.completion.expected,
+            report.completion.synthesis_completed
+        ));
+        if !report.completion.missing.is_empty() {
+            lines.push(format!(
+                "  missing: {}",
+                report.completion.missing.join(", ")
+            ));
+        }
+        if !report.completion.extra.is_empty() {
+            lines.push(format!(
+                "  unexpected: {}",
+                report.completion.extra.join(", ")
+            ));
+        }
+        for agent in report.agents.iter().take(5) {
+            let wait = agent.wait_status.as_deref().unwrap_or("not-recorded");
+            let agent_id = agent.agent_id.as_deref().unwrap_or("missing-id");
+            lines.push(format!(
+                "  - {} [{}; wait={wait}; id={agent_id}; human_verified={}]",
+                agent.role, agent.status, agent.human_verified
+            ));
+        }
+        if report.diagnostics.is_empty() {
+            lines.push("  diagnostics: none".to_string());
+        } else {
+            lines.push("  diagnostics:".to_string());
+            for diagnostic in report.diagnostics.iter().take(6) {
+                lines.push(format!(
+                    "  - {} [{}]: {}",
+                    diagnostic.code,
+                    orchestration_severity_label(diagnostic.severity),
+                    redact_path_text(&diagnostic.message, &state.capsule_path)
+                ));
+            }
+        }
+    }
+    append_operator_diagnostics(&mut lines, &state.operator, &state.capsule_path);
+    lines.join("\n")
+}
+
+fn next_actions_text(state: &WorkbenchState) -> String {
+    let mut lines = vec![format!("schema: {}", state.operator.schema)];
+    if state.operator.next_actions.is_empty() {
+        lines.push("no next actions exported".to_string());
+        append_operator_diagnostics(&mut lines, &state.operator, &state.capsule_path);
+        return lines.join("\n");
+    }
+
+    for action in state.operator.next_actions.iter().take(10) {
+        lines.push(format!(
+            "- {}:{} [{}]: {}",
+            action.source, action.id, action.priority, action.summary
+        ));
+        if let Some(command) = &action.command {
+            lines.push(format!(
+                "  command: {}",
+                redact_path_text(command, &state.capsule_path)
+            ));
+        }
+    }
+    append_operator_diagnostics(&mut lines, &state.operator, &state.capsule_path);
     lines.join("\n")
 }
 
@@ -2194,6 +2722,30 @@ fn append_artifact_diagnostics(lines: &mut Vec<String>, state: &WorkbenchState) 
     );
 }
 
+fn append_operator_diagnostics(
+    lines: &mut Vec<String>,
+    report: &TuiOperatorPanelsReport,
+    capsule_path: &Path,
+) {
+    if report.diagnostics.is_empty() {
+        return;
+    }
+    lines.push("operator diagnostics:".to_string());
+    lines.extend(
+        report
+            .diagnostics
+            .iter()
+            .map(|diagnostic| format!("- {}", redact_path_text(diagnostic, capsule_path))),
+    );
+}
+
+fn orchestration_severity_label(severity: OrchestrationDiagnosticSeverity) -> &'static str {
+    match severity {
+        OrchestrationDiagnosticSeverity::Error => "error",
+        OrchestrationDiagnosticSeverity::Warning => "warning",
+    }
+}
+
 fn render_check(check: &CheckRecord) -> String {
     let conclusion = check.conclusion.as_deref().unwrap_or("unknown");
     format!(
@@ -2421,7 +2973,7 @@ mod tests {
         state.next_panel();
         assert_eq!(state.active_panel, Panel::Subagents);
         state.next_panel();
-        assert_eq!(state.active_panel, Panel::Pr);
+        assert_eq!(state.active_panel, Panel::Orchestration);
         state.previous_panel();
         assert_eq!(state.active_panel, Panel::Subagents);
     }
@@ -2465,7 +3017,7 @@ mod tests {
 
     #[test]
     fn dashboard_discovers_and_renders_capsules() {
-        let temp = tempdir().expect("tempdir");
+        let temp = tempdir_in_repo().expect("tempdir");
         let root = temp.path().join("tasks");
         init_test_capsule(
             &root,
@@ -2487,11 +3039,36 @@ mod tests {
 
         assert!(state.capsule.is_none());
         assert_eq!(state.dashboard.capsules.len(), 2);
+        assert_eq!(state.dashboard.operator.schema, TUI_OPERATOR_PANELS_SCHEMA);
+        assert_eq!(
+            state
+                .dashboard
+                .operator
+                .task_index
+                .as_ref()
+                .expect("task index")
+                .total,
+            2
+        );
+        assert!(state.dashboard.operator.skill_inventory.is_some());
         assert!(screen.contains("codex-dev dashboard"));
+        assert!(screen.contains("skill health:"));
+        assert!(screen.contains("task index:"));
         assert!(screen.contains("Dashboard one"));
         assert!(screen.contains("Dashboard two"));
         assert!(screen.contains("subagents:"));
         assert!(screen.contains("pr:"));
+    }
+
+    #[test]
+    fn dashboard_repo_root_follows_explicit_task_root() {
+        let repo_root = repo_root();
+        let discovered = dashboard_repo_root(&repo_root.join(".codex/tasks")).expect("repo root");
+
+        assert_eq!(
+            discovered,
+            fs::canonicalize(repo_root).expect("canonical repo")
+        );
     }
 
     #[test]
@@ -2520,7 +3097,7 @@ mod tests {
 
         assert!(state.dashboard.capsules.is_empty());
         assert_eq!(state.dashboard.diagnostics.len(), 1);
-        assert!(screen.contains("dashboard root does not exist"));
+        assert!(screen.contains("task root does not exist"));
         assert!(screen.contains("<tasks-root>"));
     }
 
@@ -2694,6 +3271,139 @@ mod tests {
 
         assert!(screen.contains("registry issues: <capsule>/private-plan.json"));
         assert!(!screen.contains("/tmp/tui-fixture/private-plan.json"));
+    }
+
+    #[test]
+    fn orchestration_panel_renders_completion_and_wait_metadata() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::Orchestration;
+
+        let screen = render_to_string(&state, 140, 36).expect("render");
+
+        assert!(screen.contains("tui_operator_panels.v1"));
+        assert!(screen.contains("batch pre-pr-review"));
+        assert!(screen.contains("complete=true"));
+        assert!(screen.contains("runtime_bug_reviewer"));
+        assert!(screen.contains("wait=completed"));
+        assert!(screen.contains("id=agent-runtime-1"));
+    }
+
+    #[test]
+    fn next_actions_panel_exports_commands_without_raw_outputs() {
+        let mut state = fixture_state();
+        state.active_panel = Panel::NextActions;
+
+        let screen = render_to_string(&state, 150, 36).expect("render");
+
+        assert!(screen.contains("pr-readiness:merge"));
+        assert!(screen.contains("orchestration:pre-pr-review:missing_synthesis"));
+        assert!(screen.contains("command: codex-dev pr readiness --capsule CAPSULE_DIR"));
+        assert!(screen.contains("--merge --apply"));
+        assert!(
+            screen.contains("command: codex-dev --json orchestration close --capsule CAPSULE_DIR")
+        );
+        assert!(
+            orchestration_record_command("batch", "reviewer").contains("--disposition accepted")
+        );
+        assert!(!screen.contains("/tmp/tui-fixture"));
+        assert!(!screen.contains("--capsule <capsule>"));
+        assert!(!screen.contains("<summary>"));
+        assert!(!screen.contains("raw hosted stdout"));
+    }
+
+    #[test]
+    fn next_action_generation_avoids_body_bearing_commands() {
+        let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
+        let pr = fixture_pr(checked_at);
+        let mut readiness = fixture_pr_readiness(checked_at, pr);
+        readiness.actions[0].command = vec![
+            "gh".to_string(),
+            "pr".to_string(),
+            "merge".to_string(),
+            "28".to_string(),
+            "--body".to_string(),
+            "PRIVATE_MERGE_BODY".to_string(),
+        ];
+        let mut hosted_action = fixture_pr_agent_action(checked_at);
+        hosted_action.action.command = vec![
+            "gh".to_string(),
+            "api".to_string(),
+            "-f".to_string(),
+            "body=PRIVATE_REVIEW_REPLY".to_string(),
+        ];
+
+        let report = capsule_operator_report(
+            Path::new("/tmp/private-capsule"),
+            None,
+            None,
+            Some(&readiness),
+            &[hosted_action],
+        );
+        let commands = report
+            .next_actions
+            .iter()
+            .filter_map(|action| action.command.as_deref())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(commands.contains("codex-dev pr readiness --capsule CAPSULE_DIR"));
+        assert!(commands.contains("codex-dev pr agent-action --capsule CAPSULE_DIR"));
+        assert!(commands.contains("--thread-id PRRT_example"));
+        assert!(!commands.contains("PRIVATE_MERGE_BODY"));
+        assert!(!commands.contains("PRIVATE_REVIEW_REPLY"));
+        assert!(!commands.contains("/tmp/private-capsule"));
+    }
+
+    #[test]
+    fn hosted_action_next_action_commands_include_required_flags() {
+        let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
+        let base = fixture_pr_agent_action(checked_at);
+        let cases = [
+            (
+                "post-issue-comment",
+                "issue-comment:28",
+                "--body-file BODY.md",
+            ),
+            (
+                "reply-review-comment",
+                "review-comment:123456",
+                "--review-comment-id 123456 --body-file BODY.md",
+            ),
+            (
+                "resolve-review-thread",
+                "review-thread:PRRT_123",
+                "--thread-id PRRT_123",
+            ),
+            (
+                "unresolve-review-thread",
+                "review-thread:PRRT_456",
+                "--thread-id PRRT_456",
+            ),
+            (
+                "add-labels",
+                "labels:ready,reviewed",
+                "--label ready --label reviewed",
+            ),
+            ("remove-labels", "labels:blocked", "--label blocked"),
+            ("rerun-failed-jobs", "workflow-run:98765", "--run-id 98765"),
+        ];
+
+        for (kind, target, expected) in cases {
+            let mut report = fixture_pr_agent_action(checked_at);
+            report.action = base.action.clone();
+            report.action.kind = kind.to_string();
+            report.action.target = target.to_string();
+            let command = hosted_action_next_action_command(&report).expect("command");
+
+            assert!(
+                command.contains(expected),
+                "{kind} command missing expected flags: {command}"
+            );
+            assert!(command.contains("--apply"));
+            assert!(!command.contains("PRIVATE"));
+            assert!(!command.contains('<'));
+            assert!(!command.contains('>'));
+        }
     }
 
     #[test]
@@ -2942,6 +3652,22 @@ mod tests {
         assert_eq!(*calls.borrow(), 1);
     }
 
+    fn repo_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repo root")
+            .to_path_buf()
+    }
+
+    fn tempdir_in_repo() -> std::io::Result<tempfile::TempDir> {
+        let parent = repo_root().join("target/tui-tests");
+        fs::create_dir_all(&parent)?;
+        tempfile::Builder::new()
+            .prefix("codex-dev-tui-")
+            .tempdir_in(parent)
+    }
+
     fn init_test_capsule(
         root: &Path,
         id: &str,
@@ -2999,15 +3725,46 @@ mod tests {
     fn fixture_state() -> WorkbenchState {
         let checked_at = Utc.with_ymd_and_hms(2026, 5, 9, 7, 0, 0).unwrap();
         let pr = fixture_pr(checked_at);
+        let capsule_path = PathBuf::from("/tmp/tui-fixture");
+        let subagents = fixture_subagents(checked_at);
+        let pr_agent_state = fixture_pr_agent_state(checked_at, pr.clone());
+        let pr_readiness = fixture_pr_readiness(checked_at, pr.clone());
+        let pr_agent_actions = vec![fixture_pr_agent_action(checked_at)];
+        let operator = TuiOperatorPanelsReport {
+            schema: TUI_OPERATOR_PANELS_SCHEMA.to_string(),
+            skill_inventory: None,
+            task_index: None,
+            orchestration: vec![fixture_orchestration_run(checked_at)],
+            next_actions: vec![
+                TuiNextActionExport {
+                    source: "pr-readiness".to_string(),
+                    id: "merge".to_string(),
+                    priority: "planned".to_string(),
+                    summary: "Merge after readiness turns green".to_string(),
+                    command: Some(
+                        "codex-dev pr readiness --capsule CAPSULE_DIR --repo BjornMelin/dev-skills --number 28 --merge --apply"
+                            .to_string(),
+                    ),
+                },
+                TuiNextActionExport {
+                    source: "orchestration".to_string(),
+                    id: "pre-pr-review:missing_synthesis".to_string(),
+                    priority: "required".to_string(),
+                    summary: "Record parent synthesis".to_string(),
+                    command: Some(orchestration_close_command("pre-pr-review")),
+                },
+            ],
+            diagnostics: Vec::new(),
+        };
         WorkbenchState {
-            capsule_path: PathBuf::from("/tmp/tui-fixture"),
+            capsule_path: capsule_path.clone(),
             validation: ValidationResult {
-                path: PathBuf::from("/tmp/tui-fixture"),
+                path: capsule_path.clone(),
                 valid: true,
                 errors: Vec::new(),
             },
             capsule: Some(StatusResult {
-                path: PathBuf::from("/tmp/tui-fixture"),
+                path: capsule_path,
                 id: "tui-fixture".to_string(),
                 title: "TUI fixture".to_string(),
                 status: CapsuleStatus::InReview,
@@ -3034,11 +3791,12 @@ mod tests {
                 optional: Vec::new(),
                 last_checked_at: checked_at,
             }),
-            subagents: Some(fixture_subagents(checked_at)),
+            subagents: Some(subagents),
             pr: Some(pr.clone()),
-            pr_agent_state: Some(fixture_pr_agent_state(checked_at, pr.clone())),
-            pr_readiness: Some(fixture_pr_readiness(checked_at, pr)),
-            pr_agent_actions: vec![fixture_pr_agent_action(checked_at)],
+            pr_agent_state: Some(pr_agent_state),
+            pr_readiness: Some(pr_readiness),
+            pr_agent_actions,
+            operator,
             diagnostics: Vec::new(),
             active_panel: Panel::Pr,
             last_error: None,
@@ -3130,6 +3888,9 @@ mod tests {
                     role: "runtime_bug_reviewer".to_string(),
                     task: "Find render and loading regressions".to_string(),
                     status: "completed".to_string(),
+                    agent_id: Some("agent-runtime-1".to_string()),
+                    wait_status: Some("completed".to_string()),
+                    wait_elapsed_ms: Some(250),
                     summary: "No blocking runtime regressions found".to_string(),
                     prompt_id: Some("prompt-runtime".to_string()),
                     prompt_hash: Some("abc123".to_string()),
@@ -3150,6 +3911,48 @@ mod tests {
                 recorded_at: Some(checked_at),
                 updated_at: Some(checked_at),
             }],
+        }
+    }
+
+    fn fixture_orchestration_run(checked_at: chrono::DateTime<Utc>) -> OrchestrationRunReport {
+        OrchestrationRunReport {
+            schema: codex_dev_core::ORCHESTRATION_RUN_SCHEMA.to_string(),
+            capsule: PathBuf::from("/tmp/tui-fixture"),
+            batch_id: "pre-pr-review".to_string(),
+            status: "completed".to_string(),
+            task: Some("Review TUI evidence panels".to_string()),
+            mode: Some("read-only".to_string()),
+            scope: Some("crates/codex-dev-tui/src/lib.rs".to_string()),
+            wait_policy: Some("parent waits".to_string()),
+            rendezvous_required: Some(true),
+            expected_roles: vec!["runtime_bug_reviewer".to_string()],
+            agents: vec![codex_dev_core::OrchestrationAgentReport {
+                role: "runtime_bug_reviewer".to_string(),
+                agent_id: Some("agent-runtime-1".to_string()),
+                status: "completed".to_string(),
+                wait_status: Some("completed".to_string()),
+                wait_elapsed_ms: Some(250),
+                disposition: Some("accepted".to_string()),
+                human_verified: true,
+                source_ids: vec!["subagent:runtime".to_string()],
+                artifacts: vec!["/tmp/tui-fixture/subagents.json".to_string()],
+                updated_at: Some(checked_at),
+            }],
+            completion: codex_dev_core::OrchestrationCompletionReport {
+                expected: 1,
+                recorded: 1,
+                terminal: 1,
+                human_verified: 1,
+                missing: Vec::new(),
+                extra: Vec::new(),
+                synthesis_completed: true,
+                complete: true,
+            },
+            synthesis_status: Some("completed".to_string()),
+            registry_issues: Vec::new(),
+            diagnostics: Vec::new(),
+            checked_at,
+            stale_after_minutes: ORCHESTRATION_STALE_AFTER_MINUTES,
         }
     }
 

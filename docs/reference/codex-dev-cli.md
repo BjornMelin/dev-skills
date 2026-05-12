@@ -186,7 +186,8 @@ cargo run -q -p codex-dev -- --json skills inventory
 ```
 
 The command uses the standard `codex-dev.output.v1` JSON envelope. The skill
-inventory contract lives at `result.schema: "skill_inventory.v1"`. It walks
+inventory contract is owned by `codex-dev-core` and lives at
+`result.schema: "skill_inventory.v1"`. It walks
 immediate non-symlinked `skills/*/SKILL.md` entrypoints, parses bounded shallow
 AgentSkills frontmatter fields, counts optional non-symlinked `references/`,
 `scripts/`, `assets/`, `templates/`, and `agents/` resources with bounded depth

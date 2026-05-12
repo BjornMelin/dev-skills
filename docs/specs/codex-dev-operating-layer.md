@@ -61,7 +61,7 @@ preserve.
 | Task capsule contracts and local read models | `codex-dev-core` | Shared schema and file-helper owner for CLI, TUI, and future PR-agent surfaces. |
 | Policy-gate orchestration and PR/eval/bootstrap evidence appenders | `codex-dev` | CLI/process boundary over `codex-dev-core` contracts. |
 | Local workstation readiness | `codex-dev local doctor/status` | Read-only CLI-owned schema for PATH/tool, GitHub auth class, ignored capsule root, cache root, and policy-profile summaries. |
-| Machine-readable skill inventory | `codex-dev skills inventory` | Read-only CLI-owned schema for skill metadata, bounded resource counts, README/docs exposure heuristics, package-artifact presence, validation status, and underbuilt signals. |
+| Machine-readable skill inventory | `codex-dev-core` / `codex-dev skills inventory` | Read-only core-owned schema for skill metadata, bounded resource counts, README/docs exposure heuristics, package-artifact presence, validation status, and underbuilt signals. The CLI exposes it in the standard JSON envelope. |
 | Skill metadata and package validation | `tools/skill`, skill folders | Owns validation and package writes; inventory reports shallow status but does not replace validators or packagers. |
 | Custom subagent template validation and installs | `subagent-creator` | Reuses validation/install commands. |
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
@@ -99,7 +99,7 @@ GitHub config discovery follows `GH_CONFIG_DIR`, then `XDG_CONFIG_HOME/gh`, then
 
 ## Skill Inventory Contract
 
-`skill_inventory.v1` is the CLI-owned read-only catalog contract for
+`skill_inventory.v1` is the core-owned read-only catalog contract for
 `skills/*/SKILL.md`. It describes the current checkout and is intended for
 automation that needs one stable JSON surface before planning packaging,
 validation, docs, or future UI/TUI work.
@@ -617,18 +617,25 @@ The first operating-layer release was split into issue-backed lanes:
 
 ## Optional TUI Consumer
 
-`codex-dev-tui` is a separate crate that renders a local operator view from the
-existing `codex-dev-core` JSON contracts:
+`codex-dev-tui` is a separate crate that renders a local operator view from
+`codex-dev-core` JSON contracts and read models:
 
 - capsule summary from `capsule.json`;
+- task dashboard data from `task_index.v1`;
+- skill health data from `skill_inventory.v1`;
 - validation snapshot from `verification.json`;
 - hosted PR snapshot from `pr.json`;
+- subagent batch evidence from `subagents.json` through `orchestration_run.v1`;
+- local PR-agent state, readiness, and hosted-action artifacts;
+- composed TUI-only operator diagnostics and next actions through
+  `tui_operator_panels.v1`;
 - validation errors from `codex_dev_core::validate_capsule`.
 
 The TUI owns only UI state, event handling, rendering, and terminal cleanup. It
 does not execute policy gates, mutate PR state, call hosted review tools, or
 scrape Markdown notes. Deterministic `--render-once` output uses Ratatui's
-`TestBackend` for review and CI smoke evidence.
+`TestBackend` for review and CI smoke evidence. The detailed TUI contract lives
+in `docs/reference/codex-dev-tui.md`.
 
 Each implementation PR must link its lane issue and #20, include validation
 evidence, document docs impact, and identify residual risks.

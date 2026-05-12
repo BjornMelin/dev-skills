@@ -95,15 +95,17 @@ operating layer:
   GitHub REST, fetch probes, Firecrawl calls, evidence ledgers, reports,
   closeout bundles, cache, doctor, and evals.
 - `codex-dev-core`: shared contract/read-model crate for task capsules,
-  validation, rendered summaries, orchestration run projections, policy
-  manifest data, and PR evidence snapshots.
+  validation, rendered summaries, skill inventory, task index, orchestration run
+  projections, policy manifest data, and PR evidence snapshots.
 - `codex-dev`: current CLI for local task capsule lifecycle, structured
   evidence appenders, subspawn plan/outcome/synthesis capture, orchestration
   run verification, repo-native policy gates, read-only local workstation
   readiness checks, and PR evidence capture. It depends on `codex-dev-core` and
   keeps Clap parsing plus process execution at the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
-  JSON contracts through `codex-dev-core` without owning policy logic.
+  JSON contracts through `codex-dev-core`, including operator panels for skill
+  health, task index, orchestration runs, PR-agent blockers, and next actions,
+  without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for the full skill catalog,
   skill assets, OpenAI agent metadata, subagent templates, role contracts, and
   planner presets.
