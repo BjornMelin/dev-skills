@@ -105,6 +105,8 @@ cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-smoke:end
 cargo run -q -p codex-dev -- --json policy docs-check
+cargo run -q -p codex-dev -- --json local doctor
+cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
@@ -467,6 +469,8 @@ cargo run -q -p codex-dev -- --json policy manifest --profile release
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-all:end
 cargo run -q -p codex-dev -- --json policy docs-check
+cargo run -q -p codex-dev -- --json local doctor
+cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help

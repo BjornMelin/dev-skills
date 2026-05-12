@@ -24,6 +24,7 @@ Icon?
 !.env.example
 
 # Local Codex artifacts
+.local/
 .codex/agents/
 .codex/agent-backups/
 .codex/tasks/

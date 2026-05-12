@@ -59,6 +59,7 @@ preserve.
 | Research provider routing, source cache, claim ledgers, research evals | `codex-research` | May reference sanitized source IDs or summaries as local evidence; provider calls and raw provider output remain outside `codex-dev`. |
 | Task capsule contracts and local read models | `codex-dev-core` | Shared schema and file-helper owner for CLI, TUI, and future PR-agent surfaces. |
 | Policy-gate orchestration and PR/eval/bootstrap evidence appenders | `codex-dev` | CLI/process boundary over `codex-dev-core` contracts. |
+| Local workstation readiness | `codex-dev local doctor/status` | Read-only CLI-owned schema for PATH/tool, GitHub auth class, ignored capsule root, cache root, and policy-profile summaries. |
 | Skill metadata and package validation | `tools/skill`, skill folders | Runs existing validators and records results. |
 | Custom subagent template validation and installs | `subagent-creator` | Reuses validation/install commands. |
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
@@ -67,6 +68,28 @@ preserve.
 | Hardened personal subagent pack | `subagents/hardened-codex` | Treats as a bootstrap input and smoke target. |
 | Memory and Codex runtime guidance | `codex-sdk` docs/skill | Links proposal docs; does not mutate runtime memory. |
 | Optional terminal UI | `codex-dev-tui` | Reads `codex-dev-core` JSON contracts; never owns policy. |
+
+## Local Doctor Contract
+
+`codex-dev.local-doctor.v1` is the CLI-owned local readiness contract for
+workstation and checkout preflight. It is deliberately outside the task capsule:
+it describes the current machine, not a branch artifact that should be copied
+into a PR. The command family is read-only and has no repair, network, hosted
+write, or policy-execution mode.
+
+`local doctor` and `local status` share one schema. `mode` distinguishes the
+operator intent while allowing automation to use one parser. Required local
+tool failures and a non-ignored capsule root make `ok` false. Globally
+installed `codex-dev`, `codex-dev-tui`, and `codex-research` binaries are
+warnings by default so source validation with `cargo run` remains checkout
+hermetic; `--strict-global-binaries` upgrades those missing binaries to errors
+when validating the global install posture.
+
+The GitHub auth report is categorical only. It may emit source names such as
+`GH_TOKEN`, `GITHUB_TOKEN`, or `gh_config`, but it must not print credential
+values or run `gh auth status` as a network/auth probe. Subprocess probes run
+through resolved executable paths with a sanitized environment and bounded
+stdout capture.
 
 ## Task Capsule Contract
 

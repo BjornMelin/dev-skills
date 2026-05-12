@@ -54,6 +54,7 @@ Top-level commands:
 - `evidence`
 - `subagents`
 - `policy`
+- `local`
 - `pr`
 - `completions`
 - `manpage`
@@ -81,6 +82,11 @@ Policy subcommands:
 - `policy docs-check`
 - `policy run`
 
+Local subcommands:
+
+- `local doctor`
+- `local status`
+
 PR subcommands:
 
 - `pr agent`
@@ -94,6 +100,58 @@ Artifact commands:
 
 - `completions <bash|elvish|fish|powershell|zsh>`
 - `manpage`
+
+## local doctor
+
+Run a read-only local preflight for the development workstation and checkout:
+
+```bash
+cargo run -q -p codex-dev -- --json local doctor
+```
+
+The command uses the standard `codex-dev.output.v1` JSON envelope. The local
+readiness contract lives at `result.schema: "codex-dev.local-doctor.v1"`. The
+command checks local state only: installed `codex-dev`, `codex-dev-tui`, and
+`codex-research` binaries, required tool availability, GitHub authentication
+source class without printing tokens, ignored capsule root status, cache roots,
+and built-in policy profile summaries. It does not run network probes, mutate
+config, repair the environment, or execute policy gates. Subprocess probes run
+with a sanitized environment; JSON output intentionally includes local absolute
+paths for diagnostics and should be treated as workstation evidence, not a
+public artifact.
+
+Fixture-friendly options:
+
+```bash
+cargo run -q -p codex-dev -- --json local doctor \
+  --repo-root /path/to/dev-skills \
+  --checked-at 2026-05-12T05:00:00Z
+```
+
+Missing globally installed `codex-dev` binaries are warnings by default so
+source validation with `cargo run` stays hermetic to the checkout. Use
+`--strict-global-binaries` when validating the global install posture:
+
+```bash
+codex-dev --json local doctor --strict-global-binaries
+```
+
+`github.auth_class` is a category such as `env_token`, `gh_config`,
+`gh_available_no_auth_hint`, or `gh_missing`; full secrets are never printed.
+When required commands or the ignored capsule root are missing, `ok` is false
+and the JSON envelope exits nonzero.
+
+## local status
+
+Print the same contract in compact status mode:
+
+```bash
+cargo run -q -p codex-dev -- --json local status
+```
+
+`local status` uses the same standard JSON envelope and local readiness result
+schema with `result.mode: "status"` so automation can share one parser while
+humans can request a status-oriented readiness summary.
 
 ## completions
 
@@ -680,6 +738,8 @@ cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- --json evidence append --capsule <fixture-capsule> --kind decision --summary "fixture decision"
 cargo run -q -p codex-dev -- --json capsule status <fixture-capsule>
 cargo run -q -p codex-dev -- --json policy docs-check
+cargo run -q -p codex-dev -- --json local doctor
+cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help

@@ -99,8 +99,9 @@ operating layer:
   snapshots.
 - `codex-dev`: current CLI for local task capsule lifecycle, structured
   evidence appenders, subspawn plan/outcome/synthesis capture, repo-native
-  policy gates, and PR evidence capture. It depends on `codex-dev-core` and
-  keeps Clap parsing plus process execution at the CLI boundary.
+  policy gates, read-only local workstation readiness checks, and PR evidence
+  capture. It depends on `codex-dev-core` and keeps Clap parsing plus process
+  execution at the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
   JSON contracts through `codex-dev-core` without owning policy logic.
 - `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
@@ -148,6 +149,8 @@ cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy manifest --profile full_local
 # codex-dev:policy-manifest-smoke:end
 cargo run -q -p codex-dev -- --json policy docs-check
+cargo run -q -p codex-dev -- --json local doctor
+cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help

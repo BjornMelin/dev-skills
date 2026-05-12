@@ -84,6 +84,150 @@ fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String
         .to_string()
 }
 
+#[cfg(unix)]
+fn write_fake_local_tool(bin_dir: &std::path::Path, name: &str) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let script = bin_dir.join(name);
+    let body = if name == "git" {
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+  echo "token env leaked into git probe" >&2
+  exit 7
+fi
+case "$*" in
+  *"check-ignore"*) exit 0 ;;
+  *"--version"*) printf 'git version fixture\n' ;;
+  *) exit 0 ;;
+esac
+"#
+    } else {
+        r#"#!/bin/sh
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+  echo "token env leaked into probe" >&2
+  exit 7
+fi
+if [ "$1" = "--version" ]; then
+  name="${0##*/}"
+  printf '%s fixture\n' "$name"
+fi
+"#
+    };
+    std::fs::write(&script, body).expect("write fake local tool");
+    let mut perms = std::fs::metadata(&script)
+        .expect("fake local tool metadata")
+        .permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&script, perms).expect("fake local tool executable");
+}
+
+#[cfg(unix)]
+fn write_local_doctor_fixture(root: &std::path::Path) -> (std::path::PathBuf, std::path::PathBuf) {
+    let repo = root.join("repo");
+    std::fs::create_dir_all(repo.join("docs/runbooks")).expect("repo docs");
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("repo Cargo.toml");
+    std::fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+        .expect("repo validation");
+    std::fs::write(repo.join(".gitignore"), ".codex/tasks/\n").expect("repo gitignore");
+
+    let bin = root.join("bin");
+    std::fs::create_dir_all(&bin).expect("fake bin");
+    for name in [
+        "codex-dev",
+        "codex-dev-tui",
+        "codex-research",
+        "cargo",
+        "rustc",
+        "git",
+        "gh",
+        "python3",
+        "cargo-deny",
+        "cargo-audit",
+    ] {
+        write_fake_local_tool(&bin, name);
+    }
+    (repo, bin)
+}
+
+#[cfg(unix)]
+#[test]
+fn local_doctor_emits_read_only_json_report() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+    let home = temp.path().join("home");
+    std::fs::create_dir_all(home.join(".config/gh")).expect("gh config dir");
+    std::fs::write(home.join(".config/gh/hosts.yml"), "github.com: {}\n").expect("gh config");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", home)
+        .env("GH_TOKEN", "fixture-secret-token")
+        .args([
+            "--json",
+            "local",
+            "doctor",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local doctor json");
+    assert_eq!(json["command"], "local doctor");
+    assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
+    assert_eq!(json["result"]["mode"], "doctor");
+    assert_eq!(json["result"]["ok"], true);
+    assert_eq!(json["result"]["github"]["auth_class"], "env_token");
+    assert_eq!(json["result"]["github"]["token_sources"][0], "GH_TOKEN");
+    assert!(
+        !String::from_utf8_lossy(&output).contains("fixture-secret-token"),
+        "local doctor output must not include token values"
+    );
+    assert_eq!(json["result"]["capsule_root"]["git_ignored"], true);
+    assert!(
+        json["result"]["policy_profiles"]
+            .as_array()
+            .expect("profiles")
+            .iter()
+            .any(|profile| profile["profile"] == "full_local")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn local_status_uses_same_contract_with_status_mode() {
+    let temp = tempdir().expect("tempdir");
+    let (repo, bin) = write_local_doctor_fixture(temp.path());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", bin)
+        .env("HOME", temp.path().join("home"))
+        .args([
+            "--json",
+            "local",
+            "status",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("local status json");
+    assert_eq!(json["command"], "local status");
+    assert_eq!(json["result"]["schema"], "codex-dev.local-doctor.v1");
+    assert_eq!(json["result"]["mode"], "status");
+}
+
 fn write_pr_agent_source_fixtures(source_dir: &std::path::Path, number: u64) {
     std::fs::create_dir_all(source_dir).expect("source dir");
     std::fs::write(
