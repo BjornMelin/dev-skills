@@ -577,16 +577,24 @@ of scraping Markdown.
 ## Skill And Subagent Eval Lab
 
 `tools/eval/skill_subagent_eval.py` owns offline development eval orchestration
-for skill metadata and subagent contracts. It records a normalized
-`dev-skills.skill-subagent-eval.v1` report with bounded per-check timeouts and
-isolated Python bytecode caches while delegating the actual checks to existing
-owners:
+for the complete skill catalog, local skill assets, OpenAI agent metadata, and
+subagent contracts. It records a normalized `skill_eval_report.v1` report with
+bounded per-check timeouts, portable finding paths, strict/non-strict warning
+handling, and isolated Python bytecode caches while delegating existing checks
+to their owners:
 
 - `tools/skill/quick_validate.py`
 - `skills/subagent-creator/scripts/subagent_creator.py validate`
 - `skills/subspawn/scripts/subspawn_plan.py validate-roles`
 - `skills/subspawn/scripts/subspawn_plan.py plan`
 - `python3 -m compileall`
+
+Native aggregate checks enumerate every `skills/*/SKILL.md`, validate README and
+reference-doc exposure, check tracked skill Markdown local links, parse helper
+scripts, reject tracked generated-cache artifacts, inspect local `.skill`
+bundles, and validate supported `agents/openai.yaml` shapes. Ignored local
+bundle artifacts are warning findings by default and become failures under
+`--strict`.
 
 The eval lab is not a research evaluator. `codex-research eval` remains the
 owner for research routing, privacy, budgets, evidence, report, and closeout

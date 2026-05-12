@@ -104,8 +104,9 @@ operating layer:
   execution at the CLI boundary.
 - `codex-dev-tui`: optional Ratatui workbench that reads `codex-dev` capsule
   JSON contracts through `codex-dev-core` without owning policy logic.
-- `skill_subagent_eval.py`: offline eval lab for skill metadata, subagent
-  templates, role contracts, and planner presets.
+- `skill_subagent_eval.py`: offline eval lab for the full skill catalog,
+  skill assets, OpenAI agent metadata, subagent templates, role contracts, and
+  planner presets.
 - `render_bootstrap_pack.py`: manifest-backed bootstrap packs for seeding new
   repos with agent guidance and validation docs.
 - `subagent-creator`: helper skill and CLI for custom Codex agent templates.

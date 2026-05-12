@@ -78,8 +78,8 @@ directories nested inside the source skill folder and skips symlinks so the
 bundle cannot package itself or out-of-tree targets. `quick_validate.py`
 validates only `SKILL.md` frontmatter;
 custom-agent TOML files are validated by
-`subagent_creator.py validate`, and `agents/openai.yaml` changes need a focused
-manual review until this repo grows a dedicated metadata validator.
+`subagent_creator.py validate`, and `agents/openai.yaml` metadata is validated
+by `python3 tools/eval/skill_subagent_eval.py --json`.
 
 When a fallback template exists for packaging, keep it intentionally small:
 mirror the role contract required by the packaged skill and avoid adding
