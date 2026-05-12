@@ -470,7 +470,7 @@ esac
         .permissions();
     perms.set_mode(0o755);
     std::fs::set_permissions(&git, perms).expect("cache git executable");
-    let xdg_cache_home = repo.join(".local-cache");
+    let xdg_cache_home = std::path::PathBuf::from(".local-cache");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")

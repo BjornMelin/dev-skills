@@ -1370,7 +1370,10 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
         ),
     ];
     if let Some(path) = codex_cache_dir() {
-        cache_roots.push(global_cache_status(&repo_root, path));
+        cache_roots.push(global_cache_status(
+            &repo_root,
+            normalize_local_path(&repo_root, path),
+        ));
     }
 
     let policy_profiles = all_policy_profiles()
@@ -1529,6 +1532,16 @@ fn codex_cache_dir() -> Option<PathBuf> {
     non_empty_env_path("XDG_CACHE_HOME")
         .map(|path| path.join("codex-research"))
         .or_else(|| non_empty_env_path("HOME").map(|path| path.join(".cache/codex-research")))
+}
+
+/// Resolve relative environment-derived paths against the inspected repository.
+fn normalize_local_path(repo_root: &Path, path: PathBuf) -> PathBuf {
+    let path = if path.is_absolute() {
+        path
+    } else {
+        repo_root.join(path)
+    };
+    path.canonicalize().unwrap_or(path)
 }
 
 /// Inspect a repository-local path and its git-ignore state.
