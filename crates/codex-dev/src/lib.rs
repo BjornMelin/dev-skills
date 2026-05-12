@@ -1352,10 +1352,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
             PolicyCommand::Explain(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-                let include_local_paths = args.include_local_paths;
-                let result = policy_explain(args, checked_at).map_err(|error| {
-                    policy_explain_error_without_local_paths(error, include_local_paths)
-                })?;
+                let result = policy_explain(args, checked_at)?;
                 let missing = result.missing_local_prerequisites.len();
                 let human = if missing == 0 {
                     format!(
@@ -2281,6 +2278,15 @@ pub fn policy_docs_check(explicit_repo_root: Option<&Path>) -> Result<PolicyDocs
 }
 
 pub fn policy_explain(
+    args: PolicyExplainArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<PolicyExplainReport> {
+    let include_local_paths = args.include_local_paths;
+    policy_explain_inner(args, checked_at)
+        .map_err(|error| policy_explain_error_without_local_paths(error, include_local_paths))
+}
+
+fn policy_explain_inner(
     args: PolicyExplainArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<PolicyExplainReport> {
@@ -7810,6 +7816,46 @@ mod tests {
         );
         assert!(!relative_path_message.contains("docs<local-path>"));
         assert!(!relative_path_message.contains("/home/example"));
+    }
+
+    #[test]
+    fn policy_explain_redacts_direct_api_errors_by_default() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("missing-policy-docs");
+        fs::create_dir_all(&root).expect("repo root");
+        fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
+
+        let error = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::CodexDev,
+                repo_root: Some(root.clone()),
+                include_local_paths: false,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect_err("missing policy docs should fail");
+        let message = format!("{error:#}");
+        assert!(message.contains("repo root must contain docs/runbooks/validation.md"));
+        assert!(message.contains("<local-path>"));
+        assert!(message.contains("--include-local-paths"));
+        assert!(!message.contains("docs<local-path>"));
+        assert!(!message.contains(&root.display().to_string()));
+
+        let error_with_paths = policy_explain(
+            PolicyExplainArgs {
+                profile: PolicyProfile::CodexDev,
+                repo_root: Some(root.clone()),
+                include_local_paths: true,
+                checked_at: None,
+            },
+            checked_at,
+        )
+        .expect_err("missing policy docs should fail with paths");
+        let message_with_paths = format!("{error_with_paths:#}");
+        assert!(message_with_paths.contains(&root.display().to_string()));
+        assert!(!message_with_paths.contains("--include-local-paths"));
     }
 
     #[test]
