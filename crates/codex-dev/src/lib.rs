@@ -1734,8 +1734,51 @@ fn skill_inventory_entry(
         .and_then(|name| name.to_str())
         .unwrap_or_default()
         .to_string();
-    let skill_text = read_optional_regular_text(skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES)?
-        .ok_or_else(|| anyhow::anyhow!("skill entrypoint is not a regular file"))?;
+    let skill_text = match read_optional_regular_text(skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES) {
+        Ok(Some(text)) => text,
+        Ok(None) => {
+            let message = format!(
+                "skill entrypoint is not a readable regular file: {}",
+                skill_md.display()
+            );
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "skill_entrypoint_read_error".to_string(),
+                skill: Some(directory.clone()),
+                message: message.clone(),
+            });
+            return Ok(skill_inventory_unreadable_entry(
+                repo_root,
+                skill_dir,
+                &directory,
+                readme,
+                docs_index,
+                diagnostics,
+                message,
+            ));
+        }
+        Err(error) => {
+            let message = format!(
+                "failed to read skill entrypoint {}: {error:#}",
+                skill_md.display()
+            );
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Error,
+                code: "skill_entrypoint_read_error".to_string(),
+                skill: Some(directory.clone()),
+                message: message.clone(),
+            });
+            return Ok(skill_inventory_unreadable_entry(
+                repo_root,
+                skill_dir,
+                &directory,
+                readme,
+                docs_index,
+                diagnostics,
+                message,
+            ));
+        }
+    };
     let parsed_frontmatter = parse_skill_frontmatter(&skill_text.text);
     let frontmatter = parsed_frontmatter.as_ref().ok();
     let mut errors = Vec::new();
@@ -1799,6 +1842,58 @@ fn skill_inventory_entry(
         validation,
         underbuilt_signals,
     })
+}
+
+fn skill_inventory_unreadable_entry(
+    repo_root: &Path,
+    skill_dir: &Path,
+    directory: &str,
+    readme: &CatalogInputText,
+    docs_index: &CatalogInputText,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
+    validation_error: String,
+) -> SkillInventoryEntry {
+    let skill_md = skill_dir.join("SKILL.md");
+    let catalog_name = directory;
+    let resources = skill_resource_inventory(repo_root, skill_dir, directory, diagnostics);
+    let exposure = SkillExposure {
+        readme_catalog: skill_catalog_present(&readme.text, catalog_name),
+        docs_index: skill_catalog_present(&docs_index.text, catalog_name)
+            || docs_index.text.contains(&format!("skills/{catalog_name}/")),
+    };
+    let package_path = format!("skills/dist/{catalog_name}.skill");
+    let package = skill_package_status(repo_root, directory, package_path, diagnostics);
+    let validation = SkillValidationStatus {
+        valid: false,
+        errors: vec![validation_error],
+    };
+    let catalog_reliability = CatalogInputReliability {
+        readme: readme.reliable_for_missing_signals,
+        docs_index: docs_index.reliable_for_missing_signals,
+    };
+    let underbuilt_signals = skill_underbuilt_signals(
+        &resources,
+        &exposure,
+        &package,
+        &validation,
+        catalog_reliability,
+    );
+
+    SkillInventoryEntry {
+        directory: directory.to_string(),
+        name: None,
+        description: None,
+        license: None,
+        allowed_tools: Vec::new(),
+        metadata_present: false,
+        path: repo_relative_string(repo_root, skill_dir),
+        skill_md: repo_relative_string(repo_root, &skill_md),
+        resources,
+        exposure,
+        package,
+        validation,
+        underbuilt_signals,
+    }
 }
 
 fn validate_skill_frontmatter(

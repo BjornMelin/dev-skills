@@ -853,6 +853,68 @@ fn skills_inventory_rejects_symlinked_skills_root_without_missing_root_signal() 
 
 #[cfg(unix)]
 #[test]
+fn skills_inventory_reports_unreadable_skill_entrypoint_without_aborting() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let skill_md = repo.join("skills/beta-skill/SKILL.md");
+    std::fs::set_permissions(&skill_md, std::fs::Permissions::from_mode(0o000))
+        .expect("lock skill entrypoint");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    std::fs::set_permissions(&skill_md, std::fs::Permissions::from_mode(0o600))
+        .expect("restore skill entrypoint");
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    assert_eq!(json["command"], "skills inventory");
+    assert_eq!(json["result"]["schema"], "skill_inventory.v1");
+    assert_eq!(json["result"]["invalid"], 1);
+    let beta = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "beta-skill")
+        .expect("beta skill entry");
+    assert_eq!(beta["validation"]["valid"], false);
+    assert!(
+        beta["validation"]["errors"]
+            .as_array()
+            .expect("beta errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .expect("error")
+                .contains("failed to read skill entrypoint"))
+    );
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(
+                |diagnostic| diagnostic["code"] == "skill_entrypoint_read_error"
+                    && diagnostic["skill"] == "beta-skill"
+            )
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn skills_inventory_reports_catalog_read_errors() {
     use std::os::unix::fs::PermissionsExt;
 
