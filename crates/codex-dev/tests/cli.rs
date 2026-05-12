@@ -670,6 +670,55 @@ fn skills_inventory_marks_capped_resource_counts() {
 
 #[cfg(unix)]
 #[test]
+fn skills_inventory_reports_unreadable_resource_counts() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let references = repo.join("skills/beta-skill/references");
+    std::fs::create_dir_all(&references).expect("beta references dir");
+    std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o000))
+        .expect("lock beta references dir");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    std::fs::set_permissions(&references, std::fs::Permissions::from_mode(0o700))
+        .expect("restore beta references dir");
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let beta = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "beta-skill")
+        .expect("beta skill entry");
+    assert_eq!(beta["resources"]["references"]["present"], true);
+    assert_eq!(beta["resources"]["references"]["capped"], true);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "resource_count_failed"
+                && diagnostic["skill"] == "beta-skill")
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn local_doctor_emits_read_only_json_report() {
     let temp = tempdir().expect("tempdir");
     let (repo, bin) = write_local_doctor_fixture(temp.path());
