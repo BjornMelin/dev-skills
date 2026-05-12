@@ -159,6 +159,23 @@ When you finish, report:
 - provider-specific auth path selected
 - the exact command the user should run first with `playwright-interactive`
 
+## UI Audit Contract
+
+When setup or QA evidence needs a structured handoff, use `ui_audit.v1` with
+`target.framework` set to `browser-workbench`.
+
+- Use `findings` for missing or broken verification capabilities, such as no
+  repeatable auth-state path, screenshots/traces written to tracked locations,
+  or unavailable browser tooling that blocks UI validation.
+- Use `observations` for chosen package manager, installed browser, artifact
+  directories, auth provider, and the selected `playwright-interactive` versus
+  `agent-browser` responsibility split.
+- Use `severity: error` only when a missing browser workflow blocks release or
+  verification; use `warning` for setup gaps that are important but not
+  release-blocking.
+- Keep local auth-state paths and repository roots redacted unless the user
+  explicitly asks for machine-local evidence.
+
 ## First-Run Prompt
 
 After setup, suggest a first real task such as:

@@ -56,6 +56,8 @@ out of version control.
 - [AI Stack Scanner](reference/ai-stack-scanner.md): offline `ai_stack_scan.v1`
   scanner for AI SDK, Streamdown, Zod v4, and Supabase TypeScript migration and
   safety signals.
+- [UI Audit Schema](reference/ui-audit-schema.md): shared `ui_audit.v1`
+  contract for Dash, DMC, Streamlit, and browser-workbench audit evidence.
 - [codex-research CLI Reference](reference/codex-research-cli.md): full command guide for
   `codex-research`.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
