@@ -40,6 +40,8 @@ GENERATED_DIR_NAMES = {
 }
 GENERATED_FILE_NAMES = {".DS_Store"}
 GENERATED_SUFFIXES = {".pyc", ".pyo"}
+
+
 @dataclass(frozen=True)
 class SkillRecord:
     """Repository skill directory discovered from `skills/*/SKILL.md`."""
@@ -335,10 +337,12 @@ def run_native_check(check: EvalCheck, root: Path, strict: bool) -> dict[str, An
     error_count = count_findings(findings, "error")
     warning_count = count_findings(findings, "warning")
     status = "passed"
-    if error_count or (strict and warning_count):
+    if error_count and (check.severity == "required" or strict):
         status = "failed"
-    elif warning_count:
+    elif error_count:
         status = "warning"
+    elif warning_count:
+        status = "failed" if strict else "warning"
     return {
         "id": check.id,
         "name": check.name,
