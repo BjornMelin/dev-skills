@@ -3,7 +3,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -39,6 +39,9 @@ const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_EXPLAIN_SCHEMA: &str = "policy_explain.v1";
 const RESEARCH_EVIDENCE_IMPORT_SCHEMA: &str = "research_evidence_import.v1";
 const CODEX_RESEARCH_EVIDENCE_BUNDLE_SCHEMA: &str = "codex-research.evidence-bundle.v1";
+const BOOTSTRAP_STATUS_SCHEMA: &str = "bootstrap_status.v1";
+const BOOTSTRAP_PLAN_SCHEMA: &str = "bootstrap_plan.v1";
+const BOOTSTRAP_PACK_SCHEMA: &str = "dev-skills.bootstrap-pack.v1";
 const RESEARCH_IMPORT_MAX_TEXT_CHARS: usize = 512;
 const RESEARCH_IMPORT_MAX_RESIDUAL_RISK_CHARS: usize = 1000;
 const RESEARCH_IMPORT_MAX_LIST_ITEMS: usize = 20;
@@ -106,6 +109,10 @@ impl Cli {
             Commands::Skills { command } => match command {
                 SkillsCommand::Inventory(_) => "skills inventory",
             },
+            Commands::Bootstrap { command } => match command {
+                BootstrapCommand::Status(_) => "bootstrap status",
+                BootstrapCommand::Plan(_) => "bootstrap plan",
+            },
             Commands::Task { command } => match command {
                 TaskCommand::List(_) => "task list",
                 TaskCommand::Show(_) => "task show",
@@ -167,6 +174,11 @@ enum Commands {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    /// Inspect repo bootstrap packs without rendering files.
+    Bootstrap {
+        #[command(subcommand)]
+        command: BootstrapCommand,
     },
     /// Read local task capsules from a task root.
     Task {
@@ -250,6 +262,14 @@ enum LocalCommand {
 enum SkillsCommand {
     /// Emit a read-only machine-readable inventory of tracked skills.
     Inventory(SkillsInventoryArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum BootstrapCommand {
+    /// Emit read-only bootstrap pack validity and policy-gate status.
+    Status(BootstrapStatusArgs),
+    /// Emit a read-only dry-run render plan for one bootstrap pack.
+    Plan(BootstrapPlanArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -968,6 +988,150 @@ pub struct SkillsInventoryArgs {
     pub checked_at: Option<DateTime<Utc>>,
 }
 
+/// Arguments for the read-only bootstrap pack status report.
+#[derive(Args, Clone, Debug)]
+pub struct BootstrapStatusArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Limit the report to one pack name under bootstrap/packs.
+    #[arg(long, value_name = "PACK")]
+    pub pack: Option<String>,
+    /// Include absolute local paths in JSON; redacted by default.
+    #[arg(long, help = "Report absolute local paths in JSON")]
+    pub include_local_paths: bool,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Arguments for read-only bootstrap pack dry-run planning.
+#[derive(Args, Clone, Debug)]
+pub struct BootstrapPlanArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Pack name under bootstrap/packs.
+    #[arg(long, value_name = "PACK")]
+    pub pack: String,
+    /// Output directory to inspect for would-write or would-overwrite actions.
+    #[arg(long, value_name = "OUTPUT_DIR")]
+    pub out: PathBuf,
+    /// Repository name that would be passed to the Python renderer.
+    #[arg(long, default_value = "new-repo")]
+    pub repo_name: String,
+    /// Primary language that would be passed to the Python renderer.
+    #[arg(long, default_value = "unspecified")]
+    pub primary_language: String,
+    /// Include absolute local output paths in JSON; redacted by default.
+    #[arg(long, help = "Report absolute local output paths in JSON")]
+    pub include_local_paths: bool,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Read-only bootstrap pack validity report.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapStatusReport {
+    pub schema: &'static str,
+    pub checked_at: DateTime<Utc>,
+    pub repo_root: String,
+    pub pack_root: String,
+    pub template_root: String,
+    pub ok: bool,
+    pub total: usize,
+    pub valid: usize,
+    pub invalid: usize,
+    pub diagnostics: Vec<BootstrapDiagnostic>,
+    pub packs: Vec<BootstrapPackStatus>,
+    pub policy_gates: BootstrapPolicyGateSummary,
+}
+
+/// Read-only bootstrap pack render plan report.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapPlanReport {
+    pub schema: &'static str,
+    pub checked_at: DateTime<Utc>,
+    pub repo_root: String,
+    pub pack: BootstrapPackStatus,
+    pub ok: bool,
+    pub dry_run: bool,
+    pub output_root: String,
+    pub repo_name: String,
+    pub primary_language: String,
+    pub target_count: usize,
+    pub action_counts: BTreeMap<String, usize>,
+    pub files: Vec<BootstrapPlannedFile>,
+    pub advisory_host_checks: Vec<String>,
+    pub diagnostics: Vec<BootstrapDiagnostic>,
+}
+
+/// Bootstrap status diagnostic.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapDiagnostic {
+    pub severity: LocalDiagnosticSeverity,
+    pub code: String,
+    pub message: String,
+}
+
+/// One manifest-backed bootstrap pack status.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapPackStatus {
+    pub name: String,
+    pub path: String,
+    pub schema: String,
+    pub description: String,
+    pub valid: bool,
+    pub errors: Vec<String>,
+    pub file_count: usize,
+    pub files: Vec<BootstrapPackFileStatus>,
+    pub composes: BootstrapPackComposesStatus,
+    pub advisory_host_checks: Vec<String>,
+}
+
+/// Bootstrap pack composed resource metadata.
+#[derive(Debug, Default, Serialize, PartialEq, Eq)]
+pub struct BootstrapPackComposesStatus {
+    pub skills: Vec<String>,
+    pub subagent_sources: Vec<String>,
+}
+
+/// One file entry from a bootstrap pack manifest.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapPackFileStatus {
+    pub target: String,
+    pub template: String,
+    pub template_exists: bool,
+}
+
+/// One planned bootstrap dry-run file action.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapPlannedFile {
+    pub target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_path: Option<PathBuf>,
+    pub template: String,
+    pub action: String,
+}
+
+/// Summary of the bootstrap-install policy profile backing the pack workflow.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+pub struct BootstrapPolicyGateSummary {
+    pub profile: PolicyProfile,
+    pub gate_count: usize,
+    pub required_gate_count: usize,
+    pub gate_ids: Vec<String>,
+}
+
 /// Operator intent for a local readiness report.
 #[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -1671,6 +1835,44 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Bootstrap { command } => match command {
+            BootstrapCommand::Status(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = bootstrap_status(args, checked_at)?;
+                let human = format!(
+                    "checked {} bootstrap pack(s): {} valid, {} invalid",
+                    result.total, result.valid, result.invalid
+                );
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "bootstrap status",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            BootstrapCommand::Plan(args) => {
+                let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+                let result = bootstrap_plan(args, checked_at)?;
+                let human = if result.ok {
+                    format!(
+                        "planned {} bootstrap file action(s) for {}",
+                        result.target_count, result.pack.name
+                    )
+                } else {
+                    format!(
+                        "bootstrap plan for {} has {} diagnostic(s)",
+                        result.pack.name,
+                        result.diagnostics.len()
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "bootstrap plan",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+        },
         Commands::Task { command } => match command {
             TaskCommand::List(args) => {
                 let result = task_index(&args.root)?;
@@ -1958,6 +2160,703 @@ pub fn skills_inventory(
         repo_root: args.repo_root,
         checked_at: args.checked_at,
     })
+}
+
+/// Build a read-only machine-readable bootstrap pack status report.
+pub fn bootstrap_status(
+    args: BootstrapStatusArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<BootstrapStatusReport> {
+    let repo_root = resolve_policy_docs_repo_root(args.repo_root.as_deref())?;
+    let pack_root = repo_root.join("bootstrap/packs");
+    let mut diagnostics = Vec::new();
+    let repo_root_display = bootstrap_local_path_display(&repo_root, args.include_local_paths);
+    let pack_paths = bootstrap_pack_paths(
+        &repo_root,
+        &pack_root,
+        args.pack.as_deref(),
+        &mut diagnostics,
+    );
+    let packs = pack_paths
+        .iter()
+        .map(|path| bootstrap_pack_status(&repo_root, path))
+        .collect::<Vec<_>>();
+    let valid = packs.iter().filter(|pack| pack.valid).count();
+    let invalid = packs.len().saturating_sub(valid);
+    let ok = diagnostics
+        .iter()
+        .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error)
+        && invalid == 0;
+
+    Ok(BootstrapStatusReport {
+        schema: BOOTSTRAP_STATUS_SCHEMA,
+        checked_at,
+        repo_root: repo_root_display,
+        pack_root: "bootstrap/packs".to_string(),
+        template_root: "bootstrap/templates".to_string(),
+        ok,
+        total: packs.len(),
+        valid,
+        invalid,
+        diagnostics,
+        packs,
+        policy_gates: bootstrap_policy_gate_summary(),
+    })
+}
+
+/// Build a read-only machine-readable bootstrap pack dry-run plan.
+pub fn bootstrap_plan(
+    args: BootstrapPlanArgs,
+    checked_at: DateTime<Utc>,
+) -> Result<BootstrapPlanReport> {
+    let repo_root = resolve_policy_docs_repo_root(args.repo_root.as_deref())?;
+    let mut status = bootstrap_status(
+        BootstrapStatusArgs {
+            repo_root: Some(repo_root.clone()),
+            pack: Some(args.pack.clone()),
+            include_local_paths: args.include_local_paths,
+            checked_at: Some(checked_at),
+        },
+        checked_at,
+    )?;
+    let pack = status.packs.pop().unwrap_or_else(|| BootstrapPackStatus {
+        name: args.pack.clone(),
+        path: format!("bootstrap/packs/{}.json", args.pack),
+        schema: String::new(),
+        description: String::new(),
+        valid: false,
+        errors: vec![format!("missing bootstrap pack: {}", args.pack)],
+        file_count: 0,
+        files: Vec::new(),
+        composes: BootstrapPackComposesStatus::default(),
+        advisory_host_checks: Vec::new(),
+    });
+    let mut diagnostics = status.diagnostics;
+    diagnostics.extend(pack.errors.iter().map(|error| BootstrapDiagnostic {
+        severity: LocalDiagnosticSeverity::Error,
+        code: "invalid_bootstrap_pack".to_string(),
+        message: error.clone(),
+    }));
+
+    let repo_root_display = bootstrap_local_path_display(&repo_root, args.include_local_paths);
+    let output_root = normalize_output_root(&args.out)?;
+    let output_root_display = if args.include_local_paths {
+        output_root.display().to_string()
+    } else {
+        "<bootstrap-out>".to_string()
+    };
+    let mut action_counts = BTreeMap::new();
+    let mut files = Vec::new();
+
+    if pack.valid {
+        for file in &pack.files {
+            let target = safe_bootstrap_relative_path(&file.target, &pack.path, "files[].target")
+                .map(PathBuf::from)
+                .map_err(anyhow::Error::msg)?;
+            let target_path = match resolve_bootstrap_output_target(&output_root, &target) {
+                Ok(path) => path,
+                Err(error) => {
+                    diagnostics.push(bootstrap_error("output_target_escape", error));
+                    continue;
+                }
+            };
+            let action = if target_path.exists() {
+                "would_overwrite"
+            } else {
+                "would_write"
+            }
+            .to_string();
+            *action_counts.entry(action.clone()).or_insert(0) += 1;
+            files.push(BootstrapPlannedFile {
+                target: file.target.clone(),
+                target_path: args.include_local_paths.then_some(target_path),
+                template: file.template.clone(),
+                action,
+            });
+        }
+    }
+
+    let ok = pack.valid
+        && diagnostics
+            .iter()
+            .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error);
+    let target_count = files.len();
+    let advisory_host_checks = pack.advisory_host_checks.clone();
+
+    Ok(BootstrapPlanReport {
+        schema: BOOTSTRAP_PLAN_SCHEMA,
+        checked_at,
+        repo_root: repo_root_display,
+        pack,
+        ok,
+        dry_run: true,
+        output_root: output_root_display,
+        repo_name: args.repo_name,
+        primary_language: args.primary_language,
+        target_count,
+        action_counts,
+        files,
+        advisory_host_checks,
+        diagnostics,
+    })
+}
+
+fn bootstrap_pack_paths(
+    repo_root: &Path,
+    pack_root: &Path,
+    pack: Option<&str>,
+    diagnostics: &mut Vec<BootstrapDiagnostic>,
+) -> Vec<PathBuf> {
+    if let Err(error) = validate_bootstrap_repo_path(repo_root, "bootstrap/packs", "pack root") {
+        diagnostics.push(bootstrap_error("invalid_bootstrap_pack_root", error));
+        return Vec::new();
+    }
+
+    if let Some(pack) = pack {
+        if safe_bootstrap_relative_path(pack, "bootstrap pack", "--pack").is_err()
+            || pack.contains('/')
+            || pack.contains('\\')
+        {
+            diagnostics.push(bootstrap_error(
+                "unsafe_bootstrap_pack",
+                format!("bootstrap pack name is not safe: {pack}"),
+            ));
+            return Vec::new();
+        }
+        let path = pack_root.join(format!("{pack}.json"));
+        if !path.is_file() {
+            diagnostics.push(bootstrap_error(
+                "missing_bootstrap_pack",
+                format!("bootstrap pack does not exist: {pack}"),
+            ));
+            return Vec::new();
+        }
+        if let Err(error) =
+            validate_bootstrap_existing_path(repo_root, &path, "bootstrap pack manifest")
+        {
+            diagnostics.push(bootstrap_error("invalid_bootstrap_pack_manifest", error));
+            return Vec::new();
+        }
+        return vec![path];
+    }
+
+    if !pack_root.is_dir() {
+        diagnostics.push(bootstrap_error(
+            "missing_bootstrap_pack_root",
+            "bootstrap pack root does not exist: bootstrap/packs".to_string(),
+        ));
+        return Vec::new();
+    }
+
+    let mut paths = Vec::new();
+    match fs::read_dir(pack_root) {
+        Ok(entries) => {
+            for entry in entries {
+                match entry {
+                    Ok(entry) => {
+                        let path = entry.path();
+                        if path.extension().and_then(|value| value.to_str()) == Some("json") {
+                            if let Err(error) = validate_bootstrap_existing_path(
+                                repo_root,
+                                &path,
+                                "bootstrap pack manifest",
+                            ) {
+                                diagnostics.push(bootstrap_error(
+                                    "invalid_bootstrap_pack_manifest",
+                                    error,
+                                ));
+                                continue;
+                            }
+                            paths.push(path);
+                        }
+                    }
+                    Err(error) => diagnostics.push(bootstrap_error(
+                        "bootstrap_pack_entry_read_error",
+                        format!(
+                            "failed to read bootstrap pack entry in {}: {error}",
+                            pack_root.display()
+                        ),
+                    )),
+                }
+            }
+        }
+        Err(error) => diagnostics.push(bootstrap_error(
+            "bootstrap_pack_root_read_error",
+            format!("failed to read bootstrap pack root bootstrap/packs: {error}"),
+        )),
+    }
+    paths.sort();
+    if paths.is_empty() && diagnostics.is_empty() {
+        diagnostics.push(bootstrap_error(
+            "missing_bootstrap_packs",
+            "bootstrap pack root contains no JSON pack manifests".to_string(),
+        ));
+    }
+    paths
+}
+
+fn bootstrap_pack_status(repo_root: &Path, path: &Path) -> BootstrapPackStatus {
+    let relative_path = repo_relative_string(repo_root, path);
+    let fallback_name = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+    if let Err(error) = validate_bootstrap_existing_path(repo_root, path, "bootstrap pack manifest")
+    {
+        return BootstrapPackStatus {
+            name: fallback_name,
+            path: relative_path,
+            schema: String::new(),
+            description: String::new(),
+            valid: false,
+            errors: vec![error],
+            file_count: 0,
+            files: Vec::new(),
+            composes: BootstrapPackComposesStatus::default(),
+            advisory_host_checks: Vec::new(),
+        };
+    }
+    let payload = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) => {
+            return BootstrapPackStatus {
+                name: fallback_name,
+                path: relative_path,
+                schema: String::new(),
+                description: String::new(),
+                valid: false,
+                errors: vec![format!("failed to read pack manifest: {error}")],
+                file_count: 0,
+                files: Vec::new(),
+                composes: BootstrapPackComposesStatus::default(),
+                advisory_host_checks: Vec::new(),
+            };
+        }
+    };
+    let value = match serde_json::from_str::<Value>(&payload) {
+        Ok(value) => value,
+        Err(error) => {
+            return BootstrapPackStatus {
+                name: fallback_name,
+                path: relative_path,
+                schema: String::new(),
+                description: String::new(),
+                valid: false,
+                errors: vec![format!("invalid pack JSON: {error}")],
+                file_count: 0,
+                files: Vec::new(),
+                composes: BootstrapPackComposesStatus::default(),
+                advisory_host_checks: Vec::new(),
+            };
+        }
+    };
+
+    bootstrap_pack_status_from_value(repo_root, path, relative_path, fallback_name, &value)
+}
+
+fn bootstrap_pack_status_from_value(
+    repo_root: &Path,
+    path: &Path,
+    relative_path: String,
+    fallback_name: String,
+    value: &Value,
+) -> BootstrapPackStatus {
+    let mut errors = Vec::new();
+    let schema = value
+        .get("schema")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if schema != BOOTSTRAP_PACK_SCHEMA {
+        errors.push(format!(
+            "{relative_path}: schema must be {BOOTSTRAP_PACK_SCHEMA}"
+        ));
+    }
+    let name = match value.get("name").and_then(Value::as_str) {
+        Some(name) if !name.is_empty() => name.to_string(),
+        _ => {
+            errors.push(format!("{relative_path}: name must be a non-empty string"));
+            fallback_name
+        }
+    };
+    let description = value
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let composes = bootstrap_pack_composes(&relative_path, value, &mut errors);
+    let files = bootstrap_pack_files(repo_root, path, &relative_path, value, &mut errors);
+    let advisory_host_checks = bootstrap_string_array_field(
+        &relative_path,
+        value.get("advisory_host_checks"),
+        "advisory_host_checks",
+        false,
+        &mut errors,
+    );
+
+    BootstrapPackStatus {
+        name,
+        path: relative_path,
+        schema,
+        description,
+        valid: errors.is_empty(),
+        errors,
+        file_count: files.len(),
+        files,
+        composes,
+        advisory_host_checks,
+    }
+}
+
+fn bootstrap_pack_composes(
+    relative_path: &str,
+    value: &Value,
+    errors: &mut Vec<String>,
+) -> BootstrapPackComposesStatus {
+    let Some(composes) = value.get("composes") else {
+        return BootstrapPackComposesStatus::default();
+    };
+    let Some(composes) = composes.as_object() else {
+        errors.push(format!(
+            "{relative_path}: composes must be an object when present"
+        ));
+        return BootstrapPackComposesStatus::default();
+    };
+    BootstrapPackComposesStatus {
+        skills: bootstrap_string_array_field(
+            relative_path,
+            composes.get("skills"),
+            "composes.skills",
+            false,
+            errors,
+        ),
+        subagent_sources: bootstrap_string_array_field(
+            relative_path,
+            composes.get("subagent_sources"),
+            "composes.subagent_sources",
+            false,
+            errors,
+        ),
+    }
+}
+
+fn bootstrap_pack_files(
+    repo_root: &Path,
+    manifest_path: &Path,
+    relative_path: &str,
+    value: &Value,
+    errors: &mut Vec<String>,
+) -> Vec<BootstrapPackFileStatus> {
+    let Some(files) = value.get("files").and_then(Value::as_array) else {
+        errors.push(format!("{relative_path}: files must be a non-empty array"));
+        return Vec::new();
+    };
+    if files.is_empty() {
+        errors.push(format!("{relative_path}: files must be a non-empty array"));
+        return Vec::new();
+    }
+    let mut output = Vec::new();
+    for (index, item) in files.iter().enumerate() {
+        let Some(item) = item.as_object() else {
+            errors.push(format!("{relative_path}: files[{index}] must be an object"));
+            continue;
+        };
+        let target = item.get("target").and_then(Value::as_str);
+        let template = item.get("template").and_then(Value::as_str);
+        let mut entry_valid = true;
+        let Some(target) = target.filter(|target| !target.is_empty()) else {
+            errors.push(format!(
+                "{relative_path}: files[{index}].target must be a string"
+            ));
+            continue;
+        };
+        if let Err(error) = safe_bootstrap_relative_path(target, relative_path, "files[].target") {
+            errors.push(error);
+            entry_valid = false;
+        }
+        let Some(template) = template.filter(|template| !template.is_empty()) else {
+            errors.push(format!(
+                "{relative_path}: files[{index}].template must be a string"
+            ));
+            continue;
+        };
+        let template_exists = match bootstrap_template_exists(repo_root, manifest_path, template) {
+            Ok(exists) => exists,
+            Err(error) => {
+                errors.push(error);
+                entry_valid = false;
+                false
+            }
+        };
+        if !template_exists {
+            errors.push(format!("{relative_path}: missing template {template}"));
+            entry_valid = false;
+        }
+        if entry_valid {
+            output.push(BootstrapPackFileStatus {
+                target: target.to_string(),
+                template: format!("bootstrap/templates/{template}"),
+                template_exists,
+            });
+        }
+    }
+    output
+}
+
+fn bootstrap_string_array_field(
+    relative_path: &str,
+    value: Option<&Value>,
+    label: &str,
+    required: bool,
+    errors: &mut Vec<String>,
+) -> Vec<String> {
+    let Some(value) = value else {
+        if required {
+            errors.push(format!(
+                "{relative_path}: {label} must be a non-empty array"
+            ));
+        }
+        return Vec::new();
+    };
+    let Some(values) = value.as_array() else {
+        errors.push(format!(
+            "{relative_path}: {label} must be a non-empty array"
+        ));
+        return Vec::new();
+    };
+    if required && values.is_empty() {
+        errors.push(format!(
+            "{relative_path}: {label} must be a non-empty array"
+        ));
+    }
+    let mut output = Vec::new();
+    for (index, item) in values.iter().enumerate() {
+        match item.as_str() {
+            Some(item) if !item.is_empty() => output.push(item.to_string()),
+            _ => errors.push(format!(
+                "{relative_path}: {label}[{index}] must be a non-empty string"
+            )),
+        }
+    }
+    output
+}
+
+fn bootstrap_template_exists(
+    repo_root: &Path,
+    manifest_path: &Path,
+    template: &str,
+) -> Result<bool, String> {
+    let relative = safe_bootstrap_relative_path(
+        template,
+        &repo_relative_string(repo_root, manifest_path),
+        "files[].template",
+    )?;
+    validate_bootstrap_repo_path(repo_root, "bootstrap/templates", "template root")?;
+    let template_relative = Path::new("bootstrap/templates").join(&relative);
+    let template_relative = template_relative.to_string_lossy().replace('\\', "/");
+    reject_bootstrap_repo_symlinks(repo_root, &template_relative, "bootstrap template")?;
+    let candidate = repo_root.join(&template_relative);
+    let Ok(metadata) = fs::metadata(&candidate) else {
+        return Ok(false);
+    };
+    if !metadata.is_file() {
+        return Ok(false);
+    }
+    validate_bootstrap_existing_path(repo_root, &candidate, "bootstrap template")?;
+    Ok(true)
+}
+
+fn safe_bootstrap_relative_path(
+    value: &str,
+    source: &str,
+    label: &str,
+) -> std::result::Result<String, String> {
+    let normalized = value.replace('\\', "/");
+    let has_windows_drive = value.as_bytes().get(1) == Some(&b':')
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphabetic);
+    if value.is_empty()
+        || Path::new(value).is_absolute()
+        || normalized.starts_with('/')
+        || normalized.starts_with("//")
+        || has_windows_drive
+        || normalized.split('/').any(|part| part == "..")
+    {
+        return Err(format!("unsafe relative path in {source} {label}: {value}"));
+    }
+    Ok(value.to_string())
+}
+
+fn normalize_output_root(path: &Path) -> Result<PathBuf> {
+    let expanded = expand_home_path(path)?;
+    let output = if expanded.is_absolute() {
+        expanded
+    } else {
+        env::current_dir()
+            .context("failed to read current directory")?
+            .join(expanded)
+    };
+    resolve_path_allow_missing(&output)
+}
+
+fn expand_home_path(path: &Path) -> Result<PathBuf> {
+    let raw = path.to_string_lossy();
+    if raw == "~" {
+        return Ok(PathBuf::from(home_dir()?));
+    }
+    if let Some(rest) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\")) {
+        return Ok(PathBuf::from(home_dir()?).join(rest));
+    }
+    Ok(path.to_path_buf())
+}
+
+fn home_dir() -> Result<OsString> {
+    env::var_os("HOME").ok_or_else(|| anyhow::anyhow!("HOME is required to expand ~ paths"))
+}
+
+fn resolve_bootstrap_output_target(
+    output_root: &Path,
+    target: &Path,
+) -> std::result::Result<PathBuf, String> {
+    let candidate = output_root.join(target);
+    let resolved = resolve_path_allow_missing(&candidate)
+        .map_err(|error| format!("failed to resolve bootstrap output target: {error}"))?;
+    if path_within(&resolved, output_root) {
+        Ok(resolved)
+    } else {
+        Err(format!(
+            "bootstrap output target escapes output root: {}",
+            target.display()
+        ))
+    }
+}
+
+fn resolve_path_allow_missing(path: &Path) -> Result<PathBuf> {
+    if path.exists() {
+        return fs::canonicalize(path)
+            .with_context(|| format!("failed to resolve path {}", path.display()));
+    }
+
+    let mut existing = path.to_path_buf();
+    let mut missing = Vec::new();
+    while !existing.exists() {
+        let Some(name) = existing.file_name().map(OsString::from) else {
+            break;
+        };
+        missing.push(name);
+        if !existing.pop() {
+            break;
+        }
+    }
+    let mut resolved = fs::canonicalize(&existing)
+        .with_context(|| format!("failed to resolve path prefix {}", existing.display()))?;
+    for name in missing.iter().rev() {
+        resolved.push(name);
+    }
+    Ok(resolved)
+}
+
+fn validate_bootstrap_repo_path(
+    repo_root: &Path,
+    relative: &str,
+    label: &str,
+) -> std::result::Result<(), String> {
+    reject_bootstrap_repo_symlinks(repo_root, relative, label)?;
+    let path = repo_root.join(relative);
+    validate_bootstrap_existing_path(repo_root, &path, label)
+}
+
+fn validate_bootstrap_existing_path(
+    repo_root: &Path,
+    path: &Path,
+    label: &str,
+) -> std::result::Result<(), String> {
+    let relative = repo_relative_string(repo_root, path);
+    reject_bootstrap_repo_symlinks(repo_root, &relative, label)?;
+    let canonical_repo = fs::canonicalize(repo_root)
+        .map_err(|error| format!("failed to inspect repo root: {error}"))?;
+    let resolved = fs::canonicalize(path)
+        .map_err(|error| format!("failed to inspect {label} {relative}: {error}"))?;
+    if path_within(&resolved, &canonical_repo) {
+        Ok(())
+    } else {
+        Err(format!("{label} escapes repository root: {relative}"))
+    }
+}
+
+fn reject_bootstrap_repo_symlinks(
+    repo_root: &Path,
+    relative: &str,
+    label: &str,
+) -> std::result::Result<(), String> {
+    let relative = safe_bootstrap_relative_path(relative, "bootstrap path", label)?;
+    let mut current = repo_root.to_path_buf();
+    for component in Path::new(&relative).components() {
+        match component {
+            Component::Normal(part) => current.push(part),
+            _ => {
+                return Err(format!(
+                    "unsafe relative path in bootstrap path {label}: {relative}"
+                ));
+            }
+        }
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(format!(
+                    "{label} contains symlink: {}",
+                    repo_relative_string(repo_root, &current)
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(format!(
+                    "failed to inspect {label} {}: {error}",
+                    repo_relative_string(repo_root, &current)
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn path_within(path: &Path, root: &Path) -> bool {
+    path == root || path.starts_with(root)
+}
+
+fn bootstrap_local_path_display(path: &Path, include_local_paths: bool) -> String {
+    if include_local_paths {
+        path.display().to_string()
+    } else {
+        "<repo-root>".to_string()
+    }
+}
+
+fn repo_relative_string(repo_root: &Path, path: &Path) -> String {
+    path.strip_prefix(repo_root)
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| path.display().to_string())
+}
+
+fn bootstrap_error(code: &str, message: String) -> BootstrapDiagnostic {
+    BootstrapDiagnostic {
+        severity: LocalDiagnosticSeverity::Error,
+        code: code.to_string(),
+        message,
+    }
+}
+
+fn bootstrap_policy_gate_summary() -> BootstrapPolicyGateSummary {
+    let gates = built_in_gates(PolicyProfile::BootstrapInstall);
+    BootstrapPolicyGateSummary {
+        profile: PolicyProfile::BootstrapInstall,
+        gate_count: gates.len(),
+        required_gate_count: gates.iter().filter(|gate| gate.required).count(),
+        gate_ids: gates.into_iter().map(|gate| gate.id).collect(),
+    }
 }
 
 fn render_evidence_counts(by_kind: &[EvidenceKindSummary]) -> String {
@@ -7232,6 +8131,7 @@ fn skills_gates() -> Vec<PolicyGate> {
 
 fn bootstrap_install_gates() -> Vec<PolicyGate> {
     vec![
+        bootstrap_status_gate(),
         bootstrap_pack_validate_gate(),
         policy_gate(
             "bootstrap-pack-render-smoke",
@@ -7405,6 +8305,27 @@ fn bootstrap_pack_validate_gate() -> PolicyGate {
         "docs/runbooks/validation.md#bootstrap-packs",
         ["python3"],
         "Failure means bootstrap pack manifests or templates are invalid.",
+    )
+}
+
+fn bootstrap_status_gate() -> PolicyGate {
+    policy_gate(
+        "codex-dev-bootstrap-status",
+        "codex-dev bootstrap status smoke",
+        [
+            "cargo",
+            "run",
+            "-q",
+            "-p",
+            "codex-dev",
+            "--",
+            "--json",
+            "bootstrap",
+            "status",
+        ],
+        "docs/runbooks/validation.md#bootstrap-packs",
+        ["cargo"],
+        "Failure means codex-dev cannot emit the read-only bootstrap_status.v1 contract.",
     )
 }
 
@@ -8944,6 +9865,7 @@ mod tests {
         assert_profile_ids(
             PolicyProfile::BootstrapInstall,
             &[
+                "codex-dev-bootstrap-status",
                 "bootstrap-pack-validate",
                 "bootstrap-pack-render-smoke",
                 "hardened-codex-release-manifest",
@@ -9055,6 +9977,7 @@ mod tests {
                 "cargo-install-codex-research-smoke",
                 "cargo-install-codex-dev-smoke",
                 "cargo-install-codex-dev-tui-smoke",
+                "codex-dev-bootstrap-status",
                 "bootstrap-pack-validate",
                 "bootstrap-pack-render-smoke",
                 "hardened-codex-release-manifest",

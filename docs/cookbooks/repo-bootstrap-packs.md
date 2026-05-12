@@ -15,6 +15,7 @@ python3 tools/bootstrap/render_bootstrap_pack.py --list
 Validate manifests and referenced templates:
 
 ```bash
+cargo run -q -p codex-dev -- --json bootstrap status
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 ```
 
@@ -36,6 +37,11 @@ project:
 
 ```bash
 tmp=$(mktemp -d)
+cargo run -q -p codex-dev -- --json bootstrap plan \
+  --pack codex-agent-repo \
+  --out "$tmp/repo" \
+  --repo-name example-service \
+  --primary-language rust
 python3 tools/bootstrap/render_bootstrap_pack.py \
   --pack codex-agent-repo \
   --out "$tmp/repo" \
@@ -81,6 +87,9 @@ Run these checks after changing bootstrap packs, hardened agents, or install
 docs:
 
 ```bash
+cargo run -q -p codex-dev -- --json bootstrap status
+tmp_plan=$(mktemp -d)
+cargo run -q -p codex-dev -- --json bootstrap plan --pack codex-agent-repo --out "$tmp_plan/codex" --repo-name codex-smoke --primary-language rust
 python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z

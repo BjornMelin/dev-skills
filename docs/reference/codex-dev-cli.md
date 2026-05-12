@@ -11,7 +11,7 @@ Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
 parsing, command output, and policy subprocess execution.
 
-Tracking: #20, #22, #23, #25, #42, #43, #44, #55, #80, and #82.
+Tracking: #20, #22, #23, #25, #42, #43, #44, #55, #80, #82, and #89.
 
 ## Installation
 
@@ -58,6 +58,7 @@ Top-level commands:
 - `policy`
 - `local`
 - `skills`
+- `bootstrap`
 - `task`
 - `pr`
 - `completions`
@@ -106,6 +107,11 @@ Local subcommands:
 Skills subcommands:
 
 - `skills inventory`
+
+Bootstrap subcommands:
+
+- `bootstrap status`
+- `bootstrap plan`
 
 Task subcommands:
 
@@ -256,6 +262,54 @@ frontmatter checks used by `tools/skill/quick_validate.py`: required string
 the directory, and non-empty descriptions without angle brackets. The Python
 validator and packager remain the authorities for full spec validation and
 `.skill` archive creation; this command owns the read-only inventory report.
+
+## bootstrap status
+
+Emit a read-only machine-readable report for tracked repo bootstrap packs:
+
+```bash
+cargo run -q -p codex-dev -- --json bootstrap status
+```
+
+The command uses the standard `codex-dev.output.v1` JSON envelope with
+`result.schema: "bootstrap_status.v1"`. It inspects `bootstrap/packs/*.json`,
+checks the expected `dev-skills.bootstrap-pack.v1` schema, validates safe
+relative targets and templates under `bootstrap/templates`, reports composed
+skills and subagent source metadata, and includes the current
+`bootstrap_install` policy gate IDs. It does not render files, install
+subagents, run advisory host checks, or mutate any local state.
+Local repository paths are redacted by default as `"<repo-root>"`; pass
+`--include-local-paths` only for private workstation diagnostics.
+
+Fixture-friendly options:
+
+```bash
+cargo run -q -p codex-dev -- --json bootstrap status \
+  --repo-root /path/to/dev-skills \
+  --checked-at 2026-05-12T09:00:00Z
+cargo run -q -p codex-dev -- --json bootstrap status --pack codex-agent-repo
+```
+
+## bootstrap plan
+
+Emit a read-only dry-run action plan for one bootstrap pack:
+
+```bash
+cargo run -q -p codex-dev -- --json bootstrap plan \
+  --pack codex-agent-repo \
+  --out "$tmp/codex" \
+  --repo-name codex-smoke \
+  --primary-language rust
+```
+
+The command uses `result.schema: "bootstrap_plan.v1"`. It reuses the status
+validation path, then classifies each pack target as `would_write` or
+`would_overwrite` against the requested output directory. Local absolute output
+paths are redacted by default as `"<bootstrap-out>"`; pass
+`--include-local-paths` only for private workstation diagnostics. The same flag
+also includes the local repository root. The Python renderer remains the writer
+of rendered files and owns `--force`, template substitution, and final output
+bytes.
 
 ## task list
 
