@@ -213,6 +213,11 @@ Compact shape:
           "readme_catalog": true,
           "docs_index": true
         },
+        "package": {
+          "path": "skills/dist/subspawn.skill",
+          "present": true,
+          "rejected": false
+        },
         "validation": {
           "valid": true,
           "errors": []

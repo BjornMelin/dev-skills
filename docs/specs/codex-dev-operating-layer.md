@@ -113,7 +113,8 @@ present), repo-relative source paths, non-symlinked resource file counts for
 `docs/index.md` mention/link exposure heuristics from regular non-symlinked
 files, local `skills/dist/<skill>.skill` presence using the frontmatter name
 only when it is valid and directory-matching and otherwise falling back to the
-directory name, shallow frontmatter validation, and non-blocking underbuilt
+directory name, rejected package-path status for symlinked or non-regular
+bundle paths, shallow frontmatter validation, and non-blocking underbuilt
 signals.
 
 Resource counts carry `capped: true` when the inventory hit its defensive

@@ -917,6 +917,8 @@ pub struct SkillPackageStatus {
     pub path: String,
     /// Whether `skills/dist/<skill>.skill` exists.
     pub present: bool,
+    /// Whether a bundle path existed but was rejected as unsafe or unreadable.
+    pub rejected: bool,
 }
 
 /// Shallow skill metadata validation status.
@@ -1763,10 +1765,7 @@ fn skill_inventory_entry(
             || docs_index.text.contains(&format!("skills/{catalog_name}/")),
     };
     let package_path = format!("skills/dist/{catalog_name}.skill");
-    let package = SkillPackageStatus {
-        present: regular_file_exists(&repo_root.join(&package_path)),
-        path: package_path,
-    };
+    let package = skill_package_status(repo_root, &directory, package_path, diagnostics);
     let validation = SkillValidationStatus {
         valid: errors.is_empty(),
         errors,
@@ -1985,6 +1984,66 @@ fn count_regular_files(path: &Path) -> Result<(usize, bool)> {
     count_regular_files_bounded(path, 0, &mut remaining)
 }
 
+fn skill_package_status(
+    repo_root: &Path,
+    directory: &str,
+    package_path: String,
+    diagnostics: &mut Vec<SkillInventoryDiagnostic>,
+) -> SkillPackageStatus {
+    let path = repo_root.join(&package_path);
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => SkillPackageStatus {
+            path: package_path,
+            present: false,
+            rejected: false,
+        },
+        Err(error) => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "package_path_stat_error".to_string(),
+                skill: Some(directory.to_string()),
+                message: format!("failed to inspect package path {}: {error}", path.display()),
+            });
+            SkillPackageStatus {
+                path: package_path,
+                present: false,
+                rejected: true,
+            }
+        }
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "package_path_symlink".to_string(),
+                skill: Some(directory.to_string()),
+                message: format!("skipping symlinked package path: {}", path.display()),
+            });
+            SkillPackageStatus {
+                path: package_path,
+                present: false,
+                rejected: true,
+            }
+        }
+        Ok(metadata) if !metadata.is_file() => {
+            diagnostics.push(SkillInventoryDiagnostic {
+                severity: LocalDiagnosticSeverity::Warning,
+                code: "package_path_not_regular".to_string(),
+                skill: Some(directory.to_string()),
+                message: format!("skipping non-regular package path: {}", path.display()),
+            });
+            SkillPackageStatus {
+                path: package_path,
+                present: false,
+                rejected: true,
+            }
+        }
+        Ok(_) => SkillPackageStatus {
+            path: package_path,
+            present: true,
+            rejected: false,
+        },
+    }
+}
+
 fn count_regular_files_bounded(
     path: &Path,
     depth: usize,
@@ -2022,12 +2081,6 @@ fn count_regular_files_bounded(
     Ok((count, capped))
 }
 
-fn regular_file_exists(path: &Path) -> bool {
-    fs::symlink_metadata(path)
-        .map(|metadata| metadata.is_file() && !metadata.file_type().is_symlink())
-        .unwrap_or(false)
-}
-
 fn safe_inventory_skill_name<'a>(name: Option<&'a str>, directory: &'a str) -> &'a str {
     match name {
         Some(name) if name == directory && is_valid_skill_name(name) => name,
@@ -2058,7 +2111,7 @@ fn skill_underbuilt_signals(
     if catalogs.docs_index && !exposure.docs_index {
         signals.push("missing_docs_index_exposure".to_string());
     }
-    if !package.present {
+    if !package.present && !package.rejected {
         signals.push("missing_dist_package".to_string());
     }
     if !resources.references.present {
@@ -2152,6 +2205,7 @@ fn frontmatter_base_indent(lines: &[&str]) -> usize {
 }
 
 fn extract_frontmatter(content: &str) -> std::result::Result<&str, String> {
+    let content = content.strip_prefix('\u{feff}').unwrap_or(content);
     let content = content
         .strip_prefix("---\r\n")
         .or_else(|| content.strip_prefix("---\n"))

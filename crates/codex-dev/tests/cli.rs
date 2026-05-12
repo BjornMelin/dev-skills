@@ -254,6 +254,7 @@ fn skills_inventory_emits_stable_json_report() {
     assert_eq!(skills[0]["exposure"]["readme_catalog"], true);
     assert_eq!(skills[0]["exposure"]["docs_index"], true);
     assert_eq!(skills[0]["package"]["present"], true);
+    assert_eq!(skills[0]["package"]["rejected"], false);
     assert_eq!(skills[0]["metadata_present"], true);
     assert!(
         skills[0]["allowed_tools"]
@@ -264,6 +265,7 @@ fn skills_inventory_emits_stable_json_report() {
     );
     assert_eq!(skills[1]["name"], "beta-skill");
     assert_eq!(skills[1]["package"]["present"], false);
+    assert_eq!(skills[1]["package"]["rejected"], false);
     assert!(
         skills[1]["underbuilt_signals"]
             .as_array()
@@ -434,6 +436,7 @@ description: 2026-05-12
         "skills/dist/traversal-skill.skill"
     );
     assert_eq!(traversal_skill["package"]["present"], false);
+    assert_eq!(traversal_skill["package"]["rejected"], false);
     let boolean_alias_skill = json["result"]["skills"]
         .as_array()
         .expect("skills")
@@ -583,6 +586,45 @@ fn skills_inventory_accepts_crlf_frontmatter_fences() {
 }
 
 #[test]
+fn skills_inventory_accepts_bom_prefixed_frontmatter_fences() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let bom = repo.join("skills/bom-skill");
+    std::fs::create_dir_all(&bom).expect("bom skill dir");
+    std::fs::write(
+        bom.join("SKILL.md"),
+        "\u{feff}---\nname: bom-skill\ndescription: BOM skill description.\n---\n\n# BOM\n",
+    )
+    .expect("bom skill");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let bom_skill = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "bom-skill")
+        .expect("bom skill entry");
+    assert_eq!(bom_skill["name"], "bom-skill");
+    assert_eq!(bom_skill["validation"]["valid"], true);
+}
+
+#[test]
 fn skills_inventory_accepts_indented_frontmatter_keys() {
     let temp = tempdir().expect("tempdir");
     let repo = write_skill_inventory_repo(temp.path());
@@ -662,6 +704,9 @@ description: Linked skill.
     std::fs::write(&external_readme, "`alpha-skill`").expect("external readme");
     std::fs::remove_file(repo.join("README.md")).expect("remove readme");
     symlink(&external_readme, repo.join("README.md")).expect("readme symlink");
+    let external_package = temp.path().join("external-package.skill");
+    std::fs::write(&external_package, "outside package").expect("external package");
+    symlink(&external_package, repo.join("skills/dist/beta-skill.skill")).expect("package symlink");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")
@@ -705,6 +750,21 @@ description: Linked skill.
             .iter()
             .any(|signal| signal.as_str() == Some("missing_readme_catalog"))
     );
+    let beta = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "beta-skill")
+        .expect("beta skill entry");
+    assert_eq!(beta["package"]["present"], false);
+    assert_eq!(beta["package"]["rejected"], true);
+    assert!(
+        !beta["underbuilt_signals"]
+            .as_array()
+            .expect("beta signals")
+            .iter()
+            .any(|signal| signal.as_str() == Some("missing_dist_package"))
+    );
     assert!(
         json["result"]["diagnostics"]
             .as_array()
@@ -729,6 +789,14 @@ description: Linked skill.
                 |diagnostic| diagnostic["code"] == "resource_directory_symlink"
                     && diagnostic["skill"] == "alpha-skill"
             )
+    );
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "package_path_symlink"
+                && diagnostic["skill"] == "beta-skill")
     );
 }
 
