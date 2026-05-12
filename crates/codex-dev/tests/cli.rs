@@ -449,13 +449,14 @@ fn local_doctor_reports_unignored_cache_roots() {
     std::fs::write(
         &git,
         r#"#!/bin/sh
-if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ]; then
+if [ -n "$GH_TOKEN" ] || [ -n "$GITHUB_TOKEN" ] || [ -n "$GH_ENTERPRISE_TOKEN" ] || [ -n "$GITHUB_ENTERPRISE_TOKEN" ]; then
   echo "token env leaked into git probe" >&2
   exit 7
 fi
 case "$*" in
   *".codex/tasks/probe"*) exit 0 ;;
   *".codex/research/probe"*) exit 1 ;;
+  *".local-cache/codex-research/probe"*) exit 1 ;;
   *"target/codex-dev-install-smoke/probe"*) exit 0 ;;
   *"check-ignore"*) exit 0 ;;
   *"--version"*) printf 'git version fixture\n' ;;
@@ -469,11 +470,13 @@ esac
         .permissions();
     perms.set_mode(0o755);
     std::fs::set_permissions(&git, perms).expect("cache git executable");
+    let xdg_cache_home = repo.join(".local-cache");
 
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .env("PATH", bin)
         .env("HOME", temp.path().join("home"))
+        .env("XDG_CACHE_HOME", &xdg_cache_home)
         .args([
             "--json",
             "local",
@@ -497,6 +500,11 @@ esac
             .iter()
             .any(|diagnostic| diagnostic["code"] == "research_cache_not_ignored")
     );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic["code"] == "global_codex_cache_not_ignored")
+    );
 }
 
 #[cfg(unix)]
@@ -517,6 +525,10 @@ fn local_doctor_honors_gh_config_dir_and_xdg_cache_home() {
         .env("GH_CONFIG_DIR", &gh_config)
         .env("XDG_CACHE_HOME", &xdg_cache_home)
         .env_remove("HOME")
+        .env_remove("GH_TOKEN")
+        .env_remove("GITHUB_TOKEN")
+        .env_remove("GH_ENTERPRISE_TOKEN")
+        .env_remove("GITHUB_ENTERPRISE_TOKEN")
         .args([
             "--json",
             "local",

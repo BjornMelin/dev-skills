@@ -1369,13 +1369,8 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
             "target/codex-dev-install-smoke",
         ),
     ];
-    if let Some(global_cache) = codex_cache_dir() {
-        cache_roots.push(LocalPathStatus {
-            name: "global_codex_cache".to_string(),
-            exists: global_cache.exists(),
-            path: global_cache,
-            git_ignored: None,
-        });
+    if let Some(path) = codex_cache_dir() {
+        cache_roots.push(global_cache_status(&repo_root, path));
     }
 
     let policy_profiles = all_policy_profiles()
@@ -1392,7 +1387,14 @@ pub fn local_doctor(args: LocalDoctorArgs, mode: LocalReportMode) -> Result<Loca
         })
         .collect::<Vec<_>>();
 
-    let diagnostics = local_diagnostics(&binaries, &tools, &github, &capsule_root, &cache_roots);
+    let diagnostics = local_diagnostics(
+        &binaries,
+        &tools,
+        &github,
+        &capsule_root,
+        &repo_root,
+        &cache_roots,
+    );
     let ok = diagnostics
         .iter()
         .all(|diagnostic| diagnostic.severity != LocalDiagnosticSeverity::Error);
@@ -1465,7 +1467,7 @@ fn local_github_status() -> LocalGithubStatus {
     let gh_path = find_executable_on_path("gh");
     let token_sources = GITHUB_TOKEN_ENV_VARS
         .iter()
-        .filter(|name| env::var_os(*name).is_some_and(|value| !value.is_empty()))
+        .filter(|name| non_empty_env_var(name))
         .map(|name| (*name).to_string())
         .collect::<Vec<_>>();
     let config_present = gh_config_dir()
@@ -1495,6 +1497,11 @@ fn non_empty_env_path(name: &str) -> Option<PathBuf> {
     env::var_os(name)
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+}
+
+/// Return true when an environment variable is present and non-empty.
+fn non_empty_env_var(name: &str) -> bool {
+    env::var_os(name).is_some_and(|value| !value.is_empty())
 }
 
 /// Resolve the GitHub CLI config directory using GitHub CLI environment precedence.
@@ -1527,20 +1534,38 @@ fn codex_cache_dir() -> Option<PathBuf> {
 /// Inspect a repository-local path and its git-ignore state.
 fn local_path_status(repo_root: &Path, name: &str, relative: &str) -> LocalPathStatus {
     let path = repo_root.join(relative);
-    let ignore_probe = if relative == ".codex/tasks"
-        || relative == ".codex/research"
-        || relative.starts_with("target/")
-    {
-        format!("{relative}/probe")
-    } else {
-        relative.to_string()
-    };
     LocalPathStatus {
         name: name.to_string(),
         path,
         exists: repo_root.join(relative).exists(),
-        git_ignored: git_check_ignored(repo_root, &ignore_probe),
+        git_ignored: git_check_ignored(repo_root, &directory_ignore_probe(relative)),
     }
+}
+
+/// Inspect a cache path that may be outside the repository.
+fn global_cache_status(repo_root: &Path, path: PathBuf) -> LocalPathStatus {
+    let git_ignored = repo_relative_path_for_git(repo_root, &path)
+        .and_then(|relative| git_check_ignored(repo_root, &directory_ignore_probe(&relative)));
+    LocalPathStatus {
+        name: "global_codex_cache".to_string(),
+        exists: path.exists(),
+        path,
+        git_ignored,
+    }
+}
+
+/// Convert a repository-local path into the slash-separated form expected by git.
+fn repo_relative_path_for_git(repo_root: &Path, path: &Path) -> Option<String> {
+    let relative = path.strip_prefix(repo_root).ok()?;
+    if relative.as_os_str().is_empty() {
+        return None;
+    }
+    Some(relative.to_string_lossy().replace('\\', "/"))
+}
+
+/// Probe a directory-style path so ignore rules for the directory and its contents apply.
+fn directory_ignore_probe(relative: &str) -> String {
+    format!("{}/probe", relative.trim_end_matches('/'))
 }
 
 /// Convert collected local readiness facts into actionable diagnostics.
@@ -1549,6 +1574,7 @@ fn local_diagnostics(
     tools: &[LocalToolStatus],
     github: &LocalGithubStatus,
     capsule_root: &LocalPathStatus,
+    repo_root: &Path,
     cache_roots: &[LocalPathStatus],
 ) -> Vec<LocalDiagnostic> {
     let mut diagnostics = Vec::new();
@@ -1594,10 +1620,7 @@ fn local_diagnostics(
             ),
         }),
     }
-    for cache_root in cache_roots
-        .iter()
-        .filter(|cache_root| cache_root.name != "global_codex_cache")
-    {
+    for cache_root in cache_roots {
         match cache_root.git_ignored {
             Some(true) => {}
             Some(false) => diagnostics.push(LocalDiagnostic {
@@ -1608,6 +1631,8 @@ fn local_diagnostics(
                     cache_root.path.display()
                 ),
             }),
+            None if cache_root.name == "global_codex_cache"
+                && repo_relative_path_for_git(repo_root, &cache_root.path).is_none() => {}
             None => diagnostics.push(LocalDiagnostic {
                 severity: LocalDiagnosticSeverity::Error,
                 code: format!("{}_ignore_unknown", cache_root.name),
@@ -4155,11 +4180,15 @@ fn permission_diagnostics(
     args: &PrAgentActionArgs,
     generated_at: DateTime<Utc>,
 ) -> Vec<PrAgentDiagnostic> {
-    let message = if env::var_os("GITHUB_TOKEN").is_some()
-        || env::var_os("GITHUB_ENTERPRISE_TOKEN").is_some()
-    {
+    let has_github_token = ["GITHUB_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]
+        .iter()
+        .any(|name| non_empty_env_var(name));
+    let has_gh_token = ["GH_TOKEN", "GH_ENTERPRISE_TOKEN"]
+        .iter()
+        .any(|name| non_empty_env_var(name));
+    let message = if has_github_token {
         "GITHUB_TOKEN or GITHUB_ENTERPRISE_TOKEN is set; workflow tokens and GitHub App tokens may be repository-scoped and can lack PR, issue, or Actions write permissions".to_string()
-    } else if env::var_os("GH_TOKEN").is_some() || env::var_os("GH_ENTERPRISE_TOKEN").is_some() {
+    } else if has_gh_token {
         "GH_TOKEN or GH_ENTERPRISE_TOKEN is set; verify the token has the write permissions listed in permission_notes before using --apply".to_string()
     } else {
         "no GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN, or GITHUB_ENTERPRISE_TOKEN environment variable detected; gh may use a credential store, and permission failures will be captured from hosted command stderr".to_string()
