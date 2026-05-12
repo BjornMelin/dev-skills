@@ -1956,6 +1956,149 @@ fn policy_manifest_and_dry_run_update_capsule() {
         .expect("docs-links gate");
     assert_eq!(docs_gate["network"], false);
 
+    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let explain_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            repo_root.to_str().expect("utf8 repo root"),
+            "--checked-at",
+            "2026-05-09T05:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let explain_json: Value = serde_json::from_slice(&explain_output).expect("explain json");
+    assert_eq!(explain_json["command"], "policy explain");
+    assert_eq!(explain_json["result"]["schema"], "policy_explain.v1");
+    assert_eq!(explain_json["result"]["docs_mirror"]["status"], "current");
+    assert!(
+        explain_json["result"]["gates"]
+            .as_array()
+            .expect("explain gates")
+            .iter()
+            .any(|gate| gate["id"] == "codex-dev-policy-explain")
+    );
+
+    let bad_repo_root = repo_root.join("no-such-policy-explain-root");
+    let bad_repo_root_arg = bad_repo_root.to_str().expect("utf8 bad repo root");
+    let explain_error_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            bad_repo_root_arg,
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let explain_error_json: Value =
+        serde_json::from_slice(&explain_error_output).expect("explain error json");
+    let explain_error_message = explain_error_json["result"]["error"]["message"]
+        .as_str()
+        .expect("explain error message");
+    assert!(explain_error_message.contains("failed to canonicalize repo root"));
+    assert!(explain_error_message.contains("--include-local-paths"));
+    assert!(!explain_error_message.contains(bad_repo_root_arg));
+
+    let explain_error_with_paths_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            bad_repo_root_arg,
+            "--include-local-paths",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let explain_error_with_paths_json: Value =
+        serde_json::from_slice(&explain_error_with_paths_output)
+            .expect("explain error with paths json");
+    let explain_error_with_paths_message =
+        explain_error_with_paths_json["result"]["error"]["message"]
+            .as_str()
+            .expect("explain error with paths message");
+    assert!(explain_error_with_paths_message.contains(bad_repo_root_arg));
+
+    let missing_manifest_root = temp.path().join("policy-explain-missing-manifest-root");
+    std::fs::create_dir(&missing_manifest_root).expect("missing manifest root");
+    let missing_manifest_arg = missing_manifest_root
+        .to_str()
+        .expect("utf8 missing manifest root");
+    let missing_manifest_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            missing_manifest_arg,
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let missing_manifest_json: Value =
+        serde_json::from_slice(&missing_manifest_output).expect("missing manifest error json");
+    let missing_manifest_message = missing_manifest_json["result"]["error"]["message"]
+        .as_str()
+        .expect("missing manifest error message");
+    assert!(missing_manifest_message.contains("repo root must contain Cargo.toml"));
+    assert!(missing_manifest_message.contains("--include-local-paths"));
+    assert!(!missing_manifest_message.contains(missing_manifest_arg));
+
+    let missing_manifest_with_paths_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "explain",
+            "--profile",
+            "codex_dev",
+            "--repo-root",
+            missing_manifest_arg,
+            "--include-local-paths",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let missing_manifest_with_paths_json: Value =
+        serde_json::from_slice(&missing_manifest_with_paths_output)
+            .expect("missing manifest with paths json");
+    let missing_manifest_with_paths_message =
+        missing_manifest_with_paths_json["result"]["error"]["message"]
+            .as_str()
+            .expect("missing manifest with paths message");
+    assert!(missing_manifest_with_paths_message.contains(missing_manifest_arg));
+
     let init_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args([

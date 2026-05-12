@@ -328,12 +328,22 @@ planning. Each gate includes:
 
 The default `codex_dev` profile owns the executable operating-layer gate
 manifest: formatting, `codex-dev-core` and `codex-dev` Rust gates, CLI help,
-manifest and PR-plan smokes, docs links, and whitespace checks. Additional
-profiles are `codex_dev_tui`, `codex_research`, `skills`, `bootstrap_install`,
-`docs`, `release`, and `full_local`. Profiles are branch-selection helpers for
-agents; they do not replace the validation runbook as the human source of truth.
-Dry-run policy checks record `planned` gate status in `verification.json`;
-executed gates record `passed`, `failed`, or `skipped`.
+manifest, explain, and PR-plan smokes, docs links, and whitespace checks.
+Additional profiles are `codex_dev_tui`, `codex_research`, `skills`,
+`bootstrap_install`, `docs`, `release`, and `full_local`. Profiles are
+branch-selection helpers for agents; they do not replace the validation runbook
+as the human source of truth. Dry-run policy checks record `planned` gate status
+in `verification.json`; executed gates record `passed`, `failed`, or `skipped`.
+
+`policy_explain.v1` is the read-only explanation view for a selected profile.
+It is derived from the policy manifest, documentation mirror check, and PATH
+availability probes. It includes each gate's purpose, required tools, missing
+local prerequisites, network/secrets posture, expected artifacts, docs mirror
+status, and failure interpretation without executing gate commands. Local
+absolute repository and tool paths are omitted unless the caller opts in with
+`--include-local-paths`. Aggregated policy profiles must add a profile-specific
+explain smoke when inherited gates would otherwise only exercise another
+profile's JSON contract.
 
 Executed gates must run from a discovered or explicit repository root so
 repo-relative commands produce stable results whether invoked from the root, a
