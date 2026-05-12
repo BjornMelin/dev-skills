@@ -14,10 +14,11 @@ import sys
 import tempfile
 import time
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import unquote
 
 import yaml
