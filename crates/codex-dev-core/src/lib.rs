@@ -30,6 +30,8 @@ pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 pub const TASK_INDEX_SCHEMA: &str = "task_index.v1";
 pub const ORCHESTRATION_RUN_SCHEMA: &str = "orchestration_run.v1";
 pub const SKILL_INVENTORY_SCHEMA: &str = "skill_inventory.v1";
+pub const SKILL_AUDIT_SCHEMA: &str = "skill_audit.v1";
+pub const SKILL_ARCHIVE_SCHEMA: &str = "skill_archive.v1";
 
 const SKILL_INVENTORY_MAX_TEXT_BYTES: u64 = 1024 * 1024;
 #[cfg(not(test))]
@@ -577,7 +579,16 @@ pub struct OrchestrationDiagnostic {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SkillInventoryArgs {
     pub repo_root: Option<PathBuf>,
+    pub skills_root: Option<PathBuf>,
     pub checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SkillAuditArgs {
+    pub repo_root: Option<PathBuf>,
+    pub skills_root: Option<PathBuf>,
+    pub checked_at: Option<DateTime<Utc>>,
+    pub max_skill_md_lines: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -600,6 +611,53 @@ pub struct SkillInventoryDiagnostic {
     pub code: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SkillsAuditReport {
+    pub schema: String,
+    pub checked_at: DateTime<Utc>,
+    pub repo_root: PathBuf,
+    pub skills_root: PathBuf,
+    pub archive: SkillArchiveAuditSummary,
+    pub ok: bool,
+    pub total: usize,
+    pub issue_count: usize,
+    pub error_count: usize,
+    pub warning_count: usize,
+    pub issues: Vec<SkillAuditIssue>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SkillArchiveAuditSummary {
+    pub schema: String,
+    pub root: String,
+    pub total: usize,
+    pub skills: Vec<SkillArchiveEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SkillArchiveEntry {
+    pub name: String,
+    pub status: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archived_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replacement: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SkillAuditIssue {
+    pub severity: SkillInventoryDiagnosticSeverity,
+    pub code: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
     pub message: String,
 }
 
@@ -685,6 +743,19 @@ struct BoundedText {
 struct CatalogInputText {
     text: String,
     reliable_for_missing_signals: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct SkillArchiveManifest {
+    schema: Option<String>,
+    name: Option<String>,
+    status: Option<String>,
+    archived_at: Option<String>,
+    replacement: Option<String>,
+    source_path: Option<String>,
+    archived_path: Option<String>,
+    reason: Option<String>,
+    restore: Option<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -1790,18 +1861,8 @@ fn latest_batch_timestamp(batch: &SubagentBatch) -> Option<DateTime<Utc>> {
 /// Build a read-only machine-readable inventory of tracked skill folders.
 pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryReport> {
     let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-    let repo_root = match args.repo_root {
-        Some(path) => canonicalize_repo_root(&path)?,
-        None => {
-            let cwd = env::current_dir().context("failed to read current directory")?;
-            find_repo_root(&cwd).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "failed to discover repository root from current directory; run from the repo or pass --repo-root"
-                )
-            })?
-        }
-    };
-    let skills_root = repo_root.join("skills");
+    let (repo_root, skills_root) =
+        resolve_skill_roots(args.repo_root.as_deref(), args.skills_root.as_deref())?;
     let mut diagnostics = Vec::new();
     let readme = read_optional_catalog_text(&repo_root.join("README.md"), &mut diagnostics)?;
     let docs_index =
@@ -1994,6 +2055,818 @@ pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryRepor
         diagnostics,
         skills,
     })
+}
+
+/// Build a read-only hygiene audit for skill folders.
+pub fn skills_audit(args: SkillAuditArgs) -> Result<SkillsAuditReport> {
+    let checked_at = args.checked_at.unwrap_or_else(Utc::now);
+    let inventory = skills_inventory(SkillInventoryArgs {
+        repo_root: args.repo_root,
+        skills_root: args.skills_root,
+        checked_at: Some(checked_at),
+    })?;
+    let mut issues = Vec::new();
+    for diagnostic in &inventory.diagnostics {
+        issues.push(SkillAuditIssue {
+            severity: diagnostic.severity,
+            code: diagnostic.code.clone(),
+            skill: diagnostic.skill.clone(),
+            path: None,
+            message: diagnostic.message.clone(),
+        });
+    }
+    for skill in &inventory.skills {
+        for error in &skill.validation.errors {
+            issues.push(SkillAuditIssue {
+                severity: SkillInventoryDiagnosticSeverity::Error,
+                code: "skill_validation_error".to_string(),
+                skill: Some(skill.directory.clone()),
+                path: Some(skill.skill_md.clone()),
+                message: error.clone(),
+            });
+        }
+        if !skill.resources.agents.present {
+            issues.push(SkillAuditIssue {
+                severity: SkillInventoryDiagnosticSeverity::Warning,
+                code: "missing_agents_metadata".to_string(),
+                skill: Some(skill.directory.clone()),
+                path: Some(skill.resources.agents.path.clone()),
+                message: "missing agents/openai.yaml metadata".to_string(),
+            });
+        }
+        let skill_md = inventory.repo_root.join(&skill.skill_md);
+        audit_skill_text(
+            &inventory.repo_root,
+            &skill.directory,
+            &skill_md,
+            args.max_skill_md_lines,
+            &mut issues,
+        )?;
+        let references_dir = inventory.repo_root.join(&skill.resources.references.path);
+        audit_markdown_tree(
+            &inventory.repo_root,
+            &skill.directory,
+            &references_dir,
+            &mut issues,
+        )?;
+        let scripts_dir = inventory.repo_root.join(&skill.resources.scripts.path);
+        audit_generated_python_artifacts(
+            &inventory.repo_root,
+            &skill.directory,
+            &scripts_dir,
+            &mut issues,
+        )?;
+    }
+    let mut archive_catalog_diagnostics = Vec::new();
+    let readme = read_optional_catalog_text(
+        &inventory.repo_root.join("README.md"),
+        &mut archive_catalog_diagnostics,
+    )?;
+    let docs_index = read_optional_catalog_text(
+        &inventory.repo_root.join("docs/index.md"),
+        &mut archive_catalog_diagnostics,
+    )?;
+    let active_skill_names = active_skill_names(&inventory.skills);
+    let archive = audit_skill_archive(
+        &inventory.repo_root,
+        &active_skill_names,
+        &readme,
+        &docs_index,
+        &mut issues,
+    )?;
+    issues.sort_by(|left, right| {
+        severity_sort_key(left.severity)
+            .cmp(&severity_sort_key(right.severity))
+            .then_with(|| left.skill.cmp(&right.skill))
+            .then_with(|| left.code.cmp(&right.code))
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    let error_count = issues
+        .iter()
+        .filter(|issue| issue.severity == SkillInventoryDiagnosticSeverity::Error)
+        .count();
+    let warning_count = issues
+        .iter()
+        .filter(|issue| issue.severity == SkillInventoryDiagnosticSeverity::Warning)
+        .count();
+    Ok(SkillsAuditReport {
+        schema: SKILL_AUDIT_SCHEMA.to_string(),
+        checked_at,
+        repo_root: inventory.repo_root,
+        skills_root: inventory.skills_root,
+        archive,
+        ok: error_count == 0,
+        total: inventory.total,
+        issue_count: issues.len(),
+        error_count,
+        warning_count,
+        issues,
+    })
+}
+
+fn active_skill_names(skills: &[SkillInventoryEntry]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for skill in skills {
+        names.insert(skill.directory.clone());
+        if let Some(name) = &skill.name {
+            names.insert(name.clone());
+        }
+    }
+    names
+}
+
+fn audit_skill_archive(
+    repo_root: &Path,
+    active_skill_names: &BTreeSet<String>,
+    readme: &CatalogInputText,
+    docs_index: &CatalogInputText,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<SkillArchiveAuditSummary> {
+    let archive_root = repo_root.join("archive/skills");
+    let root = repo_relative_string(repo_root, &archive_root);
+    let metadata = match fs::symlink_metadata(&archive_root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Ok(SkillArchiveAuditSummary {
+                schema: SKILL_ARCHIVE_SCHEMA.to_string(),
+                root,
+                total: 0,
+                skills: Vec::new(),
+            });
+        }
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!(
+                    "failed to inspect skill archive root {}",
+                    archive_root.display()
+                )
+            });
+        }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            None,
+            Some(root.clone()),
+            "skill archive root must be a non-symlinked directory",
+        );
+        return Ok(SkillArchiveAuditSummary {
+            schema: SKILL_ARCHIVE_SCHEMA.to_string(),
+            root,
+            total: 0,
+            skills: Vec::new(),
+        });
+    }
+
+    let mut archive_dirs = Vec::new();
+    for entry in fs::read_dir(&archive_root).with_context(|| {
+        format!(
+            "failed to read skill archive root {}",
+            archive_root.display()
+        )
+    })? {
+        let entry =
+            entry.with_context(|| format!("failed to read entry in {}", archive_root.display()))?;
+        archive_dirs.push(entry);
+    }
+    archive_dirs.sort_by_key(|entry| entry.file_name());
+
+    let mut archived = Vec::new();
+    for entry in archive_dirs {
+        let path = entry.path();
+        let directory = entry.file_name().to_string_lossy().to_string();
+        let metadata = fs::symlink_metadata(&path)
+            .with_context(|| format!("failed to inspect archived skill {}", path.display()))?;
+        if metadata.file_type().is_symlink() {
+            push_archive_issue(
+                issues,
+                SkillInventoryDiagnosticSeverity::Error,
+                "archived_skill_invalid_manifest",
+                Some(directory.clone()),
+                Some(repo_relative_string(repo_root, &path)),
+                "archived skill directory must not be a symlink",
+            );
+            archived.push(SkillArchiveEntry {
+                name: directory,
+                status: "invalid".to_string(),
+                path: repo_relative_string(repo_root, &path),
+                archived_at: None,
+                replacement: None,
+                reason: None,
+            });
+            continue;
+        }
+        if !metadata.is_dir() {
+            continue;
+        }
+
+        let manifest_path = path.join("archive.json");
+        let (manifest, status) =
+            read_skill_archive_manifest(repo_root, &directory, &manifest_path, issues)?;
+        let mut archive_name = directory.clone();
+        let mut entry_status = status;
+        let mut archived_at = None;
+        let mut replacement = None;
+        let mut reason = None;
+        if let Some(manifest) = manifest {
+            if let Some(name) = trimmed_optional(&manifest.name) {
+                archive_name = name.to_string();
+            }
+            entry_status = trimmed_optional(&manifest.status)
+                .unwrap_or("invalid")
+                .to_string();
+            archived_at = trimmed_optional(&manifest.archived_at).map(str::to_string);
+            replacement = trimmed_optional(&manifest.replacement).map(str::to_string);
+            reason = trimmed_optional(&manifest.reason).map(str::to_string);
+            validate_skill_archive_manifest(
+                repo_root,
+                &directory,
+                &archive_name,
+                &manifest,
+                &manifest_path,
+                active_skill_names,
+                issues,
+            );
+        }
+
+        validate_archived_skill_entrypoint(repo_root, &directory, &archive_name, &path, issues)?;
+        audit_archived_skill_catalog_exposure(repo_root, &archive_name, readme, docs_index, issues);
+
+        archived.push(SkillArchiveEntry {
+            name: archive_name,
+            status: entry_status,
+            path: repo_relative_string(repo_root, &path),
+            archived_at,
+            replacement,
+            reason,
+        });
+    }
+
+    Ok(SkillArchiveAuditSummary {
+        schema: SKILL_ARCHIVE_SCHEMA.to_string(),
+        root,
+        total: archived.len(),
+        skills: archived,
+    })
+}
+
+fn read_skill_archive_manifest(
+    repo_root: &Path,
+    directory: &str,
+    manifest_path: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<(Option<SkillArchiveManifest>, String)> {
+    let Some(text) = read_optional_regular_text(manifest_path, SKILL_INVENTORY_MAX_TEXT_BYTES)?
+    else {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_missing_manifest",
+            Some(directory.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            "archived skill is missing archive.json",
+        );
+        return Ok((None, "missing_manifest".to_string()));
+    };
+    match serde_json::from_str::<SkillArchiveManifest>(&text.text) {
+        Ok(manifest) => Ok((Some(manifest), "archived".to_string())),
+        Err(error) => {
+            push_archive_issue(
+                issues,
+                SkillInventoryDiagnosticSeverity::Error,
+                "archived_skill_invalid_manifest",
+                Some(directory.to_string()),
+                Some(repo_relative_string(repo_root, manifest_path)),
+                format!("archive.json is not valid JSON for {SKILL_ARCHIVE_SCHEMA}: {error}"),
+            );
+            Ok((None, "invalid_manifest".to_string()))
+        }
+    }
+}
+
+fn validate_skill_archive_manifest(
+    repo_root: &Path,
+    directory: &str,
+    archive_name: &str,
+    manifest: &SkillArchiveManifest,
+    manifest_path: &Path,
+    active_skill_names: &BTreeSet<String>,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    let manifest_rel = repo_relative_string(repo_root, manifest_path);
+    match trimmed_optional(&manifest.schema) {
+        Some(SKILL_ARCHIVE_SCHEMA) => {}
+        Some(schema) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(manifest_rel.clone()),
+            format!("archive.json schema must be {SKILL_ARCHIVE_SCHEMA}, found {schema}"),
+        ),
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(manifest_rel.clone()),
+            format!("archive.json is missing schema {SKILL_ARCHIVE_SCHEMA}"),
+        ),
+    }
+    match trimmed_optional(&manifest.status) {
+        Some("archived") => {}
+        Some(status) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(manifest_rel.clone()),
+            format!("archive.json status must be archived, found {status}"),
+        ),
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(manifest_rel.clone()),
+            "archive.json is missing archived status",
+        ),
+    }
+    match trimmed_optional(&manifest.name) {
+        Some(name) if !is_valid_skill_name(name) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(name.to_string()),
+            Some(manifest_rel.clone()),
+            format!("archive.json name '{name}' must be a valid skill name"),
+        ),
+        Some(name) if name != directory => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_name_mismatch",
+            Some(name.to_string()),
+            Some(manifest_rel.clone()),
+            format!("archive.json name '{name}' must match archived directory '{directory}'"),
+        ),
+        Some(_) => {}
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(directory.to_string()),
+            Some(manifest_rel.clone()),
+            "archive.json is missing name",
+        ),
+    }
+    match trimmed_optional(&manifest.archived_at) {
+        Some(archived_at) if DateTime::parse_from_rfc3339(archived_at).is_err() => {
+            push_archive_issue(
+                issues,
+                SkillInventoryDiagnosticSeverity::Error,
+                "archived_skill_invalid_manifest",
+                Some(archive_name.to_string()),
+                Some(manifest_rel.clone()),
+                format!("archive.json archived_at must be RFC3339, found {archived_at}"),
+            );
+        }
+        Some(_) => {}
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(manifest_rel.clone()),
+            "archive.json is missing archived_at",
+        ),
+    }
+    if active_skill_names.contains(archive_name) {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_still_active",
+            Some(archive_name.to_string()),
+            Some(format!("skills/{archive_name}/SKILL.md")),
+            "archived skill name is also present in the active skills root",
+        );
+    }
+    if let Some(replacement) = trimmed_optional(&manifest.replacement)
+        && !active_skill_names.contains(replacement)
+    {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_replacement_missing",
+            Some(archive_name.to_string()),
+            Some(manifest_rel),
+            format!("archive.json replacement skill '{replacement}' is not active"),
+        );
+    }
+    let expected_source_path = format!("skills/{directory}");
+    validate_required_archive_manifest_field(
+        &manifest.source_path,
+        "source_path",
+        &expected_source_path,
+        repo_root,
+        archive_name,
+        manifest_path,
+        issues,
+    );
+    let expected_archived_path = format!("archive/skills/{directory}");
+    validate_required_archive_manifest_field(
+        &manifest.archived_path,
+        "archived_path",
+        &expected_archived_path,
+        repo_root,
+        archive_name,
+        manifest_path,
+        issues,
+    );
+    validate_nonempty_archive_manifest_field(
+        &manifest.reason,
+        "reason",
+        repo_root,
+        archive_name,
+        manifest_path,
+        issues,
+    );
+    validate_nonempty_archive_manifest_field(
+        &manifest.restore,
+        "restore",
+        repo_root,
+        archive_name,
+        manifest_path,
+        issues,
+    );
+}
+
+fn validate_required_archive_manifest_field(
+    value: &Option<String>,
+    field: &str,
+    expected: &str,
+    repo_root: &Path,
+    archive_name: &str,
+    manifest_path: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    match trimmed_optional(value) {
+        Some(actual) if actual == expected => {}
+        Some(actual) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            format!("archive.json {field} must be '{expected}', found '{actual}'"),
+        ),
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            format!("archive.json is missing {field}"),
+        ),
+    }
+}
+
+fn validate_nonempty_archive_manifest_field(
+    value: &Option<String>,
+    field: &str,
+    repo_root: &Path,
+    archive_name: &str,
+    manifest_path: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    if trimmed_optional(value).is_none() {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            format!("archive.json is missing {field}"),
+        );
+    }
+}
+
+fn validate_archived_skill_entrypoint(
+    repo_root: &Path,
+    directory: &str,
+    archive_name: &str,
+    skill_dir: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<()> {
+    let skill_md = skill_dir.join("SKILL.md");
+    let Some(text) = read_optional_regular_text(&skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES)? else {
+        push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, &skill_md)),
+            "archived skill is missing SKILL.md",
+        );
+        return Ok(());
+    };
+    match parse_skill_frontmatter(&text.text) {
+        Ok(frontmatter) => {
+            let mut validation_errors = Vec::new();
+            validate_skill_frontmatter(directory, &frontmatter, &mut validation_errors);
+            for error in validation_errors {
+                push_archive_issue(
+                    issues,
+                    SkillInventoryDiagnosticSeverity::Error,
+                    "archived_skill_invalid_manifest",
+                    Some(archive_name.to_string()),
+                    Some(repo_relative_string(repo_root, &skill_md)),
+                    error,
+                );
+            }
+            if let Some(frontmatter_name) = frontmatter.name.as_deref().map(str::trim)
+                && frontmatter_name != archive_name
+            {
+                push_archive_issue(
+                    issues,
+                    SkillInventoryDiagnosticSeverity::Error,
+                    "archived_skill_name_mismatch",
+                    Some(archive_name.to_string()),
+                    Some(repo_relative_string(repo_root, &skill_md)),
+                    format!(
+                        "archived SKILL.md name '{frontmatter_name}' must match archive.json name '{archive_name}'"
+                    ),
+                );
+            }
+        }
+        Err(error) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, &skill_md)),
+            error,
+        ),
+    }
+    Ok(())
+}
+
+fn audit_archived_skill_catalog_exposure(
+    repo_root: &Path,
+    archive_name: &str,
+    readme: &CatalogInputText,
+    docs_index: &CatalogInputText,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    for (path, text) in [
+        ("README.md", readme.text.as_str()),
+        ("docs/index.md", docs_index.text.as_str()),
+    ] {
+        if skill_catalog_present(text, archive_name) {
+            push_archive_issue(
+                issues,
+                SkillInventoryDiagnosticSeverity::Error,
+                "archived_skill_cataloged_as_active",
+                Some(archive_name.to_string()),
+                Some(repo_relative_string(repo_root, &repo_root.join(path))),
+                "archived skill is still listed in the active catalog",
+            );
+        }
+    }
+}
+
+fn trimmed_optional(value: &Option<String>) -> Option<&str> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn push_archive_issue(
+    issues: &mut Vec<SkillAuditIssue>,
+    severity: SkillInventoryDiagnosticSeverity,
+    code: &str,
+    skill: Option<String>,
+    path: Option<String>,
+    message: impl Into<String>,
+) {
+    issues.push(SkillAuditIssue {
+        severity,
+        code: code.to_string(),
+        skill,
+        path,
+        message: message.into(),
+    });
+}
+
+fn resolve_skill_roots(
+    explicit_repo_root: Option<&Path>,
+    explicit_skills_root: Option<&Path>,
+) -> Result<(PathBuf, PathBuf)> {
+    if let Some(skills_root) = explicit_skills_root {
+        let skills_root = canonicalize_existing_dir(skills_root, "skills root")?;
+        let repo_root = match explicit_repo_root {
+            Some(repo_root) => canonicalize_existing_dir(repo_root, "repo root")?,
+            None => skills_root
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| skills_root.clone()),
+        };
+        return Ok((repo_root, skills_root));
+    }
+    let repo_root = match explicit_repo_root {
+        Some(path) => canonicalize_repo_root(path)?,
+        None => {
+            let cwd = env::current_dir().context("failed to read current directory")?;
+            find_repo_root(&cwd).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+                )
+            })?
+        }
+    };
+    Ok((repo_root.clone(), repo_root.join("skills")))
+}
+
+fn canonicalize_existing_dir(path: &Path, label: &str) -> Result<PathBuf> {
+    let canonical = fs::canonicalize(path)
+        .with_context(|| format!("failed to canonicalize {label} {}", path.display()))?;
+    let metadata = fs::symlink_metadata(&canonical)
+        .with_context(|| format!("failed to inspect {label} {}", canonical.display()))?;
+    if metadata.file_type().is_symlink() {
+        bail!("refusing to use symlinked {label}: {}", canonical.display());
+    }
+    if !metadata.is_dir() {
+        bail!("{label} is not a directory: {}", canonical.display());
+    }
+    Ok(canonical)
+}
+
+fn audit_skill_text(
+    repo_root: &Path,
+    skill: &str,
+    path: &Path,
+    max_lines: usize,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<()> {
+    let Some(text) = read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES)? else {
+        return Ok(());
+    };
+    let line_count = text.text.lines().count();
+    if line_count > max_lines {
+        issues.push(SkillAuditIssue {
+            severity: SkillInventoryDiagnosticSeverity::Warning,
+            code: "oversized_skill_md".to_string(),
+            skill: Some(skill.to_string()),
+            path: Some(repo_relative_string(repo_root, path)),
+            message: format!("SKILL.md has {line_count} lines; target maximum is {max_lines}"),
+        });
+    }
+    audit_stale_skill_references(repo_root, skill, path, &text.text, issues);
+    Ok(())
+}
+
+fn audit_markdown_tree(
+    repo_root: &Path,
+    skill: &str,
+    root: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<()> {
+    let metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("failed to inspect {}", root.display()));
+        }
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir)
+            .with_context(|| format!("failed to read directory {}", dir.display()))?
+        {
+            let entry =
+                entry.with_context(|| format!("failed to read entry in {}", dir.display()))?;
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path)
+                .with_context(|| format!("failed to inspect {}", path.display()))?;
+            if metadata.file_type().is_symlink() {
+                continue;
+            }
+            if metadata.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+                continue;
+            }
+            if path
+                .components()
+                .any(|component| component.as_os_str() == std::ffi::OsStr::new("baselines"))
+            {
+                continue;
+            }
+            if let Some(text) = read_optional_regular_text(&path, SKILL_INVENTORY_MAX_TEXT_BYTES)? {
+                audit_stale_skill_references(repo_root, skill, &path, &text.text, issues);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn audit_stale_skill_references(
+    repo_root: &Path,
+    skill: &str,
+    path: &Path,
+    text: &str,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    let placeholder_skill_path = format!("/path/to/{skill}/");
+    let stale_patterns = [
+        "/home/bjorn/.codex/skills/",
+        "~/.codex/skills/",
+        ".codex/skills/",
+        placeholder_skill_path.as_str(),
+    ];
+    for pattern in stale_patterns {
+        if text.contains(pattern) {
+            issues.push(SkillAuditIssue {
+                severity: SkillInventoryDiagnosticSeverity::Warning,
+                code: "stale_skill_path_reference".to_string(),
+                skill: Some(skill.to_string()),
+                path: Some(repo_relative_string(repo_root, path)),
+                message: format!("contains stale or non-portable skill path pattern `{pattern}`"),
+            });
+        }
+    }
+}
+
+fn audit_generated_python_artifacts(
+    repo_root: &Path,
+    skill: &str,
+    scripts_dir: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<()> {
+    let metadata = match fs::symlink_metadata(scripts_dir) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("failed to inspect {}", scripts_dir.display()));
+        }
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+    let mut stack = vec![scripts_dir.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir)
+            .with_context(|| format!("failed to read directory {}", dir.display()))?
+        {
+            let entry =
+                entry.with_context(|| format!("failed to read entry in {}", dir.display()))?;
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path)
+                .with_context(|| format!("failed to inspect {}", path.display()))?;
+            if metadata.file_type().is_symlink() {
+                continue;
+            }
+            if metadata.is_dir() {
+                if path.file_name().and_then(|name| name.to_str()) == Some("__pycache__") {
+                    issues.push(SkillAuditIssue {
+                        severity: SkillInventoryDiagnosticSeverity::Warning,
+                        code: "generated_python_cache".to_string(),
+                        skill: Some(skill.to_string()),
+                        path: Some(repo_relative_string(repo_root, &path)),
+                        message: "bundled scripts contain a generated __pycache__ directory"
+                            .to_string(),
+                    });
+                    continue;
+                }
+                stack.push(path);
+            } else if path.extension().and_then(|ext| ext.to_str()) == Some("pyc") {
+                issues.push(SkillAuditIssue {
+                    severity: SkillInventoryDiagnosticSeverity::Warning,
+                    code: "generated_python_bytecode".to_string(),
+                    skill: Some(skill.to_string()),
+                    path: Some(repo_relative_string(repo_root, &path)),
+                    message: "bundled scripts contain generated Python bytecode".to_string(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn severity_sort_key(severity: SkillInventoryDiagnosticSeverity) -> u8 {
+    match severity {
+        SkillInventoryDiagnosticSeverity::Error => 0,
+        SkillInventoryDiagnosticSeverity::Warning => 1,
+        SkillInventoryDiagnosticSeverity::Info => 2,
+    }
 }
 
 fn skill_inventory_entry(

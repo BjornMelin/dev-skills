@@ -343,6 +343,7 @@ fn write_skill_inventory_repo(root: &std::path::Path) -> std::path::PathBuf {
     std::fs::create_dir_all(alpha.join("references/deep")).expect("alpha references");
     std::fs::create_dir_all(alpha.join("scripts")).expect("alpha scripts");
     std::fs::create_dir_all(alpha.join("templates")).expect("alpha templates");
+    std::fs::create_dir_all(alpha.join("agents")).expect("alpha agents");
     std::fs::write(
         alpha.join("SKILL.md"),
         r#"---
@@ -364,6 +365,11 @@ metadata:
     std::fs::write(alpha.join("references/deep/guide.md"), "# Guide\n").expect("alpha ref");
     std::fs::write(alpha.join("scripts/check.sh"), "#!/bin/sh\n").expect("alpha script");
     std::fs::write(alpha.join("templates/prompt.md"), "Prompt\n").expect("alpha template");
+    std::fs::write(
+        alpha.join("agents/openai.yaml"),
+        "interface:\n  display_name: \"Alpha\"\n",
+    )
+    .expect("alpha openai metadata");
 
     let beta = repo.join("skills/beta-skill");
     std::fs::create_dir_all(&beta).expect("beta dir");
@@ -379,6 +385,36 @@ description: Beta skill description.
     )
     .expect("beta skill");
     repo
+}
+
+fn write_archived_skill(
+    repo: &std::path::Path,
+    directory: &str,
+    skill_name: &str,
+    manifest: Option<Value>,
+) {
+    let archived = repo.join("archive/skills").join(directory);
+    std::fs::create_dir_all(&archived).expect("archived skill dir");
+    std::fs::write(
+        archived.join("SKILL.md"),
+        format!(
+            r#"---
+name: {skill_name}
+description: Archived test skill.
+---
+
+# Archived
+"#
+        ),
+    )
+    .expect("archived skill");
+    if let Some(manifest) = manifest {
+        std::fs::write(
+            archived.join("archive.json"),
+            serde_json::to_string_pretty(&manifest).expect("archive manifest json"),
+        )
+        .expect("archive manifest");
+    }
 }
 
 fn write_bootstrap_repo(root: &std::path::Path) -> std::path::PathBuf {
@@ -504,6 +540,254 @@ fn skills_inventory_emits_stable_json_report() {
             .iter()
             .any(|signal| signal.as_str() == Some("missing_docs_index_exposure"))
     );
+}
+
+#[test]
+fn skills_validate_accepts_installed_skills_root() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let skills_root = repo.join("skills");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "validate",
+            "--skills-root",
+            skills_root.to_str().expect("skills root"),
+            "--checked-at",
+            "2026-05-12T08:30:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills validate json");
+    assert_eq!(json["command"], "skills validate");
+    assert_eq!(json["result"]["schema"], "skill_inventory.v1");
+    assert_eq!(json["result"]["checked_at"], "2026-05-12T08:30:00Z");
+    assert_eq!(json["result"]["total"], 2);
+    assert_eq!(json["result"]["invalid"], 0);
+    assert_eq!(
+        json["result"]["skills_root"],
+        skills_root.to_str().expect("skills root")
+    );
+}
+
+#[test]
+fn skills_audit_reports_hygiene_findings() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let beta = repo.join("skills/beta-skill");
+    std::fs::write(
+        beta.join("SKILL.md"),
+        r#"---
+name: beta-skill
+description: Beta skill description.
+---
+
+# Beta
+
+Run /path/to/beta-skill/scripts/check.py when needed.
+"#,
+    )
+    .expect("beta stale path skill");
+    std::fs::create_dir_all(beta.join("scripts/__pycache__")).expect("beta pycache");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:45:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert_eq!(json["command"], "skills audit");
+    assert_eq!(json["result"]["schema"], "skill_audit.v1");
+    assert_eq!(json["result"]["total"], 2);
+    assert_eq!(json["result"]["error_count"], 0);
+    let issues = json["result"]["issues"].as_array().expect("issues");
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "beta-skill" && issue["code"] == "missing_agents_metadata"
+    }));
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "beta-skill" && issue["code"] == "stale_skill_path_reference"
+    }));
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "beta-skill" && issue["code"] == "generated_python_cache"
+    }));
+}
+
+#[test]
+fn skills_archive_is_audited_without_active_inventory() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "retired-skill",
+        "retired-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "retired-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "alpha-skill",
+            "source_path": "skills/retired-skill",
+            "archived_path": "archive/skills/retired-skill",
+            "reason": "Merged into alpha-skill.",
+            "restore": "Move back to skills/retired-skill only if alpha-skill no longer owns this behavior."
+        })),
+    );
+
+    let inventory_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let inventory_json: Value =
+        serde_json::from_slice(&inventory_output).expect("skills inventory json");
+    assert_eq!(inventory_json["result"]["total"], 2);
+    assert!(
+        inventory_json["result"]["skills"]
+            .as_array()
+            .expect("skills")
+            .iter()
+            .all(|skill| skill["directory"] != "retired-skill")
+    );
+
+    let audit_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let audit_json: Value = serde_json::from_slice(&audit_output).expect("skills audit json");
+    assert_eq!(audit_json["result"]["total"], 2);
+    assert_eq!(
+        audit_json["result"]["archive"]["schema"],
+        "skill_archive.v1"
+    );
+    assert_eq!(audit_json["result"]["archive"]["root"], "archive/skills");
+    assert_eq!(audit_json["result"]["archive"]["total"], 1);
+    assert_eq!(
+        audit_json["result"]["archive"]["skills"][0]["name"],
+        "retired-skill"
+    );
+    assert_eq!(
+        audit_json["result"]["archive"]["skills"][0]["replacement"],
+        "alpha-skill"
+    );
+    assert!(
+        audit_json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .all(|issue| issue["skill"] != "retired-skill")
+    );
+}
+
+#[test]
+fn skills_audit_reports_archive_contract_issues() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "alpha-skill",
+        "alpha-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "alpha-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "missing-skill",
+            "source_path": "skills/alpha-skill",
+            "archived_path": "archive/skills/alpha-skill",
+            "reason": "Duplicate archive fixture.",
+            "restore": "Do not restore while alpha-skill is active."
+        })),
+    );
+    write_archived_skill(&repo, "orphan-skill", "orphan-skill", None);
+    write_archived_skill(
+        &repo,
+        "mismatch-skill",
+        "mismatch-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "different-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "alpha-skill",
+            "source_path": "skills/mismatch-skill",
+            "archived_path": "archive/skills/mismatch-skill",
+            "reason": "Mismatch fixture.",
+            "restore": "Fix names before restoring."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:10:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["archive"]["total"], 3);
+    let issues = json["result"]["issues"].as_array().expect("issues");
+    for code in [
+        "archived_skill_still_active",
+        "archived_skill_replacement_missing",
+        "archived_skill_cataloged_as_active",
+        "archived_skill_missing_manifest",
+        "archived_skill_name_mismatch",
+    ] {
+        assert!(
+            issues.iter().any(|issue| issue["code"] == code),
+            "missing expected archive issue code {code}"
+        );
+    }
 }
 
 #[test]
