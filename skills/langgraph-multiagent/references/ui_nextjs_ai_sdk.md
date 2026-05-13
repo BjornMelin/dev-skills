@@ -67,8 +67,8 @@ Prefer Zod schemas for tools and (when feasible) for server→client custom even
 
 For tool UI patterns (invocations, results, approvals), load:
 
-- the Vercel AI SDK skill, when available
-- any installed `ai-sdk-ui` or `ai-sdk-core` skill references, when available
+- `/home/bjorn/.codex/skills/ai-sdk-ui/references/tool-integration.md`
+- `/home/bjorn/.codex/skills/ai-sdk-core/references/tool-calling.md`
 
 ## Message persistence + stream resumption
 
@@ -80,9 +80,9 @@ AI SDK UI is flexible, but **persistence is your responsibility**:
 
 References:
 
-- the Vercel AI SDK skill, when available
-- any installed `ai-sdk-ui` references for persistence, backend, and
-  production concerns
+- `/home/bjorn/.codex/skills/ai-sdk-ui/references/persistence.md`
+- `/home/bjorn/.codex/skills/ai-sdk-ui/references/backend.md`
+- `/home/bjorn/.codex/skills/ai-sdk-ui/references/production.md`
 
 ## Markdown rendering (Streamdown)
 
@@ -96,9 +96,9 @@ Best practice:
 
 References:
 
-- Streamdown skill: load `$streamdown` when available
-- AI SDK integration: load Streamdown's AI SDK reference when available
-- Styling/security: load Streamdown's styling/security reference when available
+- Streamdown skill: `/home/bjorn/.codex/skills/streamdown/SKILL.md`
+- AI SDK integration: `/home/bjorn/.codex/skills/streamdown/references/ai-sdk-integration.md`
+- Styling/security: `/home/bjorn/.codex/skills/streamdown/references/styling-security.md`
 
 Tailwind integration notes live in the Streamdown skill:
 
@@ -109,12 +109,12 @@ Tailwind integration notes live in the Streamdown skill:
 
 For polished, production-grade UI patterns (beyond a basic chat box), load:
 
-- `$ui-workbench` or the Build Web Apps frontend skill when available
+- `/home/bjorn/.codex/skills/frontend-design/SKILL.md`
 
 For AI SDK Agents workflow/UI patterns:
 
-- the Vercel AI SDK skill, when available
-- any installed `ai-sdk-agents` production reference, when available
+- `/home/bjorn/.codex/skills/ai-sdk-agents/SKILL.md`
+- `/home/bjorn/.codex/skills/ai-sdk-agents/references/production.md`
 
 ## Bridging to a Python agent runtime (FastAPI / LangGraph)
 
@@ -140,3 +140,4 @@ For custom SSE event schemas, see:
   - `assets/templates/nextjs_ai_sdk/app/chat/page.tsx`
   - `assets/templates/nextjs_ai_sdk/app/chat/ChatClient.tsx`
   - `assets/templates/nextjs_ai_sdk/app/chat/Response.tsx`
+

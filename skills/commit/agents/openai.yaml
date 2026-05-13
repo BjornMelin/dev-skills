@@ -1,6 +1,0 @@
-interface:
-  display_name: "Commit"
-  short_description: "Stage semantic conventional commits"
-  default_prompt: "Use $commit to inspect the worktree and create scoped, semantic conventional commits without touching unrelated files."
-policy:
-  allow_implicit_invocation: true

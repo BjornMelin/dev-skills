@@ -2,7 +2,7 @@
 
 Default lanes:
 
-- `$repo-modernizer`
+- `$repo-modernize-upgrade-audit`
 - `$opensrc`
 - `$opensrc-inspect`
 - `$technical-writing`

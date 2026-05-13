@@ -91,13 +91,13 @@ report_requirements:
   - graph, affected-run, and validation evidence
   - repo-specific findings and residual risks
 skill_routing_playbook:
-  - "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
   - "Use official Turborepo docs first for unstable claims."
   - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
   - "Use `$platform-architect` when task-graph changes materially affect web/native/backend coordination."
   - "Do not use `$imagegen` for Turborepo upgrade work."
 skill_routing_operator:
-  - "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$turborepo`, and `$vercel:turborepo` when useful."
   - "Proof lane: official Turborepo docs first, source only when public guidance is insufficient."
   - "Conditional lanes: `$bun-dev` for Bun repos, `$platform-architect` for cross-stack monorepo coordination."
   - "Do not route this migration through `$imagegen`."

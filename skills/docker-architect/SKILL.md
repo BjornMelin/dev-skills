@@ -1,6 +1,6 @@
 ---
 name: docker-architect
-description: Docker + Compose—arch, implement, harden, CI. Triggers—Dockerfile, compose, bake, dockerignore, audit, build/run debug, multi-svc dev/prod.
+description: SOTA Docker/Compose architecture, implementation, refactor, and security hardening. Use when working on containerization tasks such as creating or rewriting Dockerfiles, docker-compose files, buildx/bake configs, .dockerignore, and CI pipelines for build/test/scan/publish; auditing existing container setups for security, correctness, size/perf, and best practices (least privilege, non-root, minimal images, pinned base images, BuildKit secrets, healthchecks); debugging Docker build/run issues; or designing dev vs prod compose workflows across services (DB/cache/queues) with correct networking, volumes, secrets, and resource limits.
 ---
 
 # Docker Architect
@@ -11,11 +11,8 @@ Produce production-grade, secure, right-sized Docker images and Compose environm
 
 ## Quick Start (always do this first)
 
-Resolve `skill_dir` as the directory containing this skill before running
-bundled scripts.
-
 1. Inventory the repo and existing container config:
-   - Run `python3 "$skill_dir/scripts/docker_inventory.py" --root .`
+   - Run `python3 /home/bjorn/.codex/skills/docker-architect/scripts/docker_inventory.py --root .`
 2. Choose the target:
    - **New containerization** → follow “New build workflow”
    - **Existing Dockerfiles/Compose** → follow “Audit + refactor workflow”
@@ -26,9 +23,9 @@ bundled scripts.
 
 Template rendering example (edit variables per repo):
 
-- `python3 "$skill_dir/scripts/render_template.py" --template .dockerignore --out .dockerignore`
-- `python3 "$skill_dir/scripts/render_template.py" --template compose/docker-compose.yml --out docker-compose.yml --var IMAGE_NAME=myapp:dev --var HOST_PORT=8000 --var CONTAINER_PORT=8000`
-- `python3 "$skill_dir/scripts/render_template.py" --template compose/docker-compose.dev.yml --out docker-compose.dev.yml --var CONTAINER_PORT=8000 --var DEV_COMMAND='[\"python\",\"-m\",\"uvicorn\",\"myapp.api:app\",\"--host\",\"0.0.0.0\",\"--port\",\"8000\",\"--reload\"]'`
+- `python3 /home/bjorn/.codex/skills/docker-architect/scripts/render_template.py --template .dockerignore --out .dockerignore`
+- `python3 /home/bjorn/.codex/skills/docker-architect/scripts/render_template.py --template compose/docker-compose.yml --out docker-compose.yml --var IMAGE_NAME=myapp:dev --var HOST_PORT=8000 --var CONTAINER_PORT=8000`
+- `python3 /home/bjorn/.codex/skills/docker-architect/scripts/render_template.py --template compose/docker-compose.dev.yml --out docker-compose.dev.yml --var CONTAINER_PORT=8000 --var DEV_COMMAND='[\"python\",\"-m\",\"uvicorn\",\"myapp.api:app\",\"--host\",\"0.0.0.0\",\"--port\",\"8000\",\"--reload\"]'`
 
 ## Workflow Decision Tree
 
@@ -51,19 +48,19 @@ Template rendering example (edit variables per repo):
 3. Create a Dockerfile from templates:
    - Prefer `assets/templates/python/Dockerfile.uv` for modern Python/`uv`
    - Prefer `assets/templates/node/Dockerfile.pnpm` for Node + pnpm
-   - Use `python3 "$skill_dir/scripts/render_template.py" ...` to render with variables.
+   - Use `python3 /home/bjorn/.codex/skills/docker-architect/scripts/render_template.py ...` to render with variables.
 4. Add a compose file for dependencies (DB/cache) and dev/prod profiles:
    - Start from `assets/templates/compose/docker-compose.yml` + an override (`assets/templates/compose/docker-compose.dev.yml` or `assets/templates/compose/docker-compose.prod.yml`)
    - Optional deps file: `assets/templates/compose/docker-compose.deps.yml`
 5. Local validation:
-   - `bash "$skill_dir/scripts/smoke_test_container.sh" --help`
+   - `bash /home/bjorn/.codex/skills/docker-architect/scripts/smoke_test_container.sh --help`
    - Optional: `--build-check` (Docker build checks) and `--pull` (fresh base images)
-   - For compose: `bash "$skill_dir/scripts/smoke_test_compose.sh" --help`
+   - For compose: `bash /home/bjorn/.codex/skills/docker-architect/scripts/smoke_test_compose.sh --help`
 
 ## Audit + refactor workflow (existing Dockerfiles/Compose)
 
 1. Inventory + static audit:
-   - `python3 "$skill_dir/scripts/docker_audit.py" --root .`
+   - `python3 /home/bjorn/.codex/skills/docker-architect/scripts/docker_audit.py --root .`
 2. Identify high-risk issues (see `references/security_hardening.md`):
    - Secrets in image/build args, root/privileged runtime, overly broad mounts, host networking, “latest” tags, missing healthchecks.
 3. Refactor incrementally:
@@ -86,7 +83,6 @@ Template rendering example (edit variables per repo):
 ## “Latest/correct” research rule (do not guess)
 
 When “latest” matters (base images, distro versions, language runtimes, CVEs):
-
 1. Use Exa to confirm current official guidance and tags (official sources preferred).
 2. Use `docker buildx imagetools inspect <image:tag>` to confirm manifests/platforms.
 3. If unsure, mark as `UNVERIFIED` and propose a safe default with a verification step.

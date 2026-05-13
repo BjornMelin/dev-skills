@@ -105,13 +105,13 @@ report_requirements:
   - workflow and validation evidence
   - repo-specific findings and residual risks
 skill_routing_playbook:
-  - "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, and `$expo:upgrading-expo`."
+  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, and `$expo:upgrading-expo`."
   - "Use official Expo and EAS docs first for unstable claims."
   - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
   - "Use Turborepo or platform-architecture lanes only when the repo is a monorepo and those boundaries materially affect the mobile app."
   - "Do not use `$imagegen` for Expo or EAS upgrade work."
 skill_routing_operator:
-  - "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, `$expo:upgrading-expo`."
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$expo`, `$expo:upgrading-expo`."
   - "Proof lane: official Expo and EAS docs first, source only when public guidance is insufficient."
   - "Conditional lanes: `$bun-dev` for Bun repos, `$turborepo` for monorepo task-graph work, `$platform-architect` when the app upgrade crosses web/native/backend boundaries."
   - "Do not route this migration through `$imagegen`."

@@ -10,7 +10,6 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `skills/<skill-name>/assets/` / `templates/`: optional reusable artifacts.
 - `skills/<skill-name>/agents/`: optional agent-runtime metadata (for example OpenAI YAML).
 - `skills/dist/`: prebuilt `.skill` bundles (ZIP archives) for selected skills.
-- `archive/skills/<skill-name>/`: retired skill source history with required `archive.json`; archived skills are not active/installable.
 - `crates/codex-dev-core/`: shared Rust contracts and read models for local task capsules.
 - `crates/codex-dev/`: Rust CLI for local task capsules, policy gates, and development evidence.
 - `crates/codex-dev-tui/`: optional Ratatui workbench for local `codex-dev` task capsules.
@@ -45,7 +44,6 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 - Skill names must be **hyphen-case** and match the folder name (e.g. `langgraph-multiagent`).
 - `SKILL.md` frontmatter should only use allowed keys: `name`, `description`, `license`, `allowed-tools`, `metadata`.
 - Keep `SKILL.md` concise; put large content in `references/`. Prefer scripts over massive inline code blocks.
-- When replacing or retiring a skill, move the old source to `archive/skills/<skill-name>/`, add `archive.json` with `skill_archive.v1`, remove active catalog links, and verify with `codex-dev --json skills audit`.
 - Custom subagent TOML names must be **snake_case** and must not shadow Codex built-ins (`default`, `worker`, `explorer`) unless explicitly requested.
 - Keep generated Rust docs and `target/` out of git; document Rust APIs by updating the relevant docs under `docs/reference/`.
 

@@ -1,6 +1,0 @@
-interface:
-  display_name: "Zod v4"
-  short_description: "Design and migrate Zod v4 schemas"
-  default_prompt: "Use $zod-v4 to design, audit, or migrate Zod v4 schemas, errors, codecs, JSON Schema/OpenAPI, and integrations."
-policy:
-  allow_implicit_invocation: true

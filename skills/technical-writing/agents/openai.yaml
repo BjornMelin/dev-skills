@@ -1,6 +1,0 @@
-interface:
-  display_name: "Technical Writing"
-  short_description: "Write internal engineering docs"
-  default_prompt: "Use $technical-writing to draft or revise internal engineering documentation."
-policy:
-  allow_implicit_invocation: false

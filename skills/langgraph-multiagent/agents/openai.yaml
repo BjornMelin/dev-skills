@@ -1,6 +1,0 @@
-interface:
-  display_name: "LangGraph Multiagent"
-  short_description: "Design LangGraph multi-agent systems"
-  default_prompt: "Use $langgraph-multiagent to plan or review a LangGraph multi-agent architecture."
-policy:
-  allow_implicit_invocation: false

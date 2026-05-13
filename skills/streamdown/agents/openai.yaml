@@ -1,6 +1,0 @@
-interface:
-  display_name: "Streamdown"
-  short_description: "Build streaming markdown AI chat UI"
-  default_prompt: "Use $streamdown to implement or debug Vercel Streamdown streaming markdown, Shiki, KaTeX, Mermaid, and hardened rendering."
-policy:
-  allow_implicit_invocation: false

@@ -1,6 +1,0 @@
-interface:
-  display_name: "pytest Dev"
-  short_description: "Build fast, deterministic pytest suites"
-  default_prompt: "Use $pytest-dev to design, fix, speed up, or harden pytest suites, fixtures, markers, coverage, and CI test behavior."
-policy:
-  allow_implicit_invocation: true

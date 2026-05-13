@@ -1,6 +1,0 @@
-interface:
-  display_name: "Docker Architect"
-  short_description: "Design and harden Docker/Compose setups"
-  default_prompt: "Use $docker-architect to design, implement, audit, or debug Dockerfiles, Compose, dockerignore, and container CI."
-policy:
-  allow_implicit_invocation: false

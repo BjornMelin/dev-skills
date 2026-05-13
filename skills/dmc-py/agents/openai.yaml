@@ -1,6 +1,0 @@
-interface:
-  display_name: "DMC Python"
-  short_description: "Build Dash Mantine Components apps"
-  default_prompt: "Use $dmc-py to implement or review Dash Mantine Components code with current DMC patterns."
-policy:
-  allow_implicit_invocation: false

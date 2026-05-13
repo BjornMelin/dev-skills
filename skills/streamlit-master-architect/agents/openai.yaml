@@ -1,6 +1,0 @@
-interface:
-  display_name: "Streamlit Architect"
-  short_description: "Build and harden production Streamlit apps"
-  default_prompt: "Use $streamlit-master-architect to build, refactor, debug, test, or deploy production Streamlit apps."
-policy:
-  allow_implicit_invocation: false

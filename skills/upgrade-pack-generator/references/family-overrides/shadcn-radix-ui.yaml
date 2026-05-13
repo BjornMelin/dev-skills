@@ -193,7 +193,7 @@ report_requirements:
   - final verification evidence
   - repo-specific findings and residual risks
 skill_routing_playbook:
-  - "Always start in the upgrade and cleanup lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
+  - "Always start in the upgrade and cleanup lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
   - "Primary shadcn execution lane: `$vercel:shadcn` or a repo-local shadcn skill, plus the `shadcn` CLI."
   - "Use official-doc lanes first for unstable claims: current shadcn docs, Radix docs, changelogs, and upstream source when needed."
   - "Use `$vitest` or `$vitest-dev` when UI tests, coverage, or Vitest config need to change."
@@ -232,7 +232,7 @@ operator_exit_criteria:
   - verification is green
   - "`@radix-ui/react-icons` status is explicit, not accidental"
 skill_routing_operator:
-  - "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
+  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
   - "Primary execution lane: `$vercel:shadcn` or a repo-local shadcn skill, plus the `shadcn` CLI."
   - "Proof lane: current shadcn/Radix docs and upstream source when CLI behavior needs confirmation."
   - "Test and browser lanes: `$vitest` or `$vitest-dev` for test changes; `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` for visible regression checks."
