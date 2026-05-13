@@ -1,0 +1,6 @@
+interface:
+  display_name: "AGENTS.md Maintainer"
+  short_description: "Patch durable AGENTS.md guidance"
+  default_prompt: "Use $agents-md-maintainer to decide whether implementation changed durable AGENTS.md guidance and patch it only when needed."
+policy:
+  allow_implicit_invocation: true
