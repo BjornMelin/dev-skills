@@ -12,6 +12,7 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
+- retired skill source history under `archive/skills/`;
 - reusable local Codex plugin source under `plugins/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
@@ -63,6 +64,11 @@ skills/
     assets/               # optional (templates/snippets)
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
+archive/
+  skills/
+    <skill-name>/
+      archive.json        # required archive metadata
+      SKILL.md            # retained source; not active
 plugins/
   <plugin-name>/
     .codex-plugin/
@@ -212,11 +218,14 @@ validation, and skill packaging rules, see
 
 ## Skill catalog
 
-All skills are stored in `skills/`. The canonical entrypoint for each skill is
-its `SKILL.md`. Machine-readable inventory for automation is available through
-`codex-dev --json skills inventory`; the public Agent Skills Lab artifact is
-generated with `codex-dev --json skills catalog --out catalog/agent-skills-lab.json`.
-The table below remains the human-facing catalog.
+Active skills are stored in `skills/`. The canonical entrypoint for each active
+skill is its `SKILL.md`. Machine-readable inventory for automation is available
+through `codex-dev --json skills inventory`; the public Agent Skills Lab
+artifact is generated with
+`codex-dev --json skills catalog --out catalog/agent-skills-lab.json`. Retired
+skills belong in `archive/skills/` with an `archive.json` manifest and must not
+remain linked from this active catalog. The table below remains the human-facing
+active catalog.
 
 ### Local Plugin Skill Bundles
 
@@ -252,7 +261,6 @@ The table below remains the human-facing catalog.
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
 | `docs-align` | Post-implement docs alignment: drift detection, ADRs, specs, README, `AGENTS.md`. | [skills/docs-align/SKILL.md](skills/docs-align/SKILL.md) |
 | `firecrawl` | Firecrawl CLI for search, scrape, map, crawl, interact, monitor, download, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
-| `gh-deps-intel` | JS/TS + Python dependency intel for monorepos: outdated checks, releases/changelogs → Markdown + JSON. | [skills/gh-deps-intel/SKILL.md](skills/gh-deps-intel/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
 | `kimi-ui-advisor` | Explicit-only Kimi Code CLI advisor for UI audit, redesign, component, screenshot, and compare loops that Codex reviews and verifies. | [skills/kimi-ui-advisor/SKILL.md](skills/kimi-ui-advisor/SKILL.md) |
@@ -265,7 +273,7 @@ The table below remains the human-facing catalog.
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
 | `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
-| `repo-modernize-upgrade-audit` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernize-upgrade-audit/SKILL.md](skills/repo-modernize-upgrade-audit/SKILL.md) |
+| `repo-modernizer` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernizer/SKILL.md](skills/repo-modernizer/SKILL.md) |
 | `review-remediation` | Fix local review notes with verify-first triage; excludes hosted GitHub PR review loops. | [skills/review-remediation/SKILL.md](skills/review-remediation/SKILL.md) |
 | `rust-cli-clap` | Rust CLI and Clap command design: parsers, output contracts, tests, packaging. | [skills/rust-cli-clap/SKILL.md](skills/rust-cli-clap/SKILL.md) |
 | `rust-expert` | Core Rust engineering router for ownership, async, crates, tests, performance, and security. | [skills/rust-expert/SKILL.md](skills/rust-expert/SKILL.md) |

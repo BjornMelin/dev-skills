@@ -108,6 +108,8 @@ Skills subcommands:
 
 - `skills catalog`
 - `skills inventory`
+- `skills validate`
+- `skills audit`
 - `skills sync-kimi`
 
 Bootstrap subcommands:
@@ -340,6 +342,45 @@ frontmatter checks used by `tools/skill/quick_validate.py`: required string
 the directory, and non-empty descriptions without angle brackets. The Python
 validator and packager remain the authorities for full spec validation and
 `.skill` archive creation; this command owns the read-only inventory report.
+
+## skills validate
+
+Validate skill entrypoints with the same bounded Rust frontmatter checks used by
+`skills inventory`, but with blocking validation intent:
+
+```bash
+cargo run -q -p codex-dev -- --json skills validate
+cargo run -q -p codex-dev -- --json skills validate --skills-root ~/.agents/skills
+```
+
+`skills validate` emits `result.schema: "skill_inventory.v1"`. It exits nonzero
+when any skill has invalid frontmatter, the skills root is missing or unsafe, or
+the inventory contains error diagnostics. Use it for installed global roots when
+the Python `quick_validate.py` loop would be slower or more token-heavy. Use the
+Python validator before packaging when exact package-tool parity matters.
+
+## skills audit
+
+Audit skill hygiene beyond required frontmatter:
+
+```bash
+cargo run -q -p codex-dev -- --json skills audit
+cargo run -q -p codex-dev -- --json skills audit --skills-root ~/.agents/skills
+```
+
+`skills audit` emits `result.schema: "skill_audit.v1"`. It checks validation
+diagnostics, missing `agents/openai.yaml`, oversized `SKILL.md` files, stale
+skill path patterns such as `~/.codex/skills`, and generated Python cache files
+under bundled scripts. It also validates `archive/skills/<skill>/archive.json`
+manifests without adding archived skills to the active inventory, flags archived
+skills that still exist under `skills/`, missing active replacements, name
+mismatches, invalid source/archive paths, missing archive reasons, missing
+restore guidance, and active-catalog references. `--max-skill-md-lines`
+defaults to `500`.
+
+The archive summary is reported at `result.archive` with schema
+`skill_archive.v1`, root, total archived skill count, and manifest-derived skill
+entries. `skills inventory` and `skills validate` remain active-skill only.
 
 ## skills sync-kimi
 
@@ -1291,6 +1332,8 @@ cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
+cargo run -q -p codex-dev -- --json skills validate
+cargo run -q -p codex-dev -- --json skills audit
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
