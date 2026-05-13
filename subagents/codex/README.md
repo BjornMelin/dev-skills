@@ -1,7 +1,6 @@
-# Hardened Codex Subagents
+# Codex Subagents
 
-This directory is the tracked source pack for Bjorn's hardened Codex custom
-subagents.
+This directory is the tracked source pack for Bjorn's Codex custom subagents.
 
 It intentionally separates:
 
@@ -28,8 +27,8 @@ The runtime policy is:
 ## Regenerate
 
 ```bash
-python3 subagents/hardened-codex/scripts/render_agents.py
-python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
+python3 subagents/codex/scripts/render_agents.py
+python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
 ```
 
 ## Install
@@ -37,14 +36,14 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/h
 Dry run:
 
 ```bash
-python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
 ```
 
 Install a local-only private overlay by keeping its TOML files in an ignored
 `agents/overlays/<repo>/` directory and passing the target checkout explicitly:
 
 ```bash
-python3 subagents/hardened-codex/scripts/sync_agents.py \
+python3 subagents/codex/scripts/sync_agents.py \
   --overlay <repo> \
   --project-dir /path/to/private/repo \
   --dry-run
@@ -54,9 +53,9 @@ For repeated private installs, copy `overlays.local.example.json` to the ignored
 `overlays.local.json`, set local overlay names and project paths there, then use:
 
 ```bash
-python3 subagents/hardened-codex/scripts/sync_agents.py --list
-python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --validate-sources
-python3 subagents/hardened-codex/scripts/sync_agents.py --all-local-overlays --dry-run
+python3 subagents/codex/scripts/sync_agents.py --list
+python3 subagents/codex/scripts/sync_agents.py --all-local-overlays --validate-sources
+python3 subagents/codex/scripts/sync_agents.py --all-local-overlays --dry-run
 ```
 
 For maintainable private role definitions, keep the source specs in ignored
@@ -67,7 +66,7 @@ keeps `ROLE_CATALOG.md` limited to the public catalog.
 Apply with timestamp backups:
 
 ```bash
-python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays
+python3 subagents/codex/scripts/sync_agents.py --global --all-overlays
 ```
 
 ## Smoke
@@ -76,10 +75,10 @@ Use the release manifest and validation runbook as the source of truth. Minimum
 tracked-pack smoke:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
-PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
-git check-ignore -v subagents/hardened-codex/overlays.local.json subagents/hardened-codex/roles.local.json subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
+git check-ignore -v subagents/codex/overlays.local.json subagents/codex/roles.local.json subagents/codex/agents/overlays/private-repo/private_repo_reviewer.toml
 ```
 
 After installation, add representative Codex live spawns for the roles most

@@ -67,7 +67,7 @@ preserve.
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
 | Hosted PR review remediation | `gh-pr-review-fix`, `review-remediation` | Captures review-pack/CI snapshots and links fixes. |
 | PR-agent hosted write safety | `docs/specs/codex-dev-pr-agent-safety-model.md` | Defines explicit target, dry-run, `--apply`, stale-thread, idempotency, token, and prompt-injection rules before hosted mutations exist. |
-| Hardened personal subagent pack | `subagents/hardened-codex` | Treats as a bootstrap input and smoke target. |
+| Codex subagent source pack | `subagents/codex` | Treats as a bootstrap input and smoke target. |
 | Memory and Codex runtime guidance | `codex-sdk` docs/skill | Links proposal docs; does not mutate runtime memory. |
 | Optional terminal UI | `codex-dev-tui` | Reads `codex-dev-core` JSON contracts; never owns policy. |
 
@@ -666,9 +666,9 @@ from #39 through #57 must follow the dependency order and branch ledger in the
 per branch and PR, merge into `main`, sync local `main`, and then start the next
 issue.
 
-## Hardened Subagent Pack Boundary
+## Codex Subagent Pack Boundary
 
-`subagents/hardened-codex` is a tracked source pack. Public artifacts include
+`subagents/codex` is a tracked source pack. Public artifacts include
 global roles, public overlays, renderer, sync helper, examples, and generated
 catalog. Local manifests and private overlays are ignored by design.
 
@@ -685,8 +685,8 @@ Rules:
 Baseline checks:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
 PYTHONDONTWRITEBYTECODE=1 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 ```
 

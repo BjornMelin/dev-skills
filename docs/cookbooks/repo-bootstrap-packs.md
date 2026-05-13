@@ -61,16 +61,16 @@ find "$tmp/repo" -maxdepth 3 -type f | sort
 Use `--force` only when intentionally replacing files in a disposable render
 directory or after reviewing the existing target contents.
 
-## Hardened Subagent Release Manifest
+## Codex Subagent Release Manifest
 
-The hardened pack release boundary is tracked in
-`subagents/hardened-codex/RELEASE_MANIFEST.json`.
+The Codex subagent release boundary is tracked in
+`subagents/codex/RELEASE_MANIFEST.json`.
 
 The public surface is:
 
-- global roles under `subagents/hardened-codex/agents/global`;
-- public overlays under `subagents/hardened-codex/agents/overlays/docmind`
-  and `subagents/hardened-codex/agents/overlays/tooling`;
+- global roles under `subagents/codex/agents/global`;
+- public overlays under `subagents/codex/agents/overlays/docmind`
+  and `subagents/codex/agents/overlays/tooling`;
 - renderer and sync scripts;
 - example manifests for local overlays and local roles.
 
@@ -78,12 +78,12 @@ The private local surface is ignored:
 
 - `overlays.local.json` and `overlays.local.*.json`;
 - `roles.local.json` and `roles.local.*.json`;
-- overlay directories under `subagents/hardened-codex/agents/overlays/*/`
+- overlay directories under `subagents/codex/agents/overlays/*/`
   except the explicit public allowlist.
 
 ## Smoke Matrix
 
-Run these checks after changing bootstrap packs, hardened agents, or install
+Run these checks after changing bootstrap packs, Codex subagents, or install
 docs:
 
 ```bash
@@ -94,14 +94,14 @@ python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
 python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
-PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 for path in \
-  subagents/hardened-codex/overlays.local.json \
-  subagents/hardened-codex/roles.local.json \
-  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  subagents/codex/overlays.local.json \
+  subagents/codex/roles.local.json \
+  subagents/codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
   git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
 done
 git diff --check

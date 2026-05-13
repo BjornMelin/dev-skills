@@ -635,10 +635,10 @@ cargo check -p codex-research
 cargo test -p codex-research
 codex-research --json doctor
 codex-research --json eval
-python3 -m compileall -q skills tools subagents/hardened-codex/scripts
+python3 -m compileall -q skills tools subagents/codex/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
 python3 tools/eval/skill_subagent_eval.py --json
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 git diff --check
 ```

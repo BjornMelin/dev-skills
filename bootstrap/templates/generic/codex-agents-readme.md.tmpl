@@ -13,7 +13,7 @@ Preview first:
 
 ```bash
 export DEV_SKILLS="$dev_skills_path"
-python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+python3 "$DEV_SKILLS/subagents/codex/scripts/sync_agents.py" \
   --overlay tooling \
   --project-dir "$PWD" \
   --dry-run
@@ -22,7 +22,7 @@ python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
 Apply only after reviewing the planned copy actions:
 
 ```bash
-python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+python3 "$DEV_SKILLS/subagents/codex/scripts/sync_agents.py" \
   --overlay tooling \
   --project-dir "$PWD"
 ```

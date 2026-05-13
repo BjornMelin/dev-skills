@@ -17,7 +17,7 @@ This repo now contains skill packages and supporting tooling:
 - a Rust development CLI, `codex-dev`, under `crates/`;
 - an optional Rust terminal workbench, `codex-dev-tui`, under `crates/`;
 - a Rust research CLI, `codex-research`, under `crates/`;
-- hardened Codex subagent source packs under `subagents/`;
+- Codex subagent source packs under `subagents/`;
 - tracked documentation under `docs/`;
 - skill, bootstrap, docs, and eval helpers under `tools/`.
 
@@ -81,7 +81,7 @@ tools/
   docs/                   # documentation checks
   skill/                  # skill validation and packaging helpers
 subagents/
-  hardened-codex/         # tracked global roles, public overlays, and sync helpers
+  codex/                  # tracked global roles, public overlays, and sync helpers
 ```
 
 ## Research, Subagent, and Operating Stack

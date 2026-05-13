@@ -25,14 +25,14 @@ that checkout path first:
 
 ```bash
 export DEV_SKILLS="$dev_skills_path"
-python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" --global --dry-run
+python3 "$DEV_SKILLS/subagents/codex/scripts/sync_agents.py" --global --dry-run
 ```
 
 Install a project overlay into this checkout only after reviewing the planned
 copy actions:
 
 ```bash
-python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
+python3 "$DEV_SKILLS/subagents/codex/scripts/sync_agents.py" \
   --overlay tooling \
   --project-dir "$PWD" \
   --dry-run
@@ -40,7 +40,7 @@ python3 "$DEV_SKILLS/subagents/hardened-codex/scripts/sync_agents.py" \
 
 ## Rollback
 
-The hardened installer creates timestamped backups below `.codex/agent-backups`
+The Codex subagent installer creates timestamped backups below `.codex/agent-backups`
 for project installs and `~/.codex/agent-backups` for global installs. Restore
 from the newest backup directory if an agent role needs to be reverted.
 

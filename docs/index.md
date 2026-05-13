@@ -66,7 +66,7 @@ out of version control.
 - [Crate Reference](reference/codex-research-crate.md): Rust crate structure,
   data model, provider behavior, and extension points.
 - [Validation](runbooks/validation.md): local gates including research evals,
-  bootstrap pack rendering, and hardened subagent smoke checks.
+  bootstrap pack rendering, and Codex subagent smoke checks.
 - [Global CLI Workflow](runbooks/global-cli-workflow.md): install/update,
   completion, manpage, and isolated install smoke checks for the Rust CLIs.
 - [Local Release and Supply Chain](runbooks/local-release-supply-chain.md):

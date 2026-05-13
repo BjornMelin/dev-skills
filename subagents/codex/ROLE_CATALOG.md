@@ -1,6 +1,6 @@
-# Hardened Codex Subagent Catalog
+# Codex Subagent Catalog
 
-This pack is the source of truth for Bjorn's hardened Codex custom subagents.
+This pack is the source of truth for Bjorn's Codex custom subagents.
 It renders global agents under `agents/global` and project overlays under
 `agents/overlays/<repo>`.
 
@@ -91,6 +91,6 @@ overlay to global only after it proves useful across unrelated repositories.
 ## Regeneration
 
 ```bash
-python3 subagents/hardened-codex/scripts/render_agents.py
-python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
+python3 subagents/codex/scripts/render_agents.py
+python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
 ```

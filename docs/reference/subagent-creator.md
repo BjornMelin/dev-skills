@@ -27,7 +27,7 @@ skills/subagent-creator/
 
 `templates/agents/*.toml` is the canonical source for the general reusable
 template packs listed below. Do not use this directory for `subspawn` standalone
-fallback copies or hardened-codex overlays.
+fallback copies or Codex subagent overlays.
 
 ## Role Destinations
 
@@ -150,7 +150,7 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate \
   skills/deep-researcher/templates/agents \
   skills/subagent-creator/templates/agents \
   skills/subspawn/templates/agents \
-  subagents/hardened-codex/agents
+  subagents/codex/agents
 ```
 
 Smoke test:
