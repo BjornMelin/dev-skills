@@ -1,0 +1,6 @@
+interface:
+  display_name: "New Branch"
+  short_description: "Create a scoped branch and plan"
+  default_prompt: "Use $new-branch to create a scoped conventional branch and present the implementation plan."
+policy:
+  allow_implicit_invocation: false
