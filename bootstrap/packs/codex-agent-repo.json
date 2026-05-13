@@ -11,8 +11,8 @@
       "repo-docs-align"
     ],
     "subagent_sources": [
-      "subagents/hardened-codex/agents/global",
-      "subagents/hardened-codex/agents/overlays/tooling"
+      "subagents/codex/agents/global",
+      "subagents/codex/agents/overlays/tooling"
     ]
   },
   "files": [

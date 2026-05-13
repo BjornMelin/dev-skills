@@ -411,7 +411,7 @@ fn write_bootstrap_repo(root: &std::path::Path) -> std::path::PathBuf {
   "description": "Generic Codex-ready repository bootstrap.",
   "composes": {
     "skills": ["deep-researcher", "subspawn"],
-    "subagent_sources": ["subagents/hardened-codex/agents/global"]
+    "subagent_sources": ["subagents/codex/agents/global"]
   },
   "files": [
     {"target": "AGENTS.md", "template": "generic/AGENTS.md.tmpl"},
@@ -429,7 +429,7 @@ fn write_bootstrap_repo(root: &std::path::Path) -> std::path::PathBuf {
   "description": "Rust CLI repository bootstrap.",
   "composes": {
     "skills": ["rust-expert", "rust-cli-clap"],
-    "subagent_sources": ["subagents/hardened-codex/agents/global"]
+    "subagent_sources": ["subagents/codex/agents/global"]
   },
   "files": [
     {"target": "docs/rust-agent-workflow.md", "template": "rust-cli/rust-agent-workflow.md.tmpl"}

@@ -379,7 +379,7 @@ ignored local dist artifacts must also be clean.
 ## Python Helpers
 
 ```bash
-python3 -m compileall -q skills tools subagents/hardened-codex/scripts
+python3 -m compileall -q skills tools subagents/codex/scripts
 ```
 
 ## Bootstrap Packs
@@ -395,14 +395,14 @@ python3 tools/bootstrap/render_bootstrap_pack.py --validate
 tmp=$(mktemp -d)
 python3 tools/bootstrap/render_bootstrap_pack.py --pack codex-agent-repo --out "$tmp/codex" --repo-name codex-smoke --generated-at 2026-05-09T06:00:00Z
 python3 tools/bootstrap/render_bootstrap_pack.py --pack rust-cli-agent-repo --out "$tmp/rust" --repo-name rust-smoke --primary-language rust --generated-at 2026-05-09T06:00:00Z
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
-PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/hardened-codex/agents
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 skills/subagent-creator/scripts/subagent_creator.py validate subagents/codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 for path in \
-  subagents/hardened-codex/overlays.local.json \
-  subagents/hardened-codex/roles.local.json \
-  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  subagents/codex/overlays.local.json \
+  subagents/codex/roles.local.json \
+  subagents/codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
   git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
 done
 git diff --check
@@ -417,7 +417,7 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate \
   skills/deep-researcher/templates/agents \
   skills/subagent-creator/templates/agents \
   skills/subspawn/templates/agents \
-  subagents/hardened-codex/agents
+  subagents/codex/agents
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles
 python3 skills/subspawn/scripts/subspawn_plan.py plan \
   --preset research \
@@ -624,16 +624,16 @@ root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
 (cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
-python3 -m compileall -q skills tools subagents/hardened-codex/scripts
+python3 -m compileall -q skills tools subagents/codex/scripts
 python3 tools/docs/check_links.py docs README.md AGENTS.md
-python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/hardened-codex/agents
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --validate-release-manifest
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --dry-run
-PYTHONDONTWRITEBYTECODE=1 python3 subagents/hardened-codex/scripts/sync_agents.py --global --all-overlays --validate-sources
+python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --validate-release-manifest
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --dry-run
+PYTHONDONTWRITEBYTECODE=1 python3 subagents/codex/scripts/sync_agents.py --global --all-overlays --validate-sources
 for path in \
-  subagents/hardened-codex/overlays.local.json \
-  subagents/hardened-codex/roles.local.json \
-  subagents/hardened-codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
+  subagents/codex/overlays.local.json \
+  subagents/codex/roles.local.json \
+  subagents/codex/agents/overlays/private-repo/private_repo_reviewer.toml; do
   git check-ignore -v -- "$path" >/dev/null || { echo "not ignored: $path" >&2; exit 1; }
 done
 python3 skills/subspawn/scripts/subspawn_plan.py validate-roles

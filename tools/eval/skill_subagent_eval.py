@@ -155,7 +155,7 @@ def default_checks() -> list[EvalCheck]:
                 "skills/deep-researcher/templates/agents",
                 "skills/subagent-creator/templates/agents",
                 "skills/subspawn/templates/agents",
-                "subagents/hardened-codex/agents",
+                "subagents/codex/agents",
             ),
         ),
         EvalCheck(
@@ -186,7 +186,7 @@ def default_checks() -> list[EvalCheck]:
         ),
         EvalCheck(
             id="python-helper-compile",
-            name="Skill, tool, and hardened-subagent Python helpers compile",
+            name="Skill, tool, and Codex subagent Python helpers compile",
             command=(
                 "python3",
                 "-m",
@@ -194,7 +194,7 @@ def default_checks() -> list[EvalCheck]:
                 "-q",
                 "skills",
                 "tools",
-                "subagents/hardened-codex/scripts",
+                "subagents/codex/scripts",
             ),
         ),
     ]

@@ -141,7 +141,7 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate ~/.codex/ag
    cargo fmt --all --check
    cargo test -p codex-research
    for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
-   python3 -m compileall -q skills tools subagents/hardened-codex/scripts
+   python3 -m compileall -q skills tools subagents/codex/scripts
    python3 tools/eval/skill_subagent_eval.py --json
    git diff --check
    ```

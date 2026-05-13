@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the hardened Codex subagent catalog with backups."""
+"""Install the Codex subagent catalog with backups."""
 
 from __future__ import annotations
 
@@ -510,7 +510,7 @@ def validate_release_manifest(manifest: Path = RELEASE_MANIFEST) -> int:
         errors.append(f"invalid release manifest {manifest}: {exc}")
         payload = {}
 
-    if payload.get("schema") != "dev-skills.hardened-codex-release.v1":
+    if payload.get("schema") != "dev-skills.codex-subagents-release.v1":
         errors.append("release manifest schema is invalid")
 
     public_overlay_allowlist, allowlist_errors = (

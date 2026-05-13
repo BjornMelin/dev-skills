@@ -16,7 +16,7 @@ unit; they should be self-contained and redistributable.
 | `skills/subagent-creator/templates/agents/` | Canonical for general reusable custom-agent packs | Author, validate, install, sync, diff, back up, prune, and smoke-test general role templates | Adding or changing reusable docs, review, audit, ops, implementation, or CI roles |
 | `skills/deep-researcher/templates/agents/` | Canonical for the deep-researcher Focused Six | Ship the research-specific roles used by the deep-researcher skill and its focused installer | Changing the deep research role contract, model posture, evidence contract, or installable Focused Six set |
 | `skills/subspawn/templates/agents/` | Packaged fallback copies, not a primary authoring source in a full checkout | Let the standalone `subspawn.skill` resolve preset roles without sibling skills | A `subspawn` preset depends on a role that must remain available when only the packaged subspawn skill is installed |
-| `subagents/hardened-codex/agents/` | Separate hardened global/repo overlay catalog | Global Codex baseline and repo overlay distribution, validated by hardened-codex sync tooling | Changing hardened global defaults or repo-specific overlays |
+| `subagents/codex/agents/` | Separate global/repo overlay catalog | Global Codex baseline and repo overlay distribution, validated by Codex subagent sync tooling | Changing global defaults or repo-specific overlays |
 
 Do not add a second copy just because a role is useful in multiple places. Add
 the role to the canonical owner first, then add a fallback copy only when a
@@ -40,8 +40,8 @@ Expected duplicates are limited to one of these cases:
 - a `subspawn` fallback copy mirrors a role used by a preset;
 - a general `subagent-creator` pack also includes the same role name with
   pack-specific model or instruction posture for installation convenience;
-- a hardened-codex overlay intentionally carries its own catalog and is
-  validated by the hardened-codex release checks.
+- a Codex subagent overlay intentionally carries its own catalog and is
+  validated by the Codex subagent release checks.
 
 Treat a duplicate as a bug when:
 
@@ -94,7 +94,7 @@ python3 skills/subagent-creator/scripts/subagent_creator.py validate \
   skills/deep-researcher/templates/agents \
   skills/subagent-creator/templates/agents \
   skills/subspawn/templates/agents \
-  subagents/hardened-codex/agents
+  subagents/codex/agents
 ```
 
 Validate duplicate handling and planner-visible return contracts:
