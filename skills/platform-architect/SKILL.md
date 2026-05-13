@@ -24,7 +24,7 @@ Use this skill to route broad platform work into the correct web, native, backen
    - Dash callback or Dash UI review -> `$dash-audit`
    - Design/build work -> `$frontend-design`
    - Docs sync -> `$repo-docs-align`
-   - Dependency work -> `$gh-deps-intel`
+   - Dependency modernization -> `$repo-modernizer`
 
 ## Use When
 
