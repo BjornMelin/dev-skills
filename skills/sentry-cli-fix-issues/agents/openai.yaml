@@ -1,0 +1,6 @@
+interface:
+  display_name: "Sentry CLI Fix Issues"
+  short_description: "Fix Sentry issues from CLI evidence"
+  default_prompt: "Use $sentry-cli-fix-issues to investigate a Sentry issue with CLI evidence, patch the root cause, and report verification."
+policy:
+  allow_implicit_invocation: true

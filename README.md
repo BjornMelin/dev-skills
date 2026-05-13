@@ -250,6 +250,8 @@ catalog.
 | `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `signr-pr-closure-loop` | Signr-style PR closure: review threads, CI, Expo/EAS, Vercel/Turborepo, docs, babysit to merge-ready. | [skills/signr-pr-closure-loop/SKILL.md](skills/signr-pr-closure-loop/SKILL.md) |
+| `sentry-cli-fix-issues` | Fix Sentry issues from CLI evidence: issues, events, traces, logs, replays, Seer, privacy, and verification. | [skills/sentry-cli-fix-issues/SKILL.md](skills/sentry-cli-fix-issues/SKILL.md) |
+| `sentry-triage-to-pr` | Rank unresolved Sentry issues, group PR-sized fixes, render GitHub issue plans, and plan subspawn worktrees. | [skills/sentry-triage-to-pr/SKILL.md](skills/sentry-triage-to-pr/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit: reruns/state, caching/fragments, AppTest, components v2, security, Playwright E2E. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |
 | `subagent-creator` | Create, validate, install, diff, sync, and smoke-test Codex custom subagent TOML role packs. | [skills/subagent-creator/SKILL.md](skills/subagent-creator/SKILL.md) |

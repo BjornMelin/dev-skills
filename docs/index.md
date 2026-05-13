@@ -19,6 +19,9 @@ skill-authoring systems added to this repository:
   agents.
 - `subspawn`: hardened subagent delegation policy with planner-generated
   prompts, strict wait, and evidence-first synthesis.
+- `sentry-triage-to-pr`: skill and portable Python operator for ranking
+  unresolved Sentry issues, grouping PR-sized fixes, rendering GitHub issue
+  plans, and planning subspawn worktrees from redacted CLI evidence.
 
 The docs are handwritten and tracked. Generated Rust docs and build output stay
 out of version control.
@@ -82,6 +85,7 @@ out of version control.
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
+- [Sentry Triage To PR Skill](../skills/sentry-triage-to-pr/SKILL.md)
 - [Subagent Templates](reference/subagent-templates.md): authority model for
   reusable templates, packaged fallback copies, duplicate-role validation, and
   skill packaging rules.
