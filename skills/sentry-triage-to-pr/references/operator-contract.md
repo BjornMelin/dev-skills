@@ -66,7 +66,7 @@ sentry issue view ISSUE --spans 3 --json
 sentry issue events ISSUE --full --period 7d --limit 5 --json
 sentry issue explain ISSUE --json
 sentry issue plan ISSUE --json
-sentry trace logs TRACE_ID --period 7d --limit 50 --json
+sentry trace logs TRACE_ID --json
 sentry replay view REPLAY_ID --json
 ```
 

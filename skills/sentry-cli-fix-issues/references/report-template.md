@@ -18,7 +18,11 @@ Use this shape for final closeout after fixing a Sentry issue.
 | `sentry trace view ...` | trace/span evidence, or `not available` |
 | `sentry issue explain/plan ...` | advisory finding, or `not used` |
 
-Mark any incomplete claim as `UNVERIFIED`.
+Mark any incomplete claim as `UNVERIFIED`. Before recording command output or
+evidence, redact PII, tokens, secrets, hostnames, IPs, UUIDs, session IDs, DSNs,
+and other sensitive identifiers. Replace sensitive values with `[REDACTED]`.
+
+- Redaction checked: yes/no
 
 ## Files Changed
 

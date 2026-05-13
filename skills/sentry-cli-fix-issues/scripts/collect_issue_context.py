@@ -13,6 +13,21 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
+JsonValue = (
+    None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
+)
+JsonObject = dict[str, JsonValue]
+
+ISSUE_VIEW_FIELDS = (
+    "id,shortId,title,culprit,count,userCount,firstSeen,lastSeen,level,status,"
+    "substatus,priority,platform,permalink,project,metadata,assignedTo,"
+    "isUnhandled,event,trace,replayIds"
+)
+EVENT_FIELDS = (
+    "id,eventID,groupID,projectID,message,title,location,culprit,user,tags,"
+    "platform,dateCreated,crashFile,metadata"
+)
+
 
 SENSITIVE_KEY_RE = re.compile(
     r"(authorization|cookie|token|secret|password|passwd|api[_-]?key|dsn|"
@@ -26,6 +41,15 @@ SENTRY_DSN_RE = re.compile(r"https?://[^@\s]+@[^/\s]+/\d+")
 
 
 def redact_scalar(value: str, max_string: int) -> str:
+    """Redact sensitive patterns from a scalar string.
+
+    Args:
+        value: String to redact.
+        max_string: Maximum retained length before truncation.
+
+    Returns:
+        Redacted and possibly truncated string.
+    """
     value = EMAIL_RE.sub("[REDACTED_EMAIL]", value)
     value = BEARER_RE.sub("Bearer [REDACTED]", value)
     value = SENTRY_DSN_RE.sub("[REDACTED_DSN]", value)
@@ -35,7 +59,19 @@ def redact_scalar(value: str, max_string: int) -> str:
     return value
 
 
-def redact(value: Any, max_string: int = 500, key: str | None = None) -> Any:
+def redact(
+    value: JsonValue, max_string: int = 500, key: str | None = None
+) -> JsonValue:
+    """Redact sensitive keys and nested scalar values.
+
+    Args:
+        value: JSON-compatible value to redact.
+        max_string: Maximum retained string length.
+        key: Optional parent key used for key-based redaction.
+
+    Returns:
+        Redacted JSON-compatible value.
+    """
     if key and SENSITIVE_KEY_RE.search(key):
         return "[REDACTED]"
     if isinstance(value, dict):
@@ -47,10 +83,20 @@ def redact(value: Any, max_string: int = 500, key: str | None = None) -> Any:
     return value
 
 
-def run_sentry(args: list[str], timeout: int) -> dict[str, Any]:
+def run_sentry(args: list[str], timeout: int) -> JsonObject:
+    """Run a Sentry CLI command and capture raw output.
+
+    Args:
+        args: Arguments passed after the `sentry` executable.
+        timeout: Maximum command runtime in seconds.
+
+    Returns:
+        Command record with args, return code, and captured output or error.
+    """
     command = ["sentry", *args]
     try:
-        proc = subprocess.run(
+        # No shell is used; argv is constrained to the sentry executable.
+        proc = subprocess.run(  # noqa: S603
             command,
             check=False,
             capture_output=True,
@@ -83,9 +129,38 @@ def run_sentry(args: list[str], timeout: int) -> dict[str, Any]:
     return result
 
 
-def parse_json_result(result: dict[str, Any]) -> Any:
+def positive_int(value: str) -> int:
+    """Parse a positive integer for argparse.
+
+    Args:
+        value: Raw command-line value.
+
+    Returns:
+        Parsed integer greater than zero.
+
+    Raises:
+        argparse.ArgumentTypeError: When the value is not a positive integer.
+    """
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def parse_json_result(result: JsonObject) -> JsonValue:
+    """Parse a Sentry command JSON result.
+
+    Args:
+        result: Command record returned by `run_sentry`.
+
+    Returns:
+        Parsed JSON value, `None` when stdout is empty, or a parse error record.
+    """
     stdout = result.get("stdout", "")
-    if not stdout:
+    if not isinstance(stdout, str) or not stdout:
         return None
     try:
         return json.loads(stdout)
@@ -99,7 +174,19 @@ def add_json_command(
     args: list[str],
     timeout: int,
     max_string: int,
-) -> Any:
+) -> JsonValue:
+    """Run a JSON Sentry command and add it to the bundle.
+
+    Args:
+        bundle: Mutable output bundle.
+        label: Section label for the parsed command output.
+        args: Sentry CLI arguments.
+        timeout: Maximum command runtime in seconds.
+        max_string: Maximum retained string length.
+
+    Returns:
+        Parsed command JSON, or a parse/empty-output sentinel.
+    """
     result = run_sentry(args, timeout)
     parsed = parse_json_result(result)
     bundle["commands"].append(
@@ -117,7 +204,16 @@ def add_json_command(
     return parsed
 
 
-def nested_values(value: Any, wanted_keys: set[str]) -> list[str]:
+def nested_values(value: JsonValue, wanted_keys: set[str]) -> list[str]:
+    """Collect string values for matching nested keys.
+
+    Args:
+        value: JSON-compatible value to inspect.
+        wanted_keys: Normalized key names to extract.
+
+    Returns:
+        Matching string values in traversal order.
+    """
     found: list[str] = []
     if isinstance(value, dict):
         for key, child in value.items():
@@ -132,7 +228,17 @@ def nested_values(value: Any, wanted_keys: set[str]) -> list[str]:
     return found
 
 
-def tag_values(value: Any, tag_name: str) -> list[str]:
+def tag_values(value: JsonValue, tag_name: str) -> list[str]:
+    """Collect Sentry tag values by tag key.
+
+    Args:
+        value: JSON-compatible value to inspect.
+        tag_name: Sentry tag key to match case-insensitively.
+
+    Returns:
+        Matching tag values in traversal order.
+    """
+    normalized_tag = tag_name.lower()
     values: list[str] = []
     if isinstance(value, dict):
         tags = value.get("tags")
@@ -140,8 +246,8 @@ def tag_values(value: Any, tag_name: str) -> list[str]:
             for tag in tags:
                 if not isinstance(tag, dict):
                     continue
-                key = str(tag.get("key") or tag.get("name") or "")
-                if key == tag_name and tag.get("value") is not None:
+                key = str(tag.get("key") or tag.get("name") or "").lower()
+                if key == normalized_tag and tag.get("value") is not None:
                     values.append(str(tag["value"]))
         for child in value.values():
             values.extend(tag_values(child, tag_name))
@@ -152,6 +258,15 @@ def tag_values(value: Any, tag_name: str) -> list[str]:
 
 
 def unique(values: list[str], limit: int) -> list[str]:
+    """Return unique values while preserving order.
+
+    Args:
+        values: Candidate values.
+        limit: Maximum number of values to return.
+
+    Returns:
+        Ordered de-duplicated values.
+    """
     seen: set[str] = set()
     out: list[str] = []
     for value in values:
@@ -163,7 +278,15 @@ def unique(values: list[str], limit: int) -> list[str]:
     return out
 
 
-def extract_org(issue_view: Any) -> str | None:
+def extract_org(issue_view: JsonValue) -> str | None:
+    """Extract an organization slug from issue view output.
+
+    Args:
+        issue_view: Parsed `sentry issue view` output.
+
+    Returns:
+        Organization slug when present, otherwise `None`.
+    """
     if not isinstance(issue_view, dict):
         return None
     candidates = [
@@ -183,7 +306,15 @@ def extract_org(issue_view: Any) -> str | None:
     return None
 
 
-def extract_issue_id(issue_view: Any) -> str | None:
+def extract_issue_id(issue_view: JsonValue) -> str | None:
+    """Extract the numeric issue ID from issue view output.
+
+    Args:
+        issue_view: Parsed `sentry issue view` output.
+
+    Returns:
+        Numeric issue ID or group ID when present, otherwise `None`.
+    """
     if isinstance(issue_view, dict):
         issue_id = issue_view.get("id") or issue_view.get("groupID")
         if issue_id:
@@ -192,17 +323,44 @@ def extract_issue_id(issue_view: Any) -> str | None:
 
 
 def issue_tag_values_endpoint(org: str, issue_id: str, tag: str) -> str:
+    """Build the relative Sentry API path for issue tag values.
+
+    Args:
+        org: Organization slug.
+        issue_id: Numeric issue ID.
+        tag: Tag key.
+
+    Returns:
+        Relative API endpoint path.
+    """
     return (
-        f"organizations/{quote(org)}/issues/{quote(issue_id)}/"
-        f"tags/{quote(tag)}/values/"
+        f"organizations/{quote(org, safe='')}/"
+        f"issues/{quote(issue_id, safe='')}/"
+        f"tags/{quote(tag, safe='')}/values/"
     )
 
 
 def render_json(bundle: dict[str, Any]) -> str:
+    """Render a context bundle as stable JSON.
+
+    Args:
+        bundle: Context bundle.
+
+    Returns:
+        Pretty-printed JSON string ending with a newline.
+    """
     return json.dumps(bundle, indent=2, sort_keys=True) + "\n"
 
 
 def render_markdown(bundle: dict[str, Any]) -> str:
+    """Render a context bundle as Markdown.
+
+    Args:
+        bundle: Context bundle.
+
+    Returns:
+        Markdown report string ending with a newline.
+    """
     lines = [
         "# Sentry Issue Context",
         "",
@@ -233,27 +391,88 @@ def render_markdown(bundle: dict[str, Any]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser.
+
+    Returns:
+        Configured argument parser.
+    """
     parser = argparse.ArgumentParser(
-        description="Collect redacted Sentry issue context with the sentry CLI.",
+        description=(
+            "Collect redacted Sentry issue context with the sentry CLI."
+        ),
     )
-    parser.add_argument("issue", help="Issue short ID, numeric ID, URL, or selector")
-    parser.add_argument("--period", default="24h", help="Time window for events/logs")
-    parser.add_argument("--limit-events", type=int, default=5, help="Event limit")
+    parser.add_argument(
+        "issue",
+        help="Issue short ID, numeric ID, URL, or selector",
+    )
+    parser.add_argument(
+        "--period",
+        default="24h",
+        help="Time window for events/logs",
+    )
+    parser.add_argument(
+        "--limit-events",
+        type=positive_int,
+        default=5,
+        help="Event limit",
+    )
     parser.add_argument("--fresh", action="store_true", help="Bypass CLI cache")
-    parser.add_argument("--include-seer", action="store_true", help="Run issue explain")
-    parser.add_argument("--include-plan", action="store_true", help="Run issue plan")
-    parser.add_argument("--trace-id", action="append", default=[], help="Trace ID")
-    parser.add_argument("--replay-id", action="append", default=[], help="Replay ID")
-    parser.add_argument("--tag", action="append", default=[], help="Issue tag values")
+    parser.add_argument(
+        "--include-seer",
+        action="store_true",
+        help="Run issue explain",
+    )
+    parser.add_argument(
+        "--include-plan",
+        action="store_true",
+        help="Run issue plan",
+    )
+    parser.add_argument(
+        "--trace-id",
+        action="append",
+        default=[],
+        help="Trace ID",
+    )
+    parser.add_argument(
+        "--replay-id",
+        action="append",
+        default=[],
+        help="Replay ID",
+    )
+    parser.add_argument(
+        "--tag",
+        action="append",
+        default=[],
+        help="Issue tag values",
+    )
     parser.add_argument("--org", help="Org slug for API fallbacks")
-    parser.add_argument("--timeout", type=int, default=120, help="Command timeout")
-    parser.add_argument("--max-string", type=int, default=500, help="Max string length")
-    parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    parser.add_argument(
+        "--timeout",
+        type=positive_int,
+        default=120,
+        help="Command timeout",
+    )
+    parser.add_argument(
+        "--max-string",
+        type=positive_int,
+        default=500,
+        help="Max string length",
+    )
+    parser.add_argument(
+        "--format",
+        choices=["markdown", "json"],
+        default="markdown",
+    )
     parser.add_argument("--out", type=Path, help="Optional output path")
     return parser
 
 
 def main() -> int:
+    """Run the context collector.
+
+    Returns:
+        Process exit code.
+    """
     args = build_parser().parse_args()
     fresh = ["--fresh"] if args.fresh else []
     bundle: dict[str, Any] = {
@@ -274,7 +493,7 @@ def main() -> int:
             *fresh,
             "--json",
             "--fields",
-            "id,shortId,title,culprit,count,userCount,firstSeen,lastSeen,level,status,substatus,priority,platform,permalink,project,metadata,assignedTo,isUnhandled,event,trace,replayIds",
+            ISSUE_VIEW_FIELDS,
         ],
         args.timeout,
         args.max_string,
@@ -295,7 +514,7 @@ def main() -> int:
             *fresh,
             "--json",
             "--fields",
-            "id,eventID,groupID,projectID,message,title,location,culprit,user,tags,platform,dateCreated,crashFile,metadata",
+            EVENT_FIELDS,
         ],
         args.timeout,
         args.max_string,
@@ -388,7 +607,11 @@ def main() -> int:
                 "skipped": "org slug or numeric issue id unavailable"
             }
 
-    output = render_json(bundle) if args.format == "json" else render_markdown(bundle)
+    output = (
+        render_json(bundle)
+        if args.format == "json"
+        else render_markdown(bundle)
+    )
     if args.out:
         args.out.write_text(output)
     else:
