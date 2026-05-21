@@ -1,0 +1,54 @@
+name: Agent Skills Catalog Dispatch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/agent-skills-catalog-dispatch.yml"
+      - "catalog/agent-skills-lab.json"
+      - "crates/codex-dev-core/**"
+      - "crates/codex-dev/**"
+      - "docs/**"
+      - "README.md"
+      - "skills/**"
+      - "tools/skill/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch-portfolio:
+    name: Dispatch portfolio rebuild
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify catalog artifact
+        run: |
+          set -euo pipefail
+          test -f catalog/agent-skills-lab.json
+          jq -e '.schemaVersion == "agent_skills_lab_catalog.v1"' catalog/agent-skills-lab.json
+
+      - name: Dispatch bjornmelin.io rebuild
+        env:
+          GH_TOKEN: ${{ secrets.PLATFORM_REPOSITORY_DISPATCH_TOKEN }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_REF: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${GH_TOKEN}" ]]; then
+            echo "Missing required secret: PLATFORM_REPOSITORY_DISPATCH_TOKEN" >&2
+            exit 1
+          fi
+
+          gh api repos/BjornMelin/bjornmelin-platform-io/dispatches \
+            --method POST \
+            --field event_type=agent-skills-catalog-updated \
+            --field client_payload[source_repository]="${SOURCE_REPOSITORY}" \
+            --field client_payload[source_ref]="${SOURCE_REF}" \
+            --field client_payload[source_sha]="${SOURCE_SHA}" \
+            --field client_payload[catalog_path]="catalog/agent-skills-lab.json"

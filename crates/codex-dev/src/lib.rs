@@ -13,24 +13,24 @@ use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use codex_dev_core::{
-    AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA, EvidenceKind, EvidenceKindSummary,
-    EvidenceRecord, EvidenceSummary, GateRecord, GateStatus, InitArgs, OUTPUT_SCHEMA,
-    OrchestrationDiagnosticSeverity, OrchestrationRunReport, POLICY_GATES_SCHEMA,
-    PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA,
-    PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
-    PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution, PrAgentHostedActionReport,
-    PrAgentHostedActionSpec, PrAgentHostedActionStatus, PrAgentReadinessAction,
-    PrAgentReadinessActionStatus, PrAgentReadinessAttempt, PrAgentReadinessCheck,
-    PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity, PrAgentSourceRecord,
-    PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrEvidence,
-    PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
-    RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
-    SubagentSynthesisStatus, SubagentWaitStatus, TaskRootStatus, Verification, append_evidence,
-    append_jsonl, capsule_status, ensure_regular_contract_files, init_capsule, orchestration_run,
-    pr_status, read_json, recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome,
-    record_subagent_plan, record_subagent_synthesis, render_capsule, render_command,
-    render_pr_label, render_pr_status, stable_json_hash, task_export, task_index, task_show,
-    validate_capsule, write_json,
+    AgentSkillsCatalogArgs, AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA,
+    EvidenceKind, EvidenceKindSummary, EvidenceRecord, EvidenceSummary, GateRecord, GateStatus,
+    InitArgs, OUTPUT_SCHEMA, OrchestrationDiagnosticSeverity, OrchestrationRunReport,
+    POLICY_GATES_SCHEMA, PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA,
+    PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest,
+    PolicyProfile, PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution,
+    PrAgentHostedActionReport, PrAgentHostedActionSpec, PrAgentHostedActionStatus,
+    PrAgentReadinessAction, PrAgentReadinessActionStatus, PrAgentReadinessAttempt,
+    PrAgentReadinessCheck, PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity,
+    PrAgentSourceRecord, PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan,
+    PrEvidence, PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs,
+    RecordSubagentPlanArgs, RecordSubagentSynthesisArgs, SubagentDisposition,
+    SubagentOutcomeStatus, SubagentSynthesisStatus, SubagentWaitStatus, TaskRootStatus,
+    Verification, agent_skills_catalog, append_evidence, append_jsonl, capsule_status,
+    ensure_regular_contract_files, init_capsule, orchestration_run, pr_status, read_json,
+    recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
+    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
+    stable_json_hash, task_export, task_index, task_show, validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -107,6 +107,7 @@ impl Cli {
                 LocalCommand::Status(_) => "local status",
             },
             Commands::Skills { command } => match command {
+                SkillsCommand::Catalog(_) => "skills catalog",
                 SkillsCommand::Inventory(_) => "skills inventory",
             },
             Commands::Bootstrap { command } => match command {
@@ -260,6 +261,8 @@ enum LocalCommand {
 
 #[derive(Subcommand, Debug)]
 enum SkillsCommand {
+    /// Emit the public Agent Skills Lab catalog artifact.
+    Catalog(SkillsCatalogArgs),
     /// Emit a read-only machine-readable inventory of tracked skills.
     Inventory(SkillsInventoryArgs),
 }
@@ -986,6 +989,34 @@ pub struct SkillsInventoryArgs {
     /// Deterministic report timestamp, primarily for tests and fixture generation.
     #[arg(long, value_name = "RFC3339")]
     pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Arguments for the public Agent Skills Lab catalog artifact.
+#[derive(Args, Clone, Debug)]
+pub struct SkillsCatalogArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub generated_at: Option<DateTime<Utc>>,
+    /// Public source repository URL used when building per-skill source links.
+    #[arg(
+        long,
+        default_value = "https://github.com/BjornMelin/dev-skills",
+        value_name = "URL"
+    )]
+    pub source_repository: String,
+    /// Source commit SHA used when building immutable GitHub source links.
+    #[arg(long, value_name = "SHA")]
+    pub source_commit: Option<String>,
+    /// Write the raw catalog artifact to a path instead of only printing the JSON envelope.
+    #[arg(long, value_name = "PATH")]
+    pub out: Option<PathBuf>,
 }
 
 /// Arguments for the read-only bootstrap pack status report.
@@ -1821,6 +1852,38 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
         },
         Commands::Skills { command } => match command {
+            SkillsCommand::Catalog(args) => {
+                let source_commit = match &args.source_commit {
+                    Some(source_commit) => source_commit.clone(),
+                    None => resolve_source_commit(args.repo_root.as_deref())?,
+                };
+                let out = args.out.clone();
+                let result = agent_skills_catalog(AgentSkillsCatalogArgs {
+                    repo_root: args.repo_root,
+                    generated_at: args.generated_at,
+                    source_repository: args.source_repository,
+                    source_commit,
+                })?;
+                if let Some(out) = out {
+                    if let Some(parent) =
+                        out.parent().filter(|parent| !parent.as_os_str().is_empty())
+                    {
+                        fs::create_dir_all(parent)
+                            .with_context(|| format!("failed to create {}", parent.display()))?;
+                    }
+                    write_json(out, &result)?;
+                }
+                let human = format!(
+                    "generated Agent Skills Lab catalog with {} skill(s)",
+                    result.skills_count
+                );
+                Ok(CommandOutput {
+                    ok: true,
+                    command: "skills catalog",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             SkillsCommand::Inventory(args) => {
                 let result = skills_inventory(args)?;
                 let human = format!(
@@ -2101,6 +2164,31 @@ fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
     } else {
         Ok(format!("{}\n", output.human))
     }
+}
+
+fn resolve_source_commit(repo_root: Option<&Path>) -> Result<String> {
+    let mut command = Command::new("git");
+    if let Some(repo_root) = repo_root {
+        command.arg("-C").arg(repo_root);
+    }
+    let output = command
+        .args(["rev-parse", "HEAD"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .context("failed to run git rev-parse HEAD")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("failed to resolve source commit with git rev-parse HEAD: {stderr}");
+    }
+    let source_commit = String::from_utf8(output.stdout)
+        .context("git rev-parse HEAD emitted non-UTF-8 output")?
+        .trim()
+        .to_string();
+    if source_commit.is_empty() {
+        bail!("git rev-parse HEAD emitted an empty source commit");
+    }
+    Ok(source_commit)
 }
 
 fn orchestration_output(
