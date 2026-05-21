@@ -35,8 +35,40 @@ jobs:
       - name: Verify catalog artifact
         run: |
           set -euo pipefail
-          test -f catalog/agent-skills-lab.json
-          jq -e '.schemaVersion == "agent_skills_lab_catalog.v1"' catalog/agent-skills-lab.json
+          catalog_path="catalog/agent-skills-lab.json"
+          generated_path="/tmp/agent-skills-lab.generated.json"
+          tracked_normalized_path="/tmp/agent-skills-lab.tracked.normalized.json"
+          generated_normalized_path="/tmp/agent-skills-lab.generated.normalized.json"
+
+          test -f "${catalog_path}"
+          jq -e '
+            .schemaVersion == "agent_skills_lab_catalog.v1"
+            and (.sourceCommit | test("^[0-9a-f]{7,40}$"; "i"))
+          ' "${catalog_path}"
+
+          catalog_generated_at="$(jq -er '.generatedAt' "${catalog_path}")"
+          catalog_source_commit="$(jq -er '.sourceCommit' "${catalog_path}")"
+          if [[ "${catalog_source_commit}" != "${GITHUB_SHA}" ]]; then
+            echo "Catalog sourceCommit ${catalog_source_commit} differs from workflow SHA ${GITHUB_SHA}; comparing normalized generated output."
+          fi
+
+          cargo run -q -p codex-dev -- --json skills catalog \
+            --generated-at "${catalog_generated_at}" \
+            --source-commit "${GITHUB_SHA}" \
+            --out "${generated_path}" \
+            >/tmp/agent-skills-lab-envelope.json
+
+          jq -S \
+            --arg tracked_sha "${catalog_source_commit}" \
+            --arg current_sha "${GITHUB_SHA}" \
+            'walk(if type == "string" then gsub($tracked_sha; "<sourceCommit>") | gsub($current_sha; "<sourceCommit>") else . end)' \
+            "${catalog_path}" >"${tracked_normalized_path}"
+          jq -S \
+            --arg tracked_sha "${catalog_source_commit}" \
+            --arg current_sha "${GITHUB_SHA}" \
+            'walk(if type == "string" then gsub($tracked_sha; "<sourceCommit>") | gsub($current_sha; "<sourceCommit>") else . end)' \
+            "${generated_path}" >"${generated_normalized_path}"
+          diff -u "${tracked_normalized_path}" "${generated_normalized_path}"
 
       - name: Dispatch bjornmelin.io rebuild
         env:

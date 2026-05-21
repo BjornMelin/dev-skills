@@ -551,7 +551,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
     );
     assert_eq!(envelope["result"]["sourceCommit"], "abc123");
     assert_eq!(envelope["result"]["skillsCount"], 2);
-    assert_eq!(envelope["result"]["validSkillsCount"], 2);
+    assert!(envelope["result"].get("validSkillsCount").is_none());
     assert_eq!(
         envelope["result"]["installCommands"]["list"],
         "npx skills add BjornMelin/dev-skills --list"
