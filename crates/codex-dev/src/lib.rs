@@ -1854,10 +1854,16 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
         Commands::Skills { command } => match command {
             SkillsCommand::Catalog(args) => {
                 let source_commit = match &args.source_commit {
-                    Some(source_commit) => source_commit.clone(),
+                    Some(source_commit) => {
+                        let source_commit = source_commit.trim();
+                        if source_commit.is_empty() {
+                            bail!("--source-commit must not be empty");
+                        }
+                        source_commit.to_string()
+                    }
                     None => resolve_source_commit(args.repo_root.as_deref())?,
                 };
-                let out = args.out.clone();
+                let out = args.out;
                 let result = agent_skills_catalog(AgentSkillsCatalogArgs {
                     repo_root: args.repo_root,
                     generated_at: args.generated_at,

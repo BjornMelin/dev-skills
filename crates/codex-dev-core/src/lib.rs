@@ -597,7 +597,6 @@ pub struct AgentSkillsCatalogReport {
     pub source_repository: String,
     pub source_commit: String,
     pub skills_count: usize,
-    pub valid_skills_count: usize,
     pub total_skill_directories: usize,
     pub install_commands: AgentSkillsCatalogInstallCommands,
     pub skills: Vec<AgentSkillsCatalogSkill>,
@@ -2080,21 +2079,31 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
         repo_root: args.repo_root,
         checked_at: Some(generated_at),
     })?;
-    let source_repository = args.source_repository.trim_end_matches('/').to_string();
+    let source_repository = args
+        .source_repository
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
+    if source_repository.is_empty() {
+        bail!("source_repository must not be empty");
+    }
+    let source_commit = args.source_commit.trim().to_string();
+    if source_commit.is_empty() {
+        bail!("source_commit must not be empty");
+    }
     let skills = inventory
         .skills
         .iter()
         .filter(|skill| skill.validation.valid)
-        .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &args.source_commit))
+        .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_commit))
         .collect::<Vec<_>>();
 
     Ok(AgentSkillsCatalogReport {
         schema_version: AGENT_SKILLS_CATALOG_SCHEMA.to_string(),
         generated_at,
         source_repository,
-        source_commit: args.source_commit,
+        source_commit,
         skills_count: skills.len(),
-        valid_skills_count: inventory.valid,
         total_skill_directories: inventory.total,
         install_commands: AgentSkillsCatalogInstallCommands {
             list: "npx skills add BjornMelin/dev-skills --list".to_string(),

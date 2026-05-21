@@ -15,6 +15,10 @@ on:
       - "tools/skill/**"
   workflow_dispatch:
 
+concurrency:
+  group: agent-skills-catalog-dispatch-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -24,7 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
 
       - name: Verify catalog artifact
         run: |
@@ -41,8 +47,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${GH_TOKEN}" ]]; then
-            echo "Missing required secret: PLATFORM_REPOSITORY_DISPATCH_TOKEN" >&2
-            exit 1
+            echo "Skipping dispatch because PLATFORM_REPOSITORY_DISPATCH_TOKEN is not configured."
+            exit 0
           fi
 
           gh api repos/BjornMelin/bjornmelin-platform-io/dispatches \
