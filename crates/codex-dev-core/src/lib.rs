@@ -597,6 +597,7 @@ pub struct AgentSkillsCatalogReport {
     pub source_repository: String,
     pub source_commit: String,
     pub skills_count: usize,
+    pub valid_skills_count: usize,
     pub total_skill_directories: usize,
     pub install_commands: AgentSkillsCatalogInstallCommands,
     pub skills: Vec<AgentSkillsCatalogSkill>,
@@ -2104,6 +2105,7 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
         source_repository,
         source_commit,
         skills_count: skills.len(),
+        valid_skills_count: inventory.valid,
         total_skill_directories: inventory.total,
         install_commands: AgentSkillsCatalogInstallCommands {
             list: "npx skills add BjornMelin/dev-skills --list".to_string(),
