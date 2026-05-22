@@ -30,6 +30,7 @@ pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 pub const TASK_INDEX_SCHEMA: &str = "task_index.v1";
 pub const ORCHESTRATION_RUN_SCHEMA: &str = "orchestration_run.v1";
 pub const SKILL_INVENTORY_SCHEMA: &str = "skill_inventory.v1";
+pub const AGENT_SKILLS_CATALOG_SCHEMA: &str = "agent_skills_lab_catalog.v1";
 
 const SKILL_INVENTORY_MAX_TEXT_BYTES: u64 = 1024 * 1024;
 #[cfg(not(test))]
@@ -578,6 +579,81 @@ pub struct OrchestrationDiagnostic {
 pub struct SkillInventoryArgs {
     pub repo_root: Option<PathBuf>,
     pub checked_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentSkillsCatalogArgs {
+    pub repo_root: Option<PathBuf>,
+    pub generated_at: Option<DateTime<Utc>>,
+    pub source_repository: String,
+    pub source_commit: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogReport {
+    pub schema_version: String,
+    pub generated_at: DateTime<Utc>,
+    pub source_repository: String,
+    pub source_commit: String,
+    pub skills_count: usize,
+    pub total_skill_directories: usize,
+    pub install_commands: AgentSkillsCatalogInstallCommands,
+    pub skills: Vec<AgentSkillsCatalogSkill>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogInstallCommands {
+    pub list: String,
+    pub install_all_codex: String,
+    pub install_all_agents: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogSkill {
+    pub name: String,
+    pub slug: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    pub path: String,
+    pub skill_md_path: String,
+    pub source_urls: AgentSkillsCatalogSourceUrls,
+    pub install_commands: AgentSkillsCatalogSkillInstallCommands,
+    pub readiness_labels: Vec<String>,
+    pub quality_signals: Vec<String>,
+    pub improvement_signals: Vec<String>,
+    pub resources: AgentSkillsCatalogResources,
+    pub exposure: SkillExposure,
+    pub package: SkillPackageStatus,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogSourceUrls {
+    pub directory: String,
+    pub skill_md: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogSkillInstallCommands {
+    pub codex_global: String,
+    pub codex_project: String,
+    pub all_agents: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSkillsCatalogResources {
+    pub references: usize,
+    pub scripts: usize,
+    pub assets: usize,
+    pub templates: usize,
+    pub agents: usize,
+    pub total: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -1994,6 +2070,182 @@ pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryRepor
         diagnostics,
         skills,
     })
+}
+
+/// Build the public Agent Skills Lab catalog from the tracked skill inventory.
+pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsCatalogReport> {
+    let generated_at = args.generated_at.unwrap_or_else(Utc::now);
+    let inventory = skills_inventory(SkillInventoryArgs {
+        repo_root: args.repo_root,
+        checked_at: Some(generated_at),
+    })?;
+    let source_repository = args
+        .source_repository
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
+    if source_repository.is_empty() {
+        bail!("source_repository must not be empty");
+    }
+    let source_commit = args.source_commit.trim().to_string();
+    if source_commit.is_empty() {
+        bail!("source_commit must not be empty");
+    }
+    let skills = inventory
+        .skills
+        .iter()
+        .filter(|skill| skill.validation.valid)
+        .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_commit))
+        .collect::<Vec<_>>();
+
+    Ok(AgentSkillsCatalogReport {
+        schema_version: AGENT_SKILLS_CATALOG_SCHEMA.to_string(),
+        generated_at,
+        source_repository,
+        source_commit,
+        skills_count: skills.len(),
+        total_skill_directories: inventory.total,
+        install_commands: AgentSkillsCatalogInstallCommands {
+            list: "npx skills add BjornMelin/dev-skills --list".to_string(),
+            install_all_codex: "npx skills add BjornMelin/dev-skills --skill '*' -a codex"
+                .to_string(),
+            install_all_agents: "npx skills add BjornMelin/dev-skills --all".to_string(),
+        },
+        skills,
+    })
+}
+
+fn agent_skills_catalog_skill(
+    skill: &SkillInventoryEntry,
+    source_repository: &str,
+    source_commit: &str,
+) -> AgentSkillsCatalogSkill {
+    let slug = safe_inventory_skill_name(skill.name.as_deref(), &skill.directory).to_string();
+    let resources = agent_skills_catalog_resources(&skill.resources);
+    AgentSkillsCatalogSkill {
+        name: sanitize_agent_skills_catalog_text(
+            skill.name.clone().unwrap_or_else(|| slug.clone()),
+        ),
+        slug: slug.clone(),
+        description: sanitize_agent_skills_catalog_text(
+            skill.description.clone().unwrap_or_default(),
+        ),
+        license: skill
+            .license
+            .clone()
+            .map(sanitize_agent_skills_catalog_text),
+        path: skill.path.clone(),
+        skill_md_path: skill.skill_md.clone(),
+        source_urls: AgentSkillsCatalogSourceUrls {
+            directory: github_tree_url(source_repository, source_commit, &skill.path),
+            skill_md: github_blob_url(source_repository, source_commit, &skill.skill_md),
+        },
+        install_commands: AgentSkillsCatalogSkillInstallCommands {
+            codex_global: format!(
+                "npx skills add BjornMelin/dev-skills --skill {slug} -g -a codex -y"
+            ),
+            codex_project: format!("npx skills add BjornMelin/dev-skills --skill {slug} -a codex"),
+            all_agents: format!("npx skills add BjornMelin/dev-skills --agent '*' --skill {slug}"),
+        },
+        readiness_labels: agent_skills_catalog_readiness_labels(skill, &resources),
+        quality_signals: agent_skills_catalog_quality_signals(skill, &resources),
+        improvement_signals: skill.underbuilt_signals.clone(),
+        resources,
+        exposure: SkillExposure {
+            readme_catalog: skill.exposure.readme_catalog,
+            docs_index: skill.exposure.docs_index,
+        },
+        package: SkillPackageStatus {
+            path: skill.package.path.clone(),
+            present: skill.package.present,
+            rejected: skill.package.rejected,
+        },
+    }
+}
+
+fn sanitize_agent_skills_catalog_text(value: String) -> String {
+    value.replace('\u{2014}', "--")
+}
+
+fn agent_skills_catalog_resources(
+    resources: &SkillResourceInventory,
+) -> AgentSkillsCatalogResources {
+    let total = resources.references.files
+        + resources.scripts.files
+        + resources.assets.files
+        + resources.templates.files
+        + resources.agents.files;
+    AgentSkillsCatalogResources {
+        references: resources.references.files,
+        scripts: resources.scripts.files,
+        assets: resources.assets.files,
+        templates: resources.templates.files,
+        agents: resources.agents.files,
+        total,
+    }
+}
+
+fn agent_skills_catalog_readiness_labels(
+    skill: &SkillInventoryEntry,
+    resources: &AgentSkillsCatalogResources,
+) -> Vec<String> {
+    let mut labels = vec!["Valid".to_string()];
+    if skill.package.present && !skill.package.rejected {
+        labels.push("Packaged".to_string());
+    }
+    if skill.exposure.docs_index {
+        labels.push("Documented".to_string());
+    }
+    if resources.total >= 5 || (resources.references > 0 && resources.scripts > 0) {
+        labels.push("Resource-rich".to_string());
+    }
+    if !skill.package.present || resources.total < 5 || !skill.exposure.docs_index {
+        labels.push("Emerging".to_string());
+    }
+    labels
+}
+
+fn agent_skills_catalog_quality_signals(
+    skill: &SkillInventoryEntry,
+    resources: &AgentSkillsCatalogResources,
+) -> Vec<String> {
+    let mut signals = Vec::new();
+    if skill.exposure.readme_catalog {
+        signals.push("readme_catalogued".to_string());
+    }
+    if skill.exposure.docs_index {
+        signals.push("docs_indexed".to_string());
+    }
+    if skill.package.present && !skill.package.rejected {
+        signals.push("package_available".to_string());
+    }
+    if resources.references > 0 {
+        signals.push("has_references".to_string());
+    }
+    if resources.scripts > 0 {
+        signals.push("has_scripts".to_string());
+    }
+    if resources.assets > 0 {
+        signals.push("has_assets".to_string());
+    }
+    if resources.templates > 0 {
+        signals.push("has_templates".to_string());
+    }
+    if resources.agents > 0 {
+        signals.push("has_agents".to_string());
+    }
+    if resources.total >= 5 || (resources.references > 0 && resources.scripts > 0) {
+        signals.push("resource_rich".to_string());
+    }
+    signals
+}
+
+fn github_blob_url(source_repository: &str, source_commit: &str, path: &str) -> String {
+    format!("{source_repository}/blob/{source_commit}/{path}")
+}
+
+fn github_tree_url(source_repository: &str, source_commit: &str, path: &str) -> String {
+    format!("{source_repository}/tree/{source_commit}/{path}")
 }
 
 fn skill_inventory_entry(

@@ -27,6 +27,10 @@ The crate owns:
   `SkillsInventoryReport`, metadata diagnostics, bounded resource counts,
   README/docs exposure heuristics, package-artifact status, validation status,
   and non-blocking underbuilt signals;
+- the public `agent_skills_lab_catalog.v1` transform used by bjornmelin.io,
+  including `AgentSkillsCatalogReport`, public-safe source links, install
+  commands, readiness labels, quality signals, and resource counts derived from
+  the tracked inventory;
 - policy and PR evidence data models such as `PolicyManifest`,
   `PolicyGate`, `PrControlPlan`, `PrControlCommand`,
   `PrAgentStateReport`, `PrAgentHostedActionReport`, and

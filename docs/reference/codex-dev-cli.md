@@ -106,6 +106,7 @@ Local subcommands:
 
 Skills subcommands:
 
+- `skills catalog`
 - `skills inventory`
 
 Bootstrap subcommands:
@@ -188,6 +189,65 @@ cargo run -q -p codex-dev -- --json local status
 `local status` uses the same standard JSON envelope and local readiness result
 schema with `result.mode: "status"` so automation can share one parser while
 humans can request a status-oriented readiness summary.
+
+## skills catalog
+
+Emit the public Agent Skills Lab catalog artifact consumed by `bjornmelin.io`:
+
+```bash
+cargo run -q -p codex-dev -- --json skills catalog \
+  --out catalog/agent-skills-lab.json
+```
+
+The command uses the standard `codex-dev.output.v1` JSON envelope. The public
+artifact itself lives at `result.schemaVersion:
+"agent_skills_lab_catalog.v1"` and is also written as raw JSON when `--out` is
+provided. It reuses the tracked skill inventory read model, includes only valid
+public skills, adds immutable source links from the source repository and
+commit, adds copyable `npx skills add` install commands, and converts package,
+docs, resource, and validation data into positive readiness labels for the
+portfolio marketplace. It does not package skills, call skills.sh, run network
+checks, mutate portfolio files, or expose local absolute paths.
+
+Fixture-friendly options:
+
+```bash
+cargo run -q -p codex-dev -- --json skills catalog \
+  --repo-root /path/to/dev-skills \
+  --generated-at 2026-05-20T08:00:00Z \
+  --source-repository https://github.com/BjornMelin/dev-skills \
+  --source-commit 0123456789abcdef
+```
+
+Compact shape:
+
+```json
+{
+  "schema": "codex-dev.output.v1",
+  "ok": true,
+  "command": "skills catalog",
+  "result": {
+    "schemaVersion": "agent_skills_lab_catalog.v1",
+    "sourceRepository": "https://github.com/BjornMelin/dev-skills",
+    "skillsCount": 57,
+    "skills": [
+      {
+        "name": "subspawn",
+        "slug": "subspawn",
+        "skillMdPath": "skills/subspawn/SKILL.md",
+        "readinessLabels": ["Valid", "Packaged", "Documented"],
+        "installCommands": {
+          "codexGlobal": "npx skills add BjornMelin/dev-skills --skill subspawn -g -a codex -y"
+        }
+      }
+    ]
+  }
+}
+```
+
+`sourceCommit` defaults to `git rev-parse HEAD`. Pass it explicitly when
+generating deterministic fixtures or when a workflow needs to pin links to a
+known commit.
 
 ## skills inventory
 
@@ -1085,6 +1145,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
+cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help

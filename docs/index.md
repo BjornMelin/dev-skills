@@ -48,8 +48,8 @@ out of version control.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle, evidence appenders, subspawn
   plan/outcome/synthesis capture, policy gates, local readiness and skill
-  inventory reports, PR evidence capture, and apply-gated PR actions and
-  closeout readiness reports.
+  inventory reports, public Agent Skills Lab catalog generation, PR evidence
+  capture, and apply-gated PR actions and closeout readiness reports.
 - [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.

@@ -157,6 +157,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
+cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json research import-bundle --help
 cargo run -q -p codex-dev -- --json orchestration verify --help
@@ -200,8 +201,9 @@ validation, and skill packaging rules, see
 
 All skills are stored in `skills/`. The canonical entrypoint for each skill is
 its `SKILL.md`. Machine-readable inventory for automation is available through
-`codex-dev --json skills inventory`; the table below remains the human-facing
-catalog.
+`codex-dev --json skills inventory`; the public Agent Skills Lab artifact is
+generated with `codex-dev --json skills catalog --out catalog/agent-skills-lab.json`.
+The table below remains the human-facing catalog.
 
 | Skill | Description | Source |
 | --- | --- | --- |

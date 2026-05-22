@@ -345,10 +345,11 @@ fn write_skill_inventory_repo(root: &std::path::Path) -> std::path::PathBuf {
     std::fs::create_dir_all(alpha.join("templates")).expect("alpha templates");
     std::fs::write(
         alpha.join("SKILL.md"),
-        r#"---
+        format!(
+            r#"---
 name: alpha-skill
 description: |
-  Alpha skill description.
+  Alpha skill description.{}
 license: MIT
 allowed-tools:
   - web.run
@@ -359,6 +360,8 @@ metadata:
 
 # Alpha
 "#,
+            '\u{2014}'
+        ),
     )
     .expect("alpha skill");
     std::fs::write(alpha.join("references/deep/guide.md"), "# Guide\n").expect("alpha ref");
@@ -503,6 +506,99 @@ fn skills_inventory_emits_stable_json_report() {
             .expect("signals")
             .iter()
             .any(|signal| signal.as_str() == Some("missing_docs_index_exposure"))
+    );
+}
+
+#[test]
+fn skills_catalog_emits_public_agent_skills_artifact() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let out = temp.path().join("agent-skills-lab.json");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "catalog",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--generated-at",
+            "2026-05-20T08:00:00Z",
+            "--source-repository",
+            "https://github.com/example/dev-skills/",
+            "--source-commit",
+            "abc123",
+            "--out",
+            out.to_str().expect("out path"),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope: Value = serde_json::from_slice(&output).expect("skills catalog json");
+    assert_eq!(envelope["command"], "skills catalog");
+    assert_eq!(
+        envelope["result"]["schemaVersion"],
+        "agent_skills_lab_catalog.v1"
+    );
+    assert_eq!(envelope["result"]["generatedAt"], "2026-05-20T08:00:00Z");
+    assert_eq!(
+        envelope["result"]["sourceRepository"],
+        "https://github.com/example/dev-skills"
+    );
+    assert_eq!(envelope["result"]["sourceCommit"], "abc123");
+    assert_eq!(envelope["result"]["skillsCount"], 2);
+    assert_eq!(envelope["result"]["totalSkillDirectories"], 2);
+    assert!(envelope["result"].get("validSkillsCount").is_none());
+    assert_eq!(
+        envelope["result"]["installCommands"]["list"],
+        "npx skills add BjornMelin/dev-skills --list"
+    );
+
+    let artifact: Value =
+        serde_json::from_str(&std::fs::read_to_string(out).expect("catalog artifact written"))
+            .expect("catalog artifact json");
+    assert_eq!(artifact, envelope["result"]);
+    let skills = artifact["skills"].as_array().expect("skills array");
+    assert_eq!(skills[0]["name"], "alpha-skill");
+    assert_eq!(skills[0]["slug"], "alpha-skill");
+    assert_eq!(skills[0]["path"], "skills/alpha-skill");
+    assert_eq!(skills[0]["description"], "Alpha skill description.--");
+    assert_eq!(skills[0]["skillMdPath"], "skills/alpha-skill/SKILL.md");
+    assert_eq!(
+        skills[0]["sourceUrls"]["skillMd"],
+        "https://github.com/example/dev-skills/blob/abc123/skills/alpha-skill/SKILL.md"
+    );
+    assert_eq!(
+        skills[0]["installCommands"]["codexGlobal"],
+        "npx skills add BjornMelin/dev-skills --skill alpha-skill -g -a codex -y"
+    );
+    assert!(
+        skills[0]["readinessLabels"]
+            .as_array()
+            .expect("readiness labels")
+            .iter()
+            .any(|label| label.as_str() == Some("Packaged"))
+    );
+    assert!(
+        skills[0]["qualitySignals"]
+            .as_array()
+            .expect("quality signals")
+            .iter()
+            .any(|signal| signal.as_str() == Some("resource_rich"))
+    );
+    assert_eq!(skills[0]["resources"]["total"], 3);
+    assert_eq!(skills[1]["name"], "beta-skill");
+    assert_eq!(skills[1]["path"], "skills/beta-skill");
+    assert!(
+        skills[1]["readinessLabels"]
+            .as_array()
+            .expect("readiness labels")
+            .iter()
+            .any(|label| label.as_str() == Some("Emerging"))
     );
 }
 
