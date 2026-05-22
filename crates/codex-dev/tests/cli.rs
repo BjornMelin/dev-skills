@@ -551,6 +551,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
     );
     assert_eq!(envelope["result"]["sourceCommit"], "abc123");
     assert_eq!(envelope["result"]["skillsCount"], 2);
+    assert_eq!(envelope["result"]["totalSkillDirectories"], 2);
     assert!(envelope["result"].get("validSkillsCount").is_none());
     assert_eq!(
         envelope["result"]["installCommands"]["list"],
@@ -562,7 +563,9 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
             .expect("catalog artifact json");
     assert_eq!(artifact, envelope["result"]);
     let skills = artifact["skills"].as_array().expect("skills array");
+    assert_eq!(skills[0]["name"], "alpha-skill");
     assert_eq!(skills[0]["slug"], "alpha-skill");
+    assert_eq!(skills[0]["path"], "skills/alpha-skill");
     assert_eq!(skills[0]["description"], "Alpha skill description.--");
     assert_eq!(skills[0]["skillMdPath"], "skills/alpha-skill/SKILL.md");
     assert_eq!(
@@ -588,6 +591,8 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
             .any(|signal| signal.as_str() == Some("resource_rich"))
     );
     assert_eq!(skills[0]["resources"]["total"], 3);
+    assert_eq!(skills[1]["name"], "beta-skill");
+    assert_eq!(skills[1]["path"], "skills/beta-skill");
     assert!(
         skills[1]["readinessLabels"]
             .as_array()
