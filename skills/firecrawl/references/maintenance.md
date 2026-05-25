@@ -31,17 +31,17 @@ git diff --check
 After installing to the global runtime:
 
 ```bash
-python3 tools/skill/quick_validate.py /home/bjorn/.agents/skills/firecrawl
-node /home/bjorn/.agents/skills/skill-auditor/scripts/audit-skills-baseline.mjs /home/bjorn/.agents/skills /tmp/firecrawl-skill-audit firecrawl-post-merge
+python3 tools/skill/quick_validate.py "$HOME/.agents/skills/firecrawl"
+node "$HOME/.agents/skills/skill-auditor/scripts/audit-skills-baseline.mjs" "$HOME/.agents/skills" /tmp/firecrawl-skill-audit firecrawl-post-merge
 ```
 
 ## Source Of Truth
 
-Tracked source lives in `~/repos/agents/dev-skills/skills/firecrawl`. Install
-to the global runtime with:
+Tracked source lives in `<your-dev-skills-clone>/skills/firecrawl`. From the
+root of that clone, install to the global runtime with:
 
 ```bash
-rsync -a --delete skills/firecrawl/ /home/bjorn/.agents/skills/firecrawl/
+rsync -a --delete skills/firecrawl/ "$HOME/.agents/skills/firecrawl/"
 ```
 
 Before deleting split skills, back them up. Remove only these split CLI skills:
