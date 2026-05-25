@@ -1,0 +1,70 @@
+{
+  "skill_name": "firecrawl",
+  "notes": "Trigger evals for the consolidated Firecrawl CLI skill. Near-misses are included to protect ordinary repo work.",
+  "queries": [
+    {
+      "query": "Search the web for the latest Firecrawl CLI release and summarize the changelog.",
+      "should_trigger": true
+    },
+    {
+      "query": "Fetch https://example.com/pricing and tell me what plans are listed.",
+      "should_trigger": true
+    },
+    {
+      "query": "Map the docs site and find the page about webhooks.",
+      "should_trigger": true
+    },
+    {
+      "query": "Crawl everything under /docs for this product and save the markdown.",
+      "should_trigger": true
+    },
+    {
+      "query": "This pricing table is behind a button. Scrape it, click the annual toggle, and extract the data.",
+      "should_trigger": true
+    },
+    {
+      "query": "Parse ./reports/vendor-contract.pdf and summarize the termination clause.",
+      "should_trigger": true
+    },
+    {
+      "query": "Set up a recurring monitor for this changelog page and alert me when it changes.",
+      "should_trigger": true
+    },
+    {
+      "query": "Download this docs site for offline reference.",
+      "should_trigger": true
+    },
+    {
+      "query": "Run firecrawl init and setup skills.",
+      "should_trigger": true
+    },
+    {
+      "query": "Use a schema to extract pricing with evidence URLs from this site.",
+      "should_trigger": true
+    },
+    {
+      "query": "Crawl the whole domain with subdomains and external links.",
+      "should_trigger": true
+    },
+    {
+      "query": "Use Firecrawl to upload and parse our private repo roadmap.",
+      "should_trigger": true
+    },
+    {
+      "query": "Open src/main.ts and rename the config variable.",
+      "should_trigger": false
+    },
+    {
+      "query": "Run git status and show me the dirty files.",
+      "should_trigger": false
+    },
+    {
+      "query": "Add FIRECRAWL_API_KEY to this Next.js app and wire the SDK endpoint.",
+      "should_trigger": false
+    },
+    {
+      "query": "Deploy the web app to Vercel.",
+      "should_trigger": false
+    }
+  ]
+}

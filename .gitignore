@@ -71,6 +71,7 @@ skills/dist/
 skills/*.zip
 
 # Local skill tooling caches
+.firecrawl/
 skills/bun-dev/.bun-platform/
 skills/bun-dev/references/release-sync-report.json
 .agents/

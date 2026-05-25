@@ -230,6 +230,7 @@ The table below remains the human-facing catalog.
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
 | `docs-align` | Post-implement docs alignment: drift detection, ADRs, specs, README, `AGENTS.md`. | [skills/docs-align/SKILL.md](skills/docs-align/SKILL.md) |
+| `firecrawl` | Firecrawl CLI for search, scrape, map, crawl, interact, monitor, download, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
 | `gh-deps-intel` | JS/TS + Python dependency intel for monorepos: outdated checks, releases/changelogs → Markdown + JSON. | [skills/gh-deps-intel/SKILL.md](skills/gh-deps-intel/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end with minimal verified fixes (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
