@@ -47,15 +47,15 @@ Use local command output as authority. Do not guess at account state.
 ## Install
 
 If the binary is missing, explain the missing prerequisite and ask before
-installing global tooling. If the user approves, prefer the current released
-package:
+installing global tooling. If the user approves, install the current released
+CLI package through Bun:
 
 ```bash
-npm install -g firecrawl-cli@1.18.0
+bun add -g firecrawl-cli@latest
 ```
 
-In Bun-first environments where global npm tooling is not desired, the user may
-choose their own install path. Do not run Firecrawl skill setup commands:
+For one-off checks without a global install, use `bunx firecrawl-cli@latest`.
+Do not run Firecrawl skill setup commands:
 
 ```bash
 # Do not run from this skill:

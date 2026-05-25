@@ -5,7 +5,7 @@ description: |
 license: ISC
 allowed-tools:
   - Bash(firecrawl *)
-  - Bash(npx firecrawl *)
+  - Bash(bunx firecrawl *)
 ---
 
 # Firecrawl CLI
