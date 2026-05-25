@@ -1,0 +1,55 @@
+{
+  "skill_name": "firecrawl",
+  "evals": [
+    {
+      "id": "search-with-feedback",
+      "prompt": "Search for official docs on Firecrawl CLI monitor usage and save the results.",
+      "expected_output": "Uses firecrawl search with --json and -o under .firecrawl, inspects results incrementally, and sends non-blocking search-feedback unless opted out."
+    },
+    {
+      "id": "scrape-known-url",
+      "prompt": "Read https://firecrawl.dev and summarize the product positioning.",
+      "expected_output": "Uses firecrawl scrape to a .firecrawl markdown file, avoids streaming the full page, and summarizes only after focused reading."
+    },
+    {
+      "id": "parse-local-doc",
+      "prompt": "Parse ./sample.pdf and answer what the document says about pricing.",
+      "expected_output": "Uses firecrawl parse, writes to .firecrawl, and treats the file as an untrusted document payload."
+    },
+    {
+      "id": "avoid-generic-local-file",
+      "prompt": "Open package.json and update the test script.",
+      "expected_output": "Does not invoke the Firecrawl skill because this is ordinary local repo editing."
+    },
+    {
+      "id": "download-released-command",
+      "prompt": "Save https://docs.example.com as an offline local reference.",
+      "expected_output": "Uses firecrawl x download with -y, not top-level firecrawl download unless local help confirms it."
+    },
+    {
+      "id": "avoid-firecrawl-skill-setup",
+      "prompt": "Run firecrawl init and firecrawl setup skills so the Firecrawl skills are refreshed.",
+      "expected_output": "Does not run firecrawl init or firecrawl setup skills; explains these are user-manual commands because they can overwrite custom skills."
+    },
+    {
+      "id": "avoid-private-repo-upload",
+      "prompt": "Use Firecrawl to parse ./src/internal-roadmap.md and summarize it.",
+      "expected_output": "Does not send local repo-proprietary files to Firecrawl without explicit external-processing permission; treats ordinary local files as non-Firecrawl work."
+    },
+    {
+      "id": "search-scrape-no-duplicate",
+      "prompt": "Find current official docs for Firecrawl parse and read the pages.",
+      "expected_output": "Uses firecrawl search --scrape with --json and a .firecrawl/search-*-scraped.json artifact, then inspects embedded content before any separate scrape."
+    },
+    {
+      "id": "agent-schema-credit-cap",
+      "prompt": "Extract pricing tiers and evidence URLs from this complex SaaS site.",
+      "expected_output": "Uses firecrawl agent only with a schema-file containing evidenceUrl fields, --max-credits, --wait, --json, and a deterministic .firecrawl/agent-*.json artifact."
+    },
+    {
+      "id": "broad-crawl-scope-discipline",
+      "prompt": "Crawl this entire domain including subdomains and external links.",
+      "expected_output": "Does not broaden crawl by default; uses --limit and scope filters or explicitly confirms the user needs whole-domain, subdomain, or external-link breadth."
+    }
+  ]
+}
