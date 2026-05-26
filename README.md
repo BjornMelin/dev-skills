@@ -211,6 +211,7 @@ The table below remains the human-facing catalog.
 | `ai-sdk-agents` | AI SDK v6+ agents with `ToolLoopAgent`: loop control, dynamic tools, and agent workflows. | [skills/ai-sdk-agents/SKILL.md](skills/ai-sdk-agents/SKILL.md) |
 | `ai-sdk-core` | AI SDK Core: text/structured output, tools, MCP, embeddings/reranking, middleware, telemetry. | [skills/ai-sdk-core/SKILL.md](skills/ai-sdk-core/SKILL.md) |
 | `ai-sdk-ui` | Chat and generative UIs with AI SDK React (`useChat`, persistence, streaming, backends). | [skills/ai-sdk-ui/SKILL.md](skills/ai-sdk-ui/SKILL.md) |
+| `autoreview` | Codex-only structured closeout review helper for local, branch, or commit diffs. | [skills/autoreview/SKILL.md](skills/autoreview/SKILL.md) |
 | `aws-architecture` | AWS architecture: service selection, boundaries, rollout, and verification. | [skills/aws-architecture/SKILL.md](skills/aws-architecture/SKILL.md) |
 | `browser-workbench-setup` | Bootstrap browser/UI QA: Playwright-interactive primary, agent-browser smoke, auth and local conventions. | [skills/browser-workbench-setup/SKILL.md](skills/browser-workbench-setup/SKILL.md) |
 | `bun-audit` | Bun-first audit/remediation router (delegates to the shared engine in `bun-dev`). | [skills/bun-audit/SKILL.md](skills/bun-audit/SKILL.md) |
