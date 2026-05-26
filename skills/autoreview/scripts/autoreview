@@ -195,7 +195,7 @@ def local_bundle(repo: Path) -> str:
 
 
 def branch_bundle(repo: Path, base_ref: str) -> str:
-    git(repo, "fetch", "origin", "--quiet", check=False)
+    ensure_ref(repo, base_ref)
     return "\n\n".join(
         [
             "# Branch Diff",
@@ -217,6 +217,23 @@ def commit_bundle(repo: Path, commit_ref: str) -> str:
     )
 
 
+def ensure_ref(repo: Path, ref: str) -> None:
+    result = run(["git", "rev-parse", "--verify", ref], repo, check=False)
+    if result.returncode != 0:
+        raise SystemExit(
+            f"base ref is not available locally: {ref}\n"
+            "Fetch the ref before running branch review or pass a different --base value."
+        )
+
+
+def normalize_repo_path(value: str) -> str:
+    path = value.strip().replace("\\", "/")
+    while path.startswith("./"):
+        path = path[2:]
+    path = os.path.normpath(path).replace("\\", "/")
+    return "" if path == "." else path
+
+
 def review_paths(repo: Path, target: str, target_ref: str | None, commit_ref: str) -> set[str]:
     names: set[str] = set()
     if target == "local":
@@ -232,7 +249,7 @@ def review_paths(repo: Path, target: str, target_ref: str | None, commit_ref: st
         sources = [git(repo, "show", "--name-only", "--format=", commit_ref)]
     for source in sources:
         for line in source.splitlines():
-            path = line.strip()
+            path = normalize_repo_path(line)
             if path:
                 names.add(path)
     return names
@@ -469,7 +486,7 @@ def validate_report(report: dict[str, Any], repo: Path, changed_paths: set[str],
         location = finding.get("code_location")
         if not isinstance(location, dict):
             raise SystemExit(f"finding {index} missing code_location")
-        rel = str(location.get("file_path", "")).strip()
+        rel = normalize_repo_path(str(location.get("file_path", "")))
         line = location.get("line")
         if not rel or not isinstance(line, int) or line < 1:
             raise SystemExit(f"finding {index} has invalid location: {location}")

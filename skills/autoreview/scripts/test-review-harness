@@ -15,7 +15,11 @@ fixture=malicious
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --fixture)
-      fixture=${2:-}
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        usage >&2
+        exit 2
+      fi
+      fixture=$2
       shift 2
       ;;
     -h|--help)
