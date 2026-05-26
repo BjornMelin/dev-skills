@@ -1,0 +1,6 @@
+interface:
+  display_name: "Auto Review"
+  short_description: "Codex-only structured closeout review"
+  default_prompt: "Use $autoreview to run a Codex-only structured closeout review of the current git change."
+policy:
+  allow_implicit_invocation: false
