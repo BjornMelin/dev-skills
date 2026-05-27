@@ -1,0 +1,7 @@
+interface:
+  display_name: "Kimi UI Advisor"
+  short_description: "Kimi-powered UI audit, redesign, component, and screenshot advice"
+  default_prompt: "Use $kimi-ui-advisor to ask Kimi for structured frontend UI audit, redesign, component, screenshot, or before/after comparison advice before Codex edits and verifies the repo."
+
+policy:
+  allow_implicit_invocation: false
