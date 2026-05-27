@@ -50,6 +50,35 @@ MODE_INSTRUCTIONS = {
 }
 
 
+def positive_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a positive integer") from exc
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a non-negative integer") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return parsed
+
+
+def validate_numeric_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.max_steps <= 0:
+        parser.error("--max-steps must be a positive integer")
+    if args.timeout <= 0:
+        parser.error("--timeout must be a positive integer")
+    if args.retries < 0:
+        parser.error("--retries must be a non-negative integer")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Ask Kimi Code CLI for frontend/UI suggestions without letting it edit files.",
@@ -113,9 +142,9 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--agent-file", type=Path, default=DEFAULT_AGENT_FILE)
     parser.add_argument("--kimi-bin", default="kimi", help="Kimi executable name or path.")
-    parser.add_argument("--max-steps", type=int, default=8)
-    parser.add_argument("--timeout", type=int, default=480, help="Timeout in seconds.")
-    parser.add_argument("--retries", type=int, default=1, help="Retries for exit code 75.")
+    parser.add_argument("--max-steps", type=positive_int, default=8)
+    parser.add_argument("--timeout", type=positive_int, default=480, help="Timeout in seconds.")
+    parser.add_argument("--retries", type=non_negative_int, default=1, help="Retries for exit code 75.")
     parser.add_argument(
         "--thinking",
         action="store_true",
@@ -128,6 +157,7 @@ def parse_args() -> argparse.Namespace:
         if args.mode != "advise":
             raise SystemExit("Use either --compare or --mode, not both.")
         args.mode = "compare"
+    validate_numeric_args(args, parser)
     return args
 
 
@@ -135,7 +165,8 @@ def read_prompt(args: argparse.Namespace) -> str:
     if args.prompt and args.prompt_file:
         raise SystemExit("Use either --prompt or --prompt-file, not both.")
     if args.prompt_file:
-        return args.prompt_file.read_text(encoding="utf-8").strip()
+        with args.prompt_file.open("r", encoding="utf-8") as handle:
+            return handle.read().strip()
     if args.prompt:
         return args.prompt.strip()
     if not sys.stdin.isatty():
@@ -147,7 +178,8 @@ def read_design_brief(args: argparse.Namespace) -> str:
     if args.design_brief and args.design_brief_file:
         raise SystemExit("Use either --design-brief or --design-brief-file, not both.")
     if args.design_brief_file:
-        return args.design_brief_file.read_text(encoding="utf-8").strip()
+        with args.design_brief_file.open("r", encoding="utf-8") as handle:
+            return handle.read().strip()
     return (args.design_brief or "").strip()
 
 
@@ -339,7 +371,7 @@ def run_kimi(args: argparse.Namespace, prompt: str) -> tuple[int, str, str, int]
         prompt,
     ]
 
-    attempts = args.retries + 1
+    attempts = max(1, args.retries + 1)
     last: subprocess.CompletedProcess[str] | None = None
     for attempt in range(1, attempts + 1):
         last = subprocess.run(
@@ -353,8 +385,7 @@ def run_kimi(args: argparse.Namespace, prompt: str) -> tuple[int, str, str, int]
             return last.returncode, last.stdout, last.stderr, attempt
         time.sleep(min(10, 2 * attempt))
 
-    assert last is not None
-    return last.returncode, last.stdout, last.stderr, attempts
+    return 1, "", "Kimi did not run because retry attempts could not be initialized.", attempts
 
 
 def parse_kimi_stdout(stdout: str) -> tuple[str, list[dict[str, Any]], list[str]]:
@@ -411,7 +442,8 @@ def write_output(payload: dict[str, Any], args: argparse.Namespace) -> None:
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         payload.setdefault("metadata", {})["saved_to"] = str(output_path)
-        output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        with output_path.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def main() -> int:
