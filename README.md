@@ -235,6 +235,7 @@ The table below remains the human-facing catalog.
 | `gh-deps-intel` | JS/TS + Python dependency intel for monorepos: outdated checks, releases/changelogs → Markdown + JSON. | [skills/gh-deps-intel/SKILL.md](skills/gh-deps-intel/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end with minimal verified fixes (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
+| `kimi-ui-advisor` | Explicit-only Kimi Code CLI advisor for UI audit, redesign, component, screenshot, and compare loops that Codex reviews and verifies. | [skills/kimi-ui-advisor/SKILL.md](skills/kimi-ui-advisor/SKILL.md) |
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |
 | `new-branch` | Create a conventional, semver-friendly branch first, then plan work and the PR. | [skills/new-branch/SKILL.md](skills/new-branch/SKILL.md) |
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
