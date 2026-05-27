@@ -70,15 +70,6 @@ def non_negative_int(value: str) -> int:
     return parsed
 
 
-def validate_numeric_args(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
-    if args.max_steps <= 0:
-        parser.error("--max-steps must be a positive integer")
-    if args.timeout <= 0:
-        parser.error("--timeout must be a positive integer")
-    if args.retries < 0:
-        parser.error("--retries must be a non-negative integer")
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Ask Kimi Code CLI for frontend/UI suggestions without letting it edit files.",
@@ -157,7 +148,6 @@ def parse_args() -> argparse.Namespace:
         if args.mode != "advise":
             raise SystemExit("Use either --compare or --mode, not both.")
         args.mode = "compare"
-    validate_numeric_args(args, parser)
     return args
 
 
