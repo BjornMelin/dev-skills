@@ -2312,7 +2312,7 @@ fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
         .open(&path)
         .with_context(|| format!("failed to create {}", path.display()))?;
     file.write_all(
-        b"#!/usr/bin/env sh\nset -eu\nexec codex-dev skills sync-kimi --apply --project-root \"$PWD\" --launch -- \"$@\"\n",
+        b"#!/usr/bin/env sh\nset -eu\nexec codex-dev skills sync-kimi --apply --launch -- \"$@\"\n",
     )?;
     drop(file);
     set_executable(&path)?;

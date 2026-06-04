@@ -414,6 +414,34 @@ fn explicit_missing_project_root_is_rejected() {
     assert!(error.to_string().contains("project root does not exist"));
 }
 
+#[test]
+fn explicit_file_project_root_is_rejected() {
+    let temp = tempdir().expect("tempdir");
+    let codex = temp.path().join(".codex");
+    let agents = temp.path().join(".agents");
+    let kimi = temp.path().join(".kimi-code");
+    let file_root = temp.path().join("README.md");
+    fs::create_dir_all(&codex).expect("codex dir");
+    fs::write(&file_root, "not a project directory").expect("file root");
+
+    let error = kimi_sync(KimiSyncArgs {
+        apply: false,
+        scope: KimiSyncScope::GlobalOnly,
+        codex_home: Some(codex),
+        agents_home: Some(agents),
+        kimi_home: Some(kimi),
+        project_root: Some(file_root),
+        checked_at: None,
+    })
+    .expect_err("file project root rejected");
+
+    assert!(
+        error
+            .to_string()
+            .contains("project root is not a directory")
+    );
+}
+
 fn write_skill(path: &Path, name: &str) {
     write_text(
         &path.join("SKILL.md"),

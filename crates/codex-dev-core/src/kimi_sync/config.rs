@@ -96,7 +96,8 @@ pub(super) fn resolve_project_root(project_root: Option<PathBuf>) -> Result<Opti
         }
     };
     match fs::canonicalize(&root) {
-        Ok(path) => Ok(Some(path)),
+        Ok(path) if path.is_dir() => Ok(Some(path)),
+        Ok(path) => bail!("project root is not a directory: {}", path.display()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound && !explicit => Ok(None),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             bail!("project root does not exist: {}", root.display())
