@@ -3,6 +3,7 @@ use std::env;
 use std::ffi::OsString;
 use std::fs;
 use std::io::Read;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::thread::sleep;
@@ -15,22 +16,24 @@ use clap_complete::Shell;
 use codex_dev_core::{
     AgentSkillsCatalogArgs, AppendEvidenceArgs, Capsule, CapsuleStatus, EVIDENCE_SCHEMA,
     EvidenceKind, EvidenceKindSummary, EvidenceRecord, EvidenceSummary, GateRecord, GateStatus,
-    InitArgs, OUTPUT_SCHEMA, OrchestrationDiagnosticSeverity, OrchestrationRunReport,
-    POLICY_GATES_SCHEMA, PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA,
-    PR_AGENT_STATE_SCHEMA, PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest,
-    PolicyProfile, PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution,
-    PrAgentHostedActionReport, PrAgentHostedActionSpec, PrAgentHostedActionStatus,
-    PrAgentReadinessAction, PrAgentReadinessActionStatus, PrAgentReadinessAttempt,
-    PrAgentReadinessCheck, PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity,
-    PrAgentSourceRecord, PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan,
-    PrEvidence, PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs,
-    RecordSubagentPlanArgs, RecordSubagentSynthesisArgs, SubagentDisposition,
-    SubagentOutcomeStatus, SubagentSynthesisStatus, SubagentWaitStatus, TaskRootStatus,
-    Verification, agent_skills_catalog, append_evidence, append_jsonl, capsule_status,
-    ensure_regular_contract_files, init_capsule, orchestration_run, pr_status, read_json,
-    recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome, record_subagent_plan,
-    record_subagent_synthesis, render_capsule, render_command, render_pr_label, render_pr_status,
-    stable_json_hash, task_export, task_index, task_show, validate_capsule, write_json,
+    InitArgs, KimiSyncArgs, KimiSyncReport, KimiSyncScope, OUTPUT_SCHEMA,
+    OrchestrationDiagnosticSeverity, OrchestrationRunReport, POLICY_GATES_SCHEMA,
+    PR_AGENT_HOSTED_ACTION_SCHEMA, PR_AGENT_READINESS_SCHEMA, PR_AGENT_STATE_SCHEMA,
+    PR_CONTROL_PLAN_SCHEMA, PolicyGate, PolicyGateResult, PolicyManifest, PolicyProfile,
+    PolicyRunResult, PrAgentDiagnostic, PrAgentHostedActionExecution, PrAgentHostedActionReport,
+    PrAgentHostedActionSpec, PrAgentHostedActionStatus, PrAgentReadinessAction,
+    PrAgentReadinessActionStatus, PrAgentReadinessAttempt, PrAgentReadinessCheck,
+    PrAgentReadinessReport, PrAgentReadinessStatus, PrAgentSeverity, PrAgentSourceRecord,
+    PrAgentSourceStatus, PrAgentStateReport, PrControlCommand, PrControlPlan, PrEvidence,
+    PrRecordArgs, PrRecordSourceKind, RecordSubagentOutcomeArgs, RecordSubagentPlanArgs,
+    RecordSubagentSynthesisArgs, SubagentDisposition, SubagentOutcomeStatus,
+    SubagentSynthesisStatus, SubagentWaitStatus, TaskRootStatus, Verification,
+    agent_skills_catalog, append_evidence, append_jsonl, capsule_status,
+    ensure_regular_contract_files, init_capsule, kimi_sync, orchestration_run, pr_status,
+    read_json, recommend_pr_agent_actions, record_pr_snapshot, record_subagent_outcome,
+    record_subagent_plan, record_subagent_synthesis, render_capsule, render_command,
+    render_pr_label, render_pr_status, stable_json_hash, task_export, task_index, task_show,
+    validate_capsule, write_json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -109,6 +112,7 @@ impl Cli {
             Commands::Skills { command } => match command {
                 SkillsCommand::Catalog(_) => "skills catalog",
                 SkillsCommand::Inventory(_) => "skills inventory",
+                SkillsCommand::SyncKimi(_) => "skills sync-kimi",
             },
             Commands::Bootstrap { command } => match command {
                 BootstrapCommand::Status(_) => "bootstrap status",
@@ -265,6 +269,9 @@ enum SkillsCommand {
     Catalog(SkillsCatalogArgs),
     /// Emit a read-only machine-readable inventory of tracked skills.
     Inventory(SkillsInventoryArgs),
+    /// Sync Kimi Code skill loading to the Codex enabled skill set.
+    #[command(name = "sync-kimi")]
+    SyncKimi(SkillsSyncKimiArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -991,6 +998,69 @@ pub struct SkillsInventoryArgs {
     pub checked_at: Option<DateTime<Utc>>,
 }
 
+/// Arguments for syncing Kimi Code skill discovery to Codex enabled skills.
+#[derive(Args, Clone, Debug)]
+pub struct SkillsSyncKimiArgs {
+    /// Print the planned mirror without writing it.
+    #[arg(long, conflicts_with = "apply")]
+    pub dry_run: bool,
+    /// Write the generated Kimi mirror and any requested wrapper.
+    #[arg(long)]
+    pub apply: bool,
+    /// Codex skill/plugin scope to mirror into Kimi.
+    #[arg(long, value_enum, default_value_t = KimiSyncScopeArg::Focused)]
+    pub scope: KimiSyncScopeArg,
+    /// Codex home directory; defaults to ~/.codex.
+    #[arg(long, value_name = "PATH")]
+    pub codex_home: Option<PathBuf>,
+    /// Agent skills home directory; defaults to ~/.agents.
+    #[arg(long, value_name = "PATH")]
+    pub agents_home: Option<PathBuf>,
+    /// Kimi Code home directory; defaults to ~/.kimi-code.
+    #[arg(long, value_name = "PATH")]
+    pub kimi_home: Option<PathBuf>,
+    /// Project root whose project-local skills should be mirrored.
+    #[arg(
+        long,
+        value_name = "PATH",
+        help = "Project root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub project_root: Option<PathBuf>,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+    /// Install or refresh ~/.local/bin/kimi-codex.
+    #[arg(long)]
+    pub install_wrapper: bool,
+    /// Override the wrapper path used with --install-wrapper.
+    #[arg(long, value_name = "PATH")]
+    pub wrapper_path: Option<PathBuf>,
+    /// Launch Kimi after applying the sync.
+    #[arg(long)]
+    pub launch: bool,
+    /// Arguments passed through to Kimi when --launch is used.
+    #[arg(last = true)]
+    pub kimi_args: Vec<OsString>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+#[value(rename_all = "kebab-case")]
+pub enum KimiSyncScopeArg {
+    Focused,
+    AllEnabled,
+    GlobalOnly,
+}
+
+impl From<KimiSyncScopeArg> for KimiSyncScope {
+    fn from(value: KimiSyncScopeArg) -> Self {
+        match value {
+            KimiSyncScopeArg::Focused => Self::Focused,
+            KimiSyncScopeArg::AllEnabled => Self::AllEnabled,
+            KimiSyncScopeArg::GlobalOnly => Self::GlobalOnly,
+        }
+    }
+}
+
 /// Arguments for the public Agent Skills Lab catalog artifact.
 #[derive(Args, Clone, Debug)]
 pub struct SkillsCatalogArgs {
@@ -1529,6 +1599,7 @@ where
 }
 
 fn handle_cli(cli: Cli) -> Result<CommandOutput> {
+    let json_output = cli.json;
     match cli.command {
         Commands::Completions(args) => {
             let shell = shell_name(args.shell);
@@ -1903,6 +1974,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            SkillsCommand::SyncKimi(args) => handle_skills_sync_kimi(args, json_output),
         },
         Commands::Bootstrap { command } => match command {
             BootstrapCommand::Status(args) => {
@@ -2156,6 +2228,141 @@ fn shell_name(shell: Shell) -> String {
         .to_possible_value()
         .map(|value| value.get_name().to_string())
         .unwrap_or_else(|| format!("{shell:?}").to_ascii_lowercase())
+}
+
+fn handle_skills_sync_kimi(args: SkillsSyncKimiArgs, json_output: bool) -> Result<CommandOutput> {
+    if args.install_wrapper && !args.apply {
+        bail!("--install-wrapper writes ~/.local/bin/kimi-codex and requires --apply");
+    }
+    if args.launch && !args.apply {
+        bail!("--launch requires --apply so Kimi receives a current mirror");
+    }
+    if args.launch && json_output {
+        bail!("--launch is interactive and cannot be combined with --json");
+    }
+    if !args.launch && !args.kimi_args.is_empty() {
+        bail!("Kimi passthrough arguments require --launch");
+    }
+
+    let wrapper_path = args.wrapper_path.clone();
+    let launch = args.launch;
+    let install_wrapper = args.install_wrapper;
+    let kimi_args = args.kimi_args.clone();
+    let result = kimi_sync(KimiSyncArgs {
+        apply: args.apply,
+        scope: args.scope.into(),
+        codex_home: args.codex_home,
+        agents_home: args.agents_home,
+        kimi_home: args.kimi_home,
+        project_root: args.project_root,
+        checked_at: args.checked_at,
+    })?;
+
+    if install_wrapper {
+        install_kimi_wrapper(wrapper_path.as_deref())?;
+    }
+    if launch {
+        launch_kimi(&result, &kimi_args)?;
+    }
+
+    let mode = if result.dry_run { "planned" } else { "applied" };
+    let wrapper = if install_wrapper {
+        "; installed kimi-codex wrapper"
+    } else {
+        ""
+    };
+    let human = format!(
+        "{mode} Kimi skill sync with {} included skill(s), {} excluded skill(s), {} diagnostic(s){wrapper}",
+        result.summary.included, result.summary.excluded, result.summary.diagnostics
+    );
+    Ok(CommandOutput {
+        ok: result.ok,
+        command: "skills sync-kimi",
+        human,
+        result: serde_json::to_value(result)?,
+    })
+}
+
+fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
+    let path = match wrapper_path {
+        Some(path) => path.to_path_buf(),
+        None => default_wrapper_path()?,
+    };
+    if fs::symlink_metadata(&path)
+        .map(|metadata| metadata.file_type().is_symlink())
+        .unwrap_or(false)
+    {
+        bail!(
+            "refusing to overwrite symlink wrapper path: {}",
+            path.display()
+        );
+    }
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&path)
+        .with_context(|| format!("failed to create {}", path.display()))?;
+    file.write_all(
+        b"#!/usr/bin/env sh\nset -eu\nexec codex-dev skills sync-kimi --apply --project-root \"$PWD\" --launch -- \"$@\"\n",
+    )?;
+    drop(file);
+    set_executable(&path)?;
+    Ok(())
+}
+
+fn default_wrapper_path() -> Result<PathBuf> {
+    let home = env::var_os("HOME").ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
+    Ok(PathBuf::from(home)
+        .join(".local")
+        .join("bin")
+        .join("kimi-codex"))
+}
+
+#[cfg(unix)]
+fn set_executable(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut permissions = fs::metadata(path)
+        .with_context(|| format!("failed to inspect {}", path.display()))?
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions)
+        .with_context(|| format!("failed to chmod {}", path.display()))
+}
+
+#[cfg(not(unix))]
+fn set_executable(_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+fn launch_kimi(report: &KimiSyncReport, kimi_args: &[OsString]) -> Result<()> {
+    let mut command = Command::new("kimi");
+    command.arg("--skills-dir").arg(&report.skills_root);
+    command.args(kimi_args);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+
+        let error = command.exec();
+        bail!("failed to launch kimi: {error}");
+    }
+    #[cfg(not(unix))]
+    {
+        let status = command.status().context("failed to launch kimi")?;
+        if status.success() {
+            Ok(())
+        } else {
+            bail!("kimi exited with status {status}")
+        }
+    }
 }
 
 fn render_output(output: CommandOutput, json_output: bool) -> Result<String> {
@@ -9284,6 +9491,73 @@ mod tests {
         assert_eq!(value["ok"], true);
         assert_eq!(value["command"], "capsule init");
         assert_eq!(value["result"]["capsule"]["issues"][0], 22);
+    }
+
+    #[test]
+    fn run_from_skills_sync_kimi_emits_filtered_json_envelope() {
+        let temp = tempdir().expect("tempdir");
+        let codex = temp.path().join(".codex");
+        let agents = temp.path().join(".agents");
+        let kimi = temp.path().join(".kimi-code");
+        let project = temp.path().join("project");
+        let enabled = agents.join("skills/shadcn");
+        let disabled = agents.join("skills/disabled-global");
+        fs::create_dir_all(&enabled).expect("enabled skill dir");
+        fs::create_dir_all(&disabled).expect("disabled skill dir");
+        fs::create_dir_all(&codex).expect("codex dir");
+        fs::create_dir_all(&project).expect("project dir");
+        fs::write(
+            enabled.join("SKILL.md"),
+            "---\nname: shadcn\ndescription: Test skill.\n---\n",
+        )
+        .expect("enabled skill");
+        fs::write(
+            disabled.join("SKILL.md"),
+            "---\nname: disabled-global\ndescription: Test skill.\n---\n",
+        )
+        .expect("disabled skill");
+        fs::write(
+            codex.join("config.toml"),
+            r#"[[skills.config]]
+name = "disabled-global"
+enabled = false
+"#,
+        )
+        .expect("codex config");
+
+        let output = run_from([
+            "codex-dev",
+            "--json",
+            "skills",
+            "sync-kimi",
+            "--dry-run",
+            "--scope",
+            "global-only",
+            "--codex-home",
+            codex.to_str().expect("codex path"),
+            "--agents-home",
+            agents.to_str().expect("agents path"),
+            "--kimi-home",
+            kimi.to_str().expect("kimi path"),
+            "--project-root",
+            project.to_str().expect("project path"),
+            "--checked-at",
+            "2026-06-03T00:00:00Z",
+        ])
+        .expect("run");
+        let value: Value = serde_json::from_str(&output).expect("json output");
+
+        assert_eq!(value["schema"], OUTPUT_SCHEMA);
+        assert_eq!(value["ok"], true);
+        assert_eq!(value["command"], "skills sync-kimi");
+        assert_eq!(value["result"]["schema"], "codex-dev.kimi-sync.v1");
+        assert_eq!(value["result"]["dryRun"], true);
+        assert_eq!(value["result"]["summary"]["included"], 1);
+        assert_eq!(value["result"]["summary"]["excluded"], 1);
+        assert_eq!(value["result"]["included"][0]["name"], "shadcn");
+        assert_eq!(value["result"]["excluded"][0]["name"], "disabled-global");
+        assert!(!value["result"]["mirrorRoot"].as_str().unwrap().is_empty());
+        assert!(!kimi.join("codex-sync").exists());
     }
 
     #[test]
