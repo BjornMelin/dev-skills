@@ -157,6 +157,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
+cargo run -q -p codex-dev -- --json skills sync-kimi --dry-run --project-root "$PWD"
 cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json research import-bundle --help

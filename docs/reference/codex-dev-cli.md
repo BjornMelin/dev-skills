@@ -108,6 +108,7 @@ Skills subcommands:
 
 - `skills catalog`
 - `skills inventory`
+- `skills sync-kimi`
 
 Bootstrap subcommands:
 
@@ -322,6 +323,80 @@ frontmatter checks used by `tools/skill/quick_validate.py`: required string
 the directory, and non-empty descriptions without angle brackets. The Python
 validator and packager remain the authorities for full spec validation and
 `.skill` archive creation; this command owns the read-only inventory report.
+
+## skills sync-kimi
+
+Generate a Kimi Code skill mirror from the effective Codex skill set:
+
+```bash
+cargo run -q -p codex-dev -- --json skills sync-kimi \
+  --dry-run \
+  --project-root /path/to/project
+```
+
+The command uses `result.schema: "codex-dev.kimi-sync.v1"`. By default it
+plans a focused mirror that includes enabled global skills, enabled
+project-local skills from the requested project root, and enabled skills from
+the focused Codex plugins: Clerk, Expo, Native Motion, Vercel, and Web Motion.
+It reads `~/.codex/config.toml` `[[skills.config]]` rules and only mirrors
+skills that remain enabled in Codex. Skill rules may match by plain global
+skill name, plugin namespaced skill name such as `vercel:nextjs`, the skill
+directory path, or the `SKILL.md` path. Later matching rules win, matching the
+Codex config order.
+
+Apply the mirror:
+
+```bash
+cargo run -q -p codex-dev -- --json skills sync-kimi \
+  --apply \
+  --project-root /path/to/project
+```
+
+Applied syncs write only under
+`~/.kimi-code/codex-sync/effective/<project-hash>/`. The generated `skills/`
+directory is a symlink mirror into the existing Codex/global/project skill
+folders, so it does not duplicate plugin installations or copy skill content.
+The `launchCommand` field is the Kimi invocation that constrains startup
+loading:
+
+```bash
+kimi --skills-dir ~/.kimi-code/codex-sync/effective/<project-hash>/skills
+```
+
+Using `--skills-dir` is intentional: it makes Kimi load the generated effective
+mirror instead of auto-loading every skill under `~/.agents/skills`. The command
+also always excludes the Vercel plugin `shadcn` skill so the newer global
+official `shadcn` skill can be used when it is enabled in Codex.
+
+Install the convenience wrapper:
+
+```bash
+cargo run -q -p codex-dev -- --json skills sync-kimi \
+  --apply \
+  --install-wrapper \
+  --project-root /path/to/project
+```
+
+The wrapper is installed as `~/.local/bin/kimi-codex` unless `--wrapper-path`
+is supplied. It refreshes the mirror for the current working directory and then
+execs Kimi with the generated `--skills-dir`:
+
+```bash
+cd /path/to/project
+kimi-codex
+```
+
+Other scopes are available when needed:
+
+```bash
+cargo run -q -p codex-dev -- --json skills sync-kimi --scope all-enabled
+cargo run -q -p codex-dev -- --json skills sync-kimi --scope global-only
+```
+
+`all-enabled` includes all enabled Codex plugins instead of the focused plugin
+set. `global-only` skips plugin discovery and is useful for fixture or
+workstation-global checks. `--launch` is interactive, requires `--apply`, and
+cannot be combined with `--json`; pass Kimi arguments after `--`.
 
 ## bootstrap status
 

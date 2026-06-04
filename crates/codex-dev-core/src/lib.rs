@@ -15,6 +15,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
+mod kimi_sync;
+pub use kimi_sync::{
+    KIMI_SYNC_SCHEMA, KimiSyncArgs, KimiSyncDiagnostic, KimiSyncDiagnosticSeverity,
+    KimiSyncExcludedSkill, KimiSyncReport, KimiSyncScope, KimiSyncSkill, KimiSyncSourceKind,
+    KimiSyncSummary, kimi_sync,
+};
+
 pub const CAPSULE_SCHEMA: &str = "codex-dev.task-capsule.v1";
 pub const EVIDENCE_SCHEMA: &str = "codex-dev.evidence.v1";
 pub const VERIFICATION_SCHEMA: &str = "codex-dev.verification.v1";
