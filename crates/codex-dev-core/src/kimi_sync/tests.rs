@@ -329,7 +329,8 @@ fn apply_writes_symlink_mirror_only_under_kimi_sync_root() {
     let codex = temp.path().join(".codex");
     let agents = temp.path().join(".agents");
     let kimi = temp.path().join(".kimi-code");
-    write_skill(&agents.join("skills/deep-researcher"), "deep-researcher");
+    let source_skill = agents.join("skills/deep-researcher");
+    write_skill(&source_skill, "deep-researcher");
     write_text(&codex.join("config.toml"), "");
 
     let report = kimi_sync(KimiSyncArgs {
@@ -343,8 +344,24 @@ fn apply_writes_symlink_mirror_only_under_kimi_sync_root() {
     })
     .expect("sync");
 
-    assert!(report.skills_root.join("deep-researcher").exists());
-    assert!(report.mirror_root.join("manifest.json").is_file());
+    let mirror_skill = report.skills_root.join("deep-researcher");
+    let link_metadata = fs::symlink_metadata(&mirror_skill).expect("mirror skill metadata");
+    assert!(link_metadata.file_type().is_symlink());
+    assert_eq!(
+        fs::read_link(&mirror_skill).expect("mirror skill symlink target"),
+        source_skill
+    );
+
+    let manifest_path = report.mirror_root.join("manifest.json");
+    let manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read mirror manifest"))
+            .expect("valid mirror manifest json");
+    let included = manifest["included"].as_array().expect("included skills");
+    assert!(
+        included
+            .iter()
+            .any(|skill| skill["name"] == "deep-researcher")
+    );
 }
 
 #[cfg(unix)]
@@ -373,6 +390,28 @@ fn apply_rejects_symlinked_sync_root() {
     .expect_err("symlinked sync root rejected");
 
     assert!(error.to_string().contains("symlinked Kimi sync root"));
+}
+
+#[test]
+fn explicit_missing_project_root_is_rejected() {
+    let temp = tempdir().expect("tempdir");
+    let codex = temp.path().join(".codex");
+    let agents = temp.path().join(".agents");
+    let kimi = temp.path().join(".kimi-code");
+    fs::create_dir_all(&codex).expect("codex dir");
+
+    let error = kimi_sync(KimiSyncArgs {
+        apply: false,
+        scope: KimiSyncScope::GlobalOnly,
+        codex_home: Some(codex),
+        agents_home: Some(agents),
+        kimi_home: Some(kimi),
+        project_root: Some(temp.path().join("missing-project")),
+        checked_at: None,
+    })
+    .expect_err("missing explicit project root rejected");
+
+    assert!(error.to_string().contains("project root does not exist"));
 }
 
 fn write_skill(path: &Path, name: &str) {

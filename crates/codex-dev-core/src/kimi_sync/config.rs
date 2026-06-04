@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use sha2::{Digest, Sha256};
 
 use super::{CodexConfig, PluginState, SkillConfigRule};
@@ -13,8 +13,9 @@ pub(super) fn default_home_path(path: Option<PathBuf>, child: &str) -> Result<Pa
     match path {
         Some(path) => Ok(path),
         None => {
-            let home = env::var_os("HOME").ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
-            Ok(PathBuf::from(home).join(child))
+            let home = home_path()
+                .ok_or_else(|| anyhow::anyhow!("home directory could not be determined"))?;
+            Ok(home.join(child))
         }
     }
 }
@@ -86,6 +87,7 @@ pub(super) fn read_codex_config(path: &Path) -> Result<CodexConfig> {
 }
 
 pub(super) fn resolve_project_root(project_root: Option<PathBuf>) -> Result<Option<PathBuf>> {
+    let explicit = project_root.is_some();
     let root = match project_root {
         Some(path) => path,
         None => {
@@ -95,7 +97,10 @@ pub(super) fn resolve_project_root(project_root: Option<PathBuf>) -> Result<Opti
     };
     match fs::canonicalize(&root) {
         Ok(path) => Ok(Some(path)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound && !explicit => Ok(None),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            bail!("project root does not exist: {}", root.display())
+        }
         Err(error) => Err(error).with_context(|| format!("failed to inspect {}", root.display())),
     }
 }
@@ -137,12 +142,26 @@ fn expand_home_path(path: &Path) -> PathBuf {
         return path.to_path_buf();
     };
     if path_str == "~" {
-        return env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+        return home_path().unwrap_or_else(|| path.to_path_buf());
     }
     if let Some(rest) = path_str.strip_prefix("~/")
-        && let Some(home) = env::var_os("HOME")
+        && let Some(home) = home_path()
     {
-        return PathBuf::from(home).join(rest);
+        return home.join(rest);
     }
     path.to_path_buf()
+}
+
+fn home_path() -> Option<PathBuf> {
+    if let Some(home) = env::var_os("HOME") {
+        return Some(PathBuf::from(home));
+    }
+    if let Some(home) = env::var_os("USERPROFILE") {
+        return Some(PathBuf::from(home));
+    }
+    let drive = env::var_os("HOMEDRIVE")?;
+    let path = env::var_os("HOMEPATH")?;
+    let mut home = PathBuf::from(drive);
+    home.push(path);
+    Some(home)
 }

@@ -2283,6 +2283,7 @@ fn handle_skills_sync_kimi(args: SkillsSyncKimiArgs, json_output: bool) -> Resul
     })
 }
 
+#[cfg(unix)]
 fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
     let path = match wrapper_path {
         Some(path) => path.to_path_buf(),
@@ -2318,12 +2319,24 @@ fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
     Ok(())
 }
 
+#[cfg(not(unix))]
+fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
+    let _ = wrapper_path;
+    bail!("--install-wrapper is currently supported only on Unix");
+}
+
+#[cfg(unix)]
 fn default_wrapper_path() -> Result<PathBuf> {
     let home = env::var_os("HOME").ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
     Ok(PathBuf::from(home)
         .join(".local")
         .join("bin")
         .join("kimi-codex"))
+}
+
+#[cfg(not(unix))]
+fn default_wrapper_path() -> Result<PathBuf> {
+    bail!("default kimi-codex wrapper path is currently supported only on Unix")
 }
 
 #[cfg(unix)]
@@ -9558,6 +9571,73 @@ enabled = false
         assert_eq!(value["result"]["excluded"][0]["name"], "disabled-global");
         assert!(!value["result"]["mirrorRoot"].as_str().unwrap().is_empty());
         assert!(!kimi.join("codex-sync").exists());
+    }
+
+    #[test]
+    fn run_from_skills_sync_kimi_reports_flag_invariant_errors() {
+        let temp = tempdir().expect("tempdir");
+        let codex = temp.path().join(".codex");
+        let agents = temp.path().join(".agents");
+        let kimi = temp.path().join(".kimi-code");
+        let project = temp.path().join("project");
+        fs::create_dir_all(&codex).expect("codex dir");
+        fs::create_dir_all(&agents).expect("agents dir");
+        fs::create_dir_all(&kimi).expect("kimi dir");
+        fs::create_dir_all(&project).expect("project dir");
+
+        let cases: Vec<(&str, Vec<String>, &str)> = vec![
+            (
+                "install wrapper without apply",
+                vec!["--install-wrapper".to_string()],
+                "--install-wrapper writes ~/.local/bin/kimi-codex and requires --apply",
+            ),
+            (
+                "launch without apply",
+                vec!["--launch".to_string()],
+                "--launch requires --apply",
+            ),
+            (
+                "launch with json",
+                vec!["--apply".to_string(), "--launch".to_string()],
+                "--launch is interactive and cannot be combined with --json",
+            ),
+            (
+                "passthrough without launch",
+                vec!["--".to_string(), "--version".to_string()],
+                "Kimi passthrough arguments require --launch",
+            ),
+        ];
+
+        for (label, extra_args, expected_message) in cases {
+            let mut args = vec![
+                "codex-dev".to_string(),
+                "--json".to_string(),
+                "skills".to_string(),
+                "sync-kimi".to_string(),
+                "--codex-home".to_string(),
+                codex.display().to_string(),
+                "--agents-home".to_string(),
+                agents.display().to_string(),
+                "--kimi-home".to_string(),
+                kimi.display().to_string(),
+                "--project-root".to_string(),
+                project.display().to_string(),
+            ];
+            args.extend(extra_args);
+
+            let output = run_from(args).unwrap_or_else(|error| panic!("{label}: {error:#}"));
+            let value: Value = serde_json::from_str(&output).expect("json output");
+            assert_eq!(value["ok"], false, "{label}");
+            assert_eq!(value["command"], "skills sync-kimi", "{label}");
+            assert!(
+                value["result"]["error"]["message"]
+                    .as_str()
+                    .expect("message")
+                    .contains(expected_message),
+                "{label}: {}",
+                value["result"]["error"]["message"]
+            );
+        }
     }
 
     #[test]
