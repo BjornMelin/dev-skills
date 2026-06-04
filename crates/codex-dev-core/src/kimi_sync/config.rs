@@ -153,15 +153,5 @@ fn expand_home_path(path: &Path) -> PathBuf {
 }
 
 fn home_path() -> Option<PathBuf> {
-    if let Some(home) = env::var_os("HOME") {
-        return Some(PathBuf::from(home));
-    }
-    if let Some(home) = env::var_os("USERPROFILE") {
-        return Some(PathBuf::from(home));
-    }
-    let drive = env::var_os("HOMEDRIVE")?;
-    let path = env::var_os("HOMEPATH")?;
-    let mut home = PathBuf::from(drive);
-    home.push(path);
-    Some(home)
+    dirs::home_dir()
 }
