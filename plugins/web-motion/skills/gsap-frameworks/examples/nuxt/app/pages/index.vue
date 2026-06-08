@@ -37,6 +37,7 @@ onMounted(async () => {
       return () => split.revert();
     }, container.value);
   } catch (error) {
+    gsap.set(".headline", { autoAlpha: 1 });
     if (!cancelled) console.error("Failed to initialize GSAP SplitText animation", error);
   }
 });

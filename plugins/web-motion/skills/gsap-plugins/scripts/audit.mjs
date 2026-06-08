@@ -440,6 +440,12 @@ function scan(root, maxFiles) {
   const files = listFiles(root, maxFiles);
   const pkg = readPackage(root);
   const findings = [];
+  const fileTexts = new Map();
+  for (const file of files) {
+    try {
+      fileTexts.set(file, fs.readFileSync(file, 'utf8'));
+    } catch {}
+  }
   for (const rule of profile.rules) {
     if (config.ignoreRules.includes(rule.id)) continue;
     if (rule.kind === 'packageHasAny') {
@@ -462,13 +468,7 @@ function scan(root, maxFiles) {
       }
       continue;
     }
-    for (const file of files) {
-      let text;
-      try {
-        text = fs.readFileSync(file, 'utf8');
-      } catch {
-        continue;
-      }
+    for (const [file, text] of fileTexts) {
       findings.push(...scanRule(rule, file, root, text, config));
     }
   }

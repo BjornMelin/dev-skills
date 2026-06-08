@@ -282,9 +282,11 @@ triggers when the preference changes.
 
 ```javascript
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+let heroScrollTrigger;
 
 function setupScrollScene() {
-  ScrollTrigger.getById("hero-scroll")?.kill();
+  heroScrollTrigger?.kill();
+  heroScrollTrigger = undefined;
 
   if (motionQuery.matches) {
     gsap.set(".hero", { autoAlpha: 1, y: 0 });
@@ -301,6 +303,7 @@ function setupScrollScene() {
       scrub: true
     }
   });
+  heroScrollTrigger = ScrollTrigger.getById("hero-scroll");
 }
 
 motionQuery.addEventListener("change", setupScrollScene);
@@ -308,7 +311,7 @@ setupScrollScene();
 
 // Cleanup on route/component teardown:
 motionQuery.removeEventListener("change", setupScrollScene);
-ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+heroScrollTrigger?.kill();
 ```
 
 You can also use `gsap.matchMedia()` when the scene already uses GSAP-owned

@@ -328,14 +328,18 @@ function readDirEntries(dir) {
 
 function shouldSkipFile(relativePath, fileName, fullPath = '') {
   const normalized = relativePath.split(path.sep).join('/');
-  if (fullPath) {
-    try {
-      if (fs.readFileSync(fullPath, 'utf8').slice(0, 512).includes('motion-audit-skip-file')) return true;
-    } catch {}
-  }
+  const extension = path.extname(fileName);
   if (normalized === 'scripts/audit.mjs' || normalized.endsWith('/scripts/audit.mjs')) return true;
   if (/^skills\/[^/]+\/SKILL\.md$/.test(normalized)) return true;
-  return path.extname(fileName) === '.json' && fileName !== 'package.json';
+  if (extension === '.json' && fileName !== 'package.json') return true;
+  if (fullPath && (fileExtensions.has(extension) || fileNames.has(fileName))) {
+    try {
+      return fs.readFileSync(fullPath, 'utf8').slice(0, 512).includes('motion-audit-skip-file');
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 function listFiles(root, maxFiles) {
