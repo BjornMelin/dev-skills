@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with GSAP Vue in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GSAP Vue is directly in scope for gsap-frameworks."
+    },
+    {
+      "query": "Can you help with GSAP Svelte in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GSAP Svelte is directly in scope for gsap-frameworks."
+    },
+    {
+      "query": "Can you help with Nuxt GSAP in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Nuxt GSAP is directly in scope for gsap-frameworks."
+    },
+    {
+      "query": "Can you help with framework lifecycle in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "framework lifecycle is directly in scope for gsap-frameworks."
+    },
+    {
+      "query": "Can you help with component cleanup in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "component cleanup is directly in scope for gsap-frameworks."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap in vue and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-frameworks."
+    },
+    {
+      "query": "Audit this Vue GSAP composable for lifecycle cleanup and scoped element selection.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-frameworks."
+    },
+    {
+      "query": "Review this Svelte GSAP action for teardown, SSR boundaries, and animation ownership.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-frameworks."
+    },
+    {
+      "query": "Check this Angular GSAP integration for component lifecycle and renderer-safe DOM access.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-frameworks."
+    },
+    {
+      "query": "Validate this framework GSAP wrapper for route transitions and reduced-motion fallback behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-frameworks."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-frameworks."
+    }
+  ]
+}

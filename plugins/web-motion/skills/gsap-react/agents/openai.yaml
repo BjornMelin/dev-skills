@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP React"
+  short_description: "Official @gsap/react lifecycle guidance"
+  default_prompt: "Use $gsap-react for React and Next.js GSAP integration using @gsap/react, useGSAP(), refs, scoped contexts, cleanup, SSR/client boundaries, and dependency-safe animation setup."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP Plugins"
+  short_description: "Official GSAP plugin registration and usage"
+  default_prompt: "Use $gsap-plugins for GSAP plugin registration, public package imports, Flip, Draggable, Observer, MotionPath, ScrollTo, SVG/text/ease plugins, and plugin boundary review."
+policy:
+  allow_implicit_invocation: true

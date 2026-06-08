@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with @gsap/react in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@gsap/react is directly in scope for gsap-react."
+    },
+    {
+      "query": "Can you help with useGSAP in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "useGSAP is directly in scope for gsap-react."
+    },
+    {
+      "query": "Can you help with GSAP React in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GSAP React is directly in scope for gsap-react."
+    },
+    {
+      "query": "Can you help with Next.js GSAP in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Next.js GSAP is directly in scope for gsap-react."
+    },
+    {
+      "query": "Can you help with gsap.context in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "gsap.context is directly in scope for gsap-react."
+    },
+    {
+      "query": "Can you help with React animation cleanup in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "React animation cleanup is directly in scope for gsap-react."
+    },
+    {
+      "query": "Review this GSAP implementation for react and next.js gsap integration using @gsap/react and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-react."
+    },
+    {
+      "query": "Audit this @gsap/react component for useGSAP scoping, refs, and Strict Mode cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-react."
+    },
+    {
+      "query": "Review this Next.js GSAP animation for client boundaries and route-transition teardown.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-react."
+    },
+    {
+      "query": "Check this React GSAP event handler for contextSafe usage and selector containment.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-react."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-react."
+    }
+  ]
+}

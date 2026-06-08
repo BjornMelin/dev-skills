@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with gsap.utils in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "gsap.utils is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with clamp in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "clamp is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with mapRange in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "mapRange is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with normalize in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "normalize is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with snap in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "snap is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with wrap in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "wrap is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with selector in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "selector is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Can you help with function-based values in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "function-based values is directly in scope for gsap-utils."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap.utils helpers such as clamp and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-utils."
+    },
+    {
+      "query": "Audit this gsap.utils usage for clamp/mapRange/snap correctness and deterministic random behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-utils."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-utils."
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "skill": "gsap-timeline",
+  "checked_at": "2026-06-04",
+  "copy_policy": "GreenSock official GSAP skill text is copied as the primary SKILL.md baseline under the upstream MIT skill repository license; GSAP package/runtime docs remain subject to GSAP package terms and are summarized or cited unless separately license-gated.",
+  "upstream_sources": [
+    {
+      "label": "GreenSock official GSAP AI skills, MIT: https://github.com/greensock/gsap-skills"
+    },
+    {
+      "label": "GSAP documentation and package license source: https://gsap.com/docs/v3/ and https://gsap.com/standard-license/"
+    },
+    {
+      "label": "Agent Skills specification and best practices: https://agentskills.io/specification"
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/official-source.md",
+      "title": "Official GreenSock timeline skill source",
+      "sources": []
+    },
+    {
+      "file": "references/position-parameter.md",
+      "title": "Position parameter and labels guide",
+      "sources": []
+    },
+    {
+      "file": "references/playback-control.md",
+      "title": "Timeline playback, cleanup, and testing",
+      "sources": []
+    },
+    {
+      "file": "references/sequence-design-taxonomy.md",
+      "title": "Timeline sequence design taxonomy",
+      "sources": [
+        "https://gsap.com/docs/v3/GSAP/Timeline/",
+        "https://gsap.com/docs/v3/GSAP/gsap.to()"
+      ]
+    },
+    {
+      "file": "references/timeline-state-machine-patterns.md",
+      "title": "Timeline state-machine and playback patterns",
+      "sources": [
+        "https://gsap.com/docs/v3/GSAP/Timeline/",
+        "https://gsap.com/docs/v3/GSAP/gsap.context()"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-timeline-current-notes.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

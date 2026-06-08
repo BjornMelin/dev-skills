@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP Frameworks"
+  short_description: "Official GSAP framework lifecycle guidance"
+  default_prompt: "Use $gsap-frameworks for GSAP in Vue, Svelte, Nuxt, Astro, and vanilla component lifecycles with scoped selectors and cleanup."
+policy:
+  allow_implicit_invocation: false
