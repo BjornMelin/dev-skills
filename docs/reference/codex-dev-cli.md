@@ -1295,8 +1295,12 @@ cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr review --help
 cargo run -q -p codex-dev -- --json pr readiness --help
 cargo run -q -p codex-dev -- --json pr record --help
+cargo run -q -p codex-dev -- --json review --help
+cargo run -q -p codex-dev -- --json commit plan --help
+cargo run -q -p codex-dev -- --json commit validate --help
 ```
 
 Use [Validation](../runbooks/validation.md) for the canonical local matrix,

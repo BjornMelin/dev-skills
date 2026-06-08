@@ -4402,65 +4402,83 @@ fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result
     Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
 }
 
-pub fn github_review_threads_from_graphql(value: &Value) -> Vec<GitHubReviewThread> {
+pub fn github_review_threads_from_graphql(value: &Value) -> Result<Vec<GitHubReviewThread>> {
     let mut threads = Vec::new();
-    collect_github_review_threads(value, &mut threads);
-    threads
+    collect_github_review_threads(value, &mut threads)?;
+    Ok(threads)
 }
 
-fn collect_github_review_threads(value: &Value, out: &mut Vec<GitHubReviewThread>) {
-    match value {
-        Value::Array(items) => {
-            for item in items {
-                collect_github_review_threads(item, out);
-            }
+fn collect_github_review_threads(value: &Value, out: &mut Vec<GitHubReviewThread>) -> Result<()> {
+    if let Some(pages) = value.as_array()
+        && pages.iter().any(Value::is_object)
+    {
+        for page in pages {
+            let nodes = review_thread_nodes(page)
+                .with_context(|| "GitHub review-thread page is missing reviewThreads.nodes")?;
+            collect_github_review_thread_nodes(nodes, out)?;
         }
-        Value::Object(map) => {
-            if let Some(id) = map.get("id").and_then(Value::as_str)
-                && map.get("isResolved").is_some()
-            {
-                let comments = map.get("comments");
-                out.push(GitHubReviewThread {
-                    id: id.to_string(),
-                    is_resolved: map
-                        .get("isResolved")
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false),
-                    is_outdated: map
-                        .get("isOutdated")
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false),
-                    comments: collect_github_review_comments(comments),
-                    comments_total_count: comments
-                        .and_then(|comments| comments.get("totalCount"))
-                        .and_then(Value::as_u64),
-                    comments_has_next_page: comments
-                        .and_then(|comments| comments.pointer("/pageInfo/hasNextPage"))
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false),
-                });
-                return;
-            }
-            for nested in map.values() {
-                collect_github_review_threads(nested, out);
-            }
-        }
-        _ => {}
+        return Ok(());
     }
+
+    let nodes = review_thread_nodes(value)
+        .with_context(|| "GitHub review-thread source is missing reviewThreads.nodes")?;
+    collect_github_review_thread_nodes(nodes, out)
 }
 
-fn collect_github_review_comments(value: Option<&Value>) -> Vec<GitHubReviewComment> {
+fn collect_github_review_thread_nodes(
+    nodes: &[Value],
+    out: &mut Vec<GitHubReviewThread>,
+) -> Result<()> {
+    for node in nodes {
+        out.push(github_review_thread_from_node(node)?);
+    }
+    Ok(())
+}
+
+fn github_review_thread_from_node(node: &Value) -> Result<GitHubReviewThread> {
+    let id = node
+        .get("id")
+        .and_then(Value::as_str)
+        .with_context(|| format!("GitHub review thread is missing id: {node}"))?;
+    let is_resolved = optional_bool(node, "isResolved")
+        .with_context(|| format!("GitHub review thread is missing isResolved: {node}"))?;
+    let is_outdated = optional_bool(node, "isOutdated").unwrap_or(false);
+    let comments = node
+        .get("comments")
+        .with_context(|| format!("GitHub review thread {id} is missing comments"))?;
+    let comments_total_count = comments
+        .get("totalCount")
+        .and_then(Value::as_u64)
+        .with_context(|| format!("GitHub review thread {id} is missing comments.totalCount"))?;
+    let comments_has_next_page = comments
+        .pointer("/pageInfo/hasNextPage")
+        .and_then(Value::as_bool)
+        .with_context(|| {
+            format!("GitHub review thread {id} is missing comments.pageInfo.hasNextPage")
+        })?;
+
+    Ok(GitHubReviewThread {
+        id: id.to_string(),
+        is_resolved,
+        is_outdated,
+        comments: collect_github_review_comments(Some(comments))?,
+        comments_total_count: Some(comments_total_count),
+        comments_has_next_page,
+    })
+}
+
+fn collect_github_review_comments(value: Option<&Value>) -> Result<Vec<GitHubReviewComment>> {
     let Some(value) = value else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let nodes = value
         .get("nodes")
         .and_then(Value::as_array)
         .or_else(|| value.as_array());
     let Some(nodes) = nodes else {
-        return Vec::new();
+        bail!("GitHub review-thread comments are missing nodes");
     };
-    nodes
+    Ok(nodes
         .iter()
         .map(|comment| GitHubReviewComment {
             id: json_scalar_key(comment.get("id"))
@@ -4496,7 +4514,7 @@ fn collect_github_review_comments(value: Option<&Value>) -> Vec<GitHubReviewComm
                 .and_then(Value::as_str)
                 .map(str::to_string),
         })
-        .collect()
+        .collect())
 }
 
 fn normalize_gh_review_comments(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {

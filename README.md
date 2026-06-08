@@ -90,9 +90,6 @@ tools/
   skill/                  # skill validation and packaging helpers
 subagents/
   codex/                  # tracked global roles, public overlays, and sync helpers
-plugins/
-  native-motion/          # Expo and React Native motion plugin skills
-  web-motion/             # Browser and frontend web motion plugin skills
 ```
 
 ## Research, Subagent, and Operating Stack

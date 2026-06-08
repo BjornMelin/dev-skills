@@ -624,7 +624,7 @@ fn build_pr_review_worklist(
     if let Some(path) = thread_source {
         let value = read_json::<Value>(&path)
             .with_context(|| format!("failed to read review thread source {}", path.display()))?;
-        threads = github_review_threads_from_graphql(&value);
+        threads = github_review_threads_from_graphql(&value)?;
     } else {
         diagnostics.push("review-thread source was not captured".to_string());
     }
@@ -792,7 +792,7 @@ fn extract_suggestions(
             .find('\n')
             .map(|index| &after_start[index + 1..])
             .unwrap_or("");
-        let Some(end) = after_header.find("```") else {
+        let Some(end) = closing_fence_offset(after_header) else {
             break;
         };
         let payload = &after_header[..end];
@@ -816,6 +816,17 @@ fn extract_suggestions(
         rest = &after_header[end + 3..];
     }
     suggestions
+}
+
+fn closing_fence_offset(markdown: &str) -> Option<usize> {
+    let mut offset = 0;
+    for line in markdown.split_inclusive('\n') {
+        if line.trim_end_matches(['\r', '\n']) == "```" {
+            return Some(offset);
+        }
+        offset += line.len();
+    }
+    (markdown.trim_end_matches(['\r', '\n']) == "```").then_some(0)
 }
 
 fn original_from_diff_hunk(
@@ -1273,6 +1284,30 @@ fn plan_or_apply_closeout(
         .cloned()
         .collect::<Vec<_>>();
     let target_threads = closeout_targets(&args, worklist.as_ref())?;
+    let early_diagnostics = closeout_precondition_diagnostics(
+        args.apply,
+        expected_head_sha.as_deref(),
+        None,
+        !validation_commands.is_empty(),
+    );
+    if args.apply
+        && early_diagnostics.iter().any(|diagnostic| {
+            diagnostic.contains("requires --expected-head-sha")
+                || diagnostic.contains("requires at least one --validation-command")
+        })
+    {
+        return Ok(closeout_blocked_report(CloseoutBlockedReportArgs {
+            repo: &repo,
+            number,
+            generated_at,
+            apply: args.apply,
+            expected_head_sha,
+            current_head_sha: None,
+            targets: target_threads,
+            validation_command: validation_commands.first().cloned(),
+            diagnostics: early_diagnostics,
+        }));
+    }
     let capsule = if args.apply || args.source_dir.is_some() {
         Some(resolve_pr_review_capsule(
             args.capsule.as_deref(),
@@ -1468,6 +1503,54 @@ fn plan_or_apply_closeout(
     })
 }
 
+struct CloseoutBlockedReportArgs<'a> {
+    repo: &'a str,
+    number: u64,
+    generated_at: DateTime<Utc>,
+    apply: bool,
+    expected_head_sha: Option<String>,
+    current_head_sha: Option<String>,
+    targets: Vec<CloseoutTarget>,
+    validation_command: Option<String>,
+    diagnostics: Vec<String>,
+}
+
+fn closeout_blocked_report(args: CloseoutBlockedReportArgs<'_>) -> PrReviewCloseoutReport {
+    let threads = args
+        .targets
+        .into_iter()
+        .map(|target| PrReviewCloseoutThread {
+            thread_id: target.thread_id,
+            work_item_id: target.work_item_id,
+            status: "blocked".to_string(),
+            reason: "closeout apply preconditions were not satisfied".to_string(),
+            commit_sha: None,
+            validation_command: args.validation_command.clone(),
+            command: Vec::new(),
+        })
+        .collect::<Vec<_>>();
+
+    PrReviewCloseoutReport {
+        schema: PR_REVIEW_CLOSEOUT_SCHEMA.to_string(),
+        repository: args.repo.to_string(),
+        number: args.number,
+        generated_at: args.generated_at,
+        dry_run: !args.apply,
+        apply_requested: args.apply,
+        expected_head_sha: args.expected_head_sha,
+        current_head_sha: args.current_head_sha,
+        ok: false,
+        summary: PrReviewCloseoutSummary {
+            planned: 0,
+            applied: 0,
+            skipped: 0,
+            blocked: threads.len() as u64,
+        },
+        threads,
+        diagnostics: args.diagnostics,
+    }
+}
+
 fn closeout_precondition_diagnostics(
     apply: bool,
     expected_head_sha: Option<&str>,
@@ -1606,7 +1689,7 @@ fn current_unresolved_threads(
             path.display()
         )
     })?;
-    let threads = github_review_threads_from_graphql(&value);
+    let threads = github_review_threads_from_graphql(&value)?;
     let incomplete_threads = threads
         .iter()
         .filter(|thread| !thread.is_resolved && !thread.is_outdated && !thread.comments_complete())
@@ -1771,9 +1854,20 @@ fn extract_path_hint(line: &str) -> Option<String> {
 
 fn normalize_path_hint_token(token: &str) -> Option<String> {
     let token = token.trim_matches(|ch: char| matches!(ch, '`' | '\'' | '"' | ',' | ';'));
-    let path_end = [".rs", ".ts", ".tsx", ".md", ".py"]
-        .iter()
-        .filter_map(|extension| token.find(extension).map(|index| index + extension.len()))
+    let path_end = token
+        .char_indices()
+        .filter_map(|(index, ch)| {
+            if ch != '.' {
+                return None;
+            }
+            let end = token[index + 1..]
+                .char_indices()
+                .take_while(|(_, ch)| ch.is_ascii_alphanumeric() || *ch == '_')
+                .take(5)
+                .map(|(offset, ch)| index + 1 + offset + ch.len_utf8())
+                .last()?;
+            (end > index + 1).then_some(end)
+        })
         .max()?;
     Some(token[..path_end].to_string())
 }
@@ -2033,6 +2127,13 @@ fn validation_commands_for_files(paths: &[String]) -> Vec<String> {
     let mut commands = BTreeSet::new();
     if paths
         .iter()
+        .any(|path| path.starts_with("crates/") && path.ends_with(".rs"))
+    {
+        commands.insert("cargo fmt --all --check".to_string());
+        commands.insert("cargo clippy --all-targets -- -D warnings".to_string());
+    }
+    if paths
+        .iter()
         .any(|path| path.starts_with("crates/codex-dev"))
     {
         commands.insert("cargo test -p codex-dev".to_string());
@@ -2044,13 +2145,36 @@ fn validation_commands_for_files(paths: &[String]) -> Vec<String> {
         commands.insert("cargo test -p codex-dev-core".to_string());
     }
     if paths.iter().any(|path| is_skill_path(path)) {
-        commands.insert("python3 tools/skill/quick_validate.py <changed-skill>".to_string());
+        for skill_path in changed_skill_roots(paths) {
+            commands.insert(format!(
+                "python3 tools/skill/quick_validate.py {skill_path}"
+            ));
+        }
     }
     if paths.iter().any(|path| path.ends_with(".md")) {
         commands.insert("python3 tools/docs/check_links.py docs README.md AGENTS.md".to_string());
     }
     commands.insert("git diff --check".to_string());
     commands.into_iter().collect()
+}
+
+fn changed_skill_roots(paths: &[String]) -> BTreeSet<String> {
+    paths
+        .iter()
+        .filter_map(|path| {
+            let parts = path.split('/').collect::<Vec<_>>();
+            if parts.first() == Some(&"skills") && parts.len() >= 2 {
+                Some(format!("skills/{}", parts[1]))
+            } else if parts.first() == Some(&"plugins")
+                && parts.get(2) == Some(&"skills")
+                && parts.len() >= 4
+            {
+                Some(format!("plugins/{}/skills/{}", parts[1], parts[3]))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn is_skill_path(path: &str) -> bool {

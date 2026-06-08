@@ -930,7 +930,7 @@ def tracked_files(root: Path, prefix: str) -> set[Path]:
     for raw_path in completed.stdout.split(b"\0"):
         if raw_path:
             path = root / raw_path.decode()
-            if path.is_file():
+            if path.is_file() and not path.is_symlink():
                 files.add(path)
     return files
 

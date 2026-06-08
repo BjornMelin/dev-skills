@@ -2273,7 +2273,9 @@ fn write_pr_review_thread_fixture(source_dir: &std::path::Path) {
                                                     "body": "This can be simplified.\n\n```suggestion\nlet answer = 42;\n```",
                                                     "diffHunk": "@@ -12,2 +12,2 @@\n-let first = 40;\n-let second = 41;\n+let first = 1;\n+let second = 2;"
                                                 }
-                                            ]
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
                                         }
                                     }
                                 ],
@@ -2316,7 +2318,9 @@ fn write_pr_review_blank_line_thread_fixture(source_dir: &std::path::Path) {
                                                     "body": "Preserve spacing.\n\n```suggestion\nlet answer = 42;\n```",
                                                     "diffHunk": "@@ -12,3 +12,3 @@\n-let first = 40;\n-\n-let second = 41;\n+let first = 1;\n+\n+let second = 2;"
                                                 }
-                                            ]
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
                                         }
                                     }
                                 ],
@@ -2357,7 +2361,9 @@ fn write_pr_review_edge_blank_suggestion_fixture(source_dir: &std::path::Path) {
                                                     "body": "Preserve edge blank lines.\n\n```suggestion\n\nlet answer = 42;\n\n```",
                                                     "diffHunk": "@@ -12,1 +12,1 @@\n-let answer = 41;\n+let answer = 41;"
                                                 }
-                                            ]
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
                                         }
                                     }
                                 ],
@@ -2374,7 +2380,23 @@ fn write_pr_review_edge_blank_suggestion_fixture(source_dir: &std::path::Path) {
 }
 
 fn write_pr_suggestion_worklist(path: &std::path::Path, items: Value) {
-    let item_count = items.as_array().map_or(0, Vec::len);
+    let item_values = items.as_array().cloned().unwrap_or_default();
+    let unresolved_threads = item_values
+        .iter()
+        .filter(|item| item["status"].as_str() != Some("resolved"))
+        .count();
+    let actionable_items = item_values
+        .iter()
+        .filter(|item| item["status"].as_str() == Some("actionable"))
+        .count();
+    let suggestion_items = item_values
+        .iter()
+        .filter(|item| {
+            item["suggestions"]
+                .as_array()
+                .is_some_and(|suggestions| !suggestions.is_empty())
+        })
+        .count();
     std::fs::write(
         path,
         serde_json::to_string_pretty(&json!({
@@ -2385,9 +2407,9 @@ fn write_pr_suggestion_worklist(path: &std::path::Path, items: Value) {
             "head_sha": "abc123",
             "source": "fixture",
             "summary": {
-                "unresolved_threads": item_count,
-                "actionable_items": item_count,
-                "suggestion_items": item_count,
+                "unresolved_threads": unresolved_threads,
+                "actionable_items": actionable_items,
+                "suggestion_items": suggestion_items,
                 "clusters": 1,
                 "fast_noop": false
             },
@@ -4942,7 +4964,16 @@ fn pr_review_closeout_apply_skips_outdated_live_threads() {
         "pullRequest": {
           "reviewThreads": {
             "nodes": [
-              {"id": "thread-suggestion", "isResolved": false, "isOutdated": true}
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": true,
+                "comments": {
+                  "nodes": [],
+                  "totalCount": 0,
+                  "pageInfo": {"hasNextPage": false, "endCursor": null}
+                }
+              }
             ],
             "pageInfo": {"hasNextPage": false, "endCursor": null}
           }
@@ -5080,7 +5111,9 @@ fn pr_review_closeout_apply_blocks_changed_thread_comments() {
                       "line": 13,
                       "body": "New feedback added after the worklist was captured."
                     }
-                  ]
+                  ],
+                  "totalCount": 2,
+                  "pageInfo": {"hasNextPage": false, "endCursor": null}
                 }
               }
             ],
@@ -5716,9 +5749,7 @@ fn pr_review_closeout_apply_blocks_without_expected_head_sha_even_with_worklist_
                 .as_str()
                 .is_some_and(|diagnostic| diagnostic.contains("requires --expected-head-sha")))
     );
-    let gh_log = std::fs::read_to_string(log).expect("gh log");
-    assert!(gh_log.contains("api graphql"));
-    assert!(!gh_log.contains("threadId=thread-suggestion"));
+    assert!(!log.exists());
 }
 
 #[test]
@@ -5784,9 +5815,7 @@ fn pr_review_closeout_apply_blocks_without_validation_command() {
                 |diagnostic| diagnostic.contains("requires at least one --validation-command")
             ))
     );
-    let gh_log = std::fs::read_to_string(log).expect("gh log");
-    assert!(gh_log.contains("api graphql"));
-    assert!(!gh_log.contains("threadId=thread-suggestion"));
+    assert!(!log.exists());
 }
 
 #[test]

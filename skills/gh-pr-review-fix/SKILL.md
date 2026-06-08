@@ -21,8 +21,8 @@ When the user invokes `$gh-pr-review-fix`, run the full closeout loop unless blo
 7. Create scoped, semantically grouped, reviewable Conventional Commits following `references/closeout-and-commits.md`.
 8. Push the PR branch once after all intended semantic commits pass validation.
 9. Re-capture fresh PR head/thread state and resolve every matching fixed hosted thread:
-   - `codex-dev --json pr review closeout --worklist <json> --expected-head-sha <pushed-head> --commit <sha> --validation-command <cmd> --apply`
-10. Re-run `codex-dev --json pr review start --fresh` and continue until zero actionable unresolved items remain or a real blocker appears.
+   - `codex-dev --json pr review closeout --repo <owner/repo> --number <pr> --worklist <json> --expected-head-sha <pushed-head> --commit <sha> --validation-command <cmd> --apply`
+10. Re-run `codex-dev --json pr review start --fresh --repo <owner/repo> --number <pr>` and continue until zero actionable unresolved items remain or a real blocker appears.
 
 ## Hosted Closeout Policy
 

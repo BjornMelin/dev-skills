@@ -514,8 +514,7 @@ function pathParts(file) {
 function isSkillArtifactDir(dir, rootIsSkillDir = false, rootIsPluginDir = false) {
   const parts = pathParts(dir);
   if (rootIsSkillDir && skillArtifactDirs.has(parts[0])) return true;
-  if (rootIsPluginDir && parts.length === 1 && skillArtifactDirs.has(parts[0])) return true;
-  return parts[0] === 'skills' && skillArtifactDirs.has(parts[2]);
+  return parts[0] === 'skills' && parts.length >= 3 && skillArtifactDirs.has(parts[2]);
 }
 function isSkillArtifactFile(file, rootIsSkillDir = false, readMarker = true) {
   const parts = pathParts(file);
@@ -545,7 +544,7 @@ function listFiles(dir, acc = [], limit = Infinity) {
 }
 function listScannableFiles(dir, acc = [], limit = Infinity, root = dir) {
   if (!existsSync(dir) || acc.length >= limit) return acc;
-  const rootIsSkillDir = existsSync(path.join(root, 'SKILL.md')) && existsSync(path.join(root, 'references'));
+  const rootIsSkillDir = existsSync(path.join(root, 'SKILL.md'));
   const rootIsPluginDir = existsSync(path.join(root, '.codex-plugin', 'plugin.json')) && existsSync(path.join(root, 'skills'));
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (acc.length >= limit) break;
