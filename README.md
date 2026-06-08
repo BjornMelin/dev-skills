@@ -12,7 +12,7 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
-- local Codex plugin bundles under `plugins/`;
+- reusable local Codex plugin source under `plugins/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
 - a Rust development CLI, `codex-dev`, under `crates/`;
@@ -63,6 +63,13 @@ skills/
     assets/               # optional (templates/snippets)
     templates/            # optional (scaffolds)
   dist/                   # local .skill bundles (ZIP; gitignored)
+plugins/
+  <plugin-name>/
+    .codex-plugin/
+      plugin.json         # Codex plugin manifest
+    skills/
+      <skill-name>/
+        SKILL.md          # plugin-scoped skill entrypoint
 crates/
   codex-dev-core/         # Shared task capsule contracts and read-model helpers
   codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
@@ -169,7 +176,11 @@ cargo run -q -p codex-dev -- --json orchestration verify --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr review --help
 cargo run -q -p codex-dev -- --json pr readiness --help
+cargo run -q -p codex-dev -- --json review --help
+cargo run -q -p codex-dev -- --json commit plan --help
+cargo run -q -p codex-dev -- --json commit validate --subject "fix(codex-dev): preserve review-thread closeout evidence"
 ```
 
 Run the canonical task capsule fixture in
@@ -245,7 +256,7 @@ The table below remains the human-facing catalog.
 | `docs-align` | Post-implement docs alignment: drift detection, ADRs, specs, README, `AGENTS.md`. | [skills/docs-align/SKILL.md](skills/docs-align/SKILL.md) |
 | `firecrawl` | Firecrawl CLI for search, scrape, map, crawl, interact, monitor, download, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
 | `gh-deps-intel` | JS/TS + Python dependency intel for monorepos: outdated checks, releases/changelogs → Markdown + JSON. | [skills/gh-deps-intel/SKILL.md](skills/gh-deps-intel/SKILL.md) |
-| `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end with minimal verified fixes (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
+| `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
 | `kimi-ui-advisor` | Explicit-only Kimi Code CLI advisor for UI audit, redesign, component, screenshot, and compare loops that Codex reviews and verifies. | [skills/kimi-ui-advisor/SKILL.md](skills/kimi-ui-advisor/SKILL.md) |
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |

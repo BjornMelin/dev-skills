@@ -1,7 +1,7 @@
 interface:
   display_name: "GH PR Review Fix"
   short_description: "Resolve GitHub PR review threads end-to-end"
-  default_prompt: "Use $gh-pr-review-fix to infer the target PR, fetch unresolved review threads, implement minimal verified fixes, and re-check until the PR is clean or blocked."
+  default_prompt: "Use $gh-pr-review-fix with codex-dev pr review to fetch fresh unresolved threads, verify and fix still-valid findings, validate, create scoped semantic Conventional Commits, push, batch-resolve fixed hosted threads, and re-check until clean or blocked."
 policy:
   allow_implicit_invocation: false
 dependencies:

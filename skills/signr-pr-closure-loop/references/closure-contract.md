@@ -12,8 +12,8 @@ the current head SHA:
 
 ## Hosted truth
 
-- Prefer `review-pack remaining` or an explicit hosted unresolved-thread query as
-  the source of truth for review closure.
+- Prefer `codex-dev pr review start --fresh` or an explicit hosted
+  unresolved-thread query as the source of truth for review closure.
 - Treat `reviewDecision` as advisory only. It can lag after fixes or after
   hosted threads have already been resolved.
 - Treat explicit CodeRabbit approval as useful evidence, not the sole terminal

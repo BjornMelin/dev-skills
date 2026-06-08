@@ -70,13 +70,15 @@ The CLI does not replace Codex-native tools. It complements them.
 
 `codex-dev-core` owns the stable local task capsule JSON contracts and read
 models. `codex-dev` owns local lifecycle commands, repo-native policy-gate
-orchestration, PR evidence adapters, and eval/bootstrap evidence surfaces.
+orchestration, PR evidence adapters, first-class PR review remediation command
+surfaces, and eval/bootstrap evidence surfaces.
 `codex-dev-tui` is an optional Ratatui workbench that consumes
 `codex-dev-core` contracts without owning policy logic.
 
-It does not replace `codex-research`, `subagent-creator`, `subspawn`, or
-`gh-pr-review-fix`. It records those tools' outputs as development evidence and
-keeps one canonical capsule per goal or branch lane.
+It does not replace `codex-research`, `subagent-creator`, or `subspawn`.
+`gh-pr-review-fix` is now the skill workflow that drives `codex-dev pr review`
+for hosted review remediation. The operating layer keeps one canonical capsule
+per goal or branch lane.
 
 See [codex-dev Operating Layer](../specs/codex-dev-operating-layer.md) for the
 schema, branch graph, ownership map, and validation expectations.

@@ -128,7 +128,24 @@ PR subcommands:
 - `pr plan`
 - `pr readiness`
 - `pr record`
+- `pr review start`
+- `pr review refresh`
+- `pr review query`
+- `pr review render`
+- `pr review apply-suggestions`
+- `pr review closeout`
 - `pr status`
+
+Review subcommands:
+
+- `review ingest`
+- `review render`
+- `review query`
+
+Commit subcommands:
+
+- `commit plan`
+- `commit validate`
 
 Artifact commands:
 
@@ -955,17 +972,71 @@ cargo run -q -p codex-dev -- --json pr plan \
 ```
 
 The output schema is `codex-dev.pr-control-plan.v1`. Commands are intentionally
-network- and secrets-marked because they use live GitHub auth, `review-pack`,
-and `gh-pr-review-fix` surfaces. `codex-dev` does not reimplement review
-remediation; it records the command plan so agents can run the canonical tools
-and capture the normalized result. Commands that need caller-supplied artifacts
-set `manual_input`; for example `review-pack remaining` requires the bundle path
-created by `review-pack start` and is not marked as directly executable.
+network- and secrets-marked because they use live GitHub auth and hosted PR
+state. `codex-dev pr review` is the canonical review-remediation command
+surface; `$gh-pr-review-fix` is the skill workflow that runs it. Commands that
+need caller-supplied artifacts set `manual_input`; for example closeout requires
+the worklist path emitted by `codex-dev pr review start`, the pushed head SHA,
+semantic fix commit SHA, and passed validation command before `--apply`.
 The plan includes JSON-producing `gh pr view`, `gh pr checks`, REST review,
 REST review-comment, and GraphQL review-thread commands whose saved outputs can
 be passed to `pr record` with the matching `--source-kind`. The GraphQL
 review-thread command uses `--paginate --slurp` with an `$endCursor` query, so
 complete multi-page thread sets can be recorded from one saved JSON artifact.
+
+## pr review
+
+Capture, query, patch, and close hosted PR review work with stable JSON:
+
+```bash
+cargo run -q -p codex-dev -- --json pr review start \
+  --repo BjornMelin/dev-skills \
+  --number 25 \
+  --fresh
+```
+
+`pr review start` and `refresh` emit `codex-dev.pr-review-worklist.v1`, write
+`pr-review-worklist.json` in the task capsule, include the canonical
+`worklist_path` in the JSON result, include `out_path` when `--out` writes a
+second copy, and preserve raw hosted evidence captured by `pr agent`. `query`
+and `render` inspect that worklist without network calls. `apply-suggestions`
+is dry-run unless `--apply` is passed and rewrites only exact GitHub suggestion
+fences whose current file hunk still matches. When `--item` is omitted,
+`apply-suggestions` processes only `actionable` worklist items; pass `--item` to
+target one captured item explicitly. `closeout` emits
+`codex-dev.pr-review-closeout.v1`; it is dry-run by default and resolves
+current matching hosted threads only when `--apply` revalidates fresh PR
+head/thread state.
+
+## review
+
+Normalize local review artifacts that are not hosted GitHub threads:
+
+```bash
+cargo run -q -p codex-dev -- --json review ingest \
+  --source /tmp/review.md \
+  --kind manual \
+  --out /tmp/review-worklist.json
+```
+
+The output schema is `codex-dev.review-worklist.v1`. Use `review render` and
+`review query` for local Codex, Zen, or manual notes before fixing findings.
+
+## commit plan and validate
+
+Plan and validate scoped semantically reviewable Conventional Commits:
+
+```bash
+cargo run -q -p codex-dev -- --json commit plan --worklist /tmp/pr-review-worklist.json
+cargo run -q -p codex-dev -- --json commit validate \
+  --subject "fix(codex-dev): preserve review-thread closeout evidence"
+```
+
+`commit plan` emits `codex-dev.commit-plan.v1` with semantic groups, scopes,
+files, source work items, SemVer impact, and recommended validation commands.
+`commit validate` emits `codex-dev.commit-validation.v1` and rejects subjects
+that describe review process instead of behavior, such as `address review
+feedback` or `address PR review comments`.
 
 ## pr agent
 
@@ -1170,7 +1241,6 @@ Supported `--source-kind` values:
 - `gh-reviews`: REST review submission arrays from `gh api repos/<owner>/<repo>/pulls/<number>/reviews`; supports single arrays and `--paginate --slurp` page arrays, then collapses to each reviewer's latest active state before deriving `review_decision`.
 - `gh-review-threads`: GraphQL `reviewThreads.nodes` output from `gh api graphql`; supports single-page objects and `--paginate --slurp` page arrays, counts resolved, current unresolved, and outdated threads separately, and is authoritative only when the final `pageInfo.hasNextPage` is false.
 - `gh-review-comments`: REST review-comment arrays; supports single arrays and `--paginate --slurp` page arrays, groups comments by thread root (`in_reply_to_id` or `id`) and counts threads whose current `position` is null and whose original position/line is present as outdated evidence, but does not infer unresolved thread state from REST comments alone.
-- `review-pack-remaining`: JSON or text output from `review-pack remaining`; records the unresolved count.
 
 All non-`normalized` source kinds require explicit PR identity unless it can be
 derived from a GitHub pull request URL in the saved source. Pass `--repo

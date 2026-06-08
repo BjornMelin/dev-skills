@@ -46,10 +46,9 @@ preserve.
 - Do not add general development commands to `codex-research`.
 - Do not reimplement subagent validation outside `subagent-creator`.
 - Do not reimplement delegation policy outside `subspawn`.
-- Do not duplicate today's hosted review remediation flow outside
-  `gh-pr-review-fix` and `review-remediation`; future PR-agent write lanes that
-  orchestrate those tools must still preserve the dedicated PR-agent safety
-  model.
+- Do not duplicate hosted review remediation outside the `codex-dev pr review`
+  command surface and the `$gh-pr-review-fix` skill workflow that drives it.
+  Hosted write lanes must preserve the dedicated PR-agent safety model.
 - Do not make the optional TUI own business logic.
 - Do not support compatibility shims for pre-1.0 draft capsule shapes.
 
@@ -65,7 +64,7 @@ preserve.
 | Skill metadata and package validation | `tools/skill`, skill folders | Owns validation and package writes; inventory reports shallow status but does not replace validators or packagers. |
 | Custom subagent template validation and installs | `subagent-creator` | Reuses validation/install commands. |
 | Subagent fanout planning and wait policy | `subspawn` | Records selected plan and subagent outcomes. |
-| Hosted PR review remediation | `gh-pr-review-fix`, `review-remediation` | Captures review-pack/CI snapshots and links fixes. |
+| Hosted PR review remediation | `codex-dev pr review` / `gh-pr-review-fix` | Captures hosted review worklists, links fixes, and batch-resolves verified current threads. |
 | PR-agent hosted write safety | `docs/specs/codex-dev-pr-agent-safety-model.md` | Defines explicit target, dry-run, `--apply`, stale-thread, idempotency, token, and prompt-injection rules before hosted mutations exist. |
 | Codex subagent source pack | `subagents/codex` | Treats as a bootstrap input and smoke target. |
 | Memory and Codex runtime guidance | `codex-sdk` docs/skill | Links proposal docs; does not mutate runtime memory. |
@@ -434,11 +433,11 @@ wait on agents.
 ### pr.json
 
 `pr.json` records hosted PR and review evidence. `codex-dev` owns the evidence
-shape only. Today, `gh-pr-review-fix`, `review-remediation`, the GitHub app,
-`gh`, and review-pack tooling remain the live remediation and thread-closure
-authorities. Future PR-agent write lanes may orchestrate hosted actions only
-when they preserve the explicit-target, dry-run, `--apply`, idempotency, and
-verify-before-fix rules in the
+shape plus first-class review worklist and closeout command surfaces.
+`gh-pr-review-fix` remains the skill workflow, while `codex-dev pr review`
+owns hosted review capture, exact-suggestion planning, and verified thread
+closeout. Hosted actions may execute only when they preserve the
+explicit-target, dry-run, `--apply`, idempotency, and verify-before-fix rules in the
 [codex-dev PR-Agent Safety Model](codex-dev-pr-agent-safety-model.md).
 
 ```json
@@ -490,9 +489,9 @@ state, such as `gh pr checks`, must leave that flag false when no earlier
 authoritative thread source exists. Outdated threads remain visible through
 `review_threads.outdated` instead of being folded into the current unresolved
 count. `sources[]` records deterministic parser provenance for saved
-normalized, `gh`, GitHub API, and review-pack artifacts. Later PR-control work
-may add more typed PR evidence, but it should not replace these fields with raw
-provider JSON.
+normalized, `gh`, and GitHub API artifacts. Later PR-control work may add more
+typed PR evidence, but it should not replace these fields with raw provider
+JSON.
 
 ### policy.json
 
@@ -505,14 +504,13 @@ section.
 `codex-dev.pr-control-plan.v1` records the live-command plan for PR evidence
 capture. `codex-dev` constructs the executable plan at the CLI boundary; the
 typed plan data model remains a `codex-dev-core` contract. Plans may reference
-network- and auth-dependent `gh`, `review-pack`, and `gh-pr-review-fix`
-commands, but those tools remain the live source of truth for hosted review and
-CI state. Commands that need a caller-supplied artifact expose that requirement
-with `manual_input` and are not marked directly required. `codex-dev pr record`
+network- and auth-dependent `gh` plus `codex-dev pr review` commands. Commands
+that need a caller-supplied artifact expose that requirement with
+`manual_input` and are not marked directly required. `codex-dev pr record`
 accepts local normalized snapshots plus saved `gh pr view`, `gh pr checks`,
-REST review, REST review-comment, GraphQL review-thread, and `review-pack
-remaining` outputs. Every non-`normalized` source must preserve explicit PR
-identity through a GitHub PR URL or caller-provided `--repo` and `--number`.
+REST review, REST review-comment, and GraphQL review-thread outputs. Every
+non-`normalized` source must preserve explicit PR identity through a GitHub PR
+URL or caller-provided `--repo` and `--number`.
 Provider-derived partial sources merge into the existing `pr.json` snapshot
 instead of replacing unrelated fields, and they must not silently turn unknown
 thread state into a clean authoritative thread count. GraphQL review-thread

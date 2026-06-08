@@ -55,8 +55,8 @@ Use `references/tool-routing.md`.
 
 Default routing:
 
-- review feedback + review bundles -> `$gh-pr-review-fix` plus `review-pack`
-- failing GitHub Actions checks -> `$github:gh-fix-ci`
+- review feedback + review worklists -> `$gh-pr-review-fix` backed by `codex-dev pr review`
+- failing GitHub Actions checks -> GitHub plugin or `gh` workflow-log remediation
 - Expo/EAS workflows, builds, or validation -> `$expo:expo-cicd-workflows`,
   `$expo:upgrading-expo`, Expo MCP when available, EAS CLI
 - Vercel or Turborepo issues -> `$vercel` plugin capabilities,
@@ -64,7 +64,7 @@ Default routing:
 - Bun, package-manager, or runtime policy issues -> `$bun-dev`
 - repo-wide docs drift -> `$repo-docs-align` if installed, else `$docs-align`,
   else direct docs sweep
-- post-push monitoring -> `$babysit-pr`
+- post-push monitoring -> `codex-dev --json pr readiness` plus GitHub status checks
 - scoped commits -> `$commit`
 
 If named skill unavailable, continue with closest repo-native fallback.
