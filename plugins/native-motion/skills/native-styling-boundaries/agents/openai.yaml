@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Styling Boundaries"
+  short_description: "NativeWind and Tailwind boundaries for RN"
+  default_prompt: "Use $native-styling-boundaries for NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup."
+policy:
+  allow_implicit_invocation: true

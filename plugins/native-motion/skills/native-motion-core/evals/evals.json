@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "native-motion-core-task-1",
+      "prompt": "In src/components/Hero.tsx, implement react-native-reanimated behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses native-motion-core routing, checks installed versions, applies domain-specific Reanimated guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Reanimated.",
+        "Uses at least one native-motion-core bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Expo and React Native product motion with Reanimated 4, Worklets, shared values, animated styles/props, gestures, scroll handlers, layout animations, CSS transitions, and migration boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-motion-core-task-2",
+      "prompt": "Review this branch for Reanimated motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses native-motion-core routing, checks installed versions, applies domain-specific Reanimated guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Reanimated.",
+        "Uses at least one native-motion-core bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Expo and React Native product motion with Reanimated 4, Worklets, shared values, animated styles/props, gestures, scroll handlers, layout animations, CSS transitions, and migration boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-motion-core-task-3",
+      "prompt": "Create a minimal example using react-native-worklets that includes cleanup and accessibility notes.",
+      "expected_output": "Uses native-motion-core routing, checks installed versions, applies domain-specific Reanimated guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Reanimated.",
+        "Uses at least one native-motion-core bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Expo and React Native product motion with Reanimated 4, Worklets, shared values, animated styles/props, gestures, scroll handlers, layout animations, CSS transitions, and migration boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-motion-core-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Reanimated primitive without changing unrelated UI.",
+      "expected_output": "Uses native-motion-core routing, checks installed versions, applies domain-specific Reanimated guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Reanimated.",
+        "Uses at least one native-motion-core bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Expo and React Native product motion with Reanimated 4, Worklets, shared values, animated styles/props, gestures, scroll handlers, layout animations, CSS transitions, and migration boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

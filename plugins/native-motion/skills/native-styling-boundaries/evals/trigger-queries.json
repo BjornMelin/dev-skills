@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with NativeWind in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "NativeWind is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Can you help with react-native-css in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "react-native-css is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Can you help with Tailwind React Native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Tailwind React Native is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Can you help with className native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "className native is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Can you help with motion-safe native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "motion-safe native is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Can you help with NativeWind animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "NativeWind animation is directly in scope for native-styling-boundaries."
+    },
+    {
+      "query": "Review this NativeWind implementation for nativewind and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for NativeWind motion expertise owned by native-styling-boundaries."
+    },
+    {
+      "query": "Audit this NativeWind setup for static class safety, Metro configuration, and token ownership.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-styling-boundaries."
+    },
+    {
+      "query": "Review this react-native-css migration for Tailwind version boundaries and native runtime support.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-styling-boundaries."
+    },
+    {
+      "query": "Check this Tailwind React Native screen for className extraction and motion-safe styling behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-styling-boundaries."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-styling-boundaries."
+    }
+  ]
+}

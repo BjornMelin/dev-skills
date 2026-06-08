@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with @react-three/fiber/native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@react-three/fiber/native is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Can you help with Expo Three in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Expo Three is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Can you help with expo-gl in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "expo-gl is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Can you help with react-native-wgpu in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "react-native-wgpu is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Can you help with native Three.js in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "native Three.js is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Can you help with R3F native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "R3F native is directly in scope for native-three-r3f."
+    },
+    {
+      "query": "Review this Three.js/R3F implementation for react three fiber native and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Three.js/R3F motion expertise owned by native-three-r3f."
+    },
+    {
+      "query": "Audit this React Three Fiber native scene for GL lifecycle, asset loading, and disposal.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-three-r3f."
+    },
+    {
+      "query": "Review this Expo Three/WebGPU setup for native GPU capability checks and validation.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-three-r3f."
+    },
+    {
+      "query": "Check this R3F native model loader for GLTF assets, Suspense fallback, and memory cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-three-r3f."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-three-r3f."
+    }
+  ]
+}

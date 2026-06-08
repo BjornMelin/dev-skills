@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Three R3F"
+  short_description: "Native Three/R3F GPU scene boundaries"
+  default_prompt: "Use $native-three-r3f for React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation."
+policy:
+  allow_implicit_invocation: true

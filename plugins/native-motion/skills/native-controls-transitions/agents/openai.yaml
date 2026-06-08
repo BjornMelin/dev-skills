@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Controls Transitions"
+  short_description: "Expo Router, screens, and native controls"
+  default_prompt: "Use $native-controls-transitions for Expo Router Stack/native-stack transitions, react-native-screens boundaries, Expo UI SwiftUI/Jetpack Compose controls, native control animation ownership, and validation."
+policy:
+  allow_implicit_invocation: true

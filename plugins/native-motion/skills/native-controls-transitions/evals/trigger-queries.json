@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Expo Router Stack transition in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Expo Router Stack transition is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Can you help with native-stack animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "native-stack animation is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Can you help with react-native-screens in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "react-native-screens is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Can you help with Expo UI in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Expo UI is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Can you help with SwiftUI control in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "SwiftUI control is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Can you help with Jetpack Compose control in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Jetpack Compose control is directly in scope for native-controls-transitions."
+    },
+    {
+      "query": "Review this Expo UI implementation for expo router stack/native-stack transitions and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Expo UI motion expertise owned by native-controls-transitions."
+    },
+    {
+      "query": "Audit this Expo Router Stack transition for native-stack options and screen lifecycle boundaries.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-controls-transitions."
+    },
+    {
+      "query": "Review this Expo UI control animation for SwiftUI/Jetpack Compose ownership and validation.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-controls-transitions."
+    },
+    {
+      "query": "Check these react-native-screens transitions for reduced-motion behavior and navigation fallback coverage.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-controls-transitions."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-controls-transitions."
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "skill": "native-motion-core",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Expo SDK docs, React Native Reanimated, React Native Worklets, and Software Mansion source notes."
+    },
+    {
+      "label": "React Native accessibility and performance documentation."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/reanimated-worklets-core.md",
+      "title": "Reanimated 4 and Worklets core workflow",
+      "sources": []
+    },
+    {
+      "file": "references/expo-sdk-compatibility.md",
+      "title": "Expo SDK compatibility matrix",
+      "sources": []
+    },
+    {
+      "file": "references/layout-scroll-gesture-patterns.md",
+      "title": "Layout, scroll, and gesture patterns",
+      "sources": []
+    },
+    {
+      "file": "references/threading-runonjs-scheduleonrn.md",
+      "title": "Reanimated threading and RN callback boundaries",
+      "sources": [
+        "https://docs.swmansion.com/react-native-reanimated/docs/guides/worklets",
+        "https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started"
+      ]
+    },
+    {
+      "file": "references/gesture-handler-integration.md",
+      "title": "Gesture Handler and Reanimated integration",
+      "sources": [
+        "https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started",
+        "https://reactnative.dev/docs/animations"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-expo-reanimated.md",
+    "references/docs-reanimated-4-migration-testing.md",
+    "references/docs-reanimated-compatibility.md",
+    "references/docs-reanimated-getting-started.md",
+    "references/docs-reanimated-performance.md",
+    "references/docs-expo-animation.md",
+    "references/docs-reanimated-accessibility.md",
+    "references/docs-rn-animated-source-notes.md",
+    "references/software-mansion-animations-animation-functions.md",
+    "references/software-mansion-animations-animations-performance.md",
+    "references/software-mansion-animations-animations.md",
+    "references/software-mansion-animations-canvas-animations.md",
+    "references/software-mansion-animations-canvas-atlas.md",
+    "references/software-mansion-animations-gpu-animations.md",
+    "references/software-mansion-animations-index.md",
+    "references/software-mansion-animations-layout-animations.md",
+    "references/software-mansion-animations-scroll-and-events.md",
+    "references/software-mansion-animations-svg-animations.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

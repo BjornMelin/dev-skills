@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Rive"
+  short_description: "Rive React Native state-machine assets"
+  default_prompt: "Use $native-rive for Rive React Native/Nitro runtime, .riv assets, state machines, inputs, asset loading, platform compatibility, accessibility, and iOS/Android proof."
+policy:
+  allow_implicit_invocation: true

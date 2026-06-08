@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Accessibility Performance"
+  short_description: "Native motion accessibility and performance review"
+  default_prompt: "Use $native-accessibility-performance for Expo/React Native motion accessibility, reduced motion, haptics, UI-thread performance, frame pressure, gestures, and manual device proof."
+policy:
+  allow_implicit_invocation: true

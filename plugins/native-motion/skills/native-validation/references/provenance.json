@@ -1,0 +1,67 @@
+{
+  "skill": "native-validation",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Expo Doctor, EAS Build, Expo development build, and SDK compatibility docs."
+    },
+    {
+      "label": "React Native testing and Reanimated Jest docs."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/expo-doctor-eas-gates.md",
+      "title": "Expo Doctor, install check, and EAS gates",
+      "sources": []
+    },
+    {
+      "file": "references/motion-package-compatibility.md",
+      "title": "Motion package compatibility matrix",
+      "sources": []
+    },
+    {
+      "file": "references/test-and-device-matrix.md",
+      "title": "Native test and device proof matrix",
+      "sources": []
+    },
+    {
+      "file": "references/risk-tier-validation-ladder.md",
+      "title": "Native motion risk-tier validation ladder",
+      "sources": [
+        "https://docs.expo.dev/workflow/diagnostics/",
+        "https://docs.expo.dev/develop/development-builds/introduction/",
+        "https://docs.expo.dev/build/setup/"
+      ]
+    },
+    {
+      "file": "references/animation-test-harnesses.md",
+      "title": "Animation test harness and fixture selection",
+      "sources": [
+        "https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/getting-started",
+        "https://docs.expo.dev/workflow/diagnostics/"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-eas-build.md",
+    "references/docs-expo-development-builds.md",
+    "references/docs-expo-doctor.md",
+    "references/docs-expo-new-architecture.md",
+    "references/docs-reanimated-jest-and-worklets.md",
+    "references/docs-rn-testing-overview.md",
+    "references/validation-playbook.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

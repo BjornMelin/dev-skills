@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "native-styling-boundaries-task-1",
+      "prompt": "In src/components/Hero.tsx, implement NativeWind behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses native-styling-boundaries routing, checks installed versions, applies domain-specific NativeWind guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for NativeWind.",
+        "Uses at least one native-styling-boundaries bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-styling-boundaries-task-2",
+      "prompt": "Review this branch for NativeWind motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses native-styling-boundaries routing, checks installed versions, applies domain-specific NativeWind guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for NativeWind.",
+        "Uses at least one native-styling-boundaries bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-styling-boundaries-task-3",
+      "prompt": "Create a minimal example using react-native-css that includes cleanup and accessibility notes.",
+      "expected_output": "Uses native-styling-boundaries routing, checks installed versions, applies domain-specific NativeWind guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for NativeWind.",
+        "Uses at least one native-styling-boundaries bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-styling-boundaries-task-4",
+      "prompt": "Migrate an existing motion implementation to the right NativeWind primitive without changing unrelated UI.",
+      "expected_output": "Uses native-styling-boundaries routing, checks installed versions, applies domain-specific NativeWind guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for NativeWind.",
+        "Uses at least one native-styling-boundaries bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

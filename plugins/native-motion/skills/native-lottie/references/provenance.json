@@ -1,0 +1,60 @@
+{
+  "skill": "native-lottie",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "lottie-web, lottie-react-native, dotLottie web/native package docs and source metadata."
+    },
+    {
+      "label": "Expo SDK docs for native package compatibility when applicable."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/native-lottie-asset-lifecycle.md",
+      "title": "Native Lottie asset lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/dotlottie-native-boundaries.md",
+      "title": "dotLottie native boundaries",
+      "sources": []
+    },
+    {
+      "file": "references/accessibility-performance.md",
+      "title": "Native Lottie accessibility and performance",
+      "sources": []
+    },
+    {
+      "file": "references/designer-handoff-and-feature-support.md",
+      "title": "Native Lottie designer handoff and feature support",
+      "sources": [
+        "https://docs.expo.dev/versions/latest/sdk/lottie/",
+        "https://github.com/airbnb/lottie-web/wiki/Usage"
+      ]
+    },
+    {
+      "file": "references/native-playback-control-refs.md",
+      "title": "Native Lottie playback refs and lifecycle",
+      "sources": [
+        "https://docs.expo.dev/versions/latest/sdk/lottie/",
+        "https://reactnative.dev/docs/accessibility"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-lottie-react-native-readme.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}
