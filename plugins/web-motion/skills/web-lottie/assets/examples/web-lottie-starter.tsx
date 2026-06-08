@@ -17,6 +17,11 @@ function usePrefersReducedMotion() {
   return reduceMotion;
 }
 
+/**
+ * Renders a Lottie animation badge that respects reduced-motion preferences.
+ *
+ * @param path - URL or path to the Lottie JSON asset.
+ */
 export function LottieBadge({ path }: { path: string }) {
   const host = useRef<HTMLDivElement>(null);
   const reduceMotion = usePrefersReducedMotion();

@@ -659,14 +659,15 @@ function verifyEvals() {
     const evals = loadJson(path.join(dir, 'evals', 'evals.json'));
     const triggers = loadJson(path.join(dir, 'evals', 'trigger-queries.json'));
     if (evals.__error) findings.push({ skill: name, severity: 'error', message: evals.__error });
-    if (!Array.isArray(evals.evals) || evals.evals.length < 3) findings.push({ skill: name, severity: 'error', message: 'evals/evals.json must include at least 3 evals' });
-    for (const ev of evals.evals || []) {
+    const evalItems = Array.isArray(evals.evals) ? evals.evals : [];
+    if (evalItems.length < 3) findings.push({ skill: name, severity: 'error', message: 'evals/evals.json must include at least 3 evals' });
+    for (const ev of evalItems) {
       if (!ev.prompt || !ev.expected_output) findings.push({ skill: name, severity: 'error', message: 'eval ' + (ev.id || '<missing>') + ' missing prompt or expected_output' });
       if (!Array.isArray(ev.assertions) || ev.assertions.length < 4) findings.push({ skill: name, severity: 'error', message: 'eval ' + (ev.id || '<missing>') + ' has fewer than 4 assertions' });
     }
     if (triggers.__error) findings.push({ skill: name, severity: 'error', message: triggers.__error });
-    const queries = triggers.queries || [];
-    if (!Array.isArray(queries) || queries.length < 20) findings.push({ skill: name, severity: 'error', message: 'trigger evals need at least 20 queries' });
+    const queries = Array.isArray(triggers.queries) ? triggers.queries : [];
+    if (queries.length < 20) findings.push({ skill: name, severity: 'error', message: 'trigger evals need at least 20 queries' });
     const pos = queries.filter((q) => q.should_trigger === true).length;
     const neg = queries.filter((q) => q.should_trigger === false).length;
     if (pos < 8 || neg < 8) findings.push({ skill: name, severity: 'error', message: 'trigger evals need balanced positives and negatives' });
@@ -676,6 +677,9 @@ function verifyEvals() {
 function scan() {
   const scanRoot = path.resolve(option('--root', process.cwd()));
   const maxFiles = Number(option('--max-files', '2000'));
+  if (!Number.isInteger(maxFiles) || maxFiles <= 0) {
+    fail('invalid --max-files value; expected a positive integer');
+  }
   const patterns = [
     { id: 'transition-all', scope: 'file', re: /\btransitionProperty\s*[:=]\s*\{?\s*(?:['"`][^'"`{};]*\ball\b|[^,;{}\n]*\ball\b)|\btransition\s*[:=]\s*\{?\s*['"`][^'"`{};]*\ball\b|\btransition(?:-property)?\s*:(?!\s*\{?\s*['"`])\s*[^;{}]*\ball\b|\btransition-all\b/g, hint: 'Prefer explicit transitioned properties.' },
     { id: 'infinite-animation', re: /repeat:\s*-1|animation-iteration-count:\s*infinite|loop=\{?true/, hint: 'Verify reduced-motion and interruption behavior for loops.' },

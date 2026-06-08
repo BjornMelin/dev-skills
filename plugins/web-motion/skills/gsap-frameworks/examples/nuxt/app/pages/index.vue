@@ -8,30 +8,37 @@ let ctx;
 let cancelled = false;
 
 onMounted(async () => {
-  if (!container.value) return;
-  const SplitText = await lazyLoadPlugin("SplitText");
-  if (cancelled || !container.value) return;
+  try {
+    if (!container.value) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const SplitText = await lazyLoadPlugin("SplitText");
+    if (cancelled || !container.value) return;
 
-  ctx = gsap.context(() => {
-    const split = SplitText.create(".headline", {
-      type: "chars",
-    });
+    ctx = gsap.context(() => {
+      const split = SplitText.create(".headline", {
+        type: "chars",
+      });
 
-    gsap.from(split.chars, {
-      autoAlpha: 0,
-      y: -50,
-      xPercent: -100,
-      rotation: -45,
-      ease: "power1.inOut",
-      stagger: {
-        amount: 0.3,
-      },
-    });
+      if (!reduceMotion) {
+        gsap.from(split.chars, {
+          autoAlpha: 0,
+          y: -50,
+          xPercent: -100,
+          rotation: -45,
+          ease: "power1.inOut",
+          stagger: {
+            amount: 0.3,
+          },
+        });
+      }
 
-    gsap.set(".headline", { autoAlpha: 1 });
+      gsap.set(".headline", { autoAlpha: 1 });
 
-    return () => split.revert();
-  }, container.value);
+      return () => split.revert();
+    }, container.value);
+  } catch (error) {
+    if (!cancelled) console.error("Failed to initialize GSAP SplitText animation", error);
+  }
 });
 
 onUnmounted(() => {

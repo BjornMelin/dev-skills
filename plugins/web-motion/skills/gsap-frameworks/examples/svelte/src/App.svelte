@@ -9,32 +9,38 @@
     let cancelled = false;
 
     (async () => {
-      const { SplitText } = await import("gsap/SplitText");
-      if (cancelled || !container) return;
+      try {
+        const { SplitText } = await import("gsap/SplitText");
+        if (cancelled || !container) return;
 
-      gsap.registerPlugin(SplitText);
-      await tick();
-      if (cancelled || !container) return;
+        gsap.registerPlugin(SplitText);
+        await tick();
+        if (cancelled || !container) return;
 
-      ctx = gsap.context(() => {
-        const split = SplitText.create(".headline", { type: "chars" });
-        gsap.from(split.chars, {
-          autoAlpha: 0,
-          y: 24,
-          stagger: 0.03,
-          duration: 0.45,
-          ease: "power2.out",
-        });
+        ctx = gsap.context(() => {
+          const split = SplitText.create(".headline", { type: "chars" });
+          gsap.from(split.chars, {
+            autoAlpha: 0,
+            y: 24,
+            stagger: 0.03,
+            duration: 0.45,
+            ease: "power2.out",
+          });
 
-        gsap.from(".item", {
-          autoAlpha: 0,
-          y: 16,
-          stagger: 0.08,
-          duration: 0.4,
-        });
+          gsap.from(".item", {
+            autoAlpha: 0,
+            y: 16,
+            stagger: 0.08,
+            duration: 0.4,
+          });
 
-        return () => split.revert();
-      }, container);
+          return () => split.revert();
+        }, container);
+      } catch (error) {
+        cancelled = true;
+        ctx?.revert();
+        console.error("Failed to initialize GSAP SplitText animation", error);
+      }
     })();
 
     return () => {

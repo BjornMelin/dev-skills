@@ -8,7 +8,7 @@
         "Mentions the relevant installed package/runtime/version checks for Motion React.",
         "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -20,7 +20,7 @@
         "Mentions the relevant installed package/runtime/version checks for Motion React.",
         "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -32,7 +32,7 @@
         "Mentions the relevant installed package/runtime/version checks for Motion React.",
         "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -44,7 +44,7 @@
         "Mentions the relevant installed package/runtime/version checks for Motion React.",
         "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     }

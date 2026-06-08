@@ -5,6 +5,12 @@ const Particle = d.struct({
   velocity: d.vec2f,
 });
 
+/**
+ * Creates a TypeGPU particle storage buffer after checking WebGPU availability.
+ *
+ * @param count - Number of Particle records to allocate.
+ * @returns A result with tgpu root and particles buffer, or a WebGPU failure reason.
+ */
 export async function createParticles(count: number) {
   const gpu = (globalThis.navigator as { gpu?: { requestAdapter: () => Promise<unknown> } } | undefined)?.gpu;
   if (!gpu) {

@@ -4,12 +4,14 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from "vue";
 import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 const container = ref(null);
 let ctx;
 
 onMounted(() => {
   if (!container.value) return;
+  gsap.registerPlugin(ScrollTrigger);
 
   ctx = gsap.context(() => {
     // Simple tween - moves the box right and fades it in

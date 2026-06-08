@@ -5,8 +5,11 @@
   let root;
 
   onMount(() => {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const ctx = gsap.context(() => {
-      gsap.from('.item', { y: 16, autoAlpha: 0, stagger: 0.06 });
+      if (!reduceMotion) {
+        gsap.from('.item', { y: 16, autoAlpha: 0, stagger: 0.06 });
+      }
     }, root);
     return () => ctx.revert();
   });

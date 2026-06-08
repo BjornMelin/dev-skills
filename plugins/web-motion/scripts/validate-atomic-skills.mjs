@@ -209,16 +209,17 @@ for (const skill of requiredSkills) {
   }
 
   const evals = json(path.join(skillDir, 'evals', 'evals.json'));
-  if (!Array.isArray(evals.evals) || evals.evals.length < 3) fail(`${skill}: evals/evals.json needs at least 3 evals`);
-  for (const item of evals.evals || []) {
+  const evalItems = Array.isArray(evals.evals) ? evals.evals : [];
+  if (evalItems.length < 3) fail(`${skill}: evals/evals.json needs at least 3 evals`);
+  for (const item of evalItems) {
     if (!Array.isArray(item.assertions) || item.assertions.length < 4) {
       fail(`${skill}: eval ${item.id || '<missing>'} needs at least 4 assertions`);
     }
   }
 
   const triggers = json(path.join(skillDir, 'evals', 'trigger-queries.json'));
-  const queries = triggers.queries || [];
-  if (!Array.isArray(queries) || queries.length < 20) fail(`${skill}: trigger-queries needs at least 20 queries`);
+  const queries = Array.isArray(triggers.queries) ? triggers.queries : [];
+  if (queries.length < 20) fail(`${skill}: trigger-queries needs at least 20 queries`);
   const uniqueQueries = new Set(queries.map((query) => String(query.query || '').trim().toLowerCase()));
   if (uniqueQueries.size !== queries.length || uniqueQueries.has('')) {
     fail(`${skill}: trigger-queries must be non-empty and unique`);

@@ -16,4 +16,8 @@
     transition-duration: 1ms;
     transform: none;
   }
+
+  .panel[data-open='true'] {
+    transform: none;
+  }
 }

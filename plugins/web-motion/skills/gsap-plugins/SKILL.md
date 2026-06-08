@@ -132,12 +132,13 @@ gsap.registerPlugin(Draggable, InertiaPlugin);
 Draggable.create(".box", { type: "x,y", inertia: true });
 ```
 
-Or track velocity of a property: 
+Or track velocity of a property:
+
 ```javascript
 InertiaPlugin.track(".box", "x");
 ```
 
-Then use `"auto"` to continue the current velocity and glide to a stop: 
+Then use `"auto"` to continue the current velocity and glide to a stop:
 
 ```javascript
 gsap.to(obj, { inertia: { x: "auto" } });

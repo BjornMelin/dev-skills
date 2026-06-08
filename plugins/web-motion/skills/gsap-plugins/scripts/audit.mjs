@@ -223,6 +223,12 @@ Inline suppression:
 `;
 }
 
+function readOption(rest, flag) {
+  const value = rest.shift();
+  if (!value || value.startsWith('-')) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
 function parseArgs(argv) {
   const args = { command: null, root: process.cwd(), format: 'markdown', output: null, maxFiles: 2000 };
   const rest = [...argv];
@@ -230,17 +236,17 @@ function parseArgs(argv) {
     const arg = rest.shift();
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--json') args.format = 'json';
-    else if (arg === '--root') args.root = path.resolve(rest.shift() ?? '.');
-    else if (arg === '--format') args.format = rest.shift() ?? 'markdown';
-    else if (arg === '--output') args.output = path.resolve(rest.shift() ?? '');
-    else if (arg === '--max-files') args.maxFiles = Number(rest.shift() ?? 2000);
+    else if (arg === '--root') args.root = path.resolve(readOption(rest, '--root'));
+    else if (arg === '--format') args.format = readOption(rest, '--format');
+    else if (arg === '--output') args.output = path.resolve(readOption(rest, '--output'));
+    else if (arg === '--max-files') args.maxFiles = Number(readOption(rest, '--max-files'));
     else if (!arg.startsWith('-') && args.command === null) args.command = arg;
     else throw new Error(`Unknown argument: ${arg}`);
   }
   args.command = args.command ?? 'scan';
   if (!['scan', 'doctor'].includes(args.command)) throw new Error(`Unknown command: ${args.command}`);
   if (!['markdown', 'json'].includes(args.format)) throw new Error(`Unknown format: ${args.format}`);
-  if (!Number.isFinite(args.maxFiles) || args.maxFiles < 1) throw new Error('--max-files must be a positive number');
+  if (!Number.isInteger(args.maxFiles) || args.maxFiles < 1) throw new Error('--max-files must be a positive integer');
   return args;
 }
 
@@ -273,16 +279,19 @@ function readDirEntries(dir) {
 
 function shouldSkipFile(relativePath, fileName, fullPath = '') {
   const normalized = relativePath.split(path.sep).join('/');
-  const full = fullPath.split(path.sep).join('/');
-  if (fullPath) {
-    try {
-      if (fs.readFileSync(fullPath, 'utf8').slice(0, 512).includes('motion-audit-skip-file')) return true;
-    } catch {}
-  }
+  const extension = path.extname(fileName);
   if (normalized === 'scripts/audit.mjs' || normalized.endsWith('/scripts/audit.mjs')) return true;
   if (/^skills\/[^/]+\/(?:agents|assets|examples|references|scripts|templates)(?:\/|$)/.test(normalized)) return true;
   if (path.basename(fileName) === 'SKILL.md' && /^skills\/[^/]+\/SKILL\.md$/.test(normalized)) return true;
-  return path.extname(fileName) === '.json' && fileName !== 'package.json';
+  if (extension === '.json' && fileName !== 'package.json') return true;
+  if (fullPath && (fileExtensions.has(extension) || fileNames.has(fileName))) {
+    try {
+      return fs.readFileSync(fullPath, 'utf8').slice(0, 512).includes('motion-audit-skip-file');
+    } catch {
+      return true;
+    }
+  }
+  return false;
 }
 
 function listFiles(root, maxFiles) {

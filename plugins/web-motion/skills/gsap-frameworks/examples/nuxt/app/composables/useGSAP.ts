@@ -33,6 +33,9 @@ type Plugins = keyof PluginMap;
 type PluginModule<K extends Plugins> = Awaited<ReturnType<PluginMap[K]>>;
 type PluginExport<K extends Plugins> = PluginModule<K>[K & keyof PluginModule<K>];
 
+/**
+ * Provides GSAP with ScrollTrigger registered and a typed lazy plugin loader.
+ */
 export function useGSAP() {
   gsap.registerPlugin(ScrollTrigger);
 

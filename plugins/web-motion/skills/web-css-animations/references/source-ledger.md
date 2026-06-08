@@ -8,9 +8,9 @@ intentionally does not reference local scrape paths or machine cache locations.
 
 ## Primary Sources
 
-- MDN CSS Animations, Transitions, and prefers-reduced-motion documentation.
-- CSSWG drafts for new CSS motion features when MDN notes support limits.
-- Agent Skills specification and best practices.
+- MDN CSS Animations, Transitions, and prefers-reduced-motion documentation: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_animations, https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_transitions, https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion
+- CSSWG drafts for new CSS motion features when MDN notes support limits: https://drafts.csswg.org/
+- Agent Skills specification and best practices: https://github.com/agenticsorg/AgentSkills
 
 ## Source-Backed Notes
 

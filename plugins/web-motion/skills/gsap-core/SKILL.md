@@ -100,8 +100,9 @@ gsap.to(svgEl, { rotation: 90, svgOrigin: "100 100" });
 
 ## Stagger
 
-Offset the animation of each item by 0.1 second like this: 
-```javascript 
+Offset the animation of each item by 0.1 second like this:
+
+```javascript
 gsap.to(".item", {
   y: -20,
   stagger: 0.1
@@ -144,7 +145,7 @@ base (out)        .in                .out               .inOut
 
 ### Custom: use CustomEase (plugin)
 
-Simple cubic-bezier values (as used in CSS `cubic-bezier()`): 
+Simple cubic-bezier values (as used in CSS `cubic-bezier()`):
 
 ```javascript
 const myEase = CustomEase.create("my-ease", ".17,.67,.83,.67");
