@@ -54,7 +54,7 @@ function read(file) {
 }
 
 function portableText(value) {
-  return String(value).replaceAll('\\\\', '/');
+  return String(value).replace(/\\+/g, '/');
 }
 
 function listFiles(dir) {

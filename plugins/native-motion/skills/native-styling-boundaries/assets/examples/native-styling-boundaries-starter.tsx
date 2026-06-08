@@ -10,7 +10,7 @@ export function NativeButton({ onPress = () => undefined }: { onPress?: () => vo
   return (
     <Pressable
       accessibilityRole="button"
-      className="rounded-md bg-black px-4 py-3 active:opacity-80"
+      className="min-h-[44px] justify-center rounded-md bg-black px-4 py-3 active:opacity-80"
       onPress={onPress}
     >
       <Text className="text-white">Save</Text>

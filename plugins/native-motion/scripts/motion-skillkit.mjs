@@ -43,7 +43,7 @@ function readPluginName() {
 }
 
 function portableText(value) {
-  return String(value).replaceAll('\\\\', '/');
+  return String(value).replace(/\\+/g, '/');
 }
 
 function option(name, fallback) {
