@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Three.js in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Three.js is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with @react-three/fiber in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@react-three/fiber is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with @react-three/drei in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@react-three/drei is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with R3F Canvas in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "R3F Canvas is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with useFrame in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "useFrame is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with GLTF in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GLTF is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Can you help with WebGLRenderer in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "WebGLRenderer is directly in scope for web-three-r3f."
+    },
+    {
+      "query": "Review this Three.js/R3F implementation for three.js and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Three.js/R3F motion expertise owned by web-three-r3f."
+    },
+    {
+      "query": "Audit this React Three Fiber scene for Canvas lifecycle, asset disposal, and Suspense fallback.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-three-r3f."
+    },
+    {
+      "query": "Review this Drei GLTF loader setup for preloading, compression, and memory cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-three-r3f."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-three-r3f."
+    }
+  ]
+}

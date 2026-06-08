@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Motion React"
+  short_description: "Motion for React presence, layout, and scroll"
+  default_prompt: "Use $web-motion-react for Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries."
+policy:
+  allow_implicit_invocation: true

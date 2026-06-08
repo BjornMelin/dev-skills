@@ -1,0 +1,60 @@
+{
+  "skill": "gsap-plugins",
+  "checked_at": "2026-06-04",
+  "copy_policy": "GreenSock official GSAP skill text is copied as the primary SKILL.md baseline under the upstream MIT skill repository license; GSAP package/runtime docs remain subject to GSAP package terms and are summarized or cited unless separately license-gated.",
+  "upstream_sources": [
+    {
+      "label": "GreenSock official GSAP AI skills, MIT: https://github.com/greensock/gsap-skills"
+    },
+    {
+      "label": "GSAP documentation and package license source: https://gsap.com/docs/v3/ and https://gsap.com/standard-license/"
+    },
+    {
+      "label": "Agent Skills specification and best practices: https://agentskills.io/specification"
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/official-source.md",
+      "title": "Official GreenSock plugin skill source",
+      "sources": []
+    },
+    {
+      "file": "references/plugin-availability.md",
+      "title": "Plugin import and availability matrix",
+      "sources": []
+    },
+    {
+      "file": "references/plugin-lifecycle.md",
+      "title": "Plugin setup, cleanup, and accessibility review",
+      "sources": []
+    },
+    {
+      "file": "references/premium-plugin-license-boundaries.md",
+      "title": "Plugin availability and license boundaries",
+      "sources": [
+        "https://gsap.com/docs/v3/Plugins/",
+        "https://gsap.com/standard-license/"
+      ]
+    },
+    {
+      "file": "references/plugin-specific-test-fixtures.md",
+      "title": "Plugin-specific fixtures and verification",
+      "sources": [
+        "https://gsap.com/docs/v3/Plugins/",
+        "https://gsap.com/docs/v3/GSAP/gsap.to()"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-plugin-current-notes.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

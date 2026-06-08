@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Tailwind animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Tailwind animation is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with transition-all in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "transition-all is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with motion-safe in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "motion-safe is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with motion-reduce in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "motion-reduce is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with @theme in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@theme is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with animate- in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "animate- is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Can you help with duration- in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "duration- is directly in scope for web-tailwind-motion."
+    },
+    {
+      "query": "Review this Tailwind CSS implementation for tailwind css v4 transition and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Tailwind CSS motion expertise owned by web-tailwind-motion."
+    },
+    {
+      "query": "Audit this Tailwind motion token setup for v4 theme tokens and static class safety.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-tailwind-motion."
+    },
+    {
+      "query": "Review these motion-safe variants for reduced-motion fallbacks and transition property scope.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-tailwind-motion."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-tailwind-motion."
+    }
+  ]
+}

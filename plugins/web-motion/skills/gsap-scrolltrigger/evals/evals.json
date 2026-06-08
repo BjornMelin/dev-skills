@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "gsap-scrolltrigger-task-1",
+      "prompt": "In src/components/Hero.ts, implement ScrollTrigger behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses gsap-scrolltrigger routing, checks installed versions, applies domain-specific GSAP guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for GSAP.",
+        "Uses at least one gsap-scrolltrigger bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to GSAP ScrollTrigger scroll-linked animation, pinning, scrub, trigger callbacks, refresh/invalidation, responsive matchMedia scenes, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "gsap-scrolltrigger-task-2",
+      "prompt": "Review this branch for GSAP motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses gsap-scrolltrigger routing, checks installed versions, applies domain-specific GSAP guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for GSAP.",
+        "Uses at least one gsap-scrolltrigger bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to GSAP ScrollTrigger scroll-linked animation, pinning, scrub, trigger callbacks, refresh/invalidation, responsive matchMedia scenes, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "gsap-scrolltrigger-task-3",
+      "prompt": "Create a minimal example using scroll-linked animation that includes cleanup and accessibility notes.",
+      "expected_output": "Uses gsap-scrolltrigger routing, checks installed versions, applies domain-specific GSAP guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for GSAP.",
+        "Uses at least one gsap-scrolltrigger bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to GSAP ScrollTrigger scroll-linked animation, pinning, scrub, trigger callbacks, refresh/invalidation, responsive matchMedia scenes, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "gsap-scrolltrigger-task-4",
+      "prompt": "Migrate an existing motion implementation to the right GSAP primitive without changing unrelated UI.",
+      "expected_output": "Uses gsap-scrolltrigger routing, checks installed versions, applies domain-specific GSAP guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for GSAP.",
+        "Uses at least one gsap-scrolltrigger bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to GSAP ScrollTrigger scroll-linked animation, pinning, scrub, trigger callbacks, refresh/invalidation, responsive matchMedia scenes, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

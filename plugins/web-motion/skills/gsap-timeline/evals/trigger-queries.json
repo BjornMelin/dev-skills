@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with gsap.timeline in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "gsap.timeline is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Can you help with position parameter in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "position parameter is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Can you help with timeline labels in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "timeline labels is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Can you help with sequence animations in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "sequence animations is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Can you help with animation order in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "animation order is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Can you help with playhead in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "playhead is directly in scope for gsap-timeline."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap timelines and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-timeline."
+    },
+    {
+      "query": "Audit this GSAP timeline for position parameters, nested playback, and interruption handling.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-timeline."
+    },
+    {
+      "query": "Review this animation sequence for labels, defaults, and deterministic teardown.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-timeline."
+    },
+    {
+      "query": "Check this choreographed GSAP flow for reversible state and route-transition cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-timeline."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-timeline."
+    }
+  ]
+}

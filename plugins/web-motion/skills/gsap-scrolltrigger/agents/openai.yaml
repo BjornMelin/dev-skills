@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP ScrollTrigger"
+  short_description: "Official ScrollTrigger scene guidance"
+  default_prompt: "Use $gsap-scrolltrigger for GSAP ScrollTrigger scroll-linked animation, pinning, scrub, trigger callbacks, refresh/invalidation, responsive matchMedia scenes, and cleanup."
+policy:
+  allow_implicit_invocation: true

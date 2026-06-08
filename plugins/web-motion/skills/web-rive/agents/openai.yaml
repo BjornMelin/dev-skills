@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Rive"
+  short_description: "Rive web animation asset workflows"
+  default_prompt: "Use $web-rive for Rive web and React runtime integration, .riv assets, state machines, inputs, lifecycle cleanup, accessibility, remote asset security, and fallback behavior."
+policy:
+  allow_implicit_invocation: true

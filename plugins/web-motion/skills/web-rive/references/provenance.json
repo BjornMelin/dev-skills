@@ -1,0 +1,63 @@
+{
+  "skill": "web-rive",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Rive web/native runtime package docs and source metadata."
+    },
+    {
+      "label": "Rive state machine documentation."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/rive-react-runtime.md",
+      "title": "Rive React/runtime lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/state-machine-inputs.md",
+      "title": "State machine input contract guide",
+      "sources": []
+    },
+    {
+      "file": "references/asset-security-and-fallbacks.md",
+      "title": "Rive asset security, accessibility, and fallback review",
+      "sources": []
+    },
+    {
+      "file": "references/layout-fit-and-resize.md",
+      "title": "Rive layout, fit, resize, and DPR behavior",
+      "sources": [
+        "https://rive.app/docs/runtimes/web",
+        "https://rive.app/docs/runtimes/web/state-machines"
+      ]
+    },
+    {
+      "file": "references/data-binding-and-events.md",
+      "title": "Rive data binding and event contracts",
+      "sources": [
+        "https://rive.app/docs/runtimes/web/state-machines",
+        "https://rive.app/docs/runtimes/web"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-rive-react.md",
+    "references/docs-rive-state-machine.md",
+    "references/docs-rive-web-js.md",
+    "references/implementation-notes.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

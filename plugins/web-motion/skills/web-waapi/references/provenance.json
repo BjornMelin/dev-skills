@@ -1,0 +1,60 @@
+{
+  "skill": "web-waapi",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "MDN Web Animations API documentation."
+    },
+    {
+      "label": "Browser compatibility and local support policy."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/waapi-lifecycle.md",
+      "title": "Animation object lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/keyframe-effect-options.md",
+      "title": "Keyframes and timing options",
+      "sources": []
+    },
+    {
+      "file": "references/playback-testing.md",
+      "title": "Playback and interruption validation",
+      "sources": []
+    },
+    {
+      "file": "references/promise-events-and-cancellation.md",
+      "title": "Animation promises, events, and cancellation",
+      "sources": [
+        "https://developer.mozilla.org/docs/Web/API/Web_Animations_API/Using_the_Web_Animations_API",
+        "https://developer.mozilla.org/docs/Web/API/Animation/commitStyles"
+      ]
+    },
+    {
+      "file": "references/testing-with-getanimations.md",
+      "title": "Testing with getAnimations and deterministic fixtures",
+      "sources": [
+        "https://developer.mozilla.org/docs/Web/API/Web_Animations_API/Using_the_Web_Animations_API",
+        "https://developer.mozilla.org/docs/Web/API/Animation/commitStyles"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-mdn-web-animations-api.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

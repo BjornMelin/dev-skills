@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Three R3F"
+  short_description: "Web Three.js and React Three Fiber scenes"
+  default_prompt: "Use $web-three-r3f for Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, useFrame, disposal, SSR/client boundaries, DPR, and browser proof."
+policy:
+  allow_implicit_invocation: true

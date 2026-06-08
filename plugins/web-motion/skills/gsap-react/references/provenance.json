@@ -1,0 +1,58 @@
+{
+  "skill": "gsap-react",
+  "checked_at": "2026-06-04",
+  "copy_policy": "GreenSock official GSAP skill text is copied as the primary SKILL.md baseline under the upstream MIT skill repository license; GSAP package/runtime docs remain subject to GSAP package terms and are summarized or cited unless separately license-gated.",
+  "upstream_sources": [
+    {
+      "label": "GreenSock official GSAP AI skills, MIT: https://github.com/greensock/gsap-skills"
+    },
+    {
+      "label": "GSAP documentation and package license source: https://gsap.com/docs/v3/ and https://gsap.com/standard-license/"
+    },
+    {
+      "label": "Agent Skills specification and best practices: https://agentskills.io/specification"
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/official-source.md",
+      "title": "Official GreenSock React skill source",
+      "sources": []
+    },
+    {
+      "file": "references/react-lifecycle.md",
+      "title": "useGSAP, refs, context, and cleanup",
+      "sources": []
+    },
+    {
+      "file": "references/next-client-boundary.md",
+      "title": "Next.js and SSR/client boundary notes",
+      "sources": []
+    },
+    {
+      "file": "references/contextsafe-event-handlers.md",
+      "title": "contextSafe event handlers and callbacks",
+      "sources": [
+        "https://gsap.com/docs/v3/GSAP/gsap.context()",
+        "https://gsap.com/docs/v3/GSAP/gsap.to()"
+      ]
+    },
+    {
+      "file": "references/strict-mode-and-route-transitions.md",
+      "title": "React Strict Mode, dependency, and route transition checks",
+      "sources": [
+        "https://gsap.com/docs/v3/GSAP/gsap.context()",
+        "https://gsap.com/docs/v3/GSAP/gsap.matchMedia()"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

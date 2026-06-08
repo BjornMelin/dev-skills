@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Lottie"
+  short_description: "Web Lottie and dotLottie asset integration"
+  default_prompt: "Use $web-lottie for lottie-web, dotLottie web components, animation JSON/dotLottie assets, player lifecycle, cleanup, renderer choice, accessibility, and asset validation."
+policy:
+  allow_implicit_invocation: true

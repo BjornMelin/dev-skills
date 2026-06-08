@@ -1,0 +1,68 @@
+{
+  "skill": "typegpu",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "TypeGPU documentation and MIT package source."
+    },
+    {
+      "label": "MDN/WebGPU browser runtime documentation."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/typegpu-codex-playbook.md",
+      "title": "Codex workflow for TypeGPU tasks",
+      "sources": []
+    },
+    {
+      "file": "references/shader-resource-boundaries.md",
+      "title": "Shader/resource ownership rules",
+      "sources": []
+    },
+    {
+      "file": "references/webgpu-runtime-validation.md",
+      "title": "Browser WebGPU validation and fallbacks",
+      "sources": []
+    },
+    {
+      "file": "references/browser-capability-and-adapter-selection.md",
+      "title": "Browser capability and adapter selection",
+      "sources": [
+        "https://docs.swmansion.com/TypeGPU/",
+        "https://developer.mozilla.org/docs/Web/API/WebGPU_API"
+      ]
+    },
+    {
+      "file": "references/compute-vs-render-pipeline-design.md",
+      "title": "Compute versus render pipeline design",
+      "sources": [
+        "https://docs.swmansion.com/TypeGPU/apis/data-schemas/",
+        "https://docs.swmansion.com/TypeGPU/"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/matrices.md",
+    "references/pipelines.md",
+    "references/setup.md",
+    "references/shaders.md",
+    "references/textures.md",
+    "references/types.md",
+    "references/advanced.md",
+    "references/noise.md",
+    "references/sdf.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

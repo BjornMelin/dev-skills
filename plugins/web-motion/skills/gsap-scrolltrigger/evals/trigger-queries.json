@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with ScrollTrigger in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "ScrollTrigger is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Can you help with scroll-linked animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "scroll-linked animation is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Can you help with scrub in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "scrub is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Can you help with pinning in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "pinning is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Can you help with start end markers in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "start end markers is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Can you help with ScrollTrigger.refresh in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "ScrollTrigger.refresh is directly in scope for gsap-scrolltrigger."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap scrolltrigger scroll-linked animation and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-scrolltrigger."
+    },
+    {
+      "query": "Audit this ScrollTrigger scene for pinning, scrub timing, and refresh lifecycle.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-scrolltrigger."
+    },
+    {
+      "query": "Review this parallax implementation for scrollerProxy ownership and reduced-motion fallback.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-scrolltrigger."
+    },
+    {
+      "query": "Check these scroll-linked GSAP triggers for responsive matchMedia setup and cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-scrolltrigger."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-scrolltrigger."
+    }
+  ]
+}

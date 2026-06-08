@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP Utils"
+  short_description: "Official gsap.utils helper guidance"
+  default_prompt: "Use $gsap-utils for gsap.utils helpers such as clamp, mapRange, normalize, interpolate, random, snap, toArray, selector, wrap, pipe, unitize, and function-based value review."
+policy:
+  allow_implicit_invocation: true

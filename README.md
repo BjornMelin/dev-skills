@@ -85,6 +85,7 @@ subagents/
   codex/                  # tracked global roles, public overlays, and sync helpers
 plugins/
   native-motion/          # Expo and React Native motion plugin skills
+  web-motion/             # Browser and frontend web motion plugin skills
 ```
 
 ## Research, Subagent, and Operating Stack
@@ -214,6 +215,7 @@ The table below remains the human-facing catalog.
 | Plugin | Skills | Description | Source |
 | --- | --- | --- | --- |
 | `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [plugins/native-motion/.codex-plugin/plugin.json](plugins/native-motion/.codex-plugin/plugin.json) |
+| `web-motion` | `gsap-core`, `gsap-frameworks`, `gsap-performance`, `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-utils`, `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [plugins/web-motion/.codex-plugin/plugin.json](plugins/web-motion/.codex-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |

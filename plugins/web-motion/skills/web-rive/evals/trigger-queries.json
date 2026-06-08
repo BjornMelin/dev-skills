@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Rive in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Rive is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with .riv in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": ".riv is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with state machine input in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "state machine input is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with @rive-app/react-canvas in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@rive-app/react-canvas is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with @rive-app/canvas in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@rive-app/canvas is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with @rive-app/react-webgl2 in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@rive-app/react-webgl2 is directly in scope for web-rive."
+    },
+    {
+      "query": "Can you help with @rive-app/webgl2 in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@rive-app/webgl2 is directly in scope for web-rive."
+    },
+    {
+      "query": "Audit this Rive React runtime integration for file loading, state-machine inputs, and fallback UI.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-rive."
+    },
+    {
+      "query": "Review this .riv web asset setup for remote loading policy, lifecycle cleanup, and accessibility.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-rive."
+    },
+    {
+      "query": "Check this Rive data-binding flow for typed input ownership and render error handling.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-rive."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-rive."
+    }
+  ]
+}

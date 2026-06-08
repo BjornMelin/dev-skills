@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-waapi-task-1",
+      "prompt": "In src/components/Hero.ts, implement Element.animate behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-waapi routing, checks installed versions, applies domain-specific WAAPI guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for WAAPI.",
+        "Uses at least one web-waapi bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Browser Web Animations API: Element.animate(), Animation, KeyframeEffect, playback control, generated keyframes, cancel/finish, commitStyles, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-waapi-task-2",
+      "prompt": "Review this branch for WAAPI motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-waapi routing, checks installed versions, applies domain-specific WAAPI guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for WAAPI.",
+        "Uses at least one web-waapi bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Browser Web Animations API: Element.animate(), Animation, KeyframeEffect, playback control, generated keyframes, cancel/finish, commitStyles, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-waapi-task-3",
+      "prompt": "Create a minimal example using WAAPI that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-waapi routing, checks installed versions, applies domain-specific WAAPI guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for WAAPI.",
+        "Uses at least one web-waapi bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Browser Web Animations API: Element.animate(), Animation, KeyframeEffect, playback control, generated keyframes, cancel/finish, commitStyles, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-waapi-task-4",
+      "prompt": "Migrate an existing motion implementation to the right WAAPI primitive without changing unrelated UI.",
+      "expected_output": "Uses web-waapi routing, checks installed versions, applies domain-specific WAAPI guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for WAAPI.",
+        "Uses at least one web-waapi bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Browser Web Animations API: Element.animate(), Animation, KeyframeEffect, playback control, generated keyframes, cancel/finish, commitStyles, and cleanup.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

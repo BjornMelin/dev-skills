@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with GSAP plugin in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GSAP plugin is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with Flip in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Flip is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with Draggable in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Draggable is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with Observer in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Observer is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with MotionPath in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "MotionPath is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with ScrollToPlugin in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "ScrollToPlugin is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with SplitText in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "SplitText is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Can you help with plugin registration in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "plugin registration is directly in scope for gsap-plugins."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap plugin registration and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-plugins."
+    },
+    {
+      "query": "Audit this GSAP plugin setup for registration, licensing boundaries, and teardown behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-plugins."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-plugins."
+    }
+  ]
+}

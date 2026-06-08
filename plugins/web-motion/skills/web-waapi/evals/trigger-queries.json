@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Element.animate in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Element.animate is directly in scope for web-waapi."
+    },
+    {
+      "query": "Can you help with WAAPI in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "WAAPI is directly in scope for web-waapi."
+    },
+    {
+      "query": "Can you help with Web Animations API in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Web Animations API is directly in scope for web-waapi."
+    },
+    {
+      "query": "Can you help with KeyframeEffect in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "KeyframeEffect is directly in scope for web-waapi."
+    },
+    {
+      "query": "Can you help with Animation object in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Animation object is directly in scope for web-waapi."
+    },
+    {
+      "query": "Can you help with commitStyles in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "commitStyles is directly in scope for web-waapi."
+    },
+    {
+      "query": "Review this WAAPI implementation for browser web animations api: element.animate() and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for WAAPI motion expertise owned by web-waapi."
+    },
+    {
+      "query": "Audit this Element.animate usage for cancellation, commitStyles boundaries, and reduced motion.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-waapi."
+    },
+    {
+      "query": "Review this WAAPI playback controller for finished promises, cleanup, and generated keyframes.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-waapi."
+    },
+    {
+      "query": "Check this KeyframeEffect setup for fill modes, timing ownership, and interruption behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-waapi."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-waapi."
+    }
+  ]
+}

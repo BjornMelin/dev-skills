@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with lottie-web in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "lottie-web is directly in scope for web-lottie."
+    },
+    {
+      "query": "Can you help with dotLottie in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "dotLottie is directly in scope for web-lottie."
+    },
+    {
+      "query": "Can you help with .lottie in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": ".lottie is directly in scope for web-lottie."
+    },
+    {
+      "query": "Can you help with Lottie JSON in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Lottie JSON is directly in scope for web-lottie."
+    },
+    {
+      "query": "Can you help with After Effects animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "After Effects animation is directly in scope for web-lottie."
+    },
+    {
+      "query": "Can you help with Bodymovin in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Bodymovin is directly in scope for web-lottie."
+    },
+    {
+      "query": "Review this Lottie implementation for lottie-web and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Lottie motion expertise owned by web-lottie."
+    },
+    {
+      "query": "Audit this lottie-web player for lifecycle cleanup, renderer choice, and reduced-motion fallback.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-lottie."
+    },
+    {
+      "query": "Review this dotLottie web component setup for asset loading, events, and accessibility labels.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-lottie."
+    },
+    {
+      "query": "Check this Bodymovin animation export for unsupported features and playback control ownership.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-lottie."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-lottie."
+    }
+  ]
+}

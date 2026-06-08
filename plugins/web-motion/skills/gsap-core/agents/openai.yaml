@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP Core"
+  short_description: "Official GSAP core plus Codex audit routing"
+  default_prompt: "Use $gsap-core for Core GSAP tweens, transforms, eases, staggers, matchMedia, accessibility, and DOM/SVG tween review."
+policy:
+  allow_implicit_invocation: true

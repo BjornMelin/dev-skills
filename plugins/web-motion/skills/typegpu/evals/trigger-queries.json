@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with TypeGPU in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "TypeGPU is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with tgpu in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "tgpu is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with d.struct in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "d.struct is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with use gpu in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "use gpu is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with unplugin-typegpu in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "unplugin-typegpu is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with typed WebGPU in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "typed WebGPU is directly in scope for typegpu."
+    },
+    {
+      "query": "Can you help with TypeGPU shader functions in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "TypeGPU shader functions are directly in scope for typegpu."
+    },
+    {
+      "query": "Review this WebGPU implementation for typegpu schemas and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for WebGPU motion expertise owned by typegpu."
+    },
+    {
+      "query": "Audit this TypeGPU shader pipeline for schema ownership, typed buffers, and capability checks.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for typegpu."
+    },
+    {
+      "query": "Review this WebGPU compute setup for resource lifecycle, bind groups, and CPU/GPU boundaries.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for typegpu."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for typegpu."
+    }
+  ]
+}

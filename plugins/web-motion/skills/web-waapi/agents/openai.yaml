@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web WAAPI"
+  short_description: "Web Animations API lifecycle and playback"
+  default_prompt: "Use $web-waapi for Browser Web Animations API: Element.animate(), Animation, KeyframeEffect, playback control, generated keyframes, cancel/finish, commitStyles, and cleanup."
+policy:
+  allow_implicit_invocation: true

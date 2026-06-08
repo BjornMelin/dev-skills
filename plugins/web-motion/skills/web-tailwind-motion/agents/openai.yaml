@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Tailwind Motion"
+  short_description: "Tailwind v4 motion utilities and tokens"
+  default_prompt: "Use $web-tailwind-motion for Tailwind CSS v4 transition, animation, duration, easing, motion-safe/motion-reduce, @theme motion tokens, and static class safety."
+policy:
+  allow_implicit_invocation: true

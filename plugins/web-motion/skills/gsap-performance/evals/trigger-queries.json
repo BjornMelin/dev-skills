@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with GSAP performance in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "GSAP performance is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Can you help with jank in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "jank is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Can you help with layout thrash in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "layout thrash is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Can you help with will-change in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "will-change is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Can you help with too many tweens in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "too many tweens is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Can you help with slow ScrollTrigger in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "slow ScrollTrigger is directly in scope for gsap-performance."
+    },
+    {
+      "query": "Review this GSAP implementation for gsap performance audits: transform/opacity and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for GSAP motion expertise owned by gsap-performance."
+    },
+    {
+      "query": "Audit this GSAP animation for transform/opacity usage, layer budget, and layout thrash risk.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-performance."
+    },
+    {
+      "query": "Review this scroll animation for jank sources, batching, and will-change cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-performance."
+    },
+    {
+      "query": "Check this 60fps GSAP sequence for paint-heavy properties and profiling evidence.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for gsap-performance."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for gsap-performance."
+    }
+  ]
+}

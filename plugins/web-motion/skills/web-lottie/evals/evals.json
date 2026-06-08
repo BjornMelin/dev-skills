@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-lottie-task-1",
+      "prompt": "In src/components/Hero.tsx, implement lottie-web behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one web-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-web, dotLottie web components, animation JSON/dotLottie assets, player lifecycle, cleanup, renderer choice, accessibility, and asset validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-lottie-task-2",
+      "prompt": "Review this branch for Lottie motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one web-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-web, dotLottie web components, animation JSON/dotLottie assets, player lifecycle, cleanup, renderer choice, accessibility, and asset validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-lottie-task-3",
+      "prompt": "Create a minimal example using dotLottie that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one web-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-web, dotLottie web components, animation JSON/dotLottie assets, player lifecycle, cleanup, renderer choice, accessibility, and asset validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-lottie-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Lottie primitive without changing unrelated UI.",
+      "expected_output": "Uses web-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one web-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-web, dotLottie web components, animation JSON/dotLottie assets, player lifecycle, cleanup, renderer choice, accessibility, and asset validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

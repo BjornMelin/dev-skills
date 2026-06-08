@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-three-r3f-task-1",
+      "prompt": "In src/components/Hero.tsx, implement three behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one web-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, useFrame, disposal, SSR/client boundaries, DPR, and browser proof.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-three-r3f-task-2",
+      "prompt": "Review this branch for Three.js/R3F motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one web-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, useFrame, disposal, SSR/client boundaries, DPR, and browser proof.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-three-r3f-task-3",
+      "prompt": "Create a minimal example using @react-three/fiber that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one web-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, useFrame, disposal, SSR/client boundaries, DPR, and browser proof.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-three-r3f-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Three.js/R3F primitive without changing unrelated UI.",
+      "expected_output": "Uses web-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one web-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, useFrame, disposal, SSR/client boundaries, DPR, and browser proof.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

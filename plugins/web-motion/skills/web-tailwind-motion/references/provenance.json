@@ -1,0 +1,64 @@
+{
+  "skill": "web-tailwind-motion",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Tailwind CSS v4 official documentation and npm package metadata."
+    },
+    {
+      "label": "MDN prefers-reduced-motion documentation for motion media behavior."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/tailwind-v4-motion-utilities.md",
+      "title": "Tailwind transition and animation utilities",
+      "sources": []
+    },
+    {
+      "file": "references/token-and-theme-motion.md",
+      "title": "Tailwind v4 @theme motion tokens",
+      "sources": []
+    },
+    {
+      "file": "references/class-safety-audit.md",
+      "title": "Static class and runtime string safety",
+      "sources": []
+    },
+    {
+      "file": "references/responsive-motion-variants.md",
+      "title": "Responsive and motion preference variants",
+      "sources": [
+        "https://tailwindcss.com/docs/transition-property",
+        "https://tailwindcss.com/docs/animation"
+      ]
+    },
+    {
+      "file": "references/semantic-token-naming.md",
+      "title": "Semantic motion token naming",
+      "sources": [
+        "https://tailwindcss.com/docs/theme",
+        "https://tailwindcss.com/docs/transition-property"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-tailwind-animation.md",
+    "references/docs-tailwind-theme.md",
+    "references/docs-tailwind-transition-property.md",
+    "references/docs-tailwind-v4-release.md",
+    "references/tailwind-motion-field-guide.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP Performance"
+  short_description: "Official GSAP performance review plus audit rules"
+  default_prompt: "Use $gsap-performance for GSAP performance audits: transform/opacity, layout thrash, ScrollTrigger batching, repeat loops, will-change, and frame pressure."
+policy:
+  allow_implicit_invocation: true
