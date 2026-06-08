@@ -98,6 +98,7 @@ const fileExtensions = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.css', '.scss', '.sass',
   '.html', '.vue', '.svelte', '.json',
 ]);
+const fileNames = new Set();
 const severities = ['low', 'medium', 'high'];
 
 function usage() {
