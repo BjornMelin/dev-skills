@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Motion React in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Motion React is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with motion/react in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "motion/react is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with AnimatePresence in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "AnimatePresence is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with layout animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "layout animation is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with useScroll in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "useScroll is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with useReducedMotion in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "useReducedMotion is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Can you help with variants in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "variants is directly in scope for web-motion-react."
+    },
+    {
+      "query": "Review this Motion React implementation for motion react components and hooks: motion and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Motion React motion expertise owned by web-motion-react."
+    },
+    {
+      "query": "Audit this Motion React component for AnimatePresence, layout animations, and reduced motion.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-motion-react."
+    },
+    {
+      "query": "Review this useScroll implementation for Motion values, SSR boundaries, and cleanup.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-motion-react."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-motion-react."
+    }
+  ]
+}

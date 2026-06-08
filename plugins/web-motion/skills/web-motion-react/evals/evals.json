@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-motion-react-task-1",
+      "prompt": "In src/components/Hero.tsx, implement Motion React behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-motion-react routing, checks installed versions, applies domain-specific Motion React guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Motion React.",
+        "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-motion-react-task-2",
+      "prompt": "Review this branch for Motion React motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-motion-react routing, checks installed versions, applies domain-specific Motion React guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Motion React.",
+        "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-motion-react-task-3",
+      "prompt": "Create a minimal example using motion/react that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-motion-react routing, checks installed versions, applies domain-specific Motion React guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Motion React.",
+        "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-motion-react-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Motion React primitive without changing unrelated UI.",
+      "expected_output": "Uses web-motion-react routing, checks installed versions, applies domain-specific Motion React guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Motion React.",
+        "Uses at least one web-motion-react bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Motion React components and hooks: motion, AnimatePresence, layout animations, useScroll, useReducedMotion, gestures, variants, and React/Next boundaries..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

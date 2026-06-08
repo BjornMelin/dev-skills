@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-tailwind-motion-task-1",
+      "prompt": "In src/components/Hero.ts, implement Tailwind animation behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-tailwind-motion routing, checks installed versions, applies domain-specific Tailwind CSS guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Tailwind CSS.",
+        "Uses at least one web-tailwind-motion bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Tailwind CSS v4 transition, animation, duration, easing, motion-safe/motion-reduce, @theme motion tokens, and static class safety..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-tailwind-motion-task-2",
+      "prompt": "Review this branch for Tailwind CSS motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-tailwind-motion routing, checks installed versions, applies domain-specific Tailwind CSS guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Tailwind CSS.",
+        "Uses at least one web-tailwind-motion bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Tailwind CSS v4 transition, animation, duration, easing, motion-safe/motion-reduce, @theme motion tokens, and static class safety..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-tailwind-motion-task-3",
+      "prompt": "Create a minimal example using transition-all that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-tailwind-motion routing, checks installed versions, applies domain-specific Tailwind CSS guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Tailwind CSS.",
+        "Uses at least one web-tailwind-motion bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Tailwind CSS v4 transition, animation, duration, easing, motion-safe/motion-reduce, @theme motion tokens, and static class safety..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-tailwind-motion-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Tailwind CSS primitive without changing unrelated UI.",
+      "expected_output": "Uses web-tailwind-motion routing, checks installed versions, applies domain-specific Tailwind CSS guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Tailwind CSS.",
+        "Uses at least one web-tailwind-motion bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Tailwind CSS v4 transition, animation, duration, easing, motion-safe/motion-reduce, @theme motion tokens, and static class safety..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

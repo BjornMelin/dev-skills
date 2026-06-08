@@ -1,0 +1,82 @@
+{
+  "skill": "web-css-animations",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored notes with source links. Do not bundle full third-party prose unless the skill metadata and attribution explicitly cover that source license. Verify official docs before applying version-sensitive API examples.",
+  "upstream_sources": [
+    {
+      "label": "MDN CSS Animations, Transitions, and prefers-reduced-motion documentation."
+    },
+    {
+      "label": "CSSWG drafts for new CSS motion features when MDN notes support limits."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/css-motion-field-guide.md",
+      "title": "CSS transition/keyframe field guide",
+      "sources": []
+    },
+    {
+      "file": "references/browser-support-and-accessibility.md",
+      "title": "Support, @supports, and reduced-motion notes",
+      "sources": []
+    },
+    {
+      "file": "references/property-performance-matrix.md",
+      "title": "CSS property performance matrix",
+      "sources": []
+    },
+    {
+      "file": "references/scroll-driven-and-view-timelines.md",
+      "title": "Scroll-driven and view-timeline CSS motion",
+      "sources": [
+        "https://developer.mozilla.org/docs/Web/CSS/CSS_Animations/Using_CSS_animations",
+        "https://developer.mozilla.org/docs/Web/CSS/CSS_Transitions/Using_CSS_transitions"
+      ]
+    },
+    {
+      "file": "references/discrete-entry-exit-transitions.md",
+      "title": "Discrete entry and exit transitions",
+      "sources": [
+        "https://developer.mozilla.org/docs/Web/CSS/transition-behavior",
+        "https://developer.mozilla.org/docs/Web/CSS/CSS_Transitions/Using_CSS_transitions"
+      ]
+    },
+    {
+      "file": "references/docs-mdn-css-animations.md",
+      "title": "MDN CSS animations routing notes",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Animations/Using"
+      ]
+    },
+    {
+      "file": "references/docs-mdn-css-transitions.md",
+      "title": "MDN CSS transitions routing notes",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Transitions/Using"
+      ]
+    },
+    {
+      "file": "references/docs-mdn-prefers-reduced-motion.md",
+      "title": "MDN prefers-reduced-motion routing notes",
+      "sources": [
+        "https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-reduced-motion"
+      ]
+    }
+  ],
+  "source_backed_note_files": [
+    "references/docs-css-modern-motion-notes.md",
+    "references/docs-browser-motion-performance.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

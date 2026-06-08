@@ -1,0 +1,19 @@
+.panel {
+  opacity: 0;
+  transform: translateY(0.5rem);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.panel[data-open='true'] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    transition-duration: 1ms;
+    transform: none;
+  }
+}

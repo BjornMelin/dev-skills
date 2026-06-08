@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web CSS Animations"
+  short_description: "CSS transitions, keyframes, and reduced motion"
+  default_prompt: "Use $web-css-animations for Browser CSS transitions, keyframes, scroll-driven animations, registered properties, discrete transitions, reduced motion, and performance-safe CSS motion."
+policy:
+  allow_implicit_invocation: true

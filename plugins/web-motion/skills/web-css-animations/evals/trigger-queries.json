@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with CSS transition in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "CSS transition is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with @keyframes in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@keyframes is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with animation-timeline in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "animation-timeline is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with prefers-reduced-motion in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "prefers-reduced-motion is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with @starting-style in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@starting-style is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with transition-behavior in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "transition-behavior is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Can you help with CSS animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "CSS animation is directly in scope for web-css-animations."
+    },
+    {
+      "query": "Review this CSS implementation for browser css transitions and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for CSS motion expertise owned by web-css-animations."
+    },
+    {
+      "query": "Audit this CSS transition system for discrete transitions, reduced motion, and paint-safe properties.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-css-animations."
+    },
+    {
+      "query": "Review this scroll-driven CSS animation for browser support and fallback behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for web-css-animations."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for web-css-animations."
+    }
+  ]
+}
