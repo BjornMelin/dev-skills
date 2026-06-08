@@ -1,0 +1,6 @@
+interface:
+  display_name: "TypeGPU"
+  short_description: "Type-safe WebGPU with TypeGPU"
+  default_prompt: "Use $typegpu for TypeGPU schemas, typed buffers/textures, shader functions, pipelines, WebGPU capability checks, and CPU/GPU resource ownership."
+policy:
+  allow_implicit_invocation: true

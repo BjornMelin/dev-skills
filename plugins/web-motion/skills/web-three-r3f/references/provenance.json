@@ -1,0 +1,68 @@
+{
+  "skill": "web-three-r3f",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Three.js, React Three Fiber, and Drei documentation/source metadata."
+    },
+    {
+      "label": "Expo/native GPU docs when the skill targets native runtime."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/r3f-scene-lifecycle.md",
+      "title": "Canvas/createRoot and scene lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/asset-loaders-and-fallbacks.md",
+      "title": "GLTF/texture loaders and fallbacks",
+      "sources": []
+    },
+    {
+      "file": "references/three-disposal-performance.md",
+      "title": "Three.js disposal and performance guide",
+      "sources": []
+    },
+    {
+      "file": "references/interaction-and-event-boundaries.md",
+      "title": "R3F interaction and event boundaries",
+      "sources": [
+        "https://r3f.docs.pmnd.rs/api/canvas",
+        "https://r3f.docs.pmnd.rs/advanced/pitfalls"
+      ]
+    },
+    {
+      "file": "references/asset-pipeline-compression.md",
+      "title": "3D asset pipeline, compression, and loader policy",
+      "sources": [
+        "https://drei.docs.pmnd.rs/loaders/gltf-use-gltf",
+        "https://threejs.org/manual/#en/cleanup",
+        "https://r3f.docs.pmnd.rs/advanced/scaling-performance"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-drei-gltf-use-gltf.md",
+    "references/docs-r3f-canvas.md",
+    "references/docs-r3f-pitfalls.md",
+    "references/docs-r3f-scaling-performance.md",
+    "references/docs-three-disposal.md",
+    "references/docs-r3f-introduction.md",
+    "references/docs-three-creating-a-scene.md",
+    "references/r3f-field-guide.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}
