@@ -94,6 +94,9 @@ const fileExtensions = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.css', '.scss', '.sass',
   '.html', '.vue', '.svelte', '.json',
 ]);
+const fileNames = new Set([
+  '.npmrc', '.yarnrc', '.yarnrc.yml', '.pnpmfile.cjs',
+]);
 const severities = ['low', 'medium', 'high'];
 
 function usage() {
@@ -201,7 +204,7 @@ function listFiles(root, maxFiles) {
         if (!shouldSkipDir(rel)) walk(full);
       } else if (
         entry.isFile() &&
-        fileExtensions.has(path.extname(entry.name)) &&
+        (fileExtensions.has(path.extname(entry.name)) || fileNames.has(entry.name)) &&
         !isCurrentScript(full)
       ) {
         files.push(full);
@@ -242,6 +245,7 @@ function isIgnored(config, ruleId, relativePath, lines, lineNumber) {
 }
 
 function makeFinding(rule, relativePath, line, excerpt) {
+  const safeExcerpt = rule.id === 'gsap.private-registry' ? '(redacted private registry/token config)' : excerpt;
   return {
     id: `${rule.id}:${relativePath}:${line}`,
     ruleId: rule.id,
@@ -250,7 +254,7 @@ function makeFinding(rule, relativePath, line, excerpt) {
     category: rule.category,
     file: relativePath,
     line,
-    excerpt,
+    excerpt: safeExcerpt,
     rationale: rule.message,
     recommendation: rule.recommendation,
   };
