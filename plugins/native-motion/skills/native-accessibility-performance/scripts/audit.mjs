@@ -292,6 +292,12 @@ Inline suppression:
 `;
 }
 
+function requireValue(rest, flag) {
+  const value = rest.shift();
+  if (!value || value.startsWith("-")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
 function parseArgs(argv) {
   const args = { command: null, root: process.cwd(), format: 'markdown', output: null, maxFiles: 2000 };
   const rest = [...argv];
@@ -299,10 +305,10 @@ function parseArgs(argv) {
     const arg = rest.shift();
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--json') args.format = 'json';
-    else if (arg === '--root') args.root = path.resolve(rest.shift() ?? '.');
-    else if (arg === '--format') args.format = rest.shift() ?? 'markdown';
-    else if (arg === '--output') args.output = path.resolve(rest.shift() ?? '');
-    else if (arg === '--max-files') args.maxFiles = Number(rest.shift() ?? 2000);
+    else if (arg === '--root') args.root = path.resolve(requireValue(rest, arg));
+    else if (arg === '--format') args.format = requireValue(rest, arg);
+    else if (arg === '--output') args.output = path.resolve(requireValue(rest, arg));
+    else if (arg === '--max-files') args.maxFiles = Number(requireValue(rest, arg));
     else if (!arg.startsWith('-') && args.command === null) args.command = arg;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -456,6 +462,119 @@ function ruleRegex(pattern) {
   return new RegExp(pattern, 'gms');
 }
 
+const workletHookArgumentCounts = new Map([
+  ['useAnimatedStyle', 1],
+  ['useDerivedValue', 1],
+  ['useAnimatedReaction', 2],
+  ['useAnimatedProps', 1],
+  ['useAnimatedScrollHandler', 1],
+  ['useFrameCallback', 1],
+  ['useAnimatedGestureHandler', 1],
+]);
+
+const gestureWorkletCallbackPattern =
+  /\.(?:onBegin|onStart|onUpdate|onChange|onEnd|onFinalize|onTouchesDown|onTouchesMove|onTouchesUp|onTouchesCancelled)\s*\(/g;
+
+function topLevelArguments(text, openParenIndex) {
+  const args = [];
+  let start = openParenIndex + 1;
+  let depth = 1;
+  let quote = null;
+  let escaped = false;
+  let lineComment = false;
+  let blockComment = false;
+  for (let index = openParenIndex + 1; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (lineComment) {
+      if (char === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (char === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '(' || char === '[' || char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === ')' || char === ']' || char === '}') {
+      depth -= 1;
+      if (depth === 0 && char === ')') {
+        args.push({ start, end: index });
+        break;
+      }
+      continue;
+    }
+    if (char === ',' && depth === 1) {
+      args.push({ start, end: index });
+      start = index + 1;
+    }
+  }
+  return args;
+}
+
+function isSharedValueWorkletRead(text, index) {
+  for (const [hookName, workletArgumentCount] of workletHookArgumentCounts) {
+    const hookRegex = new RegExp(`\\b${hookName}\\s*\\(`, 'g');
+    for (const match of text.matchAll(hookRegex)) {
+      const openParenIndex = match.index + match[0].lastIndexOf('(');
+      if (openParenIndex > index) break;
+      const args = topLevelArguments(text, openParenIndex).slice(0, workletArgumentCount);
+      for (const arg of args) {
+        if (index < arg.start || index >= arg.end) continue;
+        const argumentText = text.slice(arg.start, arg.end);
+        if (/(?:=>|\bfunction\b|['"]worklet['"])/.test(argumentText)) return true;
+      }
+    }
+  }
+  for (const match of text.matchAll(gestureWorkletCallbackPattern)) {
+    const openParenIndex = match.index + match[0].lastIndexOf('(');
+    if (openParenIndex > index) break;
+    const [callbackArg] = topLevelArguments(text, openParenIndex);
+    if (!callbackArg || index < callbackArg.start || index >= callbackArg.end) continue;
+    const argumentText = text.slice(callbackArg.start, callbackArg.end);
+    if (/(?:=>|\bfunction\b|['"]worklet['"])/.test(argumentText)) return true;
+  }
+  return false;
+}
+
+function isSharedValueWrite(text, match) {
+  const fullMatch = match[0] ?? '';
+  const matchIndex = match.index ?? 0;
+  const valueOffset = fullMatch.lastIndexOf('.value');
+  if (valueOffset < 0) return false;
+  const identifierOffset = fullMatch.search(/[A-Za-z0-9_]+\.value/);
+  const identifierIndex = matchIndex + (identifierOffset < 0 ? valueOffset : identifierOffset);
+  const afterValue = text.slice(matchIndex + valueOffset + '.value'.length).trimStart();
+  if (/^(?:\+\+|--|[+\-*/%]?=(?!=))/.test(afterValue)) return true;
+  const beforeIdentifier = text.slice(0, identifierIndex).trimEnd();
+  return beforeIdentifier.endsWith('++') || beforeIdentifier.endsWith('--');
+}
+
 function scanRule(rule, file, root, text, config) {
   const relativePath = path.relative(root, file);
   const lines = text.split('\n');
@@ -482,6 +601,12 @@ function scanRule(rule, file, root, text, config) {
   if (rule.kind === 'packageHasAny') return findings;
   const regex = ruleRegex(rule.pattern);
   for (const match of text.matchAll(regex)) {
+    if (
+      rule.id === 'native.shared-value-js-read' &&
+      (isSharedValueWorkletRead(text, match.index ?? 0) || isSharedValueWrite(text, match))
+    ) {
+      continue;
+    }
     const line = lineForIndex(text, match.index ?? 0);
     if (!isIgnored(config, rule.id, relativePath, lines, line)) {
       findings.push(makeFinding(rule, relativePath, line, excerptForLine(lines, line)));

@@ -169,6 +169,12 @@ Inline suppression:
 `;
 }
 
+function requireValue(rest, flag) {
+  const value = rest.shift();
+  if (!value || value.startsWith("-")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
 function parseArgs(argv) {
   const args = { command: null, root: process.cwd(), format: 'markdown', output: null, maxFiles: 2000 };
   const rest = [...argv];
@@ -176,10 +182,10 @@ function parseArgs(argv) {
     const arg = rest.shift();
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--json') args.format = 'json';
-    else if (arg === '--root') args.root = path.resolve(rest.shift() ?? '.');
-    else if (arg === '--format') args.format = rest.shift() ?? 'markdown';
-    else if (arg === '--output') args.output = path.resolve(rest.shift() ?? '');
-    else if (arg === '--max-files') args.maxFiles = Number(rest.shift() ?? 2000);
+    else if (arg === '--root') args.root = path.resolve(requireValue(rest, arg));
+    else if (arg === '--format') args.format = requireValue(rest, arg);
+    else if (arg === '--output') args.output = path.resolve(requireValue(rest, arg));
+    else if (arg === '--max-files') args.maxFiles = Number(requireValue(rest, arg));
     else if (!arg.startsWith('-') && args.command === null) args.command = arg;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -452,7 +458,7 @@ function scan(root, maxFiles) {
   if (!fs.existsSync(root)) throw new Error(`Root does not exist: ${root}`);
   const config = loadConfig(root);
   const files = listFiles(root, maxFiles);
-  const allFiles = listAllFiles(root, maxFiles);
+  const allFiles = listAllFiles(root, Number.POSITIVE_INFINITY);
   const pkg = readPackage(root);
   const findings = [];
   for (const rule of profile.rules) {

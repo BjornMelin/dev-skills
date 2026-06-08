@@ -46,6 +46,8 @@ useEffect(() => {
 
   AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
     if (mounted) setReduceMotion(enabled);
+  }).catch(() => {
+    if (mounted) setReduceMotion(false);
   });
 
   const subscription = AccessibilityInfo.addEventListener(

@@ -75,11 +75,11 @@ Animations are a great way to enhance and provide a better user experience. In y
 
 You can skip installing `react-native-reanimated` if you have created a project using [the default template](https://docs.expo.dev/get-started/create-a-project). This library is already installed. Otherwise, install it by running the following command:
 
-Terminalnpmyarnpnpmbun
+**Terminal**
 
-Copy
-
-`-``npx expo install react-native-reanimated`
+```bash
+npx expo install react-native-reanimated react-native-worklets
+```
 
 ## Usage
 
@@ -93,7 +93,7 @@ Copy
 
 Open in Snack
 
-```
+```tsx
 import Animated, {
   useSharedValue,
   withTiming,

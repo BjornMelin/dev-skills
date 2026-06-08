@@ -1,7 +1,3 @@
-[r3fReact Three Fiber](https://r3f.docs.pmnd.rs/). [docs](https://docs.pmnd.rs/)
-
-Search for anythingPress `/` to search
-
 # Introduction
 
 React-three-fiber is a React renderer for three.js.
@@ -126,7 +122,7 @@ styles.css
 
 index.tsx
 
-```
+```tsx
 import * as THREE from 'three'
 import { createRoot } from 'react-dom/client'
 import React, { useRef, useState } from 'react'

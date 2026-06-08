@@ -69,6 +69,28 @@ export const SpriteGrid = () => {
 };
 ```
 
+Add reduced-motion handling before wiring Atlas sprites to gestures or frame
+loops. Decorative sprite rotation should pause, lower intensity, or render a
+static frame when system reduced motion is enabled, while essential state remains
+available through native labels or adjacent text. Clean up gesture subscriptions,
+textures, and frame callbacks when the canvas unmounts.
+
+`AccessibilityInfo.isReduceMotionEnabled()` returns `Promise<boolean>`, so wire
+the initial read, runtime updates, and cleanup together:
+
+```tsx
+useEffect(() => {
+  AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+
+  const subscription = AccessibilityInfo.addEventListener(
+    'reduceMotionChanged',
+    setReduceMotion,
+  );
+
+  return () => subscription?.remove();
+}, []);
+```
+
 ## RSXform
 
 Atlas transforms use a compressed rotation-scale-translate matrix `[scos, ssin, tx, ty]`:

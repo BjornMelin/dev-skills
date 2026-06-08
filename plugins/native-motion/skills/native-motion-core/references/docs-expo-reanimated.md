@@ -98,11 +98,11 @@ Copy page
 
 ## Installation
 
-Terminalnpmyarnpnpmbun
+**Terminal**
 
-Copy
-
-`-``npx expo install react-native-reanimated react-native-worklets`
+```bash
+npx expo install react-native-reanimated react-native-worklets
+```
 
 No additional configuration is required. [Reanimated Babel plugin](https://docs.swmansion.com/react-native-reanimated/docs/fundamentals/glossary#reanimated-babel-plugin) is automatically configured in [`babel-preset-expo`](https://www.npmjs.com/package/babel-preset-expo) when you install the library.
 
@@ -116,7 +116,7 @@ Copy
 
 Open in Snack
 
-```
+```tsx
 import Animated, {
   useSharedValue,
   withTiming,

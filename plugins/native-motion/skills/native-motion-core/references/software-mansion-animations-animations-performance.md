@@ -133,7 +133,7 @@ Functions marked with `'worklet'` are not hoisted. They must be defined before t
 
 Always profile animations in a release build. Debug builds add significant JS overhead (Metro bundler, Hermes debug mode, dev warnings) that makes animations appear slower than they are in production.
 
-```
+```bash
 npx react-native run-android --mode=release
 ```
 

@@ -8,32 +8,10 @@ Checked at: 2026-06-04
 - Read when CSS-like transitions or Tailwind utilities cross native/web boundaries.
 
 
-## Operating Guidance
+## Compatibility Notes
 
-NativeWind, react-native-css, Tailwind-style classes in React Native, static class safety, design tokens, Reanimated/CSS transition boundaries, and Expo setup.
-
-### Decision Boundaries
-
-- Use native-motion-core for Reanimated implementation logic.
-- Use web-tailwind-motion for browser Tailwind.
-- Do not generate untrusted runtime class strings.
-
-### Workflow Details
-
-1. Inspect NativeWind/react-native-css versions and Babel/Metro setup.
-2. Keep classes statically discoverable and token-driven.
-3. Choose style/class ownership before adding Reanimated or CSS transitions.
-4. Validate iOS/Android/web behavior where NativeWind support differs.
-
-### Gotchas
-
-- Web Tailwind assumptions do not always map to React Native style props.
-- Runtime string concatenation can break class extraction and policy.
-- Animation ownership should not be split between NativeWind classes and Reanimated shared values.
-
-## Validation Notes
-
-- Inspect installed package versions and local architecture before applying examples.
-- Prefer the bundled `scripts/audit.mjs doctor --root <repo> --format json` command when setup is unclear.
-- Use `scripts/audit.mjs scan --root <repo> --format markdown` for repeatable static findings, then manually verify every finding against current code.
-- Close with repo-specific checks and user-visible runtime proof when this skill affects a rendered surface.
+- Treat browser Tailwind utilities as intent, not a direct native contract. React Native style props, units, pseudo states, and layout defaults differ from DOM CSS.
+- Prefer static class strings so NativeWind and Metro can discover every utility at build time.
+- Keep platform-specific differences explicit with local style objects, variants, or platform files instead of runtime class concatenation.
+- Verify CSS transition support against the installed `react-native-css`, NativeWind, and Reanimated versions before mixing utility classes with animated styles.
+- Use browser Tailwind guidance only for web surfaces; use this native skill when the target is iOS, Android, or Expo web/native parity.

@@ -8,7 +8,7 @@ Use this file when animation includes tactile feedback or vibration.
 
 - Expo SDK 56 bundles `expo-haptics` around 56.0.x.
 - `expo-haptics` supports Android, iOS, and web.
-- iOS Taptic Engine can do nothing when Low Power Mode is enabled, the user
+- iOS Taptic Engine can do nothing when Low-Power Mode is enabled, the user
   disabled Taptic Engine, the camera is active, or dictation is active.
 - Web uses the Web Vibration API and depends on browser support, hardware,
   permission, and foreground/background behavior.
@@ -33,7 +33,7 @@ Use this file when animation includes tactile feedback or vibration.
 
 - Test on real devices when haptics matter; simulators and web may not prove
   tactile behavior.
-- Record skipped haptic proof explicitly, especially for iOS Low Power Mode or
+- Record skipped haptic proof explicitly, especially for iOS Low-Power Mode or
   Android hardware availability.
 - On Android, verify whether `performAndroidHapticsAsync` better matches the
   semantic action than `impactAsync`/`notificationAsync`.

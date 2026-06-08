@@ -6,6 +6,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+/**
+ * Renders a Reanimated starter view that fades and scales in while honoring system reduce motion.
+ *
+ * @returns An animated view suitable for Expo and React Native motion smoke tests.
+ */
 export function NativeMotionCoreStarter() {
   const progress = useSharedValue(0);
   const style = useAnimatedStyle(() => ({
@@ -22,6 +27,7 @@ export function NativeMotionCoreStarter() {
 
   return (
     <Animated.View
+      accessibilityLabel="Blue animated motion starter square"
       accessibilityRole="image"
       style={[
         {

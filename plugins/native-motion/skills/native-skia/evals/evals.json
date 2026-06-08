@@ -8,7 +8,7 @@
         "Mentions the relevant installed package/runtime/version checks for Skia.",
         "Uses at least one native-skia bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -20,7 +20,7 @@
         "Mentions the relevant installed package/runtime/version checks for Skia.",
         "Uses at least one native-skia bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -32,7 +32,7 @@
         "Mentions the relevant installed package/runtime/version checks for Skia.",
         "Uses at least one native-skia bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -44,7 +44,7 @@
         "Mentions the relevant installed package/runtime/version checks for Skia.",
         "Uses at least one native-skia bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     }

@@ -9,7 +9,10 @@ const pluginName = readPluginName();
 const args = process.argv.slice(2);
 const localPathPattern = new RegExp([
   '\\.' + 'firecrawl',
-  '\\/home\\/' + 'bjorn',
+  '\\/home\\/[^\\/\\s]+',
+  '\\/Users\\/[^\\/\\s]+',
+  '[A-Za-z]:\\/[^\\/\\s]+',
+  '[A-Za-z]:\\/Users\\/[^\\/\\s]+',
   '~\\/' + 'repos\\/agents',
   '\\/tmp\\/' + 'motion',
 ].join('|'));
@@ -38,6 +41,11 @@ function readPluginName() {
     return path.basename(pluginRoot);
   }
 }
+
+function portableText(value) {
+  return String(value).replaceAll('\\\\', '/');
+}
+
 function option(name, fallback) {
   const index = args.indexOf(name);
   if (index >= 0 && args[index + 1]) return args[index + 1];
@@ -577,7 +585,7 @@ function verifySources() {
     }
     if (!existsSync(ledger)) findings.push({ skill: name, severity: 'error', message: 'missing references/source-ledger.md' });
     else {
-      const text = read(ledger);
+      const text = portableText(read(ledger));
       if (!/Checked at:/.test(text)) findings.push({ skill: name, severity: 'error', message: 'source ledger missing Checked at' });
       if (localPathPattern.test(text)) findings.push({ skill: name, severity: 'error', message: 'source ledger contains machine-local path' });
     }

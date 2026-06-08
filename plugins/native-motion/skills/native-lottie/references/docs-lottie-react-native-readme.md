@@ -250,6 +250,10 @@ export function useReduceMotion() {
 }
 ```
 
+The `useReduceMotion` hook centralizes system preference reads and subscription
+cleanup so playback components can disable decorative autoplay without duplicating
+accessibility wiring.
+
 When reduced motion is enabled:
 
 - do not autoplay decorative animations;

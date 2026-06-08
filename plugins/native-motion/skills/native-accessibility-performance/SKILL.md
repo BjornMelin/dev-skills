@@ -27,9 +27,9 @@ target repo's installed package versions before editing.
 
 ## Decision Boundaries
 
-- Use native-motion-core for implementation patterns.
-- Use native-validation for command and device validation gates.
-- Use native-skia or native-three-r3f for canvas/GPU-specific performance.
+- Prefer native-motion-core for implementation patterns.
+- Route command and device validation gates through native-validation.
+- Load native-skia or native-three-r3f for canvas/GPU-specific performance.
 
 ## Workflow
 

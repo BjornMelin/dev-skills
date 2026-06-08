@@ -26,6 +26,35 @@ For high element counts without per-pixel computation (hundreds of 2D shapes, sp
 
 Stick with Reanimated when animating standard UI components (opacity, transforms, layout changes) or responding to gestures. GPU shaders render into a `Canvas` element, separate from the React Native view hierarchy.
 
+## Accessibility and Performance Guardrails
+
+- Provide an accessible native wrapper around the GPU canvas with a concise `accessibilityLabel` and role when the scene conveys user-visible state.
+- Keep essential progress, focus, pressed, loading, and error feedback available outside shader-only visuals so reduced-motion users do not lose functional context.
+- Respect system reduced-motion settings by pausing decorative particle fields, lowering simulation intensity, or rendering a static frame when motion is nonessential.
+- Validate shader work on target devices with release or development builds; simulator-only proof is not enough for GPU-heavy surfaces.
+- Clean up GPU resources, listeners, timers, and frame loops on unmount to avoid battery drain and retained native memory.
+
+Detect reduced motion asynchronously and keep the subscription lifecycle next to
+the shader or frame-loop owner:
+
+```tsx
+useEffect(() => {
+  const handleChange = (enabled: boolean) => {
+    setReduceMotion(enabled);
+    setShaderIntensity(enabled ? 0 : 1);
+  };
+
+  AccessibilityInfo.isReduceMotionEnabled().then(handleChange);
+
+  const sub = AccessibilityInfo.addEventListener(
+    'reduceMotionChanged',
+    handleChange,
+  );
+
+  return () => sub.remove();
+}, []);
+```
+
 ---
 
 ## Setup

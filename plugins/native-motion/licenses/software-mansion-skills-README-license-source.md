@@ -10,7 +10,7 @@ Optimized for Claude Opus 4.6 and tested with [Claude Code](https://claude.ai/co
 
 Add the Software Mansion marketplace and install the plugin:
 
-```
+```text
 /plugin marketplace add software-mansion-labs/skills
 /plugin install skills@swmansion
 /reload-plugins
@@ -70,7 +70,7 @@ task eval:grade -- /path/to/workspace   # grade a skill-creator workspace
 
 ## Repository Structure
 
-```
+```text
 react-native-skills/
 └── skills/
     ├── expo-horizon/

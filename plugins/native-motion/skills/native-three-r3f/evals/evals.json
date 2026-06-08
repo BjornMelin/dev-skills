@@ -8,7 +8,7 @@
         "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
         "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -20,7 +20,7 @@
         "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
         "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -32,7 +32,7 @@
         "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
         "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -44,7 +44,7 @@
         "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
         "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation..",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     }

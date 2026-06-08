@@ -199,6 +199,12 @@ Package checks:
 `;
 }
 
+function requireValue(rest, flag) {
+  const value = rest.shift();
+  if (!value || value.startsWith("-")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
 function parseArgs(argv) {
   const args = { command: null, root: process.cwd(), format: 'markdown', output: null, maxFiles: 2000 };
   const rest = [...argv];
@@ -206,10 +212,10 @@ function parseArgs(argv) {
     const arg = rest.shift();
     if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg === '--json') args.format = 'json';
-    else if (arg === '--root') args.root = path.resolve(rest.shift() ?? '.');
-    else if (arg === '--format') args.format = rest.shift() ?? 'markdown';
-    else if (arg === '--output') args.output = path.resolve(rest.shift() ?? '');
-    else if (arg === '--max-files') args.maxFiles = Number(rest.shift() ?? 2000);
+    else if (arg === '--root') args.root = path.resolve(requireValue(rest, arg));
+    else if (arg === '--format') args.format = requireValue(rest, arg);
+    else if (arg === '--output') args.output = path.resolve(requireValue(rest, arg));
+    else if (arg === '--max-files') args.maxFiles = Number(requireValue(rest, arg));
     else if (!arg.startsWith('-') && args.command === null) args.command = arg;
     else throw new Error(`Unknown argument: ${arg}`);
   }
@@ -679,7 +685,7 @@ function isSharedValueWrite(text, match) {
   const identifierOffset = fullMatch.search(/[A-Za-z0-9_]+\.value/);
   const identifierIndex = matchIndex + (identifierOffset < 0 ? valueOffset : identifierOffset);
   const afterValue = text.slice(matchIndex + valueOffset + '.value'.length).trimStart();
-  if (/^(?:[+\-*/%]?=|\+\+|--)/.test(afterValue)) return true;
+  if (/^(?:\+\+|--|[+\-*/%]?=(?!=))/.test(afterValue)) return true;
   const beforeIdentifier = text.slice(0, identifierIndex).trimEnd();
   return beforeIdentifier.endsWith('++') || beforeIdentifier.endsWith('--');
 }

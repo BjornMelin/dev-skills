@@ -322,7 +322,7 @@ Additionally, non-layout properties can be updated using a fast path – more de
 
 ### 💡 Memoize frame callbacks [​](https://docs.swmansion.com/react-native-reanimated/docs/guides/performance/\#-memoize-frame-callbacks "Direct link to 💡 Memoize frame callbacks")
 
-If you are using [`useFrameCallback`](https://docs.swmansion.com/react-native-reanimated/docs/advanced/useFrameCallback), you should wrap the frame callback worklet inside `useCallback` in order to memoize it. This way, the frame callback won't need to be recrated and thus registered on every render. If you are using React Compiler, the frame callback should be memoized automatically.
+If you are using [`useFrameCallback`](https://docs.swmansion.com/react-native-reanimated/docs/advanced/useFrameCallback), you should wrap the frame callback worklet inside `useCallback` in order to memoize it. This way, the frame callback won't need to be recreated and thus registered on every render. If you are using React Compiler, the frame callback should be memoized automatically.
 
 ```tsx
 useFrameCallback(

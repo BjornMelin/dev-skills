@@ -8,7 +8,7 @@
         "Mentions the relevant installed package/runtime/version checks for Expo validation.",
         "Uses at least one native-validation bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout..",
+        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -20,7 +20,7 @@
         "Mentions the relevant installed package/runtime/version checks for Expo validation.",
         "Uses at least one native-validation bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout..",
+        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -32,7 +32,7 @@
         "Mentions the relevant installed package/runtime/version checks for Expo validation.",
         "Uses at least one native-validation bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout..",
+        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     },
@@ -44,7 +44,7 @@
         "Mentions the relevant installed package/runtime/version checks for Expo validation.",
         "Uses at least one native-validation bundled reference or explains why no extra reference was needed.",
         "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
-        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout..",
+        "Includes cleanup/interruption/runtime validation appropriate to Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout.",
         "Does not route the task to an unrelated near-miss skill."
       ]
     }

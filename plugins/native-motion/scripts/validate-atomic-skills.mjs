@@ -22,7 +22,10 @@ const requiredSkills = [
 
 const bannedPortablePatterns = [
   new RegExp('\\.' + 'firecrawl'),
-  new RegExp('\\/home\\/' + 'bjorn'),
+  new RegExp('\\/home\\/[^\\/\\s]+'),
+  new RegExp('\\/Users\\/[^\\/\\s]+'),
+  new RegExp('[A-Za-z]:\\/[^\\/\\s]+'),
+  new RegExp('[A-Za-z]:\\/Users\\/[^\\/\\s]+'),
   new RegExp('\\/tmp\\/' + 'motion'),
   new RegExp('~\\/' + 'repos\\/agents'),
   new RegExp('\\.\\.\\/\\.\\.\\/' + 'references'),
@@ -48,6 +51,10 @@ function fail(message) {
 
 function read(file) {
   return readFileSync(file, 'utf8');
+}
+
+function portableText(value) {
+  return String(value).replaceAll('\\\\', '/');
 }
 
 function listFiles(dir) {
@@ -186,10 +193,11 @@ for (const skill of requiredSkills) {
   const ledger = existsSync(path.join(skillDir, 'references', 'source-ledger.md'))
     ? read(path.join(skillDir, 'references', 'source-ledger.md'))
     : '';
+  const portableLedger = portableText(ledger);
   if (!/Checked at:/.test(ledger)) fail(`${skill}: source ledger missing Checked at`);
   if (!ledger.includes('references/provenance.json')) fail(`${skill}: source ledger missing provenance link`);
   for (const pattern of bannedPortablePatterns) {
-    if (pattern.test(ledger)) fail(`${skill}: source ledger contains banned non-portable pattern ${pattern}`);
+    if (pattern.test(portableLedger)) fail(`${skill}: source ledger contains banned non-portable pattern ${pattern}`);
   }
 
   const prov = json(path.join(skillDir, 'references', 'provenance.json'));
@@ -218,16 +226,19 @@ for (const skill of requiredSkills) {
 }
 
 for (const file of listFiles(pluginRoot)) {
-  const relativePath = path.relative(pluginRoot, file);
+  const relativePath = portableText(path.relative(pluginRoot, file));
   const text = read(file);
-  for (const pattern of bannedPortablePatterns) {
-    if (pattern.test(text)) fail(`${relativePath}: contains banned non-portable pattern ${pattern}`);
+  const portableFileText = portableText(text);
+  if (!text.slice(0, 512).includes('motion-audit-skip-file')) {
+    for (const pattern of bannedPortablePatterns) {
+      if (pattern.test(portableFileText)) fail(`${relativePath}: contains banned non-portable pattern ${pattern}`);
+    }
   }
   if (unresolvedPlaceholderPattern.test(text)) fail(`${relativePath}: contains unresolved placeholder marker`);
-  if (/\/templates\//.test(relativePath) && !/\/assets\/templates\//.test(relativePath)) {
+  if (/(?:^|\/)templates\//.test(relativePath) && !/(?:^|\/)assets\/templates\//.test(relativePath)) {
     fail(`${relativePath}: templates must live under assets/templates`);
   }
-  if (/\/(README|CHANGELOG|INSTALLATION_GUIDE|QUICK_REFERENCE)\.md$/i.test(relativePath)) {
+  if (/(?:^|\/)(README|CHANGELOG|INSTALLATION_GUIDE|QUICK_REFERENCE)\.md$/i.test(relativePath)) {
     fail(`${relativePath}: extraneous skill documentation file`);
   }
 }

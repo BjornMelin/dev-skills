@@ -15,7 +15,7 @@ For performance tuning and feature flags, see **`animations-performance.md`**.
 
 Pick the animation type based on what drives the animation and what it needs to compute.
 
-```
+```text
 Does the effect require per-pixel GPU computation?
 (Particle systems, fluid/physics sims, procedural noise, SDF shapes, 3D scenes)
 ├── YES → Use GPU Shaders (react-native-wgpu + TypeGPU)   → see gpu-animations.md
