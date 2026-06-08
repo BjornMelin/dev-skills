@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "web-rive-task-1",
+      "prompt": "In src/components/Hero.tsx, implement Rive behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses web-rive routing, checks installed versions, applies domain-specific Rive guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Rive.",
+        "Uses at least one web-rive bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Rive web and React runtime integration, .riv assets, state machines, inputs, lifecycle cleanup, accessibility, remote asset security, and fallback behavior..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-rive-task-2",
+      "prompt": "Review this branch for Rive motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses web-rive routing, checks installed versions, applies domain-specific Rive guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Rive.",
+        "Uses at least one web-rive bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Rive web and React runtime integration, .riv assets, state machines, inputs, lifecycle cleanup, accessibility, remote asset security, and fallback behavior..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-rive-task-3",
+      "prompt": "Create a minimal example using .riv that includes cleanup and accessibility notes.",
+      "expected_output": "Uses web-rive routing, checks installed versions, applies domain-specific Rive guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Rive.",
+        "Uses at least one web-rive bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Rive web and React runtime integration, .riv assets, state machines, inputs, lifecycle cleanup, accessibility, remote asset security, and fallback behavior..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "web-rive-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Rive primitive without changing unrelated UI.",
+      "expected_output": "Uses web-rive routing, checks installed versions, applies domain-specific Rive guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Rive.",
+        "Uses at least one web-rive bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to Rive web and React runtime integration, .riv assets, state machines, inputs, lifecycle cleanup, accessibility, remote asset security, and fallback behavior..",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "skill": "web-lottie",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "lottie-web, lottie-react-native, dotLottie web/native package docs and source metadata."
+    },
+    {
+      "label": "Expo SDK docs for native package compatibility when applicable."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/lottie-player-lifecycle.md",
+      "title": "lottie-web player lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/dotlottie-web-component.md",
+      "title": "dotLottie web component and worker notes",
+      "sources": []
+    },
+    {
+      "file": "references/asset-accessibility-security.md",
+      "title": "Asset accessibility and security review",
+      "sources": []
+    },
+    {
+      "file": "references/authoring-and-export-compatibility.md",
+      "title": "Authoring and export compatibility",
+      "sources": [
+        "https://github.com/airbnb/lottie-web/wiki/Usage",
+        "https://github.com/LottieFiles/dotlottie-web"
+      ]
+    },
+    {
+      "file": "references/runtime-event-contracts.md",
+      "title": "Runtime events, markers, and playback contracts",
+      "sources": [
+        "https://github.com/airbnb/lottie-web/wiki/Usage",
+        "https://github.com/LottieFiles/dotlottie-web"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-dotlottie-web.md",
+    "references/docs-lottie-web-load-animation-options.md",
+    "references/docs-lottie-web-readme.md",
+    "references/implementation-notes.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}
