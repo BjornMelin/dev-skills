@@ -129,11 +129,30 @@ function addCustomPropertyFindings(text, lines, scanRoot, file, findings) {
       addFinding(match[1], baseIndex + (match.index ?? 0) + match[0].lastIndexOf(match[1]), options);
     }
   };
+  const topLevelTokens = (value) => {
+    const tokens = [];
+    let start = null;
+    let depth = 0;
+    for (let index = 0; index <= value.length; index += 1) {
+      const char = value[index] ?? ' ';
+      if (char === '(') depth += 1;
+      else if (char === ')' && depth > 0) depth -= 1;
+      const boundary = index === value.length || (depth === 0 && /\s/.test(char));
+      if (boundary) {
+        if (start != null) tokens.push({ text: value.slice(start, index), index: start });
+        start = null;
+      } else if (start == null) start = index;
+    }
+    return tokens;
+  };
+  const isTransitionPropertyToken = (token) =>
+    !/^(?:\d*\.?\d+m?s|ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end|allow-discrete|normal|none|all|inherit|initial|unset|revert|revert-layer)$/i.test(token) &&
+    !/^(?:cubic-bezier|steps|linear|var|min|max|clamp)\(/i.test(token);
   const addShorthandValueFindings = (value, baseIndex, options = {}) => {
     let partStart = 0;
     for (const part of value.split(',')) {
-      const property = part.match(/(?:^|\s)(--[a-zA-Z0-9_-]+)\b/);
-      if (property) addFinding(property[1], baseIndex + partStart + (property.index ?? 0) + property[0].lastIndexOf(property[1]), options);
+      const property = topLevelTokens(part).find((token) => isTransitionPropertyToken(token.text) && /^--[a-zA-Z0-9_-]+\b/.test(token.text));
+      if (property) addFinding(property.text.match(/^--[a-zA-Z0-9_-]+\b/)?.[0], baseIndex + partStart + property.index, options);
       partStart += part.length + 1;
     }
   };
@@ -486,7 +505,28 @@ function addScrollTimelineFindings(text, lines, scanRoot, file, findings) {
   }
 }
 function isScannableMotionFile(file) {
-  return /\.(js|jsx|ts|tsx|css|scss|md|mjs|cjs)$/.test(file);
+  return /\.(js|jsx|ts|tsx|css|scss|md|mdx|mjs|cjs|html|vue|svelte|astro)$/.test(file);
+}
+const skillArtifactDirs = new Set(['agents', 'assets', 'examples', 'references', 'scripts', 'templates']);
+function pathParts(file) {
+  return file.split(path.sep);
+}
+function isSkillArtifactDir(dir, rootIsSkillDir = false, rootIsPluginDir = false) {
+  const parts = pathParts(dir);
+  if (rootIsSkillDir && skillArtifactDirs.has(parts[0])) return true;
+  if (rootIsPluginDir && parts.length === 1 && skillArtifactDirs.has(parts[0])) return true;
+  return parts[0] === 'skills' && skillArtifactDirs.has(parts[2]);
+}
+function isSkillArtifactFile(file, rootIsSkillDir = false, readMarker = true) {
+  const parts = pathParts(file);
+  if (rootIsSkillDir && path.basename(file) === 'SKILL.md' && parts.length === 1) return true;
+  if (path.basename(file) === 'SKILL.md' && parts[0] === 'skills') return true;
+  if (!readMarker) return false;
+  try {
+    return read(file).slice(0, 512).includes('motion-audit-skip-file');
+  } catch {
+    return false;
+  }
 }
 function globalRegex(regex) {
   return regex.global ? regex : new RegExp(regex.source, `${regex.flags}g`);
@@ -503,15 +543,18 @@ function listFiles(dir, acc = [], limit = Infinity) {
   }
   return acc;
 }
-function listScannableFiles(dir, acc = [], limit = Infinity) {
+function listScannableFiles(dir, acc = [], limit = Infinity, root = dir) {
   if (!existsSync(dir) || acc.length >= limit) return acc;
+  const rootIsSkillDir = existsSync(path.join(root, 'SKILL.md')) && existsSync(path.join(root, 'references'));
+  const rootIsPluginDir = existsSync(path.join(root, '.codex-plugin', 'plugin.json')) && existsSync(path.join(root, 'skills'));
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (acc.length >= limit) break;
     const full = path.join(dir, entry.name);
+    const rel = path.relative(root, full);
     if (entry.isDirectory()) {
-      if (['.git','node_modules','.next','dist','build','coverage','.turbo'].includes(entry.name)) continue;
-      listScannableFiles(full, acc, limit);
-    } else if (entry.isFile() && isScannableMotionFile(full)) acc.push(full);
+      if (['.git','node_modules','.next','dist','build','coverage','.turbo'].includes(entry.name) || isSkillArtifactDir(rel, rootIsSkillDir, rootIsPluginDir)) continue;
+      listScannableFiles(full, acc, limit, root);
+    } else if (entry.isFile() && isScannableMotionFile(full) && !isSkillArtifactFile(rel, rootIsSkillDir, false) && !isSkillArtifactFile(full)) acc.push(full);
   }
   return acc;
 }
