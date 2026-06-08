@@ -314,6 +314,10 @@ for validation, local boundaries, and report shape.
 - Use CSS scroll-driven animations only when native browser support and declarative semantics fit.
 - Use gsap-timeline for non-scroll sequencing.
 - Use web-three-r3f for 3D scroll scenes.
+- Prefer disabling nonessential pinning, scrub, and parallax when
+  `prefers-reduced-motion: reduce` matches; keep content visible in a static
+  layout or use a short opacity-only reveal when motion is needed for
+  orientation.
 
 ### Local Workflow
 

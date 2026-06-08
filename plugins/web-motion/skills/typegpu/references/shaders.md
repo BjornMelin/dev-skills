@@ -363,6 +363,7 @@ std.atomicCompareExchangeWeak(ptr, cmp, val)
 ```
 
 **Packing**
+
 ```ts
 std.pack4x8snorm(v)   std.unpack4x8snorm(x)
 std.pack4x8unorm(v)   std.unpack4x8unorm(x)

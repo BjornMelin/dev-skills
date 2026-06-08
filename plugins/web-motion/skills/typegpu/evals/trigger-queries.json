@@ -31,9 +31,9 @@
       "reason": "typed WebGPU is directly in scope for typegpu."
     },
     {
-      "query": "Can you help with shader functions in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "query": "Can you help with TypeGPU shader functions in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
       "should_trigger": true,
-      "reason": "shader functions is directly in scope for typegpu."
+      "reason": "TypeGPU shader functions are directly in scope for typegpu."
     },
     {
       "query": "Review this WebGPU implementation for typegpu schemas and produce an audit report.",

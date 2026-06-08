@@ -28,33 +28,9 @@ Checked at: 2026-06-04
 - `transition: all` around `display` and layout properties.
 - Hiding focusable content visually while leaving it reachable.
 
+## Review Steps
 
-## Operating Guidance
-
-Browser CSS transitions, keyframes, scroll-driven animations, registered properties, discrete transitions, reduced motion, and performance-safe CSS motion.
-
-### Decision Boundaries
-
-- Use CSS first for two-state UI motion.
-- Move to WAAPI when an Animation object or seeking is needed.
-- Move to GSAP for complex imperative choreography.
-
-### Workflow Details
-
-1. Identify the state driver and animated properties.
-2. Use explicit transition-property lists and product motion tokens.
-3. Add reduced-motion behavior beside the motion.
-4. Guard new CSS with @supports or local browser policy.
-
-### Gotchas
-
-- transition: all hides expensive accidental properties.
-- Unregistered custom properties animate discretely.
-- animation shorthand resets animation-timeline, so set timeline after shorthand.
-
-## Validation Notes
-
-- Inspect installed package versions and local architecture before applying examples.
-- Prefer the bundled `scripts/audit.mjs doctor --root <repo> --format json` command when setup is unclear.
-- Use `scripts/audit.mjs scan --root <repo> --format markdown` for repeatable static findings, then manually verify every finding against current code.
-- Close with repo-specific checks and user-visible runtime proof when this skill affects a rendered surface.
+1. Confirm `@starting-style` and `transition-behavior: allow-discrete` are supported or guarded.
+2. Keep open/closed ownership in DOM state, not only in visual animation state.
+3. Test keyboard focus, focus return, and reduced-motion behavior during entry and exit.
+4. Prefer opacity and transform when discrete transition support is outside the target browser policy.
