@@ -1,0 +1,46 @@
+{
+  "name": "web-motion",
+  "version": "0.1.0+codex.20260604091200",
+  "description": "Self-contained web motion skills with official GreenSock GSAP skills, MIT TypeGPU guidance, and bundled docs for Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive.",
+  "author": {
+    "name": "Bjorn Melin",
+    "url": "https://github.com/BjornMelin"
+  },
+  "homepage": "https://github.com/BjornMelin/dev-skills",
+  "repository": "https://github.com/BjornMelin/dev-skills",
+  "license": "MIT",
+  "keywords": [
+    "web-motion",
+    "react",
+    "motion",
+    "gsap",
+    "css",
+    "waapi",
+    "tailwind",
+    "lottie",
+    "three",
+    "react-three-fiber",
+    "typegpu",
+    "rive"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Web Motion",
+    "shortDescription": "Build high-quality motion for web apps.",
+    "longDescription": "Self-contained web motion plugin for production apps: official GreenSock GSAP skills, Software Mansion TypeGPU guidance, Motion React, CSS animations, WAAPI, Tailwind v4 motion utilities, Lottie/dotLottie assets, Three.js/R3F scenes, and exact-trigger Rive workflows. Includes bundled source docs and atomic-reference validation scripts.",
+    "developerName": "Bjorn Melin",
+    "category": "Design",
+    "capabilities": [
+      "Design",
+      "Coding",
+      "Frontend"
+    ],
+    "websiteURL": "https://github.com/BjornMelin/dev-skills",
+    "defaultPrompt": [
+      "Add polished Motion React transitions to this UI.",
+      "Build a GSAP ScrollTrigger sequence for this page.",
+      "Create a performant Three.js/R3F scene for this app."
+    ],
+    "brandColor": "#111827"
+  }
+}
