@@ -128,7 +128,7 @@ ease: "none"           // linear
 
 Built-in eases: base (same as `.out`), `.in`, `.out`, `.inOut` where "power" refers to the strength of the curve (1 is more gradual, 4 is steepest):
 
-```
+```text
 base (out)        .in                .out               .inOut
 "none"
 "power1"          "power1.in"        "power1.out"       "power1.inOut"
