@@ -34,3 +34,31 @@ Checked at: 2026-06-04
 2. Document any intentional decorative variance so reviewers do not treat it as flaky output.
 3. Validate wrap and wrapYoyo helpers with first, last, overflow, and negative indexes.
 4. Keep selector helpers scoped when randomization targets component-local elements.
+
+## Operating Guidance
+
+- `gsap.utils.random()` is useful for decorative variance, but it can make
+  visual tests and hydration-sensitive initial styles flaky. Prefer deterministic
+  values in test fixtures.
+- When using `wrap`, `wrapYoyo`, `mapRange`, `normalize`, or `snap`, test
+  boundary inputs explicitly. These helpers are often correct only because their
+  input domain is constrained elsewhere.
+- If a helper returns a reusable function, name and store that function so call
+  sites make the transformation obvious.
+- Use `selector(scope)` in component code so randomized target selection cannot
+  escape the component root.
+
+## Command References
+
+- Run the utilities audit:
+  `node scripts/audit.mjs scan --root <repo> --format markdown`
+- Use JSON output for deterministic review artifacts:
+  `node scripts/audit.mjs scan --root <repo> --format json --output gsap-utils-audit.json`
+- Check package/setup facts:
+  `node scripts/audit.mjs doctor --root <repo> --format json`
+
+## Validation Notes
+
+- Verify random output is not part of SSR markup unless it is stable.
+- Check first, last, overflow, and underflow indexes for cyclic helpers.
+- Confirm unit handling for numeric mapping helpers.

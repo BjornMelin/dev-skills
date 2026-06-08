@@ -328,12 +328,14 @@ std.select(falseVal, trueVal, cond)
 ```
 
 **Trig**
+
 ```ts
 std.sin  std.cos  std.tan  std.asin  std.acos  std.atan  std.atan2
 std.sinh std.cosh std.tanh  std.degrees  std.radians
 ```
 
 **Vector / matrix**
+
 ```ts
 std.dot(a, b)         std.cross(a, b)      std.length(v)
 std.normalize(v)      std.distance(a, b)
@@ -343,6 +345,7 @@ std.mul(mat, vec)     // matrix-vector multiply
 ```
 
 **Texture** (see sampling rules below)
+
 ```ts
 std.textureSample(view.$, sampler.$, uv)
 std.textureSampleLevel(view.$, sampler.$, uv, mipLevel)
@@ -353,6 +356,7 @@ std.textureDimensions(view.$)
 ```
 
 **Atomic**
+
 ```ts
 std.atomicLoad(ptr)         std.atomicStore(ptr, val)
 std.atomicAdd(ptr, val)     std.atomicSub(ptr, val)

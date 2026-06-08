@@ -35,10 +35,18 @@ type PluginExport<K extends Plugins> = PluginModule<K>[K & keyof PluginModule<K>
 
 /**
  * Provides GSAP with ScrollTrigger registered and a typed lazy plugin loader.
+ *
+ * @returns The GSAP namespace, ScrollTrigger plugin, and lazyLoadPlugin helper.
  */
 export function useGSAP() {
   gsap.registerPlugin(ScrollTrigger);
 
+  /**
+   * Loads a GSAP plugin on demand and registers it before use.
+   *
+   * @param plugin - Plugin key to load from the GSAP plugin map.
+   * @returns A Promise for the loaded PluginExport<K>.
+   */
   async function lazyLoadPlugin<K extends Plugins>(plugin: K): Promise<PluginExport<K>> {
     const loader = pluginMap[plugin];
     const module = await loader();

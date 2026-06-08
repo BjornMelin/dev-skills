@@ -13,7 +13,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .panel {
-    transition-duration: 1ms;
+    transition: none;
     transform: none;
   }
 

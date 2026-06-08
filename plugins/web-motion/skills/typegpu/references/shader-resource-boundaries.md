@@ -10,30 +10,44 @@ Checked at: 2026-06-04
 
 ## Operating Guidance
 
-TypeGPU schemas, typed buffers/textures, shader functions, pipelines, WebGPU capability checks, and CPU/GPU resource ownership.
+For full workflow, commands, and validation notes, read
+`references/typegpu-codex-playbook.md`. This file focuses on shader/resource
+ownership boundaries.
 
 ### Decision Boundaries
 
-- Do not trigger for raw WebGPU without TypeGPU imports.
-- Use web-three-r3f for Three/R3F scenes.
-- Use native-three-r3f or native-skia for React Native GPU surfaces.
+- Use this file when the task crosses shader code, schema definitions, buffers,
+  bind groups, textures, pipelines, or CPU/GPU ownership.
+- Use `references/typegpu-codex-playbook.md` for general routing, command
+  references, and broad validation flow.
+- Route scene graph or material work without TypeGPU resource ownership to
+  `web-three-r3f`.
 
-### Workflow Details
+### Ownership Checks
 
-1. Check installed typegpu, unplugin-typegpu, @webgpu/types, tsover, and browser/runtime support.
-2. Define schemas before resources and shader signatures.
-3. Keep root/device/resource ownership explicit.
-4. Validate unsupported-browser fallback, reduced-motion/static quality, and GPU cleanup.
+1. Identify the source of truth for each `d.*` schema and the CPU values that
+   populate it.
+2. Confirm every buffer, texture, sampler, bind group, and pipeline has a clear
+   owner and disposal path.
+3. Check whether resources are allocated during setup, resize, or per-frame
+   work; per-frame allocation needs measurement and caching justification.
+4. Verify shader function inputs match the schema and resource binding shape.
 
-### Gotchas
+### Common Failure Modes
 
 - A d.* schema is the CPU layout, GPU layout, and TypeScript type source of truth.
 - TypeScript shader functions require unplugin-typegpu; WGSL-only usage may not.
 - Do not allocate buffers, textures, bind groups, or pipelines per frame unless measured and cached.
+- Resizing a canvas or texture can invalidate dependent resources; rebuild only
+  the resources that depend on the changed size.
+- Capability checks must happen before TypeGPU initialization code assumes a
+  usable WebGPU adapter/device.
 
 ## Validation Notes
 
-- Inspect installed package versions and local architecture before applying examples.
-- Prefer the bundled `scripts/audit.mjs doctor --root <repo> --format json` command when setup is unclear.
-- Use `scripts/audit.mjs scan --root <repo> --format markdown` for repeatable static findings, then manually verify every finding against current code.
-- Close with repo-specific checks and user-visible runtime proof when this skill affects a rendered surface.
+- Run `node scripts/audit.mjs doctor --root <repo> --format json` before
+  interpreting scan results when dependency setup is unclear.
+- Run `node scripts/audit.mjs scan --root <repo> --format markdown` for
+  repeatable static findings, then verify each finding against current code.
+- Smoke-test unsupported-browser fallback and resource cleanup paths when the
+  change affects runtime behavior.

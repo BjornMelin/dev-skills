@@ -1,15 +1,23 @@
 import { gsap } from 'gsap';
 
-const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const tween = reduceMotion
-  ? gsap.set('.card', { autoAlpha: 1, y: 0 })
-  : gsap.to('.card', {
-      autoAlpha: 1,
-      y: 0,
-      duration: 0.45,
-      ease: 'power2.out',
-    });
+const mm = gsap.matchMedia();
+const tweens = [];
+
+mm.add('(prefers-reduced-motion: reduce)', () => {
+  gsap.set('.card', { autoAlpha: 1, y: 0 });
+});
+
+mm.add('(prefers-reduced-motion: no-preference)', () => {
+  const tween = gsap.to('.card', {
+    autoAlpha: 1,
+    y: 0,
+    duration: 0.45,
+    ease: 'power2.out',
+  });
+  tweens.push(tween);
+});
 
 export function cleanup() {
-  tween.kill();
+  tweens.forEach((tween) => tween.kill());
+  mm.revert();
 }

@@ -274,6 +274,46 @@ ScrollTrigger.getById("my-id")?.kill();
 
 In React, use the `useGSAP()` hook (@gsap/react NPM package) to ensure proper cleanup automatically, or manually kill in a cleanup (e.g. in useEffect return) when the component unmounts.
 
+## Accessibility: prefers-reduced-motion
+
+Create ScrollTrigger-linked animations only when the user has not requested
+reduced motion. Provide a static or lower-motion variant otherwise, and clean up
+triggers when the preference changes.
+
+```javascript
+const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function setupScrollScene() {
+  ScrollTrigger.getById("hero-scroll")?.kill();
+
+  if (motionQuery.matches) {
+    gsap.set(".hero", { autoAlpha: 1, y: 0 });
+    return;
+  }
+
+  gsap.to(".hero", {
+    y: -80,
+    scrollTrigger: {
+      id: "hero-scroll",
+      trigger: ".hero",
+      start: "top top",
+      end: "bottom top",
+      scrub: true
+    }
+  });
+}
+
+motionQuery.addEventListener("change", setupScrollScene);
+setupScrollScene();
+
+// Cleanup on route/component teardown:
+motionQuery.removeEventListener("change", setupScrollScene);
+ScrollTrigger.getAll().forEach((trigger) => trigger.kill());
+```
+
+You can also use `gsap.matchMedia()` when the scene already uses GSAP-owned
+responsive setup and cleanup.
+
 ## Official GSAP best practices
 
 - ✅ **gsap.registerPlugin(ScrollTrigger)** once before any ScrollTrigger usage.
