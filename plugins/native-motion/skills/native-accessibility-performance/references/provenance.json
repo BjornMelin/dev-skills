@@ -1,0 +1,67 @@
+{
+  "skill": "native-accessibility-performance",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "React Native accessibility/performance docs and Expo docs."
+    },
+    {
+      "label": "Software Mansion React Native skill notes where license-gated."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/reduced-motion-haptics-policy.md",
+      "title": "Reduced motion and haptics policy",
+      "sources": []
+    },
+    {
+      "file": "references/native-performance-audit.md",
+      "title": "Native performance audit guide",
+      "sources": []
+    },
+    {
+      "file": "references/manual-device-checks.md",
+      "title": "Manual iOS/Android proof checklist",
+      "sources": []
+    },
+    {
+      "file": "references/gesture-feedback-and-motion-sickness.md",
+      "title": "Gesture feedback and motion sickness review",
+      "sources": [
+        "https://reactnative.dev/docs/accessibility",
+        "https://docs.swmansion.com/react-native-reanimated/docs/guides/accessibility/"
+      ]
+    },
+    {
+      "file": "references/frame-budget-instrumentation.md",
+      "title": "Native frame budget instrumentation",
+      "sources": [
+        "https://reactnative.dev/docs/animations",
+        "https://docs.swmansion.com/react-native-reanimated/docs/guides/performance/"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-reanimated-performance.md",
+    "references/docs-rn-accessibility.md",
+    "references/docs-rn-accessibilityinfo.md",
+    "references/docs-rn-performance.md",
+    "references/docs-expo-animation.md",
+    "references/docs-expo-haptics.md",
+    "references/docs-reanimated-accessibility.md",
+    "references/docs-reanimated-source-notes.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

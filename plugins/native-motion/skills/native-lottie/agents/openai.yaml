@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Lottie"
+  short_description: "React Native Lottie asset integration"
+  default_prompt: "Use $native-lottie for lottie-react-native and dotLottie native assets, Expo compatibility, asset bundling, refs, playback control, accessibility, reduced motion, and platform validation."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,61 @@
+{
+  "skill": "native-styling-boundaries",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "NativeWind and react-native-css package docs/source metadata."
+    },
+    {
+      "label": "Expo Tailwind setup documentation."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/nativewind-v4-boundaries.md",
+      "title": "NativeWind setup and version boundaries",
+      "sources": []
+    },
+    {
+      "file": "references/react-native-css-tailwind.md",
+      "title": "React Native CSS and Tailwind compatibility",
+      "sources": []
+    },
+    {
+      "file": "references/class-safety-and-tokens.md",
+      "title": "Native class safety and token policy",
+      "sources": []
+    },
+    {
+      "file": "references/nativewind-metro-babel-pipeline.md",
+      "title": "NativeWind Metro, Babel, and CSS pipeline",
+      "sources": [
+        "https://www.nativewind.dev/docs/getting-started/installation",
+        "https://docs.expo.dev/guides/tailwind/"
+      ]
+    },
+    {
+      "file": "references/cross-platform-style-differences.md",
+      "title": "Cross-platform style and animation differences",
+      "sources": [
+        "https://www.nativewind.dev/v5/guides/migrate-from-v4",
+        "https://docs.expo.dev/guides/tailwind/"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-expo-tailwind-setup.md",
+    "references/docs-nativewind-installation.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

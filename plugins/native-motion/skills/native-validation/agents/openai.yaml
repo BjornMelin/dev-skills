@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Validation"
+  short_description: "Expo/RN motion validation gates"
+  default_prompt: "Use $native-validation for Validation for native motion changes: Expo Doctor, expo install --check, EAS/development build risk, Jest/Reanimated setup, RN tests, platform smoke, and audit report closeout."
+policy:
+  allow_implicit_invocation: true

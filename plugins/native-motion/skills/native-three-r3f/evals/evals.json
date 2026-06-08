@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "native-three-r3f-task-1",
+      "prompt": "In src/components/Hero.tsx, implement @react-three/fiber/native behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses native-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-three-r3f-task-2",
+      "prompt": "Review this branch for Three.js/R3F motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses native-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-three-r3f-task-3",
+      "prompt": "Create a minimal example using Expo Three that includes cleanup and accessibility notes.",
+      "expected_output": "Uses native-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-three-r3f-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Three.js/R3F primitive without changing unrelated UI.",
+      "expected_output": "Uses native-three-r3f routing, checks installed versions, applies domain-specific Three.js/R3F guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Three.js/R3F.",
+        "Uses at least one native-three-r3f bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to React Three Fiber native, Three.js in Expo/React Native, expo-gl/WebGPU boundaries, GLTF/assets, native GPU lifecycle, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

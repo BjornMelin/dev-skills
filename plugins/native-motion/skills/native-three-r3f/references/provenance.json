@@ -1,0 +1,66 @@
+{
+  "skill": "native-three-r3f",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Three.js, React Three Fiber, and Drei documentation/source metadata."
+    },
+    {
+      "label": "Expo/native GPU docs when the skill targets native runtime."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/r3f-native-installation.md",
+      "title": "R3F native installation and lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/expo-webgpu-three-boundary.md",
+      "title": "Expo GL/WebGPU/Three boundary notes",
+      "sources": []
+    },
+    {
+      "file": "references/native-gpu-validation.md",
+      "title": "Native GPU validation checklist",
+      "sources": []
+    },
+    {
+      "file": "references/expo-gl-webgpu-decision-tree.md",
+      "title": "Expo GL, WebGPU, and Three decision tree",
+      "sources": [
+        "https://docs.pmnd.rs/react-three-fiber/getting-started/installation#react-native",
+        "https://developer.mozilla.org/docs/Web/API/WebGPU_API"
+      ]
+    },
+    {
+      "file": "references/native-asset-loader-recipes.md",
+      "title": "Native 3D asset loader recipes",
+      "sources": [
+        "https://docs.pmnd.rs/react-three-fiber/getting-started/installation#react-native",
+        "https://threejs.org/manual/#en/cleanup",
+        "https://drei.docs.pmnd.rs/loaders/gltf-use-gltf"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-expo-webgpu-three.md",
+    "references/docs-r3f-native-api-notes.md",
+    "references/docs-r3f-react-native-installation.md",
+    "references/docs-three-creating-a-scene.md",
+    "references/docs-r3f-introduction.md",
+    "references/docs-software-mansion-gpu-animations.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

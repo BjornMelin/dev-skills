@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Skia"
+  short_description: "React Native Skia canvas motion"
+  default_prompt: "Use $native-skia for React Native Skia canvas animations, drawing primitives, Reanimated integration, CanvasKit/web caveats, performance, memory, and Expo/native validation."
+policy:
+  allow_implicit_invocation: true

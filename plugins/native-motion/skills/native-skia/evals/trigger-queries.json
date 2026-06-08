@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with React Native Skia in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "React Native Skia is directly in scope for native-skia."
+    },
+    {
+      "query": "Can you help with @shopify/react-native-skia in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@shopify/react-native-skia is directly in scope for native-skia."
+    },
+    {
+      "query": "Can you help with Skia Canvas in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Skia Canvas is directly in scope for native-skia."
+    },
+    {
+      "query": "Can you help with CanvasKit in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "CanvasKit is directly in scope for native-skia."
+    },
+    {
+      "query": "Can you help with Skia animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Skia animation is directly in scope for native-skia."
+    },
+    {
+      "query": "Review this Skia implementation for react native skia canvas animations and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Skia motion expertise owned by native-skia."
+    },
+    {
+      "query": "Audit this React Native Skia canvas for resource disposal, font loading, and Reanimated interop.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-skia."
+    },
+    {
+      "query": "Review this Skia shader animation for native/web boundaries and frame-budget validation.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-skia."
+    },
+    {
+      "query": "Check this Skia image pipeline for cache ownership, CanvasKit caveats, and memory pressure.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-skia."
+    },
+    {
+      "query": "Validate this Skia drawing surface for accessibility fallback and platform smoke coverage.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-skia."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-skia."
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with Expo Doctor in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Expo Doctor is directly in scope for native-validation."
+    },
+    {
+      "query": "Can you help with expo install --check in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "expo install --check is directly in scope for native-validation."
+    },
+    {
+      "query": "Can you help with EAS build validation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "EAS build validation is directly in scope for native-validation."
+    },
+    {
+      "query": "Can you help with native motion validation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "native motion validation is directly in scope for native-validation."
+    },
+    {
+      "query": "Can you help with Reanimated Jest in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Reanimated Jest is directly in scope for native-validation."
+    },
+    {
+      "query": "Can you help with development build proof in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "development build proof is directly in scope for native-validation."
+    },
+    {
+      "query": "Review this Expo validation implementation for validation for native motion changes: expo doctor and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Expo validation motion expertise owned by native-validation."
+    },
+    {
+      "query": "Plan validation for this Reanimated Expo change with expo-doctor, install checks, and device smoke.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-validation."
+    },
+    {
+      "query": "Audit this native motion rollout for EAS development-build risk and platform proof requirements.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-validation."
+    },
+    {
+      "query": "Review this motion test plan for Jest/Reanimated setup and reduced-motion coverage.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-validation."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-validation."
+    }
+  ]
+}

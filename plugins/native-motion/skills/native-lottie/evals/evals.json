@@ -1,0 +1,52 @@
+{
+  "evals": [
+    {
+      "id": "native-lottie-task-1",
+      "prompt": "In src/components/Hero.tsx, implement lottie-react-native behavior for a product surface and explain the validation gates.",
+      "expected_output": "Uses native-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one native-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-react-native and dotLottie native assets, Expo compatibility, asset bundling, refs, playback control, accessibility, reduced motion, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-lottie-task-2",
+      "prompt": "Review this branch for Lottie motion issues: package versions look current but users report jank and missing reduced-motion behavior.",
+      "expected_output": "Uses native-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one native-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-react-native and dotLottie native assets, Expo compatibility, asset bundling, refs, playback control, accessibility, reduced motion, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-lottie-task-3",
+      "prompt": "Create a minimal example using dotLottie React Native that includes cleanup and accessibility notes.",
+      "expected_output": "Uses native-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one native-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-react-native and dotLottie native assets, Expo compatibility, asset bundling, refs, playback control, accessibility, reduced motion, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    },
+    {
+      "id": "native-lottie-task-4",
+      "prompt": "Migrate an existing motion implementation to the right Lottie primitive without changing unrelated UI.",
+      "expected_output": "Uses native-lottie routing, checks installed versions, applies domain-specific Lottie guidance, runs or recommends the bundled audit CLI where relevant, and reports validation evidence.",
+      "assertions": [
+        "Mentions the relevant installed package/runtime/version checks for Lottie.",
+        "Uses at least one native-lottie bundled reference or explains why no extra reference was needed.",
+        "Includes reduced-motion/accessibility or explains why the effect is essential and already covered.",
+        "Includes cleanup/interruption/runtime validation appropriate to lottie-react-native and dotLottie native assets, Expo compatibility, asset bundling, refs, playback control, accessibility, reduced motion, and platform validation.",
+        "Does not route the task to an unrelated near-miss skill."
+      ]
+    }
+  ]
+}

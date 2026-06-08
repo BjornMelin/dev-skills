@@ -12,6 +12,7 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
+- local Codex plugin bundles under `plugins/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
 - a Rust development CLI, `codex-dev`, under `crates/`;
@@ -82,6 +83,8 @@ tools/
   skill/                  # skill validation and packaging helpers
 subagents/
   codex/                  # tracked global roles, public overlays, and sync helpers
+plugins/
+  native-motion/          # Expo and React Native motion plugin skills
 ```
 
 ## Research, Subagent, and Operating Stack
@@ -205,6 +208,12 @@ its `SKILL.md`. Machine-readable inventory for automation is available through
 `codex-dev --json skills inventory`; the public Agent Skills Lab artifact is
 generated with `codex-dev --json skills catalog --out catalog/agent-skills-lab.json`.
 The table below remains the human-facing catalog.
+
+### Local Plugin Skill Bundles
+
+| Plugin | Skills | Description | Source |
+| --- | --- | --- | --- |
+| `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [plugins/native-motion/.codex-plugin/plugin.json](plugins/native-motion/.codex-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |

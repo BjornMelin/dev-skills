@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with @rive-app/react-native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "@rive-app/react-native is directly in scope for native-rive."
+    },
+    {
+      "query": "Can you help with Rive React Native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Rive React Native is directly in scope for native-rive."
+    },
+    {
+      "query": "Can you help with .riv native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": ".riv native is directly in scope for native-rive."
+    },
+    {
+      "query": "Can you help with Rive state machine native in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "Rive state machine native is directly in scope for native-rive."
+    },
+    {
+      "query": "Can you help with rive-nitro in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "rive-nitro is directly in scope for native-rive."
+    },
+    {
+      "query": "Review this Rive implementation for rive react native/nitro runtime and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Rive motion expertise owned by native-rive."
+    },
+    {
+      "query": "Audit this @rive-app/react-native integration for Nitro setup, file loading, and state-machine inputs.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-rive."
+    },
+    {
+      "query": "Review this Rive native asset flow for cached .riv files, error fallbacks, and platform validation.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-rive."
+    },
+    {
+      "query": "Check this Rive view-model binding for dataBind ownership and typed input names.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-rive."
+    },
+    {
+      "query": "Validate this Rive React Native screen for native resource loading and reduced-motion fallback behavior.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-rive."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-rive."
+    }
+  ]
+}

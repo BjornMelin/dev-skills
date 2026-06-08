@@ -1,0 +1,104 @@
+{
+  "queries": [
+    {
+      "query": "Can you help with react-native-reanimated in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "react-native-reanimated is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with react-native-worklets in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "react-native-worklets is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with useSharedValue in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "useSharedValue is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with withTiming in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "withTiming is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with withSpring in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "withSpring is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with scheduleOnRN in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "scheduleOnRN is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Can you help with layout animation in our app and make sure it has cleanup, reduced-motion behavior, and validation?",
+      "should_trigger": true,
+      "reason": "layout animation is directly in scope for native-motion-core."
+    },
+    {
+      "query": "Review this Reanimated implementation for expo and react native product motion with reanimated 4 and produce an audit report.",
+      "should_trigger": true,
+      "reason": "The task asks for Reanimated motion expertise owned by native-motion-core."
+    },
+    {
+      "query": "Audit this Reanimated 4 screen for shared-value ownership, worklet cleanup, and reduced motion.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-motion-core."
+    },
+    {
+      "query": "Review this gesture-driven native animation for scheduleOnRN usage and UI-thread performance.",
+      "should_trigger": true,
+      "reason": "Distinct in-scope trigger wording for native-motion-core."
+    },
+    {
+      "query": "make this API route return paginated JSON from Postgres",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "fix this Zod schema for a nested form payload",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "write a SQL migration for an orders table",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "debug why Clerk middleware redirects on localhost",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "convert this CSV file into YAML",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "add Open Graph metadata to this marketing page",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "optimize a server function cold start without changing UI animation",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "write a unit test for a pure date formatter",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "create a Dockerfile for this Python service",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    },
+    {
+      "query": "review this payment webhook signature verification",
+      "should_trigger": false,
+      "reason": "Near miss or unrelated task for native-motion-core."
+    }
+  ]
+}

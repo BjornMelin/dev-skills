@@ -1,0 +1,67 @@
+{
+  "skill": "native-controls-transitions",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Expo Router, Expo UI, react-native-screens, and React Navigation docs."
+    },
+    {
+      "label": "Expo SDK compatibility docs."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/expo-router-and-screens-transitions.md",
+      "title": "Expo Router and screens transition guide",
+      "sources": []
+    },
+    {
+      "file": "references/expo-ui-control-boundaries.md",
+      "title": "Expo UI native control boundaries",
+      "sources": []
+    },
+    {
+      "file": "references/native-navigation-validation.md",
+      "title": "Navigation transition validation",
+      "sources": []
+    },
+    {
+      "file": "references/platform-transition-option-map.md",
+      "title": "Platform transition option map",
+      "sources": [
+        "https://docs.expo.dev/router/advanced/stack/",
+        "https://reactnavigation.org/docs/native-stack-navigator/"
+      ]
+    },
+    {
+      "file": "references/expo-ui-worklets-state.md",
+      "title": "Expo UI worklets and native state boundaries",
+      "sources": [
+        "https://docs.expo.dev/versions/latest/sdk/ui/",
+        "https://docs.expo.dev/router/advanced/stack/"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-expo-router-stack.md",
+    "references/docs-expo-ui.md",
+    "references/docs-react-native-screens.md",
+    "references/docs-react-navigation-native-stack.md",
+    "references/docs-expo-animations.md",
+    "references/docs-expo-controls.md",
+    "references/docs-expo-ui-jetpack-compose.md",
+    "references/docs-expo-ui-swift-ui.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}

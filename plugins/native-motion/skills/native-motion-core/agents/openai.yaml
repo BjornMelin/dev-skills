@@ -1,0 +1,6 @@
+interface:
+  display_name: "Native Motion Core"
+  short_description: "Expo/RN Reanimated and Worklets motion"
+  default_prompt: "Use $native-motion-core for Expo and React Native product motion with Reanimated 4, Worklets, shared values, animated styles/props, gestures, scroll handlers, layout animations, CSS transitions, and migration boundaries."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,61 @@
+{
+  "skill": "native-rive",
+  "checked_at": "2026-06-04",
+  "copy_policy": "Bundled references are tailored copied excerpts or derived notes from official docs/package sources where license permits. Verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    {
+      "label": "Rive web/native runtime package docs and source metadata."
+    },
+    {
+      "label": "Rive state machine documentation."
+    },
+    {
+      "label": "Agent Skills specification and best practices."
+    }
+  ],
+  "tailored_reference_files": [
+    {
+      "file": "references/rive-native-state-machines.md",
+      "title": "Native Rive state-machine contract",
+      "sources": []
+    },
+    {
+      "file": "references/rive-native-asset-loading.md",
+      "title": "Rive native asset loading and lifecycle",
+      "sources": []
+    },
+    {
+      "file": "references/nitro-platform-validation.md",
+      "title": "Nitro/platform validation notes",
+      "sources": []
+    },
+    {
+      "file": "references/rive-file-caching-and-assets.md",
+      "title": "Native Rive file caching and asset loading",
+      "sources": [
+        "https://rive.app/docs/runtimes/react-native",
+        "https://rive.app/docs/runtimes/react-native/state-machines"
+      ]
+    },
+    {
+      "file": "references/state-machine-input-protocol.md",
+      "title": "Native Rive state-machine input protocol",
+      "sources": [
+        "https://rive.app/docs/runtimes/react-native/state-machines",
+        "https://rive.app/docs/runtimes/react-native"
+      ]
+    }
+  ],
+  "bundled_source_excerpt_files": [
+    "references/docs-rive-react-native.md",
+    "references/docs-rive-state-machine.md"
+  ],
+  "local_files": [
+    "SKILL.md",
+    "scripts/audit.mjs",
+    "assets/templates",
+    "assets/examples",
+    "evals/evals.json",
+    "evals/trigger-queries.json"
+  ]
+}
