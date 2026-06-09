@@ -314,6 +314,18 @@ pub struct GitHubReviewThread {
     pub comments_has_next_page: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitHubReviewThreads {
+    pub threads: Vec<GitHubReviewThread>,
+    pub has_next_page: bool,
+}
+
+impl GitHubReviewThreads {
+    pub fn is_complete(&self) -> bool {
+        !self.has_next_page
+    }
+}
+
 impl GitHubReviewThread {
     pub fn comments_complete(&self) -> bool {
         !self.comments_has_next_page
@@ -4402,27 +4414,37 @@ fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result
     Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
 }
 
-pub fn github_review_threads_from_graphql(value: &Value) -> Result<Vec<GitHubReviewThread>> {
+pub fn github_review_threads_from_graphql(value: &Value) -> Result<GitHubReviewThreads> {
     let mut threads = Vec::new();
-    collect_github_review_threads(value, &mut threads)?;
-    Ok(threads)
+    let has_next_page = collect_github_review_threads(value, &mut threads)?;
+    Ok(GitHubReviewThreads {
+        threads,
+        has_next_page,
+    })
 }
 
-fn collect_github_review_threads(value: &Value, out: &mut Vec<GitHubReviewThread>) -> Result<()> {
+fn collect_github_review_threads(value: &Value, out: &mut Vec<GitHubReviewThread>) -> Result<bool> {
     if let Some(pages) = value.as_array()
         && pages.iter().any(Value::is_object)
     {
+        let mut last_has_next_page = None;
         for page in pages {
             let nodes = review_thread_nodes(page)
                 .with_context(|| "GitHub review-thread page is missing reviewThreads.nodes")?;
             collect_github_review_thread_nodes(nodes, out)?;
+            last_has_next_page = review_threads_has_next_page(page);
         }
-        return Ok(());
+        return last_has_next_page.with_context(
+            || "GitHub review-thread pages are missing reviewThreads.pageInfo.hasNextPage",
+        );
     }
 
     let nodes = review_thread_nodes(value)
         .with_context(|| "GitHub review-thread source is missing reviewThreads.nodes")?;
-    collect_github_review_thread_nodes(nodes, out)
+    collect_github_review_thread_nodes(nodes, out)?;
+    review_threads_has_next_page(value).with_context(
+        || "GitHub review-thread source is missing reviewThreads.pageInfo.hasNextPage",
+    )
 }
 
 fn collect_github_review_thread_nodes(
@@ -4442,7 +4464,8 @@ fn github_review_thread_from_node(node: &Value) -> Result<GitHubReviewThread> {
         .with_context(|| format!("GitHub review thread is missing id: {node}"))?;
     let is_resolved = optional_bool(node, "isResolved")
         .with_context(|| format!("GitHub review thread is missing isResolved: {node}"))?;
-    let is_outdated = optional_bool(node, "isOutdated").unwrap_or(false);
+    let is_outdated = optional_bool(node, "isOutdated")
+        .with_context(|| format!("GitHub review thread {id} is missing isOutdated"))?;
     let comments = node
         .get("comments")
         .with_context(|| format!("GitHub review thread {id} is missing comments"))?;

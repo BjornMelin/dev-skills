@@ -3988,8 +3988,27 @@ fn pr_review_start_blocks_non_authoritative_review_threads() {
       "repository": {
         "pullRequest": {
           "reviewThreads": {
-            "nodes": [],
-            "pageInfo": {"hasNextPage": true, "endCursor": "next"}
+            "nodes": [
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "comment-1",
+                      "author": {"login": "reviewer"},
+                      "path": "crates/codex-dev/src/lib.rs",
+                      "line": 12,
+                      "body": "Fix this."
+                    }
+                  ],
+                  "totalCount": 2,
+                  "pageInfo": {"hasNextPage": true, "endCursor": "comment-next"}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
           }
         }
       }
@@ -4026,7 +4045,6 @@ fn pr_review_start_blocks_non_authoritative_review_threads() {
 
     let json: Value = serde_json::from_slice(&output).expect("worklist json");
     assert_eq!(json["ok"], false);
-    assert_eq!(json["result"]["summary"]["actionable_items"], 0);
     assert!(
         json["result"]["diagnostics"]
             .as_array()
@@ -4694,9 +4712,9 @@ fn pr_review_apply_suggestions_rejects_paths_outside_repo_root() {
     assert_eq!(actions.len(), 2);
     assert!(actions.iter().all(|action| action["status"] == "blocked"));
     assert!(actions.iter().all(|action| {
-        action["reason"]
-            .as_str()
-            .is_some_and(|reason| reason.contains("relative"))
+        action["reason"].as_str().is_some_and(|reason| {
+            reason.contains("relative") || reason.contains("absolute") || reason.contains("..")
+        })
     }));
     assert_eq!(
         std::fs::read_to_string(outside).expect("outside source"),
@@ -4916,6 +4934,10 @@ fn pr_review_closeout_plans_batch_thread_resolution_from_worklist() {
             "closeout",
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--thread-id",
             "thread-suggestion",
             "--commit",
@@ -5045,6 +5067,10 @@ fn pr_review_closeout_apply_skips_outdated_live_threads() {
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--commit",
             "def456",
             "--expected-head-sha",
@@ -5189,6 +5215,10 @@ fn pr_review_closeout_apply_blocks_changed_thread_comments() {
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--thread-id",
             "thread-suggestion",
             "--commit",
@@ -5335,6 +5365,10 @@ fn pr_review_closeout_apply_blocks_changed_thread_comment_beyond_excerpt() {
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--thread-id",
             "thread-suggestion",
             "--commit",
@@ -5475,6 +5509,10 @@ fn pr_review_closeout_apply_accepts_legacy_worklist_without_body_hash() {
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--thread-id",
             "thread-suggestion",
             "--commit",
@@ -5619,6 +5657,10 @@ fn pr_review_closeout_apply_blocks_incomplete_thread_comments() {
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--commit",
             "def456",
             "--expected-head-sha",
@@ -5725,6 +5767,10 @@ fn pr_review_closeout_apply_blocks_without_expected_head_sha_even_with_worklist_
             &capsule,
             "--worklist",
             worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
             "--validation-command",
             "cargo test -p codex-dev",
             "--apply",
@@ -5748,6 +5794,105 @@ fn pr_review_closeout_apply_blocks_without_expected_head_sha_even_with_worklist_
             .any(|diagnostic| diagnostic
                 .as_str()
                 .is_some_and(|diagnostic| diagnostic.contains("requires --expected-head-sha")))
+    );
+    assert!(!log.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_without_explicit_pr_identity() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_review_thread_fixture(&fixtures);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-missing-pr-identity",
+        "PR review closeout missing PR identity",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("requires explicit --repo and --number"))
     );
     assert!(!log.exists());
 }

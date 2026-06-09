@@ -1,6 +1,6 @@
 ---
 name: gh-pr-review-fix
-description: "Fix unresolved GitHub PR review threads end-to-end with codex-dev pr review: fetch fresh hosted state, verify still-valid findings, implement minimal fixes, validate, create scoped semantic Conventional Commits, push, and resolve the fixed hosted threads. Do not use for local Codex, Zen, or manual review files; review-remediation owns those."
+description: "Fix unresolved GitHub PR review threads with codex-dev: fetch hosted state, verify, patch, validate, commit, push, and close out."
 ---
 
 # GitHub PR Review Fix

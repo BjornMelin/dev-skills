@@ -71,6 +71,8 @@ const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
     "GITHUB_ENTERPRISE_TOKEN",
 ];
 const GH_PR_VIEW_JSON_FIELDS: &str = "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels";
+// Per-thread comment pagination is intentionally not expanded here; worklist and
+// closeout paths fail closed when comments.pageInfo.hasNextPage is true.
 const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id author{login} path line startLine originalLine originalStartLine body diffHunk url}}}}}}}";
 const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
 const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){unresolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";

@@ -624,7 +624,14 @@ fn build_pr_review_worklist(
     if let Some(path) = thread_source {
         let value = read_json::<Value>(&path)
             .with_context(|| format!("failed to read review thread source {}", path.display()))?;
-        threads = github_review_threads_from_graphql(&value)?;
+        let parsed_threads = github_review_threads_from_graphql(&value)?;
+        if !parsed_threads.is_complete() {
+            diagnostics.push(
+                "review-thread state was not authoritative; reviewThreads pagination was incomplete"
+                    .to_string(),
+            );
+        }
+        threads = parsed_threads.threads;
     } else {
         diagnostics.push("review-thread source was not captured".to_string());
     }
@@ -633,7 +640,7 @@ fn build_pr_review_worklist(
     for thread in threads {
         if !thread.comments_complete() {
             diagnostics.push(format!(
-                "review-thread {} comments were incomplete: captured {} of {} comment(s)",
+                "review-thread state was not authoritative; review-thread {} comments were incomplete: captured {} of {} comment(s)",
                 thread.id,
                 thread.comments.len(),
                 thread.comment_count()
@@ -1259,6 +1266,9 @@ fn plan_or_apply_closeout(
         Some(path) => Some(read_json::<PrReviewWorklist>(path)?),
         None => None,
     };
+    if args.apply && (args.repo.is_none() || args.number.is_none()) {
+        bail!("closeout --apply requires explicit --repo and --number");
+    }
     let repo = args
         .repo
         .clone()
@@ -1689,7 +1699,11 @@ fn current_unresolved_threads(
             path.display()
         )
     })?;
-    let threads = github_review_threads_from_graphql(&value)?;
+    let parsed_threads = github_review_threads_from_graphql(&value)?;
+    if !parsed_threads.is_complete() {
+        bail!("fresh review-thread state is not authoritative");
+    }
+    let threads = parsed_threads.threads;
     let incomplete_threads = threads
         .iter()
         .filter(|thread| !thread.is_resolved && !thread.is_outdated && !thread.comments_complete())
