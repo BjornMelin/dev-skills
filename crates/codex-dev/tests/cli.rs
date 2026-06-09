@@ -4057,6 +4057,67 @@ fn pr_review_start_blocks_non_authoritative_review_threads() {
 }
 
 #[test]
+#[cfg(unix)]
+fn pr_review_start_ignores_failed_review_thread_capture_before_parsing() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-failed-thread-capture",
+        "PR review failed thread capture",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_TOKEN", "test-token")
+        .env("FAIL_THREADS", "1")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["ok"], false);
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .as_str()
+            .is_some_and(|diagnostic| diagnostic.contains("review-thread source was not captured"))
+    }));
+    assert!(!diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .as_str()
+            .is_some_and(|diagnostic| diagnostic.contains("missing comments"))
+    }));
+}
+
+#[test]
 fn pr_review_start_preserves_blank_lines_in_exact_suggestion_hunk() {
     let temp = tempdir().expect("tempdir");
     let root = temp.path().join("tasks");
@@ -4893,8 +4954,8 @@ fn pr_review_closeout_plans_batch_thread_resolution_from_worklist() {
         &worklist,
         serde_json::to_string_pretty(&json!({
             "schema": "codex-dev.pr-review-worklist.v1",
-            "repository": "BjornMelin/dev-skills",
-            "number": 48,
+            "repository": "OtherOwner/other-repo",
+            "number": 999,
             "checked_at": "2026-05-09T05:05:00Z",
             "head_sha": "abc123",
             "source": "fixture",
@@ -4966,6 +5027,8 @@ fn pr_review_closeout_plans_batch_thread_resolution_from_worklist() {
             .iter()
             .any(|part| part == "query=mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}")
     );
+    assert_eq!(json["result"]["repository"], "BjornMelin/dev-skills");
+    assert_eq!(json["result"]["number"], 48);
 }
 
 #[test]
@@ -6125,6 +6188,66 @@ fn commit_plan_expands_untracked_plugin_skill_directories() {
                 .as_str()
                 .is_some_and(|command| command.contains("quick_validate.py")))
     );
+}
+
+#[test]
+fn commit_plan_emits_repo_native_script_validation_commands() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(repo.join("plugins/native-motion/scripts")).expect("script dir");
+    std::fs::create_dir_all(repo.join("tools/eval")).expect("eval dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+
+    std::fs::write(
+        repo.join("plugins/native-motion/scripts/validate-atomic-skills.mjs"),
+        "console.log('ok');\n",
+    )
+    .expect("native validation script");
+    std::fs::write(
+        repo.join("tools/eval/skill_subagent_eval.py"),
+        "print('ok')\n",
+    )
+    .expect("eval script");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    let commands = json["result"]["groups"]
+        .as_array()
+        .expect("groups")
+        .iter()
+        .flat_map(|group| {
+            group["validation_commands"]
+                .as_array()
+                .expect("validation commands")
+        })
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    assert!(
+        commands.contains(&"node --check plugins/native-motion/scripts/validate-atomic-skills.mjs")
+    );
+    assert!(commands.contains(&"node plugins/native-motion/scripts/validate-atomic-skills.mjs"));
+    assert!(commands.contains(&"python3 -m py_compile tools/eval/skill_subagent_eval.py"));
 }
 
 #[test]

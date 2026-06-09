@@ -618,20 +618,28 @@ fn build_pr_review_worklist(
     let thread_source = state
         .sources
         .iter()
-        .find(|source| source.id == "gh-review-threads")
-        .map(|source| PathBuf::from(&source.path));
+        .find(|source| source.id == "gh-review-threads");
     let mut threads = Vec::new();
-    if let Some(path) = thread_source {
-        let value = read_json::<Value>(&path)
-            .with_context(|| format!("failed to read review thread source {}", path.display()))?;
-        let parsed_threads = github_review_threads_from_graphql(&value)?;
-        if !parsed_threads.is_complete() {
-            diagnostics.push(
+    if let Some(source) = thread_source {
+        if source.status != PrAgentSourceStatus::Captured {
+            diagnostics.push(format!(
+                "review-thread source was not captured; gh-review-threads status was {:?}",
+                source.status
+            ));
+        } else {
+            let path = PathBuf::from(&source.path);
+            let value = read_json::<Value>(&path).with_context(|| {
+                format!("failed to read review thread source {}", path.display())
+            })?;
+            let parsed_threads = github_review_threads_from_graphql(&value)?;
+            if !parsed_threads.is_complete() {
+                diagnostics.push(
                 "review-thread state was not authoritative; reviewThreads pagination was incomplete"
                     .to_string(),
             );
+            }
+            threads = parsed_threads.threads;
         }
-        threads = parsed_threads.threads;
     } else {
         diagnostics.push("review-thread source was not captured".to_string());
     }
@@ -2165,6 +2173,19 @@ fn validation_commands_for_files(paths: &[String]) -> Vec<String> {
             ));
         }
     }
+    for script_path in changed_motion_plugin_scripts(paths) {
+        commands.insert(format!("node --check {script_path}"));
+    }
+    if paths
+        .iter()
+        .any(|path| path.starts_with("plugins/native-motion/scripts/"))
+    {
+        commands
+            .insert("node plugins/native-motion/scripts/validate-atomic-skills.mjs".to_string());
+    }
+    for python_path in changed_eval_python_files(paths) {
+        commands.insert(format!("python3 -m py_compile {python_path}"));
+    }
     if paths.iter().any(|path| path.ends_with(".md")) {
         commands.insert("python3 tools/docs/check_links.py docs README.md AGENTS.md".to_string());
     }
@@ -2193,6 +2214,30 @@ fn changed_skill_roots(paths: &[String]) -> BTreeSet<String> {
 
 fn is_skill_path(path: &str) -> bool {
     path.starts_with("skills/") || (path.starts_with("plugins/") && path.contains("/skills/"))
+}
+
+fn changed_motion_plugin_scripts(paths: &[String]) -> BTreeSet<String> {
+    paths
+        .iter()
+        .filter(|path| {
+            path.starts_with("plugins/native-motion/scripts/")
+                && matches!(
+                    Path::new(path)
+                        .extension()
+                        .and_then(|extension| extension.to_str()),
+                    Some("cjs" | "js" | "mjs")
+                )
+        })
+        .cloned()
+        .collect()
+}
+
+fn changed_eval_python_files(paths: &[String]) -> BTreeSet<String> {
+    paths
+        .iter()
+        .filter(|path| path.starts_with("tools/eval/") && path.ends_with(".py"))
+        .cloned()
+        .collect()
 }
 
 fn validate_commit_subject_report(
