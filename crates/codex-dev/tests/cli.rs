@@ -4057,6 +4057,81 @@ fn pr_review_start_blocks_non_authoritative_review_threads() {
 }
 
 #[test]
+fn pr_review_start_ignores_resolved_threads_with_incomplete_comments() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "resolved-thread",
+                "isResolved": true,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [],
+                  "totalCount": 101,
+                  "pageInfo": {"hasNextPage": true, "endCursor": "comment-next"}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write resolved paginated threads");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-resolved-paginated",
+        "PR review resolved paginated",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["result"]["summary"]["actionable_items"], 0);
+    assert!(
+        json["result"]
+            .get("diagnostics")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty)
+    );
+}
+
+#[test]
 #[cfg(unix)]
 fn pr_review_start_ignores_failed_review_thread_capture_before_parsing() {
     let temp = tempdir().expect("tempdir");

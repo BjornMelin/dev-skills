@@ -646,6 +646,9 @@ fn build_pr_review_worklist(
 
     let mut items = Vec::new();
     for thread in threads {
+        if thread.is_resolved {
+            continue;
+        }
         if !thread.comments_complete() {
             diagnostics.push(format!(
                 "review-thread state was not authoritative; review-thread {} comments were incomplete: captured {} of {} comment(s)",
@@ -653,9 +656,6 @@ fn build_pr_review_worklist(
                 thread.comments.len(),
                 thread.comment_count()
             ));
-        }
-        if thread.is_resolved {
-            continue;
         }
         let status = if thread.is_outdated {
             "outdated"

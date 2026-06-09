@@ -916,7 +916,7 @@ def tracked_files(root: Path, prefix: str) -> set[Path]:
         prefix: Repo-relative path prefix to list.
 
     Returns:
-        Absolute pathlib.Path objects for tracked files under the prefix.
+        A set of absolute pathlib.Path objects for tracked files under the prefix.
 
     Raises:
         RuntimeError: If git ls-files times out.
