@@ -245,19 +245,55 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
     }
     fs::read_to_string(root.join("vercel.ts"))
         .map(|text| {
+            let text = strip_ts_comments(&text);
+            if !text.contains("export default") && !text.contains("export const") {
+                return false;
+            }
             let Some(captures) = Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#)
                 .expect("valid regex")
                 .captures(&text)
             else {
                 return false;
             };
-            text.contains("export")
-                && captures
-                    .get(1)
-                    .map(|value| !value.as_str().trim().is_empty())
-                    .unwrap_or(false)
+            captures
+                .get(1)
+                .map(|value| !value.as_str().trim().is_empty())
+                .unwrap_or(false)
         })
         .unwrap_or(false)
+}
+
+fn strip_ts_comments(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    let mut in_block = false;
+
+    while let Some(ch) = chars.next() {
+        if in_block {
+            if ch == '*' && chars.peek() == Some(&'/') {
+                chars.next();
+                in_block = false;
+            }
+            continue;
+        }
+        if ch == '/' && chars.peek() == Some(&'*') {
+            chars.next();
+            in_block = true;
+            continue;
+        }
+        if ch == '/' && chars.peek() == Some(&'/') {
+            for next in chars.by_ref() {
+                if next == '\n' {
+                    output.push('\n');
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(ch);
+    }
+
+    output
 }
 
 fn contains_bun_runtime_config(value: &Value) -> bool {
