@@ -201,7 +201,11 @@ pub(crate) struct ToolImportArgs {
     summary: Option<String>,
     #[arg(long = "source-command", value_name = "COMMAND")]
     source_command: Option<String>,
-    #[arg(long = "source-exit-code", value_name = "EXIT_CODE")]
+    #[arg(
+        long = "source-exit-code",
+        value_name = "EXIT_CODE",
+        requires = "source_command"
+    )]
     source_exit_code: Option<i32>,
     #[arg(long = "imported-at", value_name = "RFC3339")]
     imported_at: Option<DateTime<Utc>>,
@@ -661,12 +665,16 @@ fn resolve_bun_skill_context(skill_root_override: Option<PathBuf>) -> Result<Ski
 }
 
 fn find_repo_root(start: &Path) -> Option<PathBuf> {
+    let mut cargo_fallback = None;
     for ancestor in start.ancestors() {
-        if ancestor.join(".git").exists() || ancestor.join("Cargo.toml").is_file() {
+        if ancestor.join("skills/bun-dev").is_dir() || ancestor.join(".git").exists() {
             return Some(ancestor.to_path_buf());
         }
+        if cargo_fallback.is_none() && ancestor.join("Cargo.toml").is_file() {
+            cargo_fallback = Some(ancestor.to_path_buf());
+        }
     }
-    None
+    cargo_fallback
 }
 
 fn validation_commands(root: &Path, config: &AuditConfig) -> Result<Vec<String>> {

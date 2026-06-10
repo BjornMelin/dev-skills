@@ -14,9 +14,18 @@ fn tracked_bun_dev_skill_mentions_current_cli_surface() {
 
     for snippet in [
         "codex-dev bun audit",
+        "codex-dev bun rules list",
+        "codex-dev bun rules show",
         "codex-dev bun fixes plan",
+        "codex-dev bun fixes apply",
+        "codex-dev bun validate plan",
+        "codex-dev bun validate run",
         "codex-dev bun references status",
         "codex-dev bun references plan",
+        "codex-dev bun references sync",
+        "codex-dev bun doctor",
+        "codex-dev bun benchmark",
+        "codex-dev tool import",
     ] {
         assert!(
             skill_md.contains(snippet),
@@ -29,6 +38,7 @@ fn tracked_bun_dev_skill_mentions_current_cli_surface() {
         "ref-bun-capabilities-latest.md",
         "bun references status",
         "bun references plan",
+        "bun references sync",
     ] {
         assert!(
             references_index.contains(snippet),

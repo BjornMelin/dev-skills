@@ -138,6 +138,7 @@ Migration + troubleshooting:
 - `codex-dev bun references plan`: fetch vendor docs and preview changed reference files.
 - `codex-dev bun references sync`: refresh tracked references and rebuild indexes.
 - `codex-dev bun doctor`: inspect paths, version pin, and integrity.
+- `codex-dev tool import`: import an external JSON report into a task capsule.
 
 Compatibility shim:
 
@@ -193,5 +194,6 @@ codex-dev --json bun references sync
 Skill integrity check:
 
 ```bash
-bun skills/bun-dev/scripts/check-skill-integrity.ts
+codex-dev --json bun doctor
+codex-dev --json bun references status
 ```

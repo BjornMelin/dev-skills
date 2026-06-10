@@ -199,6 +199,54 @@ fn bun_validate_run_uses_configured_platform_shell() {
     );
 }
 
+#[test]
+fn bun_doctor_discovers_tracked_skill_from_workspace_crate() {
+    let crate_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = crate_dir
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .current_dir(crate_dir)
+        .args(["--json", "bun", "doctor"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("doctor json");
+
+    assert_eq!(
+        json["result"]["skill_root"],
+        repo_root
+            .join("skills/bun-dev")
+            .to_str()
+            .expect("skill root")
+    );
+}
+
+#[test]
+fn tool_import_requires_source_command_for_exit_code() {
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "tool",
+            "import",
+            "--capsule",
+            "missing-capsule",
+            "--tool",
+            "example",
+            "--report",
+            "missing-report.json",
+            "--source-exit-code",
+            "1",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("--source-command"));
+}
+
 fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String {
     let output = Command::cargo_bin("codex-dev")
         .expect("binary")

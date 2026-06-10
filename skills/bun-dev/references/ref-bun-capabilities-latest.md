@@ -174,7 +174,7 @@ Use when:
 
 Need direct rule coverage:
 
-- Bun runtime vs Node runtime choice
+- Bun runtime vs. Node runtime choice
 - Bun-native APIs
 - `Bun.WebView`
 - `Bun.cron` overload split
