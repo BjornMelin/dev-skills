@@ -157,7 +157,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         }
 
         for (name, command) in package_json.scripts.clone().unwrap_or_default() {
-            if command.contains("npx") {
+            if signals.bun_first && command.contains("npx") {
                 findings.push(create_finding(
                     &root,
                     "pm-bunx-vs-npx",
@@ -758,7 +758,7 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
       ));
         }
     }
-    if !has_bun_lockfile(root) {
+    if signals.vercel_bun_enabled && !has_bun_lockfile(root) {
         findings.push(create_finding(
       root,
       "vercel-bun-install-detection",

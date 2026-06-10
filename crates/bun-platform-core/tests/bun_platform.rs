@@ -100,6 +100,28 @@ fn reports_mixed_lockfiles_as_an_error() {
 }
 
 #[test]
+fn does_not_report_bunx_warning_for_non_bun_repo() {
+    let _env = TestEnv::new("non-bun-npx");
+    let root = unique_temp_dir("non-bun-npx-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(
+        root.join("package.json"),
+        r#"{"private":true,"scripts":{"generate":"npx prisma generate"}}"#,
+    )
+    .expect("package");
+
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "pm-bunx-vs-npx")
+    );
+}
+
+#[test]
 fn plans_and_applies_safe_package_json_fixes() {
     let _env = TestEnv::new("safe-fixes");
     let root = copy_fixture("safe-fixes");
@@ -446,6 +468,11 @@ fn explicit_vercel_adapter_reports_missing_bun_version() {
         findings
             .iter()
             .any(|finding| finding.rule_id == "vercel-bun-runtime-enable")
+    );
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-bun-install-detection")
     );
 }
 
