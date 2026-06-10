@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -669,16 +670,20 @@ fn find_repo_root(start: &Path) -> Option<PathBuf> {
 }
 
 fn validation_commands(root: &Path, config: &AuditConfig) -> Result<Vec<String>> {
-    if !config.validation_commands.is_empty() {
-        return Ok(config.validation_commands.clone());
-    }
     let package_json_path = root.join("package.json");
     let package_json = if package_json_path.is_file() {
-        let text = fs::read_to_string(&package_json_path)?;
-        serde_json::from_str::<Value>(&text).ok()
+        let text = fs::read_to_string(&package_json_path)
+            .with_context(|| format!("failed to read {}", package_json_path.display()))?;
+        Some(
+            serde_json::from_str::<Value>(&text)
+                .with_context(|| format!("failed to parse {}", package_json_path.display()))?,
+        )
     } else {
         None
     };
+    if !config.validation_commands.is_empty() {
+        return Ok(config.validation_commands.clone());
+    }
     let scripts = package_json
         .as_ref()
         .and_then(|value| value.get("scripts"))
@@ -702,9 +707,10 @@ fn run_validation_commands(
     commands: &[String],
 ) -> Result<Vec<ValidationCommandResult>> {
     let mut results = Vec::new();
+    let (shell, command_flag) = validation_shell();
     for command in commands {
-        let status = Command::new("zsh")
-            .arg("-lc")
+        let status = Command::new(&shell)
+            .arg(command_flag)
             .arg(command)
             .current_dir(root)
             .stdin(Stdio::null())
@@ -717,6 +723,22 @@ fn run_validation_commands(
         });
     }
     Ok(results)
+}
+
+#[cfg(windows)]
+fn validation_shell() -> (OsString, &'static str) {
+    (
+        std::env::var_os("COMSPEC").unwrap_or_else(|| OsString::from("cmd.exe")),
+        "/C",
+    )
+}
+
+#[cfg(not(windows))]
+fn validation_shell() -> (OsString, &'static str) {
+    (
+        std::env::var_os("SHELL").unwrap_or_else(|| OsString::from("/bin/sh")),
+        "-c",
+    )
 }
 
 #[derive(Debug, Serialize)]
