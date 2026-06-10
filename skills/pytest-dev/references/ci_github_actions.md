@@ -43,7 +43,8 @@ Baseline approach:
 2. Next runs use that JUnit as historical timing input for sharding.
 
 This skill ships `scripts/junit_split.py` which prints the list of files for a
-given shard index:
+given shard index. Set `skill_dir` to the path of this skill (for example,
+`skill_dir="skills/pytest-dev"`):
 
 ```bash
 python3 "$skill_dir/scripts/junit_split.py" \

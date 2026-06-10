@@ -14,9 +14,9 @@ This skill intentionally stays focused on agent integration; for Streamlit APIs,
 1. Detect the project’s Streamlit version:
    - `python3 -c "import streamlit as st; print(st.__version__)"`
 2. Audit the Streamlit project (deprecations + risky patterns):
-   - `python3 "<streamlit-skill-dir>/scripts/audit_streamlit_project.py" --root <PROJECT_ROOT> --format md`
+   - `python3 "$skill_dir/scripts/audit_streamlit_project.py" --root <PROJECT_ROOT> --format md`
 3. If needed, sync Streamlit docs index:
-   - `python3 "<streamlit-skill-dir>/scripts/sync_streamlit_docs.py" --out /tmp/streamlit-docs`
+   - `python3 "$skill_dir/scripts/sync_streamlit_docs.py" --out /tmp/streamlit-docs`
 
 ## Core architecture
 

@@ -2,3 +2,5 @@ interface:
   display_name: "Supabase Ts"
   short_description: "Help with Supabase Ts tasks"
   default_prompt: "Use $supabase-ts to implement or review Supabase TypeScript patterns for auth, RLS, storage, realtime, Edge Functions, vectors, and deployment."
+policy:
+  allow_implicit_invocation: false

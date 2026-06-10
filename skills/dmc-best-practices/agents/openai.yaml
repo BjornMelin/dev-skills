@@ -2,3 +2,5 @@ interface:
   display_name: "Dmc Best Practices"
   short_description: "Help with Dmc Best Practices tasks"
   default_prompt: "Use $dmc-best-practices to design, review, or optimize Dash Mantine Components apps, callbacks, theming, state, and performance."
+policy:
+  allow_implicit_invocation: false
