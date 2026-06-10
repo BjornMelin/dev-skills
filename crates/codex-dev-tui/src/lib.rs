@@ -1143,6 +1143,7 @@ fn dashboard_operator_report(root: &Path) -> TuiOperatorPanelsReport {
     let skill_inventory = match repo_root {
         Some(repo_root) => match skills_inventory(SkillInventoryArgs {
             repo_root: Some(repo_root),
+            skills_root: None,
             checked_at: Some(Utc::now()),
         }) {
             Ok(report) => Some(report),

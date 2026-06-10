@@ -2,7 +2,7 @@
 
 ## Why
 
-Bun v1.3.10 can compile HTML entrypoints into self-contained `.html` output.
+Bun v1.3.13 can compile HTML entrypoints into self-contained `.html` output.
 
 Use this when you need offline/disconnected delivery or a single-file artifact for sharing UI demos.
 

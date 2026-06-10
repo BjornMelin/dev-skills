@@ -1,7 +1,0 @@
-{
-  "name": "safe-fixes-fixture",
-  "private": true,
-  "scripts": {
-    "gen": "npx prisma generate"
-  }
-}

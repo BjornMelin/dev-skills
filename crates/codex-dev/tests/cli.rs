@@ -875,7 +875,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
             .iter()
             .any(|signal| signal.as_str() == Some("resource_rich"))
     );
-    assert_eq!(skills[0]["resources"]["total"], 3);
+    assert_eq!(skills[0]["resources"]["total"], 4);
     assert_eq!(skills[1]["name"], "beta-skill");
     assert_eq!(skills[1]["path"], "skills/beta-skill");
     assert!(

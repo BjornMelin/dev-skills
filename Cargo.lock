@@ -322,6 +322,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "bun-platform-core",
  "chrono",
  "clap",
  "clap_complete",
@@ -330,6 +331,7 @@ dependencies = [
  "predicates",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 

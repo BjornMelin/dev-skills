@@ -5,7 +5,9 @@ It is separate from `codex-research`: research evidence stays research-owned,
 while `codex-dev` records the local task capsule for a development branch.
 It also plans or executes repo-native policy gates, records subspawn plan,
 outcome, and synthesis evidence, captures normalized PR evidence, and records
-those outcomes in the task capsule. The optional `codex-dev-tui` workbench
+those outcomes in the task capsule. It also owns the native Bun platform
+command surface for `bun-dev` audits, safe fixes, validation, and reference
+sync. The optional `codex-dev-tui` workbench
 reads these same contracts for terminal scanning.
 Shared capsule schemas and local read/write helpers live in
 [`codex-dev-core`](codex-dev-core.md). The `codex-dev` CLI crate keeps Clap
@@ -53,6 +55,8 @@ Top-level commands:
 - `capsule`
 - `evidence`
 - `research`
+- `bun`
+- `tool`
 - `subagents`
 - `orchestration`
 - `policy`
@@ -78,6 +82,25 @@ Evidence subcommands:
 Research subcommands:
 
 - `research import-bundle`
+
+Bun subcommands:
+
+- `bun audit`
+- `bun rules list`
+- `bun rules show`
+- `bun fixes plan`
+- `bun fixes apply`
+- `bun validate plan`
+- `bun validate run`
+- `bun references status`
+- `bun references plan`
+- `bun references sync`
+- `bun doctor`
+- `bun benchmark`
+
+Tool subcommands:
+
+- `tool import`
 
 Subagent subcommands:
 
@@ -153,6 +176,45 @@ Artifact commands:
 
 - `completions <bash|elvish|fish|powershell|zsh>`
 - `manpage`
+
+## bun
+
+Use `codex-dev bun` for the Bun platform tooling migrated from
+`~/repos/cli/skill-tools`.
+
+```bash
+cargo run -q -p codex-dev -- --json bun audit --root .
+cargo run -q -p codex-dev -- --json bun fixes plan --root .
+cargo run -q -p codex-dev -- --json bun validate plan --root .
+cargo run -q -p codex-dev -- --json bun references status
+```
+
+Native Bun results use nested schemas such as
+`codex-dev.bun-audit.v1`, `codex-dev.bun-fixes.v1`,
+`codex-dev.bun-validate.v1`, and `codex-dev.bun-references.v1` inside the
+standard `codex-dev.output.v1` envelope. Audit cache writes are disabled by
+default; pass `--write-cache` only when reusable cache entries are desired.
+Safe fixes emit hashes and diffs by default, with complete before/after content
+available behind `--full-content`.
+
+`bun-platform` remains as a temporary compatibility binary. New automation
+should use `codex-dev bun ...`.
+
+## tool import
+
+Import an external JSON report as task-capsule evidence:
+
+```bash
+cargo run -q -p codex-dev -- --json tool import \
+  --capsule .codex/tasks/<task> \
+  --tool bun-platform \
+  --report /tmp/bun-audit.json \
+  --kind output
+```
+
+The command appends a `codex-dev.evidence.v1` record and returns
+`external_tool_report_import.v1` with the report schema, SHA-256 hash, evidence
+record, and updated evidence summary.
 
 ## local doctor
 

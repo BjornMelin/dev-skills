@@ -1,20 +1,17 @@
 ---
 name: bun-dev
-description: "Definitive, rule-first Bun development/build/runtime guidance + automation. Use when adopting Bun, migrating a repo from Node.js, auditing/fixing Bun package management (bun.lockb, bun install), optimizing scripts/monorepos (bun run --parallel/--sequential, --workspaces/--filter), configuring Bun + TypeScript, using bun test/build, tuning performance, or deploying Bun workloads/Vercel Functions with the Bun runtime (bunVersion, limitations, Next.js ISR scripts)."
+description: "Definitive, rule-first Bun development/build/runtime guidance plus native dev-skills automation. Use when adopting Bun, migrating from Node.js, auditing or fixing Bun package-management posture, optimizing scripts/monorepos, configuring Bun + TypeScript, using bun test/build, or deploying Bun workloads/Vercel Functions with Bun runtime."
 ---
 
 # Bun Dev
 
-Rule-first Bun guidance plus a shared audit/remediation engine.
+Rule-first Bun guidance plus the native `codex-dev bun` command surface.
 
-Use `bun-dev` for operating-model decisions, rule lookup, release sync, and
-platform routing. Use `bun-audit` when the task is specifically about scanning a
-repo, planning safe fixes, applying deterministic remediations, or validating
-changes against Bun policy.
+Use `bun-dev` for operating-model decisions, rule lookup, reference sync, and
+platform routing. Use `bun-audit` when the task is specifically a scan,
+safe-fix, or validation workflow.
 
-Start with `rules/_index.md` for discovery, then route by the Priority Table below.
-
-## Navigation (How To Use This Skill)
+## Navigation
 
 1. If changing package manager/runtime, open P1 rules first:
    `pm-*`, `runtime-*`, `vercel-*`.
@@ -22,54 +19,55 @@ Start with `rules/_index.md` for discovery, then route by the Priority Table bel
    `scripts-bun-run-parallel-sequential`, `scripts-bun-filter-and-workspaces`.
 3. If deploying to Vercel, open:
    `vercel-bun-runtime-enable`, `vercel-bun-runtime-limitations`.
-4. For repo-wide enforcement, use the shared CLI:
-   `bun-platform audit`, `plan-fixes`, `apply-safe-fixes`, `validate`.
-5. For “what changed recently?” (Bun v1.3.10), refresh references and open:
-   `references/ref-bun-release-notes-bun-v1.3.10.md`.
+4. For repo-wide enforcement, use:
+   `codex-dev bun audit`, `codex-dev bun fixes plan`,
+   `codex-dev bun fixes apply`, and `codex-dev bun validate run`.
+5. For current vendor-backed references, use:
+   `codex-dev bun references status` and `codex-dev bun references plan`.
 
-## Quick Start (Audit -> Fix -> Verify)
+## Quick Start
 
-Audit (report-only):
+Audit:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts audit --root . --format text
+codex-dev --json bun audit --root .
 ```
 
 Plan safe fixes:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts plan-fixes --root .
+codex-dev --json bun fixes plan --root .
 ```
 
 Apply safe fixes:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts apply-safe-fixes --root .
+codex-dev --json bun fixes apply --root .
 ```
 
 Validate after remediation:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts validate --root . --fail-on warn
+codex-dev --json bun validate run --root . --fail-on warn
 ```
 
-## Priority Table (Route To The Right Rules)
+## Priority Table
 
 | Priority | Category | Impact | Prefix |
 | --- | --- | --- | --- |
-| 1 | Package manager + lockfiles | CRITICAL | `pm-` |
-| 1 | Runtime selection + “one runtime where possible” | CRITICAL | `runtime-` |
-| 1 | Vercel Bun runtime | CRITICAL | `vercel-` |
-| 2 | Scripts + monorepo orchestration | HIGH | `scripts-` |
-| 2 | TypeScript + tooling | HIGH | `tsconfig-` |
-| 3 | Testing | MEDIUM | `test-` |
-| 3 | Bundling + build | MEDIUM | `build-` |
-| 4 | Performance | MEDIUM | `perf-` |
-| 5 | Migration + troubleshooting | LOW/MED | `migrate-`, `troubleshooting-` |
+| 1 | Package manager + lockfiles | Critical | `pm-` |
+| 1 | Runtime selection + one runtime where possible | Critical | `runtime-` |
+| 1 | Vercel Bun runtime | Critical | `vercel-` |
+| 2 | Scripts + monorepo orchestration | High | `scripts-` |
+| 2 | TypeScript + tooling | High | `tsconfig-` |
+| 3 | Testing | Medium | `test-` |
+| 3 | Bundling + build | Medium | `build-` |
+| 4 | Performance | Medium | `perf-` |
+| 5 | Migration + troubleshooting | Low/medium | `migrate-`, `troubleshooting-` |
 
-## Quick Reference (Start Here)
+## Quick Reference
 
-### 1) Package Manager + Lockfiles (CRITICAL)
+Package manager + lockfiles:
 
 - `pm-bun-add-remove-update`
 - `pm-no-mixed-lockfiles`
@@ -78,7 +76,7 @@ bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts validate --root . --fail-on
 - `pm-package-manager-field`
 - `pm-bunx-vs-npx`
 
-### 2) Runtime Selection (CRITICAL)
+Runtime selection:
 
 - `runtime-bun-vs-node-choose`
 - `runtime-bun-run-bun-flag`
@@ -86,7 +84,7 @@ bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts validate --root . --fail-on
 - `runtime-watch-and-hot-reload`
 - `runtime-env-files`
 
-### 3) Vercel Bun Runtime (CRITICAL)
+Vercel Bun runtime:
 
 - `vercel-bun-install-detection`
 - `vercel-bun-runtime-enable`
@@ -94,19 +92,19 @@ bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts validate --root . --fail-on
 - `vercel-nextjs-bun-runtime-scripts`
 - `vercel-bun-function-fetch-handler`
 
-### 4) Scripts + Monorepos (HIGH)
+Scripts + monorepos:
 
 - `scripts-bun-run-parallel-sequential`
 - `scripts-bun-filter-and-workspaces`
 - `scripts-no-npm-in-bun-repos`
 
-### 5) TypeScript (HIGH)
+TypeScript:
 
 - `tsconfig-bun-recommended`
 - `tsconfig-bun-types`
 - `tsconfig-module-resolution-bundler`
 
-### 6) Testing + Build (MEDIUM)
+Testing + build:
 
 - `test-bun-test-runner`
 - `test-bun-retry`
@@ -115,82 +113,85 @@ bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts validate --root . --fail-on
 - `build-compile-executables`
 - `build-bun-compile-browser`
 
-### 7) Performance (MEDIUM)
+Performance:
 
 - `perf-prefer-bun-native-apis`
 - `perf-avoid-node-fs-promises-hot-paths`
 
-### 8) Migration + Troubleshooting (LOW/MED)
+Migration + troubleshooting:
 
 - `migrate-node-to-bun-checklist`
 - `troubleshooting-esm-cjs-and-exports`
 - `troubleshooting-types-bun`
 
-## References (Vendor Docs Snapshots)
+## Native Commands
+
+- `codex-dev bun audit --root .`: report Bun findings.
+- `codex-dev bun rules list`: print rule ids.
+- `codex-dev bun rules show <rule-id>`: print one rule.
+- `codex-dev bun fixes plan --root .`: print safe fix candidates with hashes and diffs.
+- `codex-dev bun fixes apply --root .`: apply safe rewrites and write rollback artifacts under external dev-skills state.
+- `codex-dev bun validate plan --root .`: print validation commands.
+- `codex-dev bun validate run --root . --fail-on warn`: audit then run validation commands.
+- `codex-dev bun benchmark --root .`: time audit and fix planning.
+- `codex-dev bun references status`: inspect reference hashes and integrity.
+- `codex-dev bun references plan`: fetch vendor docs and preview changed reference files.
+- `codex-dev bun references sync`: refresh tracked references and rebuild indexes.
+- `codex-dev bun doctor`: inspect paths, version pin, and integrity.
+
+Compatibility shim:
+
+```bash
+bun-platform audit --root .
+```
+
+Prefer `codex-dev bun ...` for new automation. Keep `bun-platform` only for one
+release while old command references are retired.
+
+## Platform State
+
+- Config file: `bun-platform.config.json`
+- External config: `${XDG_CONFIG_HOME:-~/.config}/dev-skills/bun-platform`
+- External state: `${XDG_STATE_HOME:-~/.local/state}/dev-skills/bun-platform`
+- External cache: `${XDG_CACHE_HOME:-~/.cache}/dev-skills/bun-platform`
+- Audit cache is read-only by default; opt in with `--write-cache`.
+- Safe fixes write rollback artifacts under external state, never under the repo root.
+
+Config keys:
+
+- `disabledRules`
+- `severityOverrides`
+- `adapters`
+- `includePaths`
+- `excludeDirs`
+- `baseline`
+- `maxFiles`
+- `maxBytes`
+- `validationCommands`
+- `writeCache`
+
+Example template: `assets/templates/bun-platform.config.example.json`.
+
+## References
 
 Start with `references/index.md`.
 
-## Shared Platform Commands
-
-- `audit`: report Bun findings in `text`, `md`, or `json`
-- `list-rules`: print all rule ids
-- `explain <rule-id>`: print the matching rule file
-- `plan-fixes`: print deterministic safe fix candidates
-- `apply-safe-fixes`: apply safe file rewrites only
-- `validate`: rerun the audit and fail on a severity threshold
-- `benchmark`: emit audit/fix-planning timings
-- `release-sync`: refresh Bun/Vercel references and rebuild rule indexes
-
-Platform state:
-
-- `.bun-platform/cache.sqlite`: shared scan cache
-- `.bun-platform/rollbacks/`: safe-fix rollback artifacts
-- `references/release-sync-report.json`: local generated release intelligence summary (ignored; not committed)
-
-Config file:
-
-- `bun-platform.config.json`
-  - `disabledRules`
-  - `severityOverrides`
-  - `adapters`
-  - `includePaths`
-  - `excludeDirs`
-  - `baseline`
-  - `maxFiles`
-  - `maxBytes`
-  - `validationCommands`
-  - `manageGitignore`
-- Example template: `assets/templates/bun-platform.config.example.json`
-
-## Reference Map
-
 | Topic | Reference | Start with rules |
 | --- | --- | --- |
-| Bun v1.3.10 release notes | `references/ref-bun-release-notes-bun-v1.3.10.md` | `scripts-bun-run-parallel-sequential`, `build-bun-compile-browser`, `test-bun-retry`, `test-bun-test-runner` |
+| Bun latest release notes | `references/ref-bun-release-notes-latest.md` | `scripts-bun-run-parallel-sequential`, `build-bun-compile-browser`, `test-bun-retry`, `test-bun-test-runner` |
+| Bun capabilities | `references/ref-bun-capabilities-latest.md` | `runtime-*`, `build-*`, `test-*` |
+| Bun package-manager fallbacks | `references/ref-bun-package-manager-fallbacks.md` | `pm-*`, `scripts-*` |
 | Vercel Bun runtime | `references/ref-vercel-bun-runtime.md` | `vercel-bun-runtime-enable`, `vercel-bun-runtime-limitations` |
 
 Refresh reference snapshots:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts release-sync
+codex-dev --json bun references plan
+codex-dev --json bun references sync
 ```
 
-## Automation
-
-Shared CLI:
+Skill integrity check:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-platform.ts audit --root .
-```
-
-Compatibility wrapper:
-
-```bash
-bun ~/.agents/skills/bun-dev/scripts/bun-audit.ts audit --root .
-```
-
-Skill integrity check (rule ids, indexes, flat references):
-
-```bash
-bun ~/.agents/skills/bun-dev/scripts/check-skill-integrity.ts
+bun skills/bun-dev/scripts/check-skill-integrity.ts
 ```

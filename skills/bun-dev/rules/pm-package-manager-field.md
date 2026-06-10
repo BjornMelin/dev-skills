@@ -18,6 +18,6 @@ The `packageManager` field in `package.json` makes the intended package manager 
 
 ```json
 {
-  "packageManager": "bun@1.3.10"
+  "packageManager": "bun@1.3.13"
 }
 ```

@@ -1,22 +1,32 @@
 # References Index
 
-References are snapshots of vendor docs (Markdown-only, main page content). Prefer opening `rules/<rule-id>.md` first.
+Prefer rules for decisions and references for exact commands or API details.
 
-Refresh snapshots:
+Verified version pin:
+
+- Bun CLI `1.3.13`
+- Bun release `v1.3.13`
+
+Refresh vendor-backed refs:
 
 ```bash
-bun ~/.agents/skills/bun-dev/scripts/update-bun-release-notes.ts
-bun ~/.agents/skills/bun-dev/scripts/update-vercel-bun-docs.ts
+codex-dev --json bun references status
+codex-dev --json bun references plan
+codex-dev --json bun references sync
 ```
 
 ## Bun
 
-- Bun v1.3.10 release notes:
-  - `ref-bun-release-notes-bun-v1.3.10.md`
-- Bun CLI + workflow cheatsheet (skill-authored):
+- Latest Bun release notes:
+  - `ref-bun-release-notes-latest.md`
+- Bun capabilities snapshot:
+  - `ref-bun-capabilities-latest.md`
+- Bun CLI + workflow cheatsheet:
   - `ref-bun-cli-cheatsheet.md`
-- Bun built-in APIs cheatsheet (skill-authored):
+- Bun built-in APIs cheatsheet:
   - `ref-bun-builtins-cheatsheet.md`
+- Bun package-manager fallback notes:
+  - `ref-bun-package-manager-fallbacks.md`
 
 ## Vercel
 
@@ -26,7 +36,7 @@ bun ~/.agents/skills/bun-dev/scripts/update-vercel-bun-docs.ts
 ## Fast Lookup
 
 ```bash
-rg -n \"--parallel|--sequential\" ~/.agents/skills/bun-dev/references/ref-bun-release-notes-bun-v1.3.10.md
-rg -n \"bunVersion|Bun\\.serve|Beta\" ~/.agents/skills/bun-dev/references/ref-vercel-bun-runtime.md
-rg -n \"bun (install|add|update|test|build)\" ~/.agents/skills/bun-dev/references/ref-bun-cli-cheatsheet.md
+rg -n "--parallel|--sequential" skills/bun-dev/references/ref-bun-release-notes-latest.md
+rg -n "bunVersion|Bun\\.serve|Beta" skills/bun-dev/references/ref-vercel-bun-runtime.md
+rg -n "bun (install|add|update|test|build)" skills/bun-dev/references/ref-bun-cli-cheatsheet.md
 ```
