@@ -31,4 +31,3 @@ if (!parsed.success) throw new Error("Invalid payload");
 
 doWork(parsed.data.user.id);
 ```
-

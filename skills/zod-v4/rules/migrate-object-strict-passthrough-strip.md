@@ -33,4 +33,3 @@ const A = z.strictObject({ a: z.string() });
 const B = z.looseObject({ a: z.string() });
 const C = z.object({ a: z.string() }); // strips by default
 ```
-

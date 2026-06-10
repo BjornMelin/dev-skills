@@ -30,4 +30,3 @@ const Base = z.object({ a: z.string() }).refine((v) => v.a.length > 0);
 
 const X = Base.safeExtend({ a: z.string().min(2) });
 ```
-

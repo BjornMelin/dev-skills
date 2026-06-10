@@ -38,4 +38,3 @@ if (!result.success) {
   const pretty = z.prettifyError(result.error);
 }
 ```
-

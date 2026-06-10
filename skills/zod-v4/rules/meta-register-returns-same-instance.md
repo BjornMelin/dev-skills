@@ -27,4 +27,3 @@ same === S; // true
 `.meta(...)` and `.describe(...)` return new schema instances.
 
 See: `references/metadata-registries-v4.md`.
-

@@ -27,4 +27,3 @@ const Email = z.email().meta({
 
 `.register(z.globalRegistry, meta)` also works, but `.meta()` is the most direct.
 See: `references/metadata-registries-v4.md`.
-

@@ -44,4 +44,3 @@ If you need a different unknown-key strategy, pick the constructor explicitly:
 ```ts
 const StrictAB = z.strictObject({ ...A.shape, ...B.shape });
 ```
-

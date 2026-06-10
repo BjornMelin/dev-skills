@@ -26,4 +26,3 @@ const S = z.number({
 ## Notes
 
 See: `rules/error-error-precedence.md` and `references/errors-v4.md`.
-

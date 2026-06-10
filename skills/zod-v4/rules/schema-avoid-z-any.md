@@ -27,4 +27,3 @@ import { z } from "zod";
 const Payload = z.unknown();
 type Payload = z.infer<typeof Payload>; // unknown
 ```
-

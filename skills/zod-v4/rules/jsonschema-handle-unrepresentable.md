@@ -22,4 +22,3 @@ import { z } from "zod";
 
 z.toJSONSchema(z.date(), { unrepresentable: "any" }); // {}
 ```
-

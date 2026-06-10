@@ -25,4 +25,3 @@ export {};
 ## Notes
 
 See: `references/metadata-registries-v4.md`.
-

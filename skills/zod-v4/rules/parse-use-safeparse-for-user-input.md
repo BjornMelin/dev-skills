@@ -31,4 +31,3 @@ if (!result.success) {
 
 const data = result.data;
 ```
-

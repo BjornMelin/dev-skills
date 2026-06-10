@@ -24,4 +24,3 @@ const User = z.object({ email: Email }).meta({ id: "user" });
 ## Notes
 
 See: `references/metadata-registries-v4.md`.
-

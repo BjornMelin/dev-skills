@@ -17,4 +17,3 @@ import { z } from "zod";
 
 const Email = z.email().meta({ description: "An email address" });
 ```
-

@@ -31,4 +31,3 @@ const Email3 = z.email({ pattern: z.regexes.html5Email });
 const Email4 = z.email({ pattern: z.regexes.rfc5322Email });
 const Email5 = z.email({ pattern: z.regexes.unicodeEmail });
 ```
-

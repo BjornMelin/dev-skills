@@ -35,4 +35,3 @@ await UserId.parseAsync("abc");
 // or:
 const result = await UserId.safeParseAsync("abc");
 ```
-

@@ -19,4 +19,3 @@ z.toJSONSchema(z.globalRegistry, {
   uri: (id) => `https://example.com/${id}.json`,
 });
 ```
-

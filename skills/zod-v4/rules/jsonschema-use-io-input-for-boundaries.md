@@ -20,4 +20,3 @@ const Limit = z.coerce.number().pipe(z.number().min(1));
 // Describe boundary input type (string/unknown) instead of output (number).
 z.toJSONSchema(Limit, { io: "input" });
 ```
-

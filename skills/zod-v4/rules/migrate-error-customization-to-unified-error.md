@@ -38,4 +38,3 @@ z.string().min(5, { error: "Too short" });
 - Prefer schema-level `error` when possible. Per-parse `error` is lower precedence.
 - Returning `undefined` yields to the next error map.
 - See: `references/errors-v4.md`.
-

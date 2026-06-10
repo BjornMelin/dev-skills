@@ -26,4 +26,3 @@ z.toJSONSchema(S, { target: "openapi-3.0" });
 ```
 
 See: `references/json-schema-v4.md`.
-

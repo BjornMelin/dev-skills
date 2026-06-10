@@ -90,4 +90,3 @@ for (const g of groups) {
 
 writeFileSync(outPath, `${lines.join("\n")}\n`, "utf8");
 console.log(`Wrote ${path.relative(skillRoot, outPath)} (${entries.length} rules)`);
-

@@ -25,4 +25,3 @@ import { z } from "zod";
 
 const Limit = z.coerce.number().pipe(z.number().min(1));
 ```
-

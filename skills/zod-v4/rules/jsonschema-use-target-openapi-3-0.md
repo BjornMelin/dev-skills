@@ -18,4 +18,3 @@ import { z } from "zod";
 const schema = z.object({ name: z.string() });
 const openapiSchema = z.toJSONSchema(schema, { target: "openapi-3.0" });
 ```
-

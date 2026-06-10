@@ -23,4 +23,3 @@ const User = z
 
 z.toJSONSchema(User);
 ```
-

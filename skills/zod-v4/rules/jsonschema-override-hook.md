@@ -39,4 +39,3 @@ z.toJSONSchema(z.date(), {
   },
 });
 ```
-

@@ -34,4 +34,3 @@ export async function loadLocale(locale: string) {
 
 - `z.locales.*` exists, but may not be tree-shakable in some bundlers. Prefer importing the locale from `zod/locales` when bundling matters.
 - See: `references/errors-v4.md`.
-

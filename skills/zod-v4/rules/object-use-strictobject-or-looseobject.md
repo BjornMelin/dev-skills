@@ -18,4 +18,3 @@ import { z } from "zod";
 const Strict = z.strictObject({ a: z.string() });
 const Loose = z.looseObject({ a: z.string() });
 ```
-

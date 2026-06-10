@@ -23,4 +23,3 @@ const formatted = z.formatError(err);
 import { z } from "zod";
 const tree = z.treeifyError(err);
 ```
-

@@ -32,4 +32,3 @@ const Employee = z.object({ role: z.string() });
 const Employed1 = Person.extend(Employee.shape);
 const Employed2 = z.object({ ...Person.shape, ...Employee.shape });
 ```
-

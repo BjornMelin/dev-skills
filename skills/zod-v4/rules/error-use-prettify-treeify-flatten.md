@@ -23,4 +23,3 @@ if (!result.success) {
 ```
 
 See: `references/error-formatting-v4.md`.
-

@@ -31,4 +31,3 @@ import { z } from "zod";
 const Keys = z.enum(["id", "name", "email"]);
 const Person = z.partialRecord(Keys, z.string());
 ```
-

@@ -17,4 +17,3 @@ Only enable it for specific, reviewed cases:
 ```ts
 Schema.parse(value, { reportInput: true });
 ```
-

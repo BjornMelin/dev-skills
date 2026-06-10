@@ -20,4 +20,3 @@ If multiple customizations are present, the highest-precedence message wins.
 ## Reference
 
 See: `references/errors-v4.md`.
-

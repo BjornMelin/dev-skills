@@ -33,4 +33,3 @@ The function should mutate `ctx.jsonSchema` directly.
 If you need to override an unrepresentable type, set `unrepresentable: "any"` so override runs.
 
 See: `references/json-schema-v4.md`.
-

@@ -26,4 +26,3 @@ import { z } from "zod";
 z.stringbool().parse("false"); // false
 z.stringbool().parse("1"); // true
 ```
-

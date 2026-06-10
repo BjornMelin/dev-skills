@@ -25,4 +25,3 @@ export function handler(raw: unknown) {
   return doWork(parsed.data.id);
 }
 ```
-

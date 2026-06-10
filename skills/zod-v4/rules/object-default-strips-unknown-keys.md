@@ -25,4 +25,3 @@ Dog.parse({ name: "Yeller", extraKey: true });
 
 - Reject unknown keys: `z.strictObject(shape)`
 - Preserve unknown keys: `z.looseObject(shape)`
-

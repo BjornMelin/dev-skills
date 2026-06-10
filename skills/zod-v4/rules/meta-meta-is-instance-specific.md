@@ -29,4 +29,3 @@ Re-apply metadata to the derived schema:
 ```ts
 const B2 = B.meta({ description: "A cool string" });
 ```
-

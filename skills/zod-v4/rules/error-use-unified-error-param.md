@@ -26,4 +26,3 @@ const Password = z.string().min(8, { error: "Too short" });
 
 Return `undefined` from an `error` function to yield to the next error map in the precedence chain.
 See: `references/errors-v4.md`.
-
