@@ -10,6 +10,7 @@ from gh_release_fetch import GitHubClient, filter_releases_between
 
 
 def main() -> None:
+    """Fetch GitHub releases in a version window and print them as JSON."""
     parser = argparse.ArgumentParser(description="Get releases between two versions.")
     parser.add_argument("repo", help="owner/repo")
     parser.add_argument("--current", default=None, help="Current version")
@@ -23,7 +24,9 @@ def main() -> None:
 
     client = GitHubClient(mode=args.mode)
     releases = client.get_releases(owner, repo)
-    selected = filter_releases_between(releases, args.current, args.target, max_items=30)
+    selected = filter_releases_between(
+        releases, args.current, args.target, max_items=30
+    )
     client.flush_cache()
     print(json.dumps(selected, indent=2))
 

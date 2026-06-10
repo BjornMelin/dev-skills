@@ -12,6 +12,8 @@ from utils import run_cmd, which
 
 
 class ProbeResult(dict):
+    """Dictionary payload for outdated dependency probe results."""
+
     pass
 
 
@@ -105,7 +107,7 @@ def _parse_yarn_outdated(stdout: str) -> dict[str, dict[str, str]]:
             continue
         if s.lower().startswith("package "):
             continue
-        if s.startswith("Done") or s.startswith("✨"):
+        if s.startswith("Done") or s.startswith("\u2728"):
             continue
         parts = re.split(r"\s+", s)
         if len(parts) < 4:
@@ -143,7 +145,18 @@ def _parse_python_outdated_json(stdout: str, source: str) -> dict[str, dict[str,
     return out
 
 
-def probe_js_outdated(repo_context: dict[str, Any], repo_root: Path) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]], list[str]]:
+def probe_js_outdated(
+    repo_context: dict[str, Any], repo_root: Path
+) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]], list[str]]:
+    """Run the detected JavaScript package manager's outdated command.
+
+    Args:
+        repo_context: Repository context containing node manager metadata.
+        repo_root: Repository root used as the command working directory.
+
+    Returns:
+        Parsed package versions, command traces, and warnings.
+    """
     manager = repo_context.get("node_manager") or "npm"
     commands: list[list[str]] = []
     warnings: list[str] = []
@@ -164,6 +177,12 @@ def probe_js_outdated(repo_context: dict[str, Any], repo_root: Path) -> tuple[di
     traces: list[dict[str, Any]] = []
 
     for cmd in commands:
+        if not which(cmd[0]):
+            warnings.append(
+                f"Package manager `{cmd[0]}` is not available; "
+                "using registry metadata fallback."
+            )
+            continue
         proc = run_cmd(cmd, cwd=repo_root, check=False)
         traces.append(
             {
@@ -185,32 +204,61 @@ def probe_js_outdated(repo_context: dict[str, Any], repo_root: Path) -> tuple[di
 
         if parsed:
             break
-        warnings.append(f"Unable to parse `{ ' '.join(cmd) }` output; falling back to registry metadata for missing versions.")
+        warnings.append(
+            f"Unable to parse `{' '.join(cmd)}` output; "
+            "using registry metadata fallback."
+        )
 
     return parsed, traces, warnings
 
 
-def probe_python_outdated(repo_context: dict[str, Any], repo_root: Path) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]], list[str]]:
+def probe_python_outdated(
+    repo_context: dict[str, Any], repo_root: Path
+) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]], list[str]]:
+    """Run Python outdated package probes and parse their JSON output.
+
+    Args:
+        repo_context: Repository context containing Python manager metadata.
+        repo_root: Repository root used as the command working directory.
+
+    Returns:
+        Parsed package versions, command traces, and warnings.
+    """
     manager = repo_context.get("python_manager") or "uv"
     traces: list[dict[str, Any]] = []
     warnings: list[str] = []
 
     cmds: list[tuple[list[str], str]] = []
     if manager == "uv" and which("uv"):
-        cmds.append(([
-            "uv",
-            "pip",
-            "list",
-            "--outdated",
-            "--format",
-            "json",
-            "--project",
-            str(repo_root),
-        ], "uv pip list --outdated"))
+        cmds.append(
+            (
+                [
+                    "uv",
+                    "pip",
+                    "list",
+                    "--outdated",
+                    "--format",
+                    "json",
+                    "--project",
+                    str(repo_root),
+                ],
+                "uv pip list --outdated",
+            )
+        )
 
-    cmds.append((["python3", "-m", "pip", "list", "--outdated", "--format", "json"], "pip list --outdated"))
+    cmds.append(
+        (
+            ["python3", "-m", "pip", "list", "--outdated", "--format", "json"],
+            "pip list --outdated",
+        )
+    )
 
     for cmd, source in cmds:
+        if not which(cmd[0]):
+            warnings.append(
+                f"Python probe command `{cmd[0]}` is not available; skipping it."
+            )
+            continue
         proc = run_cmd(cmd, cwd=repo_root, check=False)
         traces.append(
             {
@@ -224,11 +272,22 @@ def probe_python_outdated(repo_context: dict[str, Any], repo_root: Path) -> tupl
         if parsed:
             return parsed, traces, warnings
 
-    warnings.append("Unable to gather Python outdated list from uv/pip; using index metadata fallback.")
+    warnings.append(
+        "Unable to gather Python outdated list from uv/pip; "
+        "using index metadata fallback."
+    )
     return {}, traces, warnings
 
 
 def probe_outdated(repo_context: dict[str, Any]) -> ProbeResult:
+    """Probe outdated JS and Python dependencies for a repository context.
+
+    Args:
+        repo_context: Repository context produced by detect_repo_context.
+
+    Returns:
+        ProbeResult with js, python, command_traces, and warnings keys.
+    """
     repo_root = Path(repo_context["repo_root"])
     data: ProbeResult = ProbeResult(
         js={},
@@ -253,6 +312,7 @@ def probe_outdated(repo_context: dict[str, Any]) -> ProbeResult:
 
 
 def main() -> None:
+    """Parse CLI arguments and print outdated dependency probes as JSON."""
     import argparse
     from detect_repo import detect_repo_context
 

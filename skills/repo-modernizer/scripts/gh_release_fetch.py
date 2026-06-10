@@ -9,17 +9,28 @@ import time
 from pathlib import Path
 from typing import Any
 
-from utils import cmp_version, ensure_dir, read_json, run_cmd, sleep_with_jitter, write_json
+from utils import (
+    cmp_version,
+    ensure_dir,
+    read_json,
+    run_cmd,
+    sleep_with_jitter,
+    write_json,
+)
 
 CACHE_PATH = Path.home() / ".cache" / "gh-deps-intel" / "github-api-cache.json"
 DEFAULT_TTL_SECONDS = 60 * 60 * 6
 
 
 class GitHubApiError(RuntimeError):
+    """Raised when GitHub API calls fail or return invalid data."""
+
     pass
 
 
 class GitHubClient:
+    """Rate-limit aware GitHub API client with simple JSON file caching."""
+
     def __init__(
         self,
         mode: str = "safe",
@@ -79,19 +90,26 @@ class GitHubClient:
                 try:
                     return json.loads(proc.stdout)
                 except json.JSONDecodeError as exc:
-                    raise GitHubApiError(f"Invalid JSON from gh api {path}: {exc}") from exc
+                    raise GitHubApiError(
+                        f"Invalid JSON from gh api {path}: {exc}"
+                    ) from exc
 
             stderr = (proc.stderr or "").lower()
             stdout = (proc.stdout or "").lower()
-            is_secondary = "secondary rate limit" in stderr or "secondary rate limit" in stdout
+            is_secondary = (
+                "secondary rate limit" in stderr or "secondary rate limit" in stdout
+            )
             is_rate = "rate limit" in stderr or "rate limit" in stdout
-            if attempt < self.max_retries and (is_secondary or is_rate or "http 429" in stderr or "http 403" in stderr):
+            if attempt < self.max_retries and (
+                is_secondary or is_rate or "http 429" in stderr or "http 403" in stderr
+            ):
                 delay = min(120, 5 * (2**attempt))
                 sleep_with_jitter(delay)
                 continue
 
             raise GitHubApiError(
-                f"gh api failed for {path} (attempt {attempt + 1}): rc={proc.returncode}\n"
+                "gh api failed for "
+                f"{path} (attempt {attempt + 1}): rc={proc.returncode}\n"
                 f"stderr={proc.stderr[-2000:]}"
             )
 
@@ -120,14 +138,20 @@ class GitHubClient:
                 try:
                     return json.loads(proc.stdout)
                 except json.JSONDecodeError as exc:
-                    raise GitHubApiError(f"Invalid JSON from gh graphql: {exc}") from exc
+                    raise GitHubApiError(
+                        f"Invalid JSON from gh graphql: {exc}"
+                    ) from exc
 
             stderr = (proc.stderr or "").lower()
-            if attempt < self.max_retries and ("rate limit" in stderr or "http 429" in stderr or "http 403" in stderr):
+            if attempt < self.max_retries and (
+                "rate limit" in stderr or "http 429" in stderr or "http 403" in stderr
+            ):
                 delay = min(120, 5 * (2**attempt))
                 sleep_with_jitter(delay)
                 continue
-            raise GitHubApiError(f"gh graphql failed: rc={proc.returncode} stderr={proc.stderr[-2000:]}")
+            raise GitHubApiError(
+                f"gh graphql failed: rc={proc.returncode} stderr={proc.stderr[-2000:]}"
+            )
 
         raise GitHubApiError("gh graphql failed: retries exhausted")
 
@@ -140,7 +164,9 @@ class GitHubClient:
         self._cache_set(key, data)
         return data
 
-    def get_paginated_list(self, path: str, max_pages: int = 10) -> list[dict[str, Any]]:
+    def get_paginated_list(
+        self, path: str, max_pages: int = 10
+    ) -> list[dict[str, Any]]:
         all_rows: list[dict[str, Any]] = []
         for page in range(1, max_pages + 1):
             sep = "&" if "?" in path else "?"
@@ -182,11 +208,14 @@ query($owner:String!, $repo:String!, $first:Int!) {
 }
 """
         try:
-            data = self._exec_graphql(gql, {"owner": owner, "repo": repo, "first": "100"})
+            data = self._exec_graphql(
+                gql, {"owner": owner, "repo": repo, "first": "100"}
+            )
         except GitHubApiError:
             return rows
         nodes = (
-            (((data or {}).get("data") or {}).get("repository") or {}).get("releases") or {}
+            (((data or {}).get("data") or {}).get("repository") or {}).get("releases")
+            or {}
         ).get("nodes")
         if not isinstance(nodes, list):
             return rows
@@ -214,7 +243,9 @@ query($owner:String!, $repo:String!, $first:Int!) {
         data = self.get_json("rate_limit")
         return data if isinstance(data, dict) else {}
 
-    def get_compare(self, owner: str, repo: str, base: str, head: str) -> dict[str, Any] | None:
+    def get_compare(
+        self, owner: str, repo: str, base: str, head: str
+    ) -> dict[str, Any] | None:
         try:
             data = self.get_json(f"repos/{owner}/{repo}/compare/{base}...{head}")
             return data if isinstance(data, dict) else None
@@ -232,7 +263,9 @@ query($owner:String!, $repo:String!, $first:Int!) {
         for path in candidate_paths:
             api_path = f"repos/{owner}/{repo}/contents/{path}"
             try:
-                data = self.get_json(api_path, cache_key=f"gh:contents:{owner}/{repo}:{path}")
+                data = self.get_json(
+                    api_path, cache_key=f"gh:contents:{owner}/{repo}:{path}"
+                )
             except Exception:
                 continue
             if not isinstance(data, dict):
@@ -272,6 +305,17 @@ def filter_releases_between(
     target_version: str | None,
     max_items: int = 25,
 ) -> list[dict[str, Any]]:
+    """Select release rows within an optional current-to-target window.
+
+    Args:
+        releases: GitHub release rows.
+        current_version: Current version lower bound, exclusive.
+        target_version: Target version upper bound, inclusive.
+        max_items: Maximum selected releases to return.
+
+    Returns:
+        Latest-first release rows in the selected version window.
+    """
     current = _coerce_version(current_version)
     target = _coerce_version(target_version)
 
@@ -306,8 +350,8 @@ def filter_releases_between(
         selected.append(rel)
 
     if not selected:
-        # If we have an explicit version window but cannot confidently map releases
-        # into that window, return none instead of injecting potentially unrelated notes.
+        # If an explicit version window cannot be mapped confidently, return
+        # nothing instead of injecting potentially unrelated notes.
         if current or target:
             return []
         selected = normalized[:max_items]

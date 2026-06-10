@@ -26,7 +26,9 @@ def _tuple_cmp(a: tuple[int, int], b: tuple[int, int]) -> int:
     return 0
 
 
-def _python_requires_satisfied(requires: str | None, runtime: tuple[int, int] | None) -> bool:
+def _python_requires_satisfied(
+    requires: str | None, runtime: tuple[int, int] | None
+) -> bool:
     if not requires or not runtime:
         return True
 
@@ -82,7 +84,7 @@ def _pick_python_compatible_target(
         requires = release_requires_python.get(v)
         if _python_requires_satisfied(requires, runtime):
             return v
-    return versions[0]
+    return None
 
 
 def choose_target_version(
@@ -92,6 +94,19 @@ def choose_target_version(
     repo_context: dict[str, Any],
     compatibility_policy: str = "runtime-pinned",
 ) -> dict[str, Any]:
+    """Choose an upgrade target using outdated data and runtime policy.
+
+    Args:
+        dep: Dependency row being evaluated.
+        outdated_lookup: Package-manager outdated data keyed by dependency name.
+        resolved: Registry metadata for the dependency.
+        repo_context: Detected repository context with runtime hints.
+        compatibility_policy: Version selection policy.
+
+    Returns:
+        Target-version decision with current, latest_available, target, reason,
+        and outdated_source keys.
+    """
     ecosystem = dep.get("ecosystem")
     name = dep.get("name")
 
@@ -107,7 +122,9 @@ def choose_target_version(
     reason = "latest available"
 
     if compatibility_policy == "always-latest":
-        absolute_latest = resolved.get("latest") or (versions[0] if versions else latest_available)
+        absolute_latest = resolved.get("latest") or (
+            versions[0] if versions else latest_available
+        )
         target = absolute_latest
         reason = "always-latest policy"
     elif compatibility_policy == "semver-only":
@@ -120,10 +137,15 @@ def choose_target_version(
             pinned = _pick_types_node_target(versions, node_major)
             if pinned:
                 target = pinned
-                reason = f"aligned @types/node major with detected Node runtime ({node_major})"
+                reason = (
+                    "aligned @types/node major with detected Node runtime "
+                    f"({node_major})"
+                )
 
         if ecosystem == "pypi":
-            runtime = _parse_python_tuple((repo_context.get("python_runtime") or {}).get("detected"))
+            runtime = _parse_python_tuple(
+                (repo_context.get("python_runtime") or {}).get("detected")
+            )
             rel_req = (resolved.get("metadata") or {}).get("release_requires_python")
             rel_req = rel_req if isinstance(rel_req, dict) else {}
             compatible = _pick_python_compatible_target(versions, rel_req, runtime)
@@ -132,7 +154,12 @@ def choose_target_version(
                 if compatible != latest_available:
                     reason = "latest runtime-compatible release"
 
-    if target and latest_available and cmp_version(target, latest_available) < 0 and reason == "latest available":
+    if (
+        target
+        and latest_available
+        and cmp_version(target, latest_available) < 0
+        and reason == "latest available"
+    ):
         reason = "selected by compatibility policy"
 
     return {

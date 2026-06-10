@@ -38,11 +38,20 @@ def _summarize_counts(deps: list[dict[str, Any]]) -> dict[str, int]:
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    """Render a dependency upgrade intelligence report as Markdown.
+
+    Args:
+        report: Report payload with repository context, dependencies, mode,
+            compatibility policy, warnings, and source links.
+
+    Returns:
+        Markdown report text.
+    """
     deps = sorted(report.get("dependencies", []), key=_dep_sort_key)
     counts = _summarize_counts(deps)
 
     lines: list[str] = []
-    lines.append(f"# Dependency Upgrade Intelligence Report")
+    lines.append("# Dependency Upgrade Intelligence Report")
     lines.append("")
     lines.append(f"- Generated at: `{report.get('generated_at')}`")
     lines.append(f"- Repository: `{report.get('repo_root')}`")
@@ -50,17 +59,23 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.append(f"- Runtime policy: `{report.get('compatibility_policy')}`")
     targeted = report.get("targeted_dependencies") or []
     if targeted:
-        lines.append(f"- Targeted dependency selectors: `{', '.join(str(x) for x in targeted)}`")
+        lines.append(
+            f"- Targeted dependency selectors: `{', '.join(str(x) for x in targeted)}`"
+        )
     lines.append("")
 
     lines.append("## Executive Summary")
     lines.append("")
     lines.append(
-        f"Analyzed **{counts['total']}** dependencies. High-risk upgrades: **{counts['high_risk']}**, "
-        f"medium-risk: **{counts['medium_risk']}**, low-risk: **{counts['low_risk']}**."
+        f"Analyzed **{counts['total']}** dependencies. "
+        f"High-risk upgrades: **{counts['high_risk']}**, "
+        f"medium-risk: **{counts['medium_risk']}**, "
+        f"low-risk: **{counts['low_risk']}**."
     )
     lines.append(
-        f"Breaking-change signals found for **{counts['with_breaking']}** dependencies and deprecation signals for **{counts['with_deprecations']}**."
+        "Breaking-change signals found for "
+        f"**{counts['with_breaking']}** dependencies and deprecation signals "
+        f"for **{counts['with_deprecations']}**."
     )
     lines.append("")
 
@@ -68,20 +83,30 @@ def render_markdown(report: dict[str, Any]) -> str:
     lines.append("")
     node_runtime = (report.get("repo_context") or {}).get("node_runtime") or {}
     py_runtime = (report.get("repo_context") or {}).get("python_runtime") or {}
-    lines.append(f"- Node runtime hint: `{node_runtime.get('detected') or 'not detected'}`")
-    lines.append(f"- Node major used for compatibility: `{node_runtime.get('major') or 'n/a'}`")
-    lines.append(f"- Python runtime hint: `{py_runtime.get('detected') or 'not detected'}`")
+    lines.append(
+        f"- Node runtime hint: `{node_runtime.get('detected') or 'not detected'}`"
+    )
+    lines.append(
+        f"- Node major used for compatibility: `{node_runtime.get('major') or 'n/a'}`"
+    )
+    lines.append(
+        f"- Python runtime hint: `{py_runtime.get('detected') or 'not detected'}`"
+    )
     lines.append("")
 
     if targeted:
         lines.append("## Targeted Dependency Scope")
         lines.append("")
-        lines.append("This report is scoped to explicitly requested dependency selector(s).")
+        lines.append(
+            "This report is scoped to explicitly requested dependency selector(s)."
+        )
         lines.append("")
 
     lines.append("## Upgrade Matrix")
     lines.append("")
-    lines.append("| Ecosystem | Dependency | Current | Target | Latest | Risk | Reason |")
+    lines.append(
+        "| Ecosystem | Dependency | Current | Target | Latest | Risk | Reason |"
+    )
     lines.append("|---|---|---:|---:|---:|---|---|")
     for dep in deps:
         lines.append(
@@ -108,7 +133,11 @@ def render_markdown(report: dict[str, Any]) -> str:
         if not actions:
             continue
         lines.append(f"### {dep.get('name')}")
-        lines.append(f"- Current -> target: `{dep.get('current_version') or 'unknown'}` -> `{dep.get('target_version') or 'unknown'}`")
+        lines.append(
+            "- Current -> target: "
+            f"`{dep.get('current_version') or 'unknown'}` -> "
+            f"`{dep.get('target_version') or 'unknown'}`"
+        )
         for action in actions[:8]:
             lines.append(f"- {action}")
         lines.append("")
@@ -164,11 +193,15 @@ def render_markdown(report: dict[str, Any]) -> str:
 
     lines.append("## Ordered Implementation Checklist")
     lines.append("")
-    lines.append("1. Create a branch and pin upgrade order by risk (high -> medium -> low).")
+    lines.append(
+        "1. Create a branch and pin upgrade order by risk (high -> medium -> low)."
+    )
     lines.append("2. Upgrade one dependency (or one tightly-coupled group) at a time.")
-    lines.append("3. Apply listed refactors, then run tests/lint/type checks for impacted modules.")
-    lines.append("4. Validate runtime compatibility constraints (Node/Python) after each upgrade batch.")
-    lines.append("5. Re-run this skill and confirm no unresolved breaking/deprecation items remain.")
+    lines.append("3. Apply listed refactors, then run checks for impacted modules.")
+    lines.append(
+        "4. Validate runtime compatibility constraints after each upgrade batch."
+    )
+    lines.append("5. Re-run this skill and confirm no unresolved risk items remain.")
     lines.append("")
 
     lines.append("## Source Links")
@@ -199,6 +232,23 @@ def write_reports(
     targeted_dependencies: list[str] | None = None,
     deep_repo_map: bool = False,
 ) -> dict[str, str]:
+    """Write Markdown and JSON dependency upgrade reports.
+
+    Args:
+        out_dir: Directory where report files should be written.
+        repo_root: Repository root represented in the report.
+        repo_context: Detected repository context.
+        dependencies: Analyzed dependency rows.
+        mode: Execution mode used for enrichment.
+        compatibility_policy: Target-version selection policy.
+        command_traces: Captured external command traces.
+        warnings: Warnings collected during analysis.
+        targeted_dependencies: Optional dependency selectors.
+        deep_repo_map: Whether usage mapping was included.
+
+    Returns:
+        Paths for the written Markdown and JSON reports.
+    """
     ensure_dir(out_dir)
 
     report = {

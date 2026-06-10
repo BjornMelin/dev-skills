@@ -15,15 +15,18 @@ from typing import Any, Iterable
 
 
 def now_iso() -> str:
+    """Return the current UTC timestamp in ISO-like report format."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def ensure_dir(path: Path) -> Path:
+    """Create a directory if needed and return it."""
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def read_json(path: Path, default: Any = None) -> Any:
+    """Read JSON from a file, returning default on missing or invalid input."""
     if not path.exists():
         return default
     try:
@@ -33,8 +36,11 @@ def read_json(path: Path, default: Any = None) -> Any:
 
 
 def write_json(path: Path, data: Any) -> None:
+    """Write data to a JSON file with stable indentation."""
     ensure_dir(path.parent)
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
 
 
 def run_cmd(
@@ -44,6 +50,7 @@ def run_cmd(
     env: dict[str, str] | None = None,
     timeout: int = 300,
 ) -> subprocess.CompletedProcess[str]:
+    """Run a subprocess and optionally raise on failure."""
     proc = subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
@@ -55,15 +62,19 @@ def run_cmd(
     )
     if check and proc.returncode != 0:
         display = " ".join(shlex.quote(c) for c in cmd)
-        raise RuntimeError(f"Command failed ({proc.returncode}): {display}\n{proc.stderr}")
+        raise RuntimeError(
+            f"Command failed ({proc.returncode}): {display}\n{proc.stderr}"
+        )
     return proc
 
 
 def which(name: str) -> str | None:
+    """Return the executable path for a command name if it is on PATH."""
     return shutil_which(name)
 
 
 def shutil_which(name: str) -> str | None:
+    """Search PATH for an executable command name."""
     for path in os.environ.get("PATH", "").split(os.pathsep):
         candidate = Path(path) / name
         if candidate.exists() and os.access(candidate, os.X_OK):
@@ -72,6 +83,7 @@ def shutil_which(name: str) -> str | None:
 
 
 def parse_version_tuple(raw: str | None) -> tuple[int, ...]:
+    """Parse a version-like string into a tuple of integer components."""
     if not raw:
         return tuple()
     cleaned = raw.strip().lower().lstrip("v")
@@ -84,6 +96,7 @@ def parse_version_tuple(raw: str | None) -> tuple[int, ...]:
 
 
 def cmp_version(a: str | None, b: str | None) -> int:
+    """Compare two version-like strings by numeric components."""
     aa = list(parse_version_tuple(a))
     bb = list(parse_version_tuple(b))
     if not aa and not bb:
@@ -99,11 +112,13 @@ def cmp_version(a: str | None, b: str | None) -> int:
 
 
 def sort_versions_desc(values: Iterable[str]) -> list[str]:
+    """Return unique version-like strings sorted newest first."""
     uniq = {v for v in values if v}
     return sorted(uniq, key=lambda x: parse_version_tuple(x), reverse=True)
 
 
 def extract_node_major(raw: str | None) -> int | None:
+    """Extract a Node.js major version from a runtime hint string."""
     if not raw:
         return None
     m = re.search(r"(\d{1,2})", raw)
@@ -116,12 +131,14 @@ def extract_node_major(raw: str | None) -> int | None:
 
 
 def sleep_with_jitter(seconds: float) -> None:
+    """Sleep for a small deterministic jitter above the requested seconds."""
     # Keep deterministic enough for CI while adding minor jitter.
     jitter = 0.05
     time.sleep(max(0.0, seconds + jitter))
 
 
 def compact_str(text: str | None, max_chars: int = 6000) -> str:
+    """Trim a string to a maximum display length."""
     if not text:
         return ""
     text = text.strip()
@@ -131,4 +148,5 @@ def compact_str(text: str | None, max_chars: int = 6000) -> str:
 
 
 def markdown_escape(value: str) -> str:
+    """Escape Markdown table-breaking characters in a string."""
     return value.replace("|", "\\|").replace("\n", " ")

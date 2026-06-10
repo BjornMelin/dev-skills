@@ -31,7 +31,9 @@ FEATURE_PATTERNS = [
 ]
 
 
-def _collect_matching_lines(text: str, patterns: list[str], limit: int = 12) -> list[str]:
+def _collect_matching_lines(
+    text: str, patterns: list[str], limit: int = 12
+) -> list[str]:
     lines: list[str] = []
     for raw in text.splitlines():
         line = raw.strip()
@@ -59,6 +61,16 @@ def _collect_matching_lines(text: str, patterns: list[str], limit: int = 12) -> 
 
 
 def analyze_dependency_changes(dep_row: dict[str, Any]) -> dict[str, Any]:
+    """Extract upgrade impact signals from release and changelog text.
+
+    Args:
+        dep_row: Dependency row with optional release_notes, changelog_text,
+            name, and fallback_links fields.
+
+    Returns:
+        Impact dictionary with breaking_changes, deprecations,
+        feature_adoptions, refactor_actions, risk_level, and confidence keys.
+    """
     release_notes = dep_row.get("release_notes") or []
     changelog = dep_row.get("changelog_text") or ""
 
@@ -83,17 +95,33 @@ def analyze_dependency_changes(dep_row: dict[str, Any]) -> dict[str, Any]:
 
     refactor_actions: list[str] = []
     if breaking:
-        refactor_actions.append("Audit breaking changes and removed APIs in the selected release window.")
-        refactor_actions.append("Update affected call sites and run full regression tests for touched modules.")
+        refactor_actions.append(
+            "Audit breaking changes and removed APIs in the selected window."
+        )
+        refactor_actions.append(
+            "Update affected call sites and run regression tests for touched modules."
+        )
     if deprecations:
-        refactor_actions.append("Replace deprecated APIs/flags before upgrading to next major.")
+        refactor_actions.append(
+            "Replace deprecated APIs/flags before upgrading to next major."
+        )
     if dep_row.get("name") == "@types/node":
-        refactor_actions.append("Verify TS configuration and Node globals/types remain aligned with runtime major.")
+        refactor_actions.append(
+            "Verify TS config and Node globals/types align with runtime major."
+        )
 
     if not refactor_actions:
-        refactor_actions.append("Apply version bump and run focused tests for modules importing this dependency.")
+        refactor_actions.append(
+            "Apply the version bump and test modules importing this dependency."
+        )
 
-    confidence = "high" if release_notes else "medium" if dep_row.get("fallback_links") else "low"
+    confidence = (
+        "high"
+        if release_notes
+        else "medium"
+        if dep_row.get("fallback_links")
+        else "low"
+    )
 
     return {
         "breaking_changes": breaking,

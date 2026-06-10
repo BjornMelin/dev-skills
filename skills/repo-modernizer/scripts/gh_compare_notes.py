@@ -6,10 +6,11 @@ from __future__ import annotations
 import argparse
 import json
 
-from gh_release_fetch import GitHubClient
+from gh_release_fetch import GitHubApiError, GitHubClient
 
 
 def main() -> None:
+    """Fetch a GitHub compare range and print a compact JSON summary."""
     parser = argparse.ArgumentParser(description="Summarize GitHub compare output.")
     parser.add_argument("repo", help="owner/repo")
     parser.add_argument("base")
@@ -21,8 +22,23 @@ def main() -> None:
     owner, repo = args.repo.split("/", 1)
 
     client = GitHubClient(mode="safe")
-    data = client.get_compare(owner, repo, args.base, args.head)
-    client.flush_cache()
+    try:
+        data = client.get_compare(owner, repo, args.base, args.head)
+    except GitHubApiError as exc:
+        print(
+            json.dumps(
+                {
+                    "repo": args.repo,
+                    "base": args.base,
+                    "head": args.head,
+                    "error": str(exc),
+                },
+                indent=2,
+            )
+        )
+        return
+    finally:
+        client.flush_cache()
     if not data:
         print(json.dumps({"error": "compare data unavailable"}, indent=2))
         return
@@ -43,7 +59,17 @@ def main() -> None:
             if msg:
                 summary.append(f"{sha} {msg}")
 
-    print(json.dumps({"repo": args.repo, "base": args.base, "head": args.head, "summary": summary}, indent=2))
+    print(
+        json.dumps(
+            {
+                "repo": args.repo,
+                "base": args.base,
+                "head": args.head,
+                "summary": summary,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

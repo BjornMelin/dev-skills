@@ -18,7 +18,11 @@ CACHE_TTL_SECONDS = 60 * 60 * 12
 
 
 class RegistryCache:
-    def __init__(self, path: Path = CACHE_PATH, ttl_seconds: int = CACHE_TTL_SECONDS) -> None:
+    """Small TTL cache for registry API responses."""
+
+    def __init__(
+        self, path: Path = CACHE_PATH, ttl_seconds: int = CACHE_TTL_SECONDS
+    ) -> None:
         self.path = path
         self.ttl_seconds = ttl_seconds
         self.data = read_json(path, default={}) or {}
@@ -59,6 +63,14 @@ def _http_json(url: str) -> Any:
 
 
 def extract_github_repo(url: str | None) -> str | None:
+    """Extract an owner/repo pair from a GitHub URL.
+
+    Args:
+        url: Candidate repository or metadata URL.
+
+    Returns:
+        GitHub owner/repo string when found; otherwise None.
+    """
     if not url:
         return None
     normalized = url.strip()
@@ -77,25 +89,38 @@ def extract_github_repo(url: str | None) -> str | None:
 
 
 def _pick_repository_url_from_npm(meta: dict[str, Any]) -> str | None:
+    candidates: list[str] = []
     repo = meta.get("repository")
     if isinstance(repo, str):
-        return repo
+        candidates.append(repo)
     if isinstance(repo, dict):
         url = repo.get("url")
         if isinstance(url, str):
-            return url
+            candidates.append(url)
     for field in ["homepage", "bugs"]:
         candidate = meta.get(field)
         if isinstance(candidate, str):
-            return candidate
+            candidates.append(candidate)
         if isinstance(candidate, dict):
             u = candidate.get("url")
             if isinstance(u, str):
-                return u
-    return None
+                candidates.append(u)
+    for candidate in candidates:
+        if "github.com" in candidate.lower():
+            return candidate
+    return candidates[0] if candidates else None
 
 
 def resolve_npm(name: str) -> dict[str, Any]:
+    """Resolve npm package metadata and source repository information.
+
+    Args:
+        name: npm package name.
+
+    Returns:
+        Registry metadata including versions, latest version, links, and
+        source repository fields when available.
+    """
     encoded = quote(name, safe="")
     url = f"https://registry.npmjs.org/{encoded}"
     try:
@@ -116,7 +141,9 @@ def resolve_npm(name: str) -> dict[str, Any]:
     if isinstance(dist_tags, dict):
         latest = dist_tags.get("latest")
 
-    versions = sort_versions_desc(list((data.get("versions") or {}).keys()) if isinstance(data, dict) else [])
+    versions = sort_versions_desc(
+        list((data.get("versions") or {}).keys()) if isinstance(data, dict) else []
+    )
 
     repo_url = _pick_repository_url_from_npm(data if isinstance(data, dict) else {})
     source_repo = extract_github_repo(repo_url)
@@ -144,26 +171,38 @@ def resolve_npm(name: str) -> dict[str, Any]:
 
 
 def _pick_repository_url_from_pypi(info: dict[str, Any]) -> str | None:
+    candidates: list[str] = []
     direct_fields = ["project_url", "home_page", "download_url", "package_url"]
     for f in direct_fields:
         v = info.get(f)
         if isinstance(v, str) and v:
-            if "github.com" in v.lower() or f in {"project_url", "home_page"}:
-                return v
+            candidates.append(v)
     project_urls = info.get("project_urls")
     if isinstance(project_urls, dict):
-        preferred_keys = ["Source", "Homepage", "Repository", "Code", "Changelog", "Documentation"]
+        preferred_keys = ["Source", "Repository", "Code", "Homepage"]
         for key in preferred_keys:
             v = project_urls.get(key)
             if isinstance(v, str) and v:
-                return v
+                candidates.append(v)
         for v in project_urls.values():
             if isinstance(v, str) and v:
-                return v
-    return None
+                candidates.append(v)
+    for candidate in candidates:
+        if "github.com" in candidate.lower():
+            return candidate
+    return candidates[0] if candidates else None
 
 
 def resolve_pypi(name: str) -> dict[str, Any]:
+    """Resolve PyPI package metadata and source repository information.
+
+    Args:
+        name: PyPI package name.
+
+    Returns:
+        Registry metadata including versions, latest version, links,
+        requires-python data, and source repository fields when available.
+    """
     url = f"https://pypi.org/pypi/{quote(name)}/json"
     try:
         data = _http_json(url)
@@ -181,7 +220,9 @@ def resolve_pypi(name: str) -> dict[str, Any]:
     info = data.get("info") if isinstance(data, dict) else {}
     releases = data.get("releases") if isinstance(data, dict) else {}
     latest = info.get("version") if isinstance(info, dict) else None
-    versions = sort_versions_desc(list(releases.keys()) if isinstance(releases, dict) else [])
+    versions = sort_versions_desc(
+        list(releases.keys()) if isinstance(releases, dict) else []
+    )
     release_requires_python: dict[str, str] = {}
     if isinstance(releases, dict):
         for ver, files in releases.items():
@@ -218,14 +259,27 @@ def resolve_pypi(name: str) -> dict[str, Any]:
         "metadata": {
             "repository": repo_url,
             "summary": info.get("summary") if isinstance(info, dict) else None,
-            "requires_python": info.get("requires_python") if isinstance(info, dict) else None,
-            "project_urls": info.get("project_urls") if isinstance(info, dict) else None,
+            "requires_python": info.get("requires_python")
+            if isinstance(info, dict)
+            else None,
+            "project_urls": info.get("project_urls")
+            if isinstance(info, dict)
+            else None,
             "release_requires_python": release_requires_python,
         },
     }
 
 
 def resolve_dependency(dep: dict[str, Any]) -> dict[str, Any]:
+    """Resolve registry metadata for a dependency row.
+
+    Args:
+        dep: Dependency row with ecosystem and name keys.
+
+    Returns:
+        Resolved registry metadata for supported ecosystems, or an empty
+        metadata payload for unsupported ecosystems.
+    """
     ecosystem = dep.get("ecosystem")
     name = dep.get("name")
     if ecosystem == "npm":
@@ -244,13 +298,17 @@ def resolve_dependency(dep: dict[str, Any]) -> dict[str, Any]:
 
 
 def flush_cache() -> None:
+    """Persist registry cache data to disk."""
     CACHE.flush()
 
 
 def main() -> None:
+    """Parse CLI arguments and print resolved dependency metadata as JSON."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Resolve package metadata and source repository.")
+    parser = argparse.ArgumentParser(
+        description="Resolve package metadata and source repository."
+    )
     parser.add_argument("ecosystem", choices=["npm", "pypi"])
     parser.add_argument("name")
     args = parser.parse_args()

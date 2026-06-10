@@ -6,6 +6,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -80,11 +81,16 @@ def _workspace_globs_from_pnpm(path: Path) -> list[str]:
 
 def _expand_workspace_globs(root: Path, globs_in: list[str]) -> list[Path]:
     ignored = _load_git_ignored_entries(root)
+    root_resolved = root.resolve()
     paths: set[Path] = set()
     for pattern in globs_in:
         pat = pattern.rstrip("/") + "/package.json"
         for match in glob.glob(str(root / pat), recursive=True):
             p = Path(match).resolve()
+            try:
+                p.relative_to(root_resolved)
+            except ValueError:
+                continue
             if p.is_file() and not _is_git_ignored(root, p, ignored):
                 paths.add(p)
     return sorted(paths)
@@ -139,7 +145,9 @@ def _recursive_pyproject_scan(root: Path) -> list[Path]:
 
 
 def _is_git_repo(root: Path) -> bool:
-    proc = run_cmd(["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], check=False)
+    proc = run_cmd(
+        ["git", "-C", str(root), "rev-parse", "--is-inside-work-tree"], check=False
+    )
     return proc.returncode == 0
 
 
@@ -148,7 +156,16 @@ def _load_git_ignored_entries(root: Path) -> list[str]:
     if not _is_git_repo(root):
         return []
     proc = run_cmd(
-        ["git", "-C", str(root), "ls-files", "--ignored", "--exclude-standard", "--others", "--directory"],
+        [
+            "git",
+            "-C",
+            str(root),
+            "ls-files",
+            "--ignored",
+            "--exclude-standard",
+            "--others",
+            "--directory",
+        ],
         check=False,
     )
     if proc.returncode != 0:
@@ -183,7 +200,11 @@ def _is_git_ignored(root: Path, path: Path, ignored_entries: list[str]) -> bool:
 
 def _detect_node_manager(root: Path, root_pkg: dict[str, Any]) -> str:
     package_manager = str(root_pkg.get("packageManager") or "")
-    if package_manager.startswith("bun@") or (root / "bun.lock").exists() or (root / "bun.lockb").exists():
+    if (
+        package_manager.startswith("bun@")
+        or (root / "bun.lock").exists()
+        or (root / "bun.lockb").exists()
+    ):
         return "bun"
     if package_manager.startswith("pnpm@") or (root / "pnpm-lock.yaml").exists():
         return "pnpm"
@@ -220,7 +241,9 @@ def _detect_node_runtime(root: Path, root_pkg: dict[str, Any]) -> dict[str, Any]
         for line in tool_versions.splitlines():
             s = line.strip()
             if s.startswith("nodejs "):
-                hints.append({"source": ".tool-versions", "value": s.split(" ", 1)[1].strip()})
+                hints.append(
+                    {"source": ".tool-versions", "value": s.split(" ", 1)[1].strip()}
+                )
 
     volta = root_pkg.get("volta") if isinstance(root_pkg, dict) else None
     if isinstance(volta, dict) and isinstance(volta.get("node"), str):
@@ -244,10 +267,18 @@ def _detect_python_runtime(root: Path, pyproject_files: list[Path]) -> dict[str,
 
             data = tomllib.loads(pp.read_text(encoding="utf-8"))
             project = data.get("project") if isinstance(data, dict) else None
-            if isinstance(project, dict) and isinstance(project.get("requires-python"), str):
+            if isinstance(project, dict) and isinstance(
+                project.get("requires-python"), str
+            ):
                 rel = str(pp.relative_to(root))
-                hints.append({"source": f"{rel}#project.requires-python", "value": project["requires-python"]})
+                hints.append(
+                    {
+                        "source": f"{rel}#project.requires-python",
+                        "value": project["requires-python"],
+                    }
+                )
         except Exception:
+            print(f"warning: unable to parse {pp}", file=sys.stderr)
             continue
 
     selected = hints[0]["value"] if hints else None
@@ -255,11 +286,22 @@ def _detect_python_runtime(root: Path, pyproject_files: list[Path]) -> dict[str,
 
 
 def detect_repo_context(repo_root: Path) -> dict[str, Any]:
+    """Detect repository manifests, managers, workspace files, and runtimes.
+
+    Args:
+        repo_root: Repository root to inspect.
+
+    Returns:
+        Repository context with manifest paths, ecosystem flags, manager names,
+        workspace globs, and runtime hints.
+    """
     repo_root = repo_root.resolve()
     root_pkg_path = repo_root / "package.json"
     root_pkg = _read_json(root_pkg_path) if root_pkg_path.exists() else {}
 
-    declared_globs = _workspace_globs_from_package_json(root_pkg) + _workspace_globs_from_pnpm(repo_root)
+    declared_globs = _workspace_globs_from_package_json(
+        root_pkg
+    ) + _workspace_globs_from_pnpm(repo_root)
     workspace_pkgs = _expand_workspace_globs(repo_root, declared_globs)
 
     recursive_pkgs = _recursive_package_scan(repo_root)
@@ -285,13 +327,18 @@ def detect_repo_context(repo_root: Path) -> dict[str, Any]:
         "pyproject_files": [str(p) for p in pyproject_files],
         "is_monorepo": len(package_json_files) > 1 or len(pyproject_files) > 1,
         "workspace_globs": declared_globs,
-        "node_runtime": _detect_node_runtime(repo_root, root_pkg) if has_node else {"detected": None, "major": None, "hints": []},
-        "python_runtime": _detect_python_runtime(repo_root, pyproject_files) if has_python else {"detected": None, "hints": []},
+        "node_runtime": _detect_node_runtime(repo_root, root_pkg)
+        if has_node
+        else {"detected": None, "major": None, "hints": []},
+        "python_runtime": _detect_python_runtime(repo_root, pyproject_files)
+        if has_python
+        else {"detected": None, "hints": []},
     }
     return ctx
 
 
 def main() -> None:
+    """Parse CLI arguments and print detected repository context as JSON."""
     import argparse
 
     parser = argparse.ArgumentParser(description="Detect repository context.")

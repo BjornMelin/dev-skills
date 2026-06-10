@@ -6,15 +6,30 @@ from __future__ import annotations
 from typing import Any
 
 
-def collect_fallback_links(dep: dict[str, Any], resolved: dict[str, Any]) -> list[dict[str, str]]:
+def collect_fallback_links(
+    dep: dict[str, Any], resolved: dict[str, Any]
+) -> list[dict[str, str]]:
+    """Build package and metadata fallback links for a dependency.
+
+    Args:
+        dep: Dependency row with ecosystem and name fields.
+        resolved: Registry metadata returned by repo resolution.
+
+    Returns:
+        Deduplicated link dictionaries with label and url keys.
+    """
     ecosystem = dep.get("ecosystem")
     name = dep.get("name")
     links: list[dict[str, str]] = []
 
     if ecosystem == "npm":
-        links.append({"label": "npm package", "url": f"https://www.npmjs.com/package/{name}"})
+        links.append(
+            {"label": "npm package", "url": f"https://www.npmjs.com/package/{name}"}
+        )
     elif ecosystem == "pypi":
-        links.append({"label": "PyPI package", "url": f"https://pypi.org/project/{name}/"})
+        links.append(
+            {"label": "PyPI package", "url": f"https://pypi.org/project/{name}/"}
+        )
 
     meta_links = resolved.get("links") if isinstance(resolved, dict) else None
     if isinstance(meta_links, dict):

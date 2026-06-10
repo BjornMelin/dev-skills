@@ -27,7 +27,9 @@ from runtime_policy import choose_target_version
 from utils import ensure_dir, now_iso, run_cmd, write_json
 
 
-def _build_outdated_lookup(scan: dict[str, Any], ecosystem: str) -> dict[str, dict[str, str]]:
+def _build_outdated_lookup(
+    scan: dict[str, Any], ecosystem: str
+) -> dict[str, dict[str, str]]:
     if ecosystem == "npm":
         return scan.get("outdated", {}).get("js", {})
     if ecosystem == "pypi":
@@ -51,7 +53,9 @@ def _dep_matches_selector(dep_name: str, selector: str) -> bool:
     return sel in dep
 
 
-def _filter_scan_dependencies(scan: dict[str, Any], selectors: list[str]) -> tuple[dict[str, Any], list[str]]:
+def _filter_scan_dependencies(
+    scan: dict[str, Any], selectors: list[str]
+) -> tuple[dict[str, Any], list[str]]:
     if not selectors:
         return scan, []
     deps = scan.get("dependencies", [])
@@ -76,7 +80,9 @@ def _filter_scan_dependencies(scan: dict[str, Any], selectors: list[str]) -> tup
     return out, warnings
 
 
-def _repo_usage_map_for_dependency(repo_root: Path, dep: dict[str, Any], limit: int = 120) -> dict[str, Any]:
+def _repo_usage_map_for_dependency(
+    repo_root: Path, dep: dict[str, Any], limit: int = 120
+) -> dict[str, Any]:
     name = str(dep.get("name") or "")
     ecosystem = str(dep.get("ecosystem") or "")
     if not name:
@@ -119,7 +125,17 @@ def _repo_usage_map_for_dependency(repo_root: Path, dep: dict[str, Any], limit: 
     hits: list[dict[str, Any]] = []
     seen = set()
     for pat in patterns:
-        cmd = ["rg", "-n", "--no-heading", "--color", "never", "--hidden", *glob_args, pat, str(repo_root)]
+        cmd = [
+            "rg",
+            "-n",
+            "--no-heading",
+            "--color",
+            "never",
+            "--hidden",
+            *glob_args,
+            pat,
+            str(repo_root),
+        ]
         proc = run_cmd(cmd, check=False)
         if proc.returncode not in (0, 1):
             continue
@@ -133,7 +149,13 @@ def _repo_usage_map_for_dependency(repo_root: Path, dep: dict[str, Any], limit: 
             if key in seen:
                 continue
             seen.add(key)
-            hits.append({"path": path, "line": int(line_no) if line_no.isdigit() else None, "text": text.strip()})
+            hits.append(
+                {
+                    "path": path,
+                    "line": int(line_no) if line_no.isdigit() else None,
+                    "text": text.strip(),
+                }
+            )
             if len(hits) >= limit:
                 break
         if len(hits) >= limit:
@@ -142,11 +164,24 @@ def _repo_usage_map_for_dependency(repo_root: Path, dep: dict[str, Any], limit: 
     files = sorted({h["path"] for h in hits if isinstance(h.get("path"), str)})
     summary = f"Found {len(hits)} reference hits across {len(files)} files."
     if not hits:
-        summary = "No direct usage references found with default patterns; validate dynamic/runtime usage manually."
+        summary = (
+            "No direct usage references found with default patterns; "
+            "validate dynamic/runtime usage manually."
+        )
     return {"summary": summary, "hits": hits, "files": files}
 
 
 def run_scan(repo_root: Path) -> dict[str, Any]:
+    """Detect repository dependencies and outdated package signals.
+
+    Args:
+        repo_root: Repository root to scan.
+
+    Returns:
+        Scan payload with generated_at, repo_root, repo_context,
+        dependencies, and outdated keys. Uses detect_repo_context,
+        collect_dependencies, aggregate_dependencies, and probe_outdated.
+    """
     ctx = detect_repo_context(repo_root)
     dep_rows = collect_dependencies(ctx)
     deps = aggregate_dependencies(dep_rows)
@@ -183,7 +218,9 @@ def _extract_compare_summary(compare_obj: dict[str, Any] | None) -> str:
     return "\n".join(lines)
 
 
-def _find_tag_for_version(tags: list[dict[str, Any]], version: str | None) -> str | None:
+def _find_tag_for_version(
+    tags: list[dict[str, Any]], version: str | None
+) -> str | None:
     if not version:
         return None
     candidates = {version, f"v{version}"}
@@ -248,14 +285,21 @@ def _enrich_one_dependency(
 
     try:
         releases = gh.get_releases(owner, repo)
-        selected = filter_releases_between(releases, row.get("current_version"), row.get("target_version"), max_items=25)
+        selected = filter_releases_between(
+            releases,
+            row.get("current_version"),
+            row.get("target_version"),
+            max_items=25,
+        )
         row["release_notes"] = selected
 
         changelog = gh.get_changelog(owner, repo)
         if changelog:
             row["changelog_text"] = changelog.get("text") or ""
             if changelog.get("html_url"):
-                row["source_links"].append({"label": "changelog", "url": changelog["html_url"]})
+                row["source_links"].append(
+                    {"label": "changelog", "url": changelog["html_url"]}
+                )
 
         # If no releases were found in range, attempt tag compare notes.
         if not row["release_notes"]:
@@ -272,7 +316,10 @@ def _enrich_one_dependency(
                             "tag_name": f"{base}...{head}",
                             "version": row.get("target_version"),
                             "published_at": None,
-                            "html_url": f"https://github.com/{owner}/{repo}/compare/{base}...{head}",
+                            "html_url": (
+                                f"https://github.com/{owner}/{repo}/compare/"
+                                f"{base}...{head}"
+                            ),
                             "body": compare_text,
                             "draft": False,
                             "prerelease": False,
@@ -280,7 +327,10 @@ def _enrich_one_dependency(
                     ]
 
         if not row["release_notes"]:
-            warnings.append(f"No GitHub releases/compare notes found for {source_repo} in selected range.")
+            warnings.append(
+                "No GitHub releases/compare notes found for "
+                f"{source_repo} in selected range."
+            )
 
     except GitHubApiError as exc:
         warnings.append(f"GitHub API error for {source_repo}: {exc}")
@@ -293,7 +343,12 @@ def _enrich_one_dependency(
     for rel in row.get("release_notes") or []:
         url = rel.get("html_url")
         if isinstance(url, str) and url.startswith("http"):
-            links.append({"label": f"release:{rel.get('tag_name') or rel.get('name')}", "url": url})
+            links.append(
+                {
+                    "label": f"release:{rel.get('tag_name') or rel.get('name')}",
+                    "url": url,
+                }
+            )
     links.extend(fallback)
 
     deduped: list[dict[str, str]] = []
@@ -317,6 +372,18 @@ def run_enrich(
     compatibility_policy: str = "runtime-pinned",
     deep_repo_map: bool = False,
 ) -> dict[str, Any]:
+    """Enrich scanned dependencies with registry and GitHub release metadata.
+
+    Args:
+        scan: Scan payload produced by run_scan.
+        mode: GitHub request mode, either safe or fast.
+        max_concurrency: Worker cap for fast mode.
+        compatibility_policy: Target-version selection policy.
+        deep_repo_map: Whether later analysis should include usage mapping.
+
+    Returns:
+        Enriched report payload with dependencies, warnings, and command traces.
+    """
     repo_context = scan["repo_context"]
     deps = scan["dependencies"]
 
@@ -328,7 +395,13 @@ def run_enrich(
 
     def enrich_task(dep: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
         lookup = _build_outdated_lookup(scan, dep.get("ecosystem"))
-        return _enrich_one_dependency(dep, repo_context, lookup, mode=mode, compatibility_policy=compatibility_policy)
+        return _enrich_one_dependency(
+            dep,
+            repo_context,
+            lookup,
+            mode=mode,
+            compatibility_policy=compatibility_policy,
+        )
 
     if mode == "fast" and max_concurrency > 1:
         with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
@@ -348,11 +421,17 @@ def run_enrich(
         # Auto-fallback for dependencies that hit limits/errors in fast mode.
         if rate_limited:
             warnings.append(
-                f"Fast mode fallback: re-running {len(rate_limited)} dependencies serially with safe mode due to rate-limit/errors."
+                "Fast mode fallback: re-running "
+                f"{len(rate_limited)} dependencies serially with safe mode "
+                "due to rate-limit/errors."
             )
             # Remove any partial rows for those deps first.
             retry_keys = {(d.get("ecosystem"), d.get("name")) for d in rate_limited}
-            enriched = [r for r in enriched if (r.get("ecosystem"), r.get("name")) not in retry_keys]
+            enriched = [
+                r
+                for r in enriched
+                if (r.get("ecosystem"), r.get("name")) not in retry_keys
+            ]
             for dep in rate_limited:
                 lookup = _build_outdated_lookup(scan, dep.get("ecosystem"))
                 row, w = _enrich_one_dependency(
@@ -393,6 +472,7 @@ def run_enrich(
 
 
 def run_analyze(enriched: dict[str, Any]) -> dict[str, Any]:
+    """Analyze enriched dependencies and optionally attach repo usage maps."""
     repo_root = Path(enriched["repo_root"])
     deep_repo_map = bool(enriched.get("deep_repo_map"))
     analyzed: list[dict[str, Any]] = []
@@ -406,10 +486,13 @@ def run_analyze(enriched: dict[str, Any]) -> dict[str, Any]:
             if usage.get("files"):
                 merged.setdefault("refactor_actions", [])
                 merged["refactor_actions"].append(
-                    f"Update all usage points in {len(usage.get('files') or [])} files identified by repo impact scan."
+                    "Update all usage points in "
+                    f"{len(usage.get('files') or [])} files identified "
+                    "by repo impact scan."
                 )
                 merged["refactor_actions"].append(
-                    "Refactor imports/usages first, then run tests for modules listed in repo impact map."
+                    "Refactor imports/usages first, then run tests for "
+                    "modules listed in repo impact map."
                 )
         analyzed.append(merged)
 
@@ -433,6 +516,7 @@ def run_report(
     out_dir: Path,
     compatibility_policy: str = "runtime-pinned",
 ) -> dict[str, Any]:
+    """Write reports for analyzed dependency data and return output paths."""
     paths = write_reports(
         out_dir=out_dir,
         repo_root=analyzed["repo_root"],
@@ -453,6 +537,7 @@ def run_report(
 
 
 def run_rate_limit_diag() -> dict[str, Any]:
+    """Return the current GitHub API rate-limit payload."""
     gh = GitHubClient(mode="safe")
     data = gh.get_rate_limit()
     gh.flush_cache()
@@ -460,6 +545,7 @@ def run_rate_limit_diag() -> dict[str, Any]:
 
 
 def save_stage_json(out_dir: Path, name: str, payload: dict[str, Any]) -> str:
+    """Write a stage payload under an output directory and return its path."""
     ensure_dir(out_dir)
     path = out_dir / f"{name}.json"
     write_json(path, payload)
@@ -467,24 +553,43 @@ def save_stage_json(out_dir: Path, name: str, payload: dict[str, Any]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="GitHub dependency intelligence orchestrator")
+    """Run the gh-deps-intel CLI workflow and emit JSON stage output."""
+    parser = argparse.ArgumentParser(
+        description="GitHub dependency intelligence orchestrator"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     def add_common(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--repo", default=".", help="Target repository root (default: current directory)")
-        p.add_argument("--out", default="reports", help="Output directory relative to target repo")
-        p.add_argument("--mode", choices=["safe", "fast"], default="safe", help="Execution mode")
-        p.add_argument("--max-concurrency", type=int, default=3, help="Fast mode worker cap")
+        p.add_argument(
+            "--repo",
+            default=".",
+            help="Target repository root (default: current directory)",
+        )
+        p.add_argument(
+            "--out", default="reports", help="Output directory relative to target repo"
+        )
+        p.add_argument(
+            "--mode", choices=["safe", "fast"], default="safe", help="Execution mode"
+        )
+        p.add_argument(
+            "--max-concurrency", type=int, default=3, help="Fast mode worker cap"
+        )
         p.add_argument(
             "--dependency",
             action="append",
             default=[],
-            help="Dependency selector (repeatable). Supports exact or partial name match.",
+            help=(
+                "Dependency selector (repeatable). Supports exact or "
+                "partial name match."
+            ),
         )
         p.add_argument(
             "--deep-repo-map",
             action="store_true",
-            help="Run repo-wide usage mapping with rg and include impacted files/usages in report.",
+            help=(
+                "Run repo-wide usage mapping with rg and include impacted "
+                "files/usages in report."
+            ),
         )
         p.add_argument(
             "--compatibility-policy",
@@ -493,8 +598,17 @@ def main() -> None:
             help="Target version selection policy",
         )
 
-    add_common(sub.add_parser("scan", help="Detect repo and collect dependencies/outdated data"))
-    add_common(sub.add_parser("enrich", help="Scan + enrich dependencies with registry and GitHub release metadata"))
+    add_common(
+        sub.add_parser(
+            "scan", help="Detect repo and collect dependencies/outdated data"
+        )
+    )
+    add_common(
+        sub.add_parser(
+            "enrich",
+            help="Scan + enrich dependencies with registry and GitHub release metadata",
+        )
+    )
     add_common(sub.add_parser("analyze", help="Scan + enrich + impact analysis"))
 
     p_report = sub.add_parser("report", help="Scan + enrich + analyze + report outputs")
@@ -502,7 +616,9 @@ def main() -> None:
 
     p_full = sub.add_parser("full", help="Same as report")
     add_common(p_full)
-    p_package = sub.add_parser("package", help="Single-dependency comprehensive upgrade spec")
+    p_package = sub.add_parser(
+        "package", help="Single-dependency comprehensive upgrade spec"
+    )
     add_common(p_package)
 
     sub.add_parser("rate-limit", help="Show current GitHub API rate-limit status")
@@ -520,16 +636,28 @@ def main() -> None:
     selectors = list(args.dependency or [])
     if selectors:
         scan, filter_warnings = _filter_scan_dependencies(scan, selectors)
-        scan.setdefault("outdated", {}).setdefault("warnings", []).extend(filter_warnings)
+        scan.setdefault("outdated", {}).setdefault("warnings", []).extend(
+            filter_warnings
+        )
     if args.command == "package":
         if not selectors:
             raise SystemExit("`package` requires at least one --dependency selector")
         if not scan.get("dependencies"):
-            raise SystemExit(f"No dependencies matched selector(s): {', '.join(selectors)}")
+            raise SystemExit(
+                f"No dependencies matched selector(s): {', '.join(selectors)}"
+            )
 
     if args.command == "scan":
         stage_path = save_stage_json(out_dir, "gh-deps-intel-scan", scan)
-        print(json.dumps({"scan": stage_path, "summary": {"dependencies": len(scan['dependencies'])}}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "scan": stage_path,
+                    "summary": {"dependencies": len(scan["dependencies"])},
+                },
+                indent=2,
+            )
+        )
         flush_registry_cache()
         return
 
@@ -542,19 +670,37 @@ def main() -> None:
     )
     if args.command == "enrich":
         stage_path = save_stage_json(out_dir, "gh-deps-intel-enrich", enriched)
-        print(json.dumps({"enrich": stage_path, "summary": {"dependencies": len(enriched['dependencies'])}}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "enrich": stage_path,
+                    "summary": {"dependencies": len(enriched["dependencies"])},
+                },
+                indent=2,
+            )
+        )
         flush_registry_cache()
         return
 
     analyzed = run_analyze(enriched)
     if args.command == "analyze":
         stage_path = save_stage_json(out_dir, "gh-deps-intel-analyze", analyzed)
-        print(json.dumps({"analyze": stage_path, "summary": {"dependencies": len(analyzed['dependencies'])}}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "analyze": stage_path,
+                    "summary": {"dependencies": len(analyzed["dependencies"])},
+                },
+                indent=2,
+            )
+        )
         flush_registry_cache()
         return
 
     if args.command in {"report", "full", "package"}:
-        report = run_report(analyzed, out_dir, compatibility_policy=args.compatibility_policy)
+        report = run_report(
+            analyzed, out_dir, compatibility_policy=args.compatibility_policy
+        )
         print(json.dumps(report, indent=2))
         flush_registry_cache()
         return

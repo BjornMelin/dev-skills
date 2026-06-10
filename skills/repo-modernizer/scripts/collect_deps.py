@@ -28,9 +28,25 @@ def _extract_npm_version_hint(spec: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-def collect_js_dependencies(package_json_files: list[str], repo_root: Path) -> list[dict[str, Any]]:
+def collect_js_dependencies(
+    package_json_files: list[str], repo_root: Path
+) -> list[dict[str, Any]]:
+    """Collect JavaScript dependency rows from package.json files.
+
+    Args:
+        package_json_files: package.json file paths to inspect.
+        repo_root: Repository root used for relative source paths.
+
+    Returns:
+        Dependency rows with ecosystem, name, spec, source, and type fields.
+    """
     rows: list[dict[str, Any]] = []
-    sections = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]
+    sections = [
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+    ]
     for file in package_json_files:
         path = Path(file)
         data = _read_package_json(path)
@@ -75,7 +91,18 @@ def _parse_pep508_spec(req: str) -> str:
     return rest
 
 
-def collect_python_dependencies(pyproject_files: list[str], repo_root: Path) -> list[dict[str, Any]]:
+def collect_python_dependencies(
+    pyproject_files: list[str], repo_root: Path
+) -> list[dict[str, Any]]:
+    """Collect Python dependency rows from pyproject.toml files.
+
+    Args:
+        pyproject_files: pyproject.toml file paths to inspect.
+        repo_root: Repository root used for relative source paths.
+
+    Returns:
+        Dependency rows with ecosystem, name, spec, source, and type fields.
+    """
     rows: list[dict[str, Any]] = []
     try:
         import tomllib
@@ -139,14 +166,34 @@ def collect_python_dependencies(pyproject_files: list[str], repo_root: Path) -> 
 
 
 def collect_dependencies(repo_context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect dependency rows for every manifest in a repository context.
+
+    Args:
+        repo_context: Repository context produced by detect_repo_context.
+
+    Returns:
+        Combined JavaScript and Python dependency rows.
+    """
     repo_root = Path(repo_context["repo_root"])
     deps: list[dict[str, Any]] = []
-    deps.extend(collect_js_dependencies(repo_context.get("package_json_files", []), repo_root))
-    deps.extend(collect_python_dependencies(repo_context.get("pyproject_files", []), repo_root))
+    deps.extend(
+        collect_js_dependencies(repo_context.get("package_json_files", []), repo_root)
+    )
+    deps.extend(
+        collect_python_dependencies(repo_context.get("pyproject_files", []), repo_root)
+    )
     return deps
 
 
 def aggregate_dependencies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Aggregate raw dependency rows by ecosystem and name.
+
+    Args:
+        rows: Raw dependency rows collected from manifests.
+
+    Returns:
+        Sorted dependency records with merged specs and contexts.
+    """
     grouped: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
         key = (row["ecosystem"], row["name"])
@@ -182,10 +229,13 @@ def aggregate_dependencies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def main() -> None:
+    """Parse CLI arguments and print aggregated dependencies as JSON."""
     import argparse
     from detect_repo import detect_repo_context
 
-    parser = argparse.ArgumentParser(description="Collect dependencies from repo manifests.")
+    parser = argparse.ArgumentParser(
+        description="Collect dependencies from repo manifests."
+    )
     parser.add_argument("repo", nargs="?", default=".")
     args = parser.parse_args()
 

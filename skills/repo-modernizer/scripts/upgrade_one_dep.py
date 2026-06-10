@@ -9,8 +9,13 @@ from pathlib import Path
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run gh-deps-intel package workflow for one dependency")
-    parser.add_argument("dependency", help="Dependency selector/name (e.g. @types/node, workflow)")
+    """Run the package workflow for one dependency selector."""
+    parser = argparse.ArgumentParser(
+        description="Run gh-deps-intel package workflow for one dependency"
+    )
+    parser.add_argument(
+        "dependency", help="Dependency selector/name (e.g. @types/node, workflow)"
+    )
     parser.add_argument("--repo", default=".", help="Target repository root")
     parser.add_argument("--out", default="reports", help="Output directory")
     parser.add_argument("--mode", choices=["safe", "fast"], default="safe")
