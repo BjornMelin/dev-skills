@@ -1,0 +1,6 @@
+interface:
+  display_name: "Notebook Ml Architect"
+  short_description: "Help with Notebook Ml Architect tasks"
+  default_prompt: "Use $notebook-ml-architect to audit, refactor, or design reproducible machine-learning notebooks and production-ready ML workflows."
+policy:
+  allow_implicit_invocation: false

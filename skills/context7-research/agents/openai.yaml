@@ -1,0 +1,6 @@
+interface:
+  display_name: "Context7 Research"
+  short_description: "Help with Context7 Research tasks"
+  default_prompt: "Use $context7-research to verify current library, framework, dependency, and API documentation through Context7 primary docs."
+policy:
+  allow_implicit_invocation: false

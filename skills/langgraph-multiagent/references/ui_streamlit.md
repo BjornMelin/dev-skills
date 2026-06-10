@@ -6,21 +6,17 @@ This guide complements `streamlit-master-architect` by focusing specifically on 
 
 This skill intentionally stays focused on agent integration; for Streamlit APIs, evergreen upgrade rules, and production hardening, load:
 
-- Streamlit Master Architect skill: `/home/bjorn/.codex/skills/streamlit-master-architect/SKILL.md`
-- Evergreen audit + upgrade playbook: `/home/bjorn/.codex/skills/streamlit-master-architect/references/evergreen_audit_upgrade.md`
-- Official doc URLs: `/home/bjorn/.codex/skills/streamlit-master-architect/references/official_urls.md`
-- Caching/fragments: `/home/bjorn/.codex/skills/streamlit-master-architect/references/caching_and_fragments.md`
-- Widget keys/reruns: `/home/bjorn/.codex/skills/streamlit-master-architect/references/widget_keys_and_reruns.md`
-- AppTest: `/home/bjorn/.codex/skills/streamlit-master-architect/references/testing_apptest.md`
+- Streamlit Master Architect skill: load it when available.
+- Streamlit Master Architect references: load the matching reference files from that skill when available.
 
 ## Evergreen “ground truth” loop (don’t guess Streamlit APIs)
 
 1. Detect the project’s Streamlit version:
    - `python3 -c "import streamlit as st; print(st.__version__)"`
 2. Audit the Streamlit project (deprecations + risky patterns):
-   - `python3 /home/bjorn/.codex/skills/streamlit-master-architect/scripts/audit_streamlit_project.py --root <PROJECT_ROOT> --format md`
+   - `python3 "$skill_dir/scripts/audit_streamlit_project.py" --root <PROJECT_ROOT> --format md`
 3. If needed, sync Streamlit docs index:
-   - `python3 /home/bjorn/.codex/skills/streamlit-master-architect/scripts/sync_streamlit_docs.py --out /tmp/streamlit-docs`
+   - `python3 "$skill_dir/scripts/sync_streamlit_docs.py" --out /tmp/streamlit-docs`
 
 ## Core architecture
 

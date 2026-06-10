@@ -1,0 +1,6 @@
+interface:
+  display_name: "Ai Sdk Core"
+  short_description: "Help with Ai Sdk Core tasks"
+  default_prompt: "Use $ai-sdk-core to implement or review AI SDK Core generation, structured output, tool calling, MCP, embeddings, providers, and telemetry."
+policy:
+  allow_implicit_invocation: false
