@@ -48,7 +48,7 @@ generating the pack.
    ```
 
 6. Refine the enriched manifest further with live research when needed:
-   - `$repo-modernize-upgrade-audit`
+   - `$repo-modernizer`
    - `$opensrc`
    - `$opensrc-inspect`
    - `$technical-writing`

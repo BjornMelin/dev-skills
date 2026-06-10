@@ -166,7 +166,7 @@ report_requirements:
   - deprecations and practical replacements
   - repo-specific findings, verification evidence, and residual risks
 skill_routing_playbook:
-  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
+  - "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`."
   - "Use official-doc lanes first for unstable claims: current Lucide docs, Next.js docs, changelogs, and upstream source when needed."
   - "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane."
   - "Use `$vitest` or `$vitest-dev` when tests, coverage, or Vitest config need to move."
@@ -205,7 +205,7 @@ operator_exit_criteria:
   - docs/policy match the final state
   - verification is green
 skill_routing_operator:
-  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
+  - "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`."
   - "Proof lane: current official docs, changelogs, and upstream source when needed."
   - "Test lane: `$vitest` or `$vitest-dev` when tests or coverage config move."
   - "Browser lane: `$playwright-interactive`, `$next-browser`, or `$vercel:agent-browser` only for visible UI verification."
