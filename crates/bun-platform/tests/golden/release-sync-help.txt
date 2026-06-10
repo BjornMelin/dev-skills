@@ -14,7 +14,7 @@ Options:
 
       --format <FORMAT>
           Output format for status, preview, or sync reporting.
-          
+
           [default: text]
           [possible values: text, json, md]
 

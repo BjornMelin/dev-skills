@@ -35,7 +35,16 @@ fn stdout_string(output: Output) -> String {
 }
 
 fn normalize(text: &str) -> String {
-    text.replace("\r\n", "\n")
+    let normalized = text.replace("\r\n", "\n");
+    let mut lines = normalized
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+    if normalized.ends_with('\n') {
+        lines.push('\n');
+    }
+    lines
 }
 
 fn golden(name: &str) -> &'static str {

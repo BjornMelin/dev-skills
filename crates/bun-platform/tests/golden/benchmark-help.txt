@@ -32,12 +32,12 @@ Options:
 
       --iterations <ITERATIONS>
           Number of repeated iterations to measure.
-          
+
           [default: 3]
 
       --format <FORMAT>
           Output format for benchmark results.
-          
+
           [default: text]
           [possible values: text, json, md]
 
