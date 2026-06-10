@@ -89,6 +89,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
 
     let lockfiles = [
         "bun.lockb",
+        "bun.lock",
         "package-lock.json",
         "pnpm-lock.yaml",
         "yarn.lock",
@@ -109,7 +110,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
             ),
             FindingOptions {
                 suggested_fix: Some(
-                    "Remove non-Bun lockfiles and keep bun.lockb as the single source of truth."
+                    "Remove non-Bun lockfiles and keep Bun's lockfile as the single source of truth."
                         .to_string(),
                 ),
                 ..Default::default()
@@ -332,24 +333,28 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         .as_deref()
         .unwrap_or_default()
         .contains("bun.lockb")
+        || gitignore
+            .as_deref()
+            .unwrap_or_default()
+            .contains("bun.lock")
     {
         findings.push(create_finding(
             &root,
             "pm-commit-bun-lockb",
             Severity::Warn,
             &root.join(".gitignore"),
-            "bun.lockb is ignored. Prefer committing bun.lockb for deterministic installs.",
+            "Bun lockfiles are ignored. Prefer committing bun.lock or bun.lockb for deterministic installs.",
             FindingOptions::default(),
         ));
     }
 
-    if root.join(".nvmrc").is_file() && root.join("bun.lockb").is_file() {
+    if root.join(".nvmrc").is_file() && has_bun_lockfile(&root) {
         findings.push(create_finding(
       &root,
       "runtime-bun-vs-node-choose",
       Severity::Info,
       &root.join(".nvmrc"),
-      "Found both .nvmrc and bun.lockb. If Node is not required, consider removing Node-only runtime pinning.",
+      "Found both .nvmrc and a Bun lockfile. If Node is not required, consider removing Node-only runtime pinning.",
       FindingOptions::default(),
     ));
     }
@@ -368,7 +373,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         },
       ));
         }
-        if root.join("bun.lockb").is_file()
+        if has_bun_lockfile(&root)
             && Regex::new(r"(?ms)^\s*\[install\].*^\s*frozenLockfile\s*=\s*false")?
                 .is_match(&bunfig)
         {
@@ -591,7 +596,7 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> RepoSignals {
         .and_then(|pkg| pkg.workspaces.clone())
         .map(|value| !value.is_null())
         .unwrap_or(false);
-    let bun_first = snapshot.root.join("bun.lockb").is_file()
+    let bun_first = has_bun_lockfile(snapshot.root)
         || package_json
             .as_ref()
             .and_then(|pkg| pkg.package_manager.as_deref())
@@ -675,7 +680,7 @@ fn normalize_findings(mut findings: Vec<Finding>, config: &AuditConfig) -> Vec<F
 fn run_adapters(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Result<Vec<Finding>> {
     let requested = resolve_adapter_ids(signals, &snapshot.config.adapters);
     let mut findings = Vec::new();
-    if requested.contains("vercel") && signals.vercel_bun_enabled {
+    if requested.contains("vercel") {
         findings.extend(run_vercel_adapter(snapshot, signals)?);
     }
     if requested.contains("github-actions") && snapshot.root.join(".github/workflows").is_dir() {
@@ -739,13 +744,13 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
       ));
         }
     }
-    if !root.join("bun.lockb").is_file() {
+    if !has_bun_lockfile(root) {
         findings.push(create_finding(
       root,
       "vercel-bun-install-detection",
       Severity::Warn,
       &vercel_json_path,
-      "Bun runtime is enabled but bun.lockb is missing. Add and commit bun.lockb to ensure Bun installs on Vercel.",
+      "Bun runtime is enabled but no Bun lockfile is committed. Add and commit bun.lock or bun.lockb to ensure Bun installs on Vercel.",
       FindingOptions::default(),
     ));
     }
@@ -842,7 +847,7 @@ fn run_github_actions_adapter(
                 line_hit(&content, &npx_re),
             ));
         }
-        if snapshot.root.join("bun.lockb").is_file()
+        if has_bun_lockfile(snapshot.root)
             && bun_install_re.is_match(&content)
             && !bun_frozen_re.is_match(&content)
         {
@@ -903,7 +908,7 @@ fn run_docker_adapter(
                 line_hit(&content, &install_re),
             ));
         }
-        if snapshot.root.join("bun.lockb").is_file()
+        if has_bun_lockfile(snapshot.root)
             && bun_install_re.is_match(&content)
             && !bun_frozen_re.is_match(&content)
         {
@@ -955,6 +960,10 @@ fn is_dockerfile(path: &Path) -> bool {
         .and_then(|value| value.to_str())
         .map(|value| value.starts_with("Dockerfile"))
         .unwrap_or(false)
+}
+
+fn has_bun_lockfile(root: &Path) -> bool {
+    root.join("bun.lockb").is_file() || root.join("bun.lock").is_file()
 }
 
 fn is_js_like(path: &Path) -> bool {

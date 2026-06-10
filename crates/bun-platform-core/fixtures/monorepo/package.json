@@ -5,6 +5,7 @@
   "workspaces": [
     "packages/*"
   ],
+  "_fixture_note": "Self-referential root scripts intentionally exercise scripts-bun-filter-and-workspaces.",
   "scripts": {
     "build": "bun run build",
     "test": "bun run test"

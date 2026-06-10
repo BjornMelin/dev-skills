@@ -111,8 +111,12 @@ fn audit_json_output_has_expected_fields() {
     let json = serde_json::from_str::<Value>(&stdout).expect("audit json");
     let findings = json.as_array().expect("findings array");
     assert!(!findings.is_empty());
+    let finding = findings
+        .iter()
+        .find(|finding| finding["rule_id"].as_str() == Some("scripts-no-npm-in-bun-repos"))
+        .expect("scripts-no-npm-in-bun-repos finding");
     assert_eq!(
-        findings[0]["rule_id"].as_str(),
+        finding["rule_id"].as_str(),
         Some("scripts-no-npm-in-bun-repos")
     );
     for key in [
@@ -126,6 +130,6 @@ fn audit_json_output_has_expected_fields() {
         "message",
         "suppression_key",
     ] {
-        assert!(findings[0].get(key).is_some(), "missing key `{key}`");
+        assert!(finding.get(key).is_some(), "missing key `{key}`");
     }
 }

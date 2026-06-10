@@ -11,7 +11,12 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, fs, path::PathBuf, time::Duration};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 pub fn run_release_sync(
@@ -20,58 +25,39 @@ pub fn run_release_sync(
 ) -> Result<ReleaseSyncReport> {
     paths.ensure()?;
 
-    fs::write(
-        context.references_dir.join(REF_BUN_RELEASE_NOTES),
-        fetch_bun_release_snapshot()?,
-    )?;
-    fs::write(
-        context.references_dir.join(REF_VERCEL_BUN_RUNTIME),
-        fetch_vercel_runtime_snapshot()?,
-    )?;
-    fs::write(
-        context.skill_path("rules/_index.md"),
-        build_rules_index_content(context)?,
-    )?;
-    fs::write(
-        context.skill_path("references/index.md"),
-        build_references_index_content(),
-    )?;
+    let staged_root = temp_stage_root()?;
+    copy_dir_all(&context.skill_root, &staged_root)?;
+    let staged_context = SkillContext {
+        skill_root: staged_root.clone(),
+        rules_dir: staged_root.join("rules"),
+        references_dir: staged_root.join("references"),
+    };
+    let updates = release_sync_updates(&staged_context)?;
+    for (relative_path, content) in &updates {
+        fs::write(staged_context.skill_path(relative_path), content)?;
+    }
 
-    check_skill_integrity(context)?;
-    let report = create_release_sync_report(context)?;
-    paths.write_release_report(&report)?;
+    let result: Result<ReleaseSyncReport> = (|| {
+        check_skill_integrity(&staged_context)?;
+        let report = create_release_sync_report(&staged_context)?;
+        commit_release_sync_updates(context, &updates)?;
+        paths.write_release_report(&report)?;
+        Ok(report)
+    })();
+    let _ = fs::remove_dir_all(&staged_root);
+    let report = result?;
     Ok(report)
 }
 
 pub fn preview_release_sync(context: &SkillContext) -> Result<ReleaseSyncPreview> {
-    let candidates = [
-        (
-            context.references_dir.join(REF_BUN_RELEASE_NOTES),
-            fetch_bun_release_snapshot()?,
-        ),
-        (
-            context.references_dir.join(REF_VERCEL_BUN_RUNTIME),
-            fetch_vercel_runtime_snapshot()?,
-        ),
-        (
-            context.skill_path("rules/_index.md"),
-            build_rules_index_content(context)?,
-        ),
-        (
-            context.skill_path("references/index.md"),
-            build_references_index_content(),
-        ),
-    ];
+    let candidates = release_sync_updates(context)?;
 
     let mut would_update = Vec::new();
     let mut unchanged = Vec::new();
 
-    for (path, next_content) in candidates {
-        let relative = path
-            .strip_prefix(&context.skill_root)
-            .unwrap_or(&path)
-            .display()
-            .to_string();
+    for (relative_path, next_content) in candidates {
+        let path = context.skill_path(&relative_path);
+        let relative = relative_path.display().to_string();
         let current = fs::read_to_string(&path).unwrap_or_default();
         if current == next_content {
             unchanged.push(relative);
@@ -87,6 +73,64 @@ pub fn preview_release_sync(context: &SkillContext) -> Result<ReleaseSyncPreview
         unchanged,
         integrity_ok: check_skill_integrity(context).is_ok(),
     })
+}
+
+fn release_sync_updates(context: &SkillContext) -> Result<Vec<(PathBuf, String)>> {
+    Ok(vec![
+        (
+            PathBuf::from("references").join(REF_BUN_RELEASE_NOTES),
+            fetch_bun_release_snapshot()?,
+        ),
+        (
+            PathBuf::from("references").join(REF_VERCEL_BUN_RUNTIME),
+            fetch_vercel_runtime_snapshot()?,
+        ),
+        (
+            PathBuf::from("rules/_index.md"),
+            build_rules_index_content(context)?,
+        ),
+        (
+            PathBuf::from("references/index.md"),
+            build_references_index_content(),
+        ),
+    ])
+}
+
+fn commit_release_sync_updates(
+    context: &SkillContext,
+    updates: &[(PathBuf, String)],
+) -> Result<()> {
+    for (relative_path, content) in updates {
+        let target = context.skill_path(relative_path);
+        let tmp = target.with_extension("tmp-release-sync");
+        fs::write(&tmp, content)?;
+        fs::rename(&tmp, &target)
+            .with_context(|| format!("failed to replace {}", target.display()))?;
+    }
+    Ok(())
+}
+
+fn temp_stage_root() -> Result<PathBuf> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    Ok(std::env::temp_dir().join(format!("bun-platform-release-sync-{nanos}")))
+}
+
+fn copy_dir_all(source: &Path, target: &Path) -> Result<()> {
+    fs::create_dir_all(target)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let destination = target.join(entry.file_name());
+        if file_type.is_dir() {
+            copy_dir_all(&entry.path(), &destination)?;
+        } else if file_type.is_file() {
+            fs::copy(entry.path(), destination)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn create_release_sync_report(context: &SkillContext) -> Result<ReleaseSyncReport> {

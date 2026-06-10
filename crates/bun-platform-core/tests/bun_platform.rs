@@ -1,6 +1,7 @@
 use bun_platform_core::{
-    PlatformPaths, SkillContext, apply_safe_fixes, create_release_sync_report, load_audit_config,
-    plan_safe_fixes, preview_release_sync, run_audit,
+    PlatformPaths, SkillContext, VERIFIED_BUN_VERSION, apply_safe_fixes,
+    create_release_sync_report, load_audit_config, plan_safe_fixes, preview_release_sync,
+    run_audit,
 };
 use std::{
     env, fs,
@@ -113,7 +114,9 @@ fn plans_and_applies_safe_package_json_fixes() {
     apply_safe_fixes(&root, &config, &paths).expect("apply");
     let package_json =
         fs::read_to_string(root.join("package.json")).expect("package.json after fixes");
-    assert!(package_json.contains("\"packageManager\": \"bun@1.3.14\""));
+    assert!(package_json.contains(&format!(
+        "\"packageManager\": \"bun@{VERIFIED_BUN_VERSION}\""
+    )));
     assert!(package_json.contains("\"gen\": \"bunx prisma generate\""));
     assert!(!root.join(".bun-platform").exists());
 }
@@ -169,6 +172,23 @@ fn respects_disabled_rules_and_baseline_suppressions() {
         !findings
             .iter()
             .any(|finding| finding.rule_id == "pm-bunx-vs-npx")
+    );
+}
+
+#[test]
+fn recognizes_current_bun_lockfile_name() {
+    let _env = TestEnv::new("bun-lock");
+    let root = copy_fixture("mixed-lockfiles");
+    fs::remove_file(root.join("bun.lockb")).expect("remove old lockfile");
+    fs::write(root.join("bun.lock"), "").expect("write current lockfile");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.rule_id == "pm-no-mixed-lockfiles")
     );
 }
 
@@ -249,6 +269,29 @@ fn reports_adapter_findings() {
         monorepo_findings
             .iter()
             .any(|finding| finding.rule_id == "scripts-bun-filter-and-workspaces")
+    );
+}
+
+#[test]
+fn explicit_vercel_adapter_reports_missing_bun_version() {
+    let _env = TestEnv::new("explicit-vercel");
+    let root = unique_temp_dir("explicit-vercel-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(root.join("package.json"), r#"{"private":true}"#).expect("package");
+    fs::write(root.join("vercel.json"), "{}").expect("vercel");
+    fs::write(
+        root.join("bun-platform.config.json"),
+        r#"{"adapters":["vercel"]}"#,
+    )
+    .expect("config");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-bun-runtime-enable")
     );
 }
 

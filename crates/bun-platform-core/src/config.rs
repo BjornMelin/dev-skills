@@ -7,6 +7,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+// `opensrc` is a repo-local source-snapshot workflow, distinct from the global
+// `~/.opensrc` cache, and should not be scanned as project source.
 const DEFAULT_EXCLUDE_DIRS: &[&str] = &[
     "node_modules",
     ".git",
@@ -193,6 +195,8 @@ fn read_baseline_keys(
             .filter_map(|value| value.as_str().map(ToOwned::to_owned))
             .collect()),
         serde_json::Value::String(value) => {
+            // Baseline path strings are resolved relative to the config file's
+            // parent, or to `root` when the default config path is used.
             let base = config_path.and_then(Path::parent).unwrap_or(root);
             load_baseline_file(&base.join(value))
         }

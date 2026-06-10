@@ -4,6 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Default skill root under `$HOME`; override with `BUN_PLATFORM_SKILL_ROOT` or
+/// the CLI `--skill-root` flag when targeting repo-local skill sources.
+const DEFAULT_SKILL_ROOT: &str = ".agents/skills/bun-dev";
+
 #[derive(Clone, Debug)]
 pub struct SkillContext {
     pub skill_root: PathBuf,
@@ -20,7 +24,7 @@ impl SkillContext {
         } else {
             let home =
                 env::var("HOME").context("HOME is not set and --skill-root was not provided")?;
-            PathBuf::from(home).join(".agents/skills/bun-dev")
+            PathBuf::from(home).join(DEFAULT_SKILL_ROOT)
         };
         let skill_root = skill_root
             .canonicalize()

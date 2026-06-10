@@ -185,19 +185,23 @@ fn is_bun_first_repo(root: &Path, root_map: &Map<String, Value>) -> bool {
 }
 
 fn has_vercel_bun_runtime(root: &Path) -> bool {
-    let path = root.join("vercel.json");
-    let Ok(text) = fs::read_to_string(path) else {
-        return false;
-    };
-    let Ok(json) = serde_json::from_str::<Value>(&text) else {
-        return false;
-    };
-    contains_bun_runtime_config(&json)
+    if let Ok(text) = fs::read_to_string(root.join("vercel.json"))
+        && let Ok(json) = serde_json::from_str::<Value>(&text)
+        && contains_bun_runtime_config(&json)
+    {
+        return true;
+    }
+    fs::read_to_string(root.join("vercel.ts"))
+        .map(|text| {
+            Regex::new(r#"bunVersion\s*:\s*["']"#)
+                .expect("valid regex")
+                .is_match(&text)
+        })
+        .unwrap_or(false)
 }
 
 fn contains_bun_runtime_config(value: &Value) -> bool {
     match value {
-        Value::String(text) => text == "bun" || text.starts_with("bun@") || text == "1.x",
         Value::Array(values) => values.iter().any(contains_bun_runtime_config),
         Value::Object(map) => {
             map.get("runtime")
