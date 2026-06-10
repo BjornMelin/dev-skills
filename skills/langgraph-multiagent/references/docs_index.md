@@ -55,7 +55,7 @@ Alternative UI stack (Node/TS runtime):
   - see `references/ui_nextjs_ai_sdk.md`
   - Context7: `/vercel/ai`
 - Streamdown (streaming-safe markdown renderer):
-  - skill: `/home/bjorn/.codex/skills/streamdown/SKILL.md`
+  - load `$streamdown` when available
 
 ## LangGraph doc sitemap (`llms.txt`)
 

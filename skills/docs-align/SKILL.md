@@ -23,7 +23,7 @@ Use this skill after implementation work or when you suspect documentation drift
 
 Commands above assume the current working directory is this skill’s root (`skills/docs-align` in this repository). If the working directory is elsewhere, invoke the same files with an absolute path, for example:
 
-`python3 /path/to/docs-align/scripts/docs_drift.py collect --cwd <repo> --out <json>`
+`python3 "<skill-dir>/scripts/docs_drift.py" collect --cwd <repo> --out <json>`
 
 ## Alignment policies
 

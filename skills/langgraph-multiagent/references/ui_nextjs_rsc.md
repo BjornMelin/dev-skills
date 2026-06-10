@@ -141,16 +141,14 @@ Agent responses often contain Markdown (tables, lists, code blocks). Prefer Stre
 
 Deep-dive references:
 
-- Streamdown skill: `/home/bjorn/.codex/skills/streamdown/SKILL.md`
-- Streamdown + AI SDK patterns: `/home/bjorn/.codex/skills/streamdown/references/ai-sdk-integration.md`
-- Streamdown security + styling: `/home/bjorn/.codex/skills/streamdown/references/styling-security.md`
-- Streamdown API reference: `/home/bjorn/.codex/skills/streamdown/references/api-reference.md`
+- Streamdown: load `$streamdown` when available
+- Streamdown + AI SDK patterns: load Streamdown's AI SDK reference when available
+- Streamdown security + styling: load Streamdown's styling/security reference when available
+- Streamdown API reference: load Streamdown's API reference when available
 
 ## Cross-skill UI references (load on demand)
 
 If you’re building a Next.js UI and want best-practice guidance for the UI layer beyond LangGraph:
 
-- AI SDK Core: `/home/bjorn/.codex/skills/ai-sdk-core/SKILL.md`
-- AI SDK UI: `/home/bjorn/.codex/skills/ai-sdk-ui/SKILL.md`
-- AI SDK Agents: `/home/bjorn/.codex/skills/ai-sdk-agents/SKILL.md`
-- Frontend quality + aesthetics: `/home/bjorn/.codex/skills/frontend-design/SKILL.md`
+- AI SDK Core/UI/Agents: use the Vercel AI SDK skill or installed AI SDK skills
+- Frontend quality + aesthetics: use `$ui-workbench` or the Build Web Apps frontend skill when available

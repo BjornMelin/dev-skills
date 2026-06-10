@@ -71,23 +71,23 @@ generating the pack.
 10. Re-run read-only research so the snapshot reflects the confirmed official
     pages:
 
-   ```bash
-   python3 scripts/research_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
-   ```
+    ```bash
+    python3 scripts/research_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
+    ```
 
 11. Run read-only qualification:
 
-   ```bash
-   python3 scripts/qualify_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
-   ```
+    ```bash
+    python3 scripts/qualify_upgrade_pack.py --manifest /tmp/upgrade-pack.yaml
+    ```
 
 12. Render the pack:
 
-   ```bash
-   python3 scripts/render_upgrade_pack.py \
-     --manifest /tmp/upgrade-pack.yaml \
-     --output-dir /path/to/repo/.agents/plans/upgrade/<topic>
-   ```
+    ```bash
+    python3 scripts/render_upgrade_pack.py \
+      --manifest /tmp/upgrade-pack.yaml \
+      --output-dir /path/to/repo/.agents/plans/upgrade/<topic>
+    ```
 
 ## Output Contract
 
