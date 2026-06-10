@@ -24,13 +24,6 @@ Use this skill when the deliverable is **internal technical documentation for bu
 - rollout / rollback / migration guides
 - developer-facing implementation or maintenance guides
 
-Read these support docs before choosing the mode or boundary:
-- [references/document-modes-and-boundaries.md](references/document-modes-and-boundaries.md)
-- [references/mode-structures.md](references/mode-structures.md)
-- [references/prd.md](references/prd.md)
-- [references/quality-checklists.md](references/quality-checklists.md)
-- [references/docs-as-code-and-maintenance.md](references/docs-as-code-and-maintenance.md)
-
 ## When to use this skill
 - A team needs a technical spec before implementation starts
 - A team needs a PRD for product/feature requirements before design or implementation
@@ -99,7 +92,7 @@ Do not draft from vibes alone. Pull the smallest credible evidence set first:
 If evidence is missing, label assumptions explicitly instead of pretending the document is authoritative.
 
 ### Step 4: Choose the smallest fitting structure
-Use [references/mode-structures.md](references/mode-structures.md) and only keep the sections that fit the chosen mode.
+Use the mode rules below and only keep the sections that fit the chosen document.
 
 ### Step 5: Apply mode-specific writing rules
 - **Specs** must separate goals from non-goals.
