@@ -50,7 +50,6 @@ generating the pack.
 6. Refine the enriched manifest further with live research when needed:
    - `$repo-modernizer`
    - `$opensrc`
-   - `$opensrc-inspect`
    - `$technical-writing`
    - `$hard-cut`
 7. Validate the manifest:

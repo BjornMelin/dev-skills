@@ -122,7 +122,7 @@ report_requirements:
   - codemods considered or used
   - repo-specific findings, verification evidence, and residual risks
 skill_routing_playbook:
-  - "Always start in the framework upgrade lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$vercel`, and `$vercel:nextjs`."
+  - "Always start in the framework upgrade lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, `$hard-cut`, `$vercel`, and `$vercel:nextjs`."
   - "Use official Next.js docs first for unstable claims, then Vercel guidance when platform behavior matters."
   - "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane."
   - "Use test lanes such as `$vitest` or `$vitest-dev` when tests or coverage config move."
@@ -154,7 +154,7 @@ operator_exit_criteria:
   - docs and policy match the final state
   - verification is green
 skill_routing_operator:
-  - "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, `$vercel`, `$vercel:nextjs`."
+  - "Default lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, `$hard-cut`, `$vercel`, `$vercel:nextjs`."
   - "Proof lane: official Next.js docs first, Vercel docs when platform behavior matters, upstream source only when necessary."
   - "Test lane: `$vitest` or `$vitest-dev` when tests or coverage config move."
   - "Conditional lanes: `$bun-dev` for Bun repos, browser verification only when the framework wave changes visible behavior."

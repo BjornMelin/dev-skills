@@ -289,7 +289,7 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
             "residual risks or explicit defer reasons",
         ],
         "skill_routing_playbook": [
-            "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, and `$hard-cut`.",
+            "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, and `$hard-cut`.",
             "Use official-doc lanes first for unstable claims: current upstream docs, changelogs, and source when needed.",
             "Use `$bun-dev` only when Bun is the repo's real runtime or package-manager lane.",
             "Use framework/plugin lanes only when the target repo actually detects them.",
@@ -323,7 +323,7 @@ def generic_manifest(anchor_package: str, repo_context: dict[str, Any], family_s
             "verification is green",
         ],
         "skill_routing_operator": [
-            "Default lane: `$repo-modernizer`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`.",
+            "Default lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, `$hard-cut`.",
             "Use `$bun-dev` only when Bun is actually part of repo posture.",
             "Use framework/plugin lanes only when explicitly relevant to the target repo.",
             "Do not route this migration through `$imagegen`.",

@@ -4,7 +4,6 @@ Default lanes:
 
 - `$repo-modernizer`
 - `$opensrc`
-- `$opensrc-inspect`
 - `$technical-writing`
 - `$hard-cut`
 
