@@ -1,3 +1,4 @@
 interface:
   display_name: "Codex Sdk"
   short_description: "Help with Codex Sdk tasks"
+  default_prompt: "Use $codex-sdk to design or debug Codex SDK, Codex CLI automation, MCP integration, multi-agent orchestration, and sandbox policy workflows."

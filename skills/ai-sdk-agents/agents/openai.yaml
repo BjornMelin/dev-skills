@@ -1,3 +1,4 @@
 interface:
   display_name: "Ai Sdk Agents"
   short_description: "Help with Ai Sdk Agents tasks"
+  default_prompt: "Use $ai-sdk-agents to build or review AI SDK v6 ToolLoopAgent workflows, tool loops, stop conditions, and agent orchestration."
