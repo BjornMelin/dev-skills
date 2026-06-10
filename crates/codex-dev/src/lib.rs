@@ -120,6 +120,8 @@ impl Cli {
             Commands::Skills { command } => match command {
                 SkillsCommand::Catalog(_) => "skills catalog",
                 SkillsCommand::Inventory(_) => "skills inventory",
+                SkillsCommand::Validate(_) => "skills validate",
+                SkillsCommand::Audit(_) => "skills audit",
                 SkillsCommand::SyncKimi(_) => "skills sync-kimi",
             },
             Commands::Bootstrap { command } => match command {
@@ -304,6 +306,10 @@ enum SkillsCommand {
     Catalog(SkillsCatalogArgs),
     /// Emit a read-only machine-readable inventory of tracked skills.
     Inventory(SkillsInventoryArgs),
+    /// Validate skill frontmatter and entrypoint contracts.
+    Validate(SkillsValidateArgs),
+    /// Audit skills for validation, metadata, stale references, and generated artifacts.
+    Audit(SkillsAuditArgs),
     /// Sync Kimi Code skill loading to the Codex enabled skill set.
     #[command(name = "sync-kimi")]
     SyncKimi(SkillsSyncKimiArgs),
@@ -1033,6 +1039,60 @@ pub struct SkillsInventoryArgs {
         help = "Repository root to inspect; defaults to the current git worktree root when available"
     )]
     pub repo_root: Option<PathBuf>,
+    /// Skills directory to inspect directly, for installed global skill roots.
+    #[arg(
+        long,
+        value_name = "SKILLS_ROOT",
+        help = "Skills root to inspect directly instead of <repo-root>/skills"
+    )]
+    pub skills_root: Option<PathBuf>,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Arguments for skill validation.
+#[derive(Args, Clone, Debug)]
+pub struct SkillsValidateArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Skills directory to inspect directly, for installed global skill roots.
+    #[arg(
+        long,
+        value_name = "SKILLS_ROOT",
+        help = "Skills root to inspect directly instead of <repo-root>/skills"
+    )]
+    pub skills_root: Option<PathBuf>,
+    /// Deterministic report timestamp, primarily for tests and fixture generation.
+    #[arg(long, value_name = "RFC3339")]
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Arguments for skill hygiene audits.
+#[derive(Args, Clone, Debug)]
+pub struct SkillsAuditArgs {
+    /// Repository root to inspect instead of discovering the current worktree root.
+    #[arg(
+        long,
+        value_name = "REPO_ROOT",
+        help = "Repository root to inspect; defaults to the current git worktree root when available"
+    )]
+    pub repo_root: Option<PathBuf>,
+    /// Skills directory to inspect directly, for installed global skill roots.
+    #[arg(
+        long,
+        value_name = "SKILLS_ROOT",
+        help = "Skills root to inspect directly instead of <repo-root>/skills"
+    )]
+    pub skills_root: Option<PathBuf>,
+    /// Warn when SKILL.md is longer than this many lines.
+    #[arg(long, default_value_t = 500, value_name = "LINES")]
+    pub max_skill_md_lines: usize,
     /// Deterministic report timestamp, primarily for tests and fixture generation.
     #[arg(long, value_name = "RFC3339")]
     pub checked_at: Option<DateTime<Utc>>,
@@ -2014,6 +2074,36 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            SkillsCommand::Validate(args) => {
+                let result = skills_validate(args)?;
+                let human = if result.ok {
+                    format!("validated {} skill(s): all valid", result.total)
+                } else {
+                    format!(
+                        "validated {} skill(s): {} valid, {} invalid",
+                        result.total, result.valid, result.invalid
+                    )
+                };
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "skills validate",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
+            SkillsCommand::Audit(args) => {
+                let result = skills_audit(args)?;
+                let human = format!(
+                    "audited {} skill(s) and {} archived skill(s): {} error(s), {} warning(s)",
+                    result.total, result.archive.total, result.error_count, result.warning_count
+                );
+                Ok(CommandOutput {
+                    ok: result.ok,
+                    command: "skills audit",
+                    human,
+                    result: serde_json::to_value(result)?,
+                })
+            }
             SkillsCommand::SyncKimi(args) => handle_skills_sync_kimi(args, json_output),
         },
         Commands::Bootstrap { command } => match command {
@@ -2515,7 +2605,27 @@ pub fn skills_inventory(
 ) -> Result<codex_dev_core::SkillsInventoryReport> {
     codex_dev_core::skills_inventory(codex_dev_core::SkillInventoryArgs {
         repo_root: args.repo_root,
+        skills_root: args.skills_root,
         checked_at: args.checked_at,
+    })
+}
+
+/// Build a read-only validation report for skill folders.
+pub fn skills_validate(args: SkillsValidateArgs) -> Result<codex_dev_core::SkillsInventoryReport> {
+    codex_dev_core::skills_inventory(codex_dev_core::SkillInventoryArgs {
+        repo_root: args.repo_root,
+        skills_root: args.skills_root,
+        checked_at: args.checked_at,
+    })
+}
+
+/// Build a read-only hygiene audit for skill folders.
+pub fn skills_audit(args: SkillsAuditArgs) -> Result<codex_dev_core::SkillsAuditReport> {
+    codex_dev_core::skills_audit(codex_dev_core::SkillAuditArgs {
+        repo_root: args.repo_root,
+        skills_root: args.skills_root,
+        checked_at: args.checked_at,
+        max_skill_md_lines: args.max_skill_md_lines,
     })
 }
 

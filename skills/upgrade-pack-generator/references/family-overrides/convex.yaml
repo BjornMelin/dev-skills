@@ -101,13 +101,13 @@ report_requirements:
   - codegen, release-surface, and verification evidence
   - repo-specific findings and residual risks
 skill_routing_playbook:
-  - "Always start in the upgrade lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
+  - "Always start in the upgrade lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
   - "Use official Convex docs first for unstable claims."
   - "Use `$bun-dev` only when Bun is the repo's real package-manager or runtime lane."
   - "Use `$platform-architect` when the Convex wave crosses web, mobile, and backend boundaries."
   - "Do not use `$imagegen` for Convex upgrade work."
 skill_routing_operator:
-  - "Default lane: `$repo-modernize-upgrade-audit`, `$opensrc`, `$opensrc-inspect`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
+  - "Default lane: `$repo-modernizer`, `$opensrc`, `$technical-writing`, `$hard-cut`, and the repo-local Convex skill set."
   - "Proof lane: official Convex docs first, source only when public guidance is insufficient."
   - "Conditional lanes: `$bun-dev` for Bun repos, `$platform-architect` for full-stack monorepo coordination."
   - "Do not route this migration through `$imagegen`."
