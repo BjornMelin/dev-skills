@@ -305,6 +305,60 @@ fn ignores_commented_vercel_ts_bun_version() {
 }
 
 #[test]
+fn ignores_empty_vercel_ts_bun_version() {
+    let _env = TestEnv::new("empty-vercel-ts");
+    let root = unique_temp_dir("empty-vercel-ts-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(
+        root.join("package.json"),
+        r#"{"private":true,"scripts":{"dev":"next dev","build":"next build"}}"#,
+    )
+    .expect("package");
+    fs::write(
+        root.join("vercel.ts"),
+        "export default {\n  bunVersion: \"\",\n};\n",
+    )
+    .expect("vercel.ts");
+
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-nextjs-bun-runtime-scripts")
+    );
+}
+
+#[test]
+fn detects_only_active_vercel_ts_bun_runtime_config() {
+    let _env = TestEnv::new("active-vercel-ts");
+    let root = unique_temp_dir("active-vercel-ts-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(
+        root.join("package.json"),
+        r#"{"private":true,"scripts":{"dev":"next dev","build":"next build"}}"#,
+    )
+    .expect("package");
+    fs::write(
+        root.join("vercel.ts"),
+        "export default {\n  bunVersion: \"\",\n  runtime: \"bun\",\n};\n",
+    )
+    .expect("vercel.ts");
+
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-nextjs-bun-runtime-scripts")
+    );
+}
+
+#[test]
 fn include_scope_excludes_github_workflow_findings() {
     let _env = TestEnv::new("include-workflow");
     let root = copy_fixture("github-actions");

@@ -258,24 +258,7 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
         return true;
     }
     fs::read_to_string(root.join("vercel.ts"))
-        .map(|text| {
-            let text = strip_ts_comments(&text);
-            if !text.contains("export default") && !text.contains("export const") {
-                return false;
-            }
-            let bun_version_re =
-                Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#).expect("valid regex");
-            let runtime_re = Regex::new(r#"runtime\s*:\s*["']bun["']"#).expect("valid regex");
-            if let Some(captures) = bun_version_re.captures(&text)
-                && captures
-                    .get(1)
-                    .map(|value| !value.as_str().trim().is_empty())
-                    .unwrap_or(false)
-            {
-                return true;
-            }
-            runtime_re.is_match(&text)
-        })
+        .map(|text| vercel_ts_has_bun_runtime(&text))
         .unwrap_or(false)
 }
 
@@ -394,7 +377,25 @@ pub(crate) fn strip_ts_comments(text: &str) -> String {
     output
 }
 
-fn contains_bun_runtime_config(value: &Value) -> bool {
+pub(crate) fn vercel_ts_has_bun_runtime(text: &str) -> bool {
+    let text = strip_ts_comments(text);
+    if !text.contains("export default") && !text.contains("export const") {
+        return false;
+    }
+    let bun_version_re = Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#).expect("valid regex");
+    let runtime_re = Regex::new(r#"runtime\s*:\s*["']bun["']"#).expect("valid regex");
+    if let Some(captures) = bun_version_re.captures(&text)
+        && captures
+            .get(1)
+            .map(|value| !value.as_str().trim().is_empty())
+            .unwrap_or(false)
+    {
+        return true;
+    }
+    runtime_re.is_match(&text)
+}
+
+pub(crate) fn contains_bun_runtime_config(value: &Value) -> bool {
     match value {
         Value::Array(values) => values.iter().any(contains_bun_runtime_config),
         Value::Object(map) => {

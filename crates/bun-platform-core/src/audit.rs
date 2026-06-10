@@ -1,6 +1,6 @@
 use crate::{
     config::AuditConfig,
-    fixes::strip_ts_comments,
+    fixes::{contains_bun_runtime_config, vercel_ts_has_bun_runtime},
     state::PlatformPaths,
     types::{Confidence, Finding, Severity},
 };
@@ -637,18 +637,10 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> Result<RepoSignals> {
 fn detect_vercel_bun_enabled(snapshot: &RepoSnapshot<'_>) -> Result<bool> {
     let vercel_json_path = snapshot.root.join("vercel.json");
     match snapshot.read_json::<serde_json::Value>(&vercel_json_path)? {
-        Some(json) => Ok(json
-            .get("bunVersion")
-            .and_then(|value| value.as_str())
-            .is_some()),
+        Some(json) => Ok(contains_bun_runtime_config(&json)),
         None => Ok(snapshot
             .read_text(&snapshot.root.join("vercel.ts"))?
-            .map(|text| {
-                let text = strip_ts_comments(&text);
-                Regex::new(r#"bunVersion\s*:\s*["']"#)
-                    .map(|re| re.is_match(&text))
-                    .unwrap_or(false)
-            })
+            .map(|text| vercel_ts_has_bun_runtime(&text))
             .unwrap_or(false)),
     }
 }
