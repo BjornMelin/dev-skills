@@ -21,8 +21,8 @@ class RegistryCache:
     """Small TTL cache for registry API responses.
 
     Args:
-        path: Cache file path, defaulting to CACHE_PATH.
-        ttl_seconds: Cache entry lifetime, defaulting to CACHE_TTL_SECONDS.
+        path: Path cache file location, defaulting to CACHE_PATH.
+        ttl_seconds: int cache entry lifetime, defaulting to CACHE_TTL_SECONDS.
     """
 
     def __init__(

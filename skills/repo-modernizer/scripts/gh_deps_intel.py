@@ -475,10 +475,10 @@ def run_analyze(enriched: dict[str, Any]) -> dict[str, Any]:
     """Analyze enriched dependencies and optionally attach repo usage maps.
 
     Args:
-        enriched: Enrich-stage payload with repo metadata, including repo_root.
+        enriched: Enrich-stage dict with repo metadata, including repo_root.
 
     Returns:
-        Analyze-stage payload containing dependency impact data and repo usage.
+        dict[str, Any]: Analyze-stage dependency data with repo impact details.
     """
     repo_root = Path(enriched["repo_root"])
     deep_repo_map = bool(enriched.get("deep_repo_map"))
