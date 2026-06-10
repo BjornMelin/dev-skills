@@ -15,6 +15,8 @@ use std::{
 
 static NPX_COMMAND_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\bnpx\b").expect("valid regex"));
+static BUN_COMMAND_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bbun(x)?\b").expect("valid regex"));
 
 pub fn plan_safe_fixes(root: &Path, config: &AuditConfig) -> Result<Vec<PlannedFix>> {
     let root = root
@@ -84,7 +86,7 @@ pub fn apply_safe_fixes(
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs();
+        .as_millis();
     let rollback_path = paths
         .rollback_dir()
         .join(format!("rollback-{timestamp}.json"));
@@ -92,7 +94,7 @@ pub fn apply_safe_fixes(
         &rollback_path,
         serde_json::to_vec_pretty(&serde_json::json!({
           "root": root.display().to_string(),
-          "createdAtEpochSeconds": timestamp,
+          "createdAtEpochMillis": timestamp,
           "fixes": fixes,
         }))?,
     )?;
@@ -234,6 +236,18 @@ fn is_bun_first_repo(root: &Path, root_map: &Map<String, Value>) -> bool {
             .and_then(Value::as_object)
             .map(|deps| deps.contains_key("@types/bun") || deps.contains_key("bun-types"))
             .unwrap_or(false)
+        || root_map
+            .get("scripts")
+            .and_then(Value::as_object)
+            .map(|scripts| {
+                scripts.values().any(|value| {
+                    value
+                        .as_str()
+                        .map(|command| BUN_COMMAND_RE.is_match(command))
+                        .unwrap_or(false)
+                })
+            })
+            .unwrap_or(false)
 }
 
 fn has_vercel_bun_runtime(root: &Path) -> bool {
@@ -249,16 +263,18 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
             if !text.contains("export default") && !text.contains("export const") {
                 return false;
             }
-            let Some(captures) = Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#)
-                .expect("valid regex")
-                .captures(&text)
-            else {
-                return false;
-            };
-            captures
-                .get(1)
-                .map(|value| !value.as_str().trim().is_empty())
-                .unwrap_or(false)
+            let bun_version_re =
+                Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#).expect("valid regex");
+            let runtime_re = Regex::new(r#"runtime\s*:\s*["']bun["']"#).expect("valid regex");
+            if let Some(captures) = bun_version_re.captures(&text)
+                && captures
+                    .get(1)
+                    .map(|value| !value.as_str().trim().is_empty())
+                    .unwrap_or(false)
+            {
+                return true;
+            }
+            runtime_re.is_match(&text)
         })
         .unwrap_or(false)
 }
@@ -267,8 +283,19 @@ fn strip_ts_comments(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     let mut in_block = false;
+    let mut in_single_quote = false;
+    let mut in_double_quote = false;
+    let mut in_backtick = false;
+    let mut template_brace_depth = 0;
+    let mut escape_next = false;
 
     while let Some(ch) = chars.next() {
+        if escape_next {
+            output.push(ch);
+            escape_next = false;
+            continue;
+        }
+
         if in_block {
             if ch == '*' && chars.peek() == Some(&'/') {
                 chars.next();
@@ -276,20 +303,91 @@ fn strip_ts_comments(text: &str) -> String {
             }
             continue;
         }
-        if ch == '/' && chars.peek() == Some(&'*') {
-            chars.next();
-            in_block = true;
-            continue;
-        }
-        if ch == '/' && chars.peek() == Some(&'/') {
-            for next in chars.by_ref() {
-                if next == '\n' {
-                    output.push('\n');
-                    break;
+
+        // Inside a template expression: track braces and strip comments,
+        // but still respect quotes inside the expression.
+        if in_backtick && template_brace_depth > 0 {
+            if ch == '{' {
+                template_brace_depth += 1;
+                output.push(ch);
+                continue;
+            }
+            if ch == '}' {
+                template_brace_depth -= 1;
+                output.push(ch);
+                continue;
+            }
+            if in_single_quote || in_double_quote {
+                output.push(ch);
+                if ch == '\\' {
+                    escape_next = true;
+                } else if in_single_quote && ch == '\'' {
+                    in_single_quote = false;
+                } else if in_double_quote && ch == '"' {
+                    in_double_quote = false;
+                }
+                continue;
+            }
+            if ch == '\'' {
+                in_single_quote = true;
+                output.push(ch);
+                continue;
+            }
+            if ch == '"' {
+                in_double_quote = true;
+                output.push(ch);
+                continue;
+            }
+            // Fall through to normal comment handling
+        } else if in_single_quote || in_double_quote || in_backtick {
+            output.push(ch);
+            if ch == '\\' {
+                escape_next = true;
+                continue;
+            }
+            if in_single_quote && ch == '\'' {
+                in_single_quote = false;
+            } else if in_double_quote && ch == '"' {
+                in_double_quote = false;
+            } else if in_backtick && template_brace_depth == 0 {
+                if ch == '`' {
+                    in_backtick = false;
+                } else if ch == '$' && chars.peek() == Some(&'{') {
+                    chars.next();
+                    output.push('{');
+                    template_brace_depth = 1;
                 }
             }
             continue;
         }
+
+        if ch == '/' {
+            if chars.peek() == Some(&'*') {
+                chars.next();
+                in_block = true;
+                continue;
+            }
+            if chars.peek() == Some(&'/') {
+                chars.next();
+                for next in chars.by_ref() {
+                    if next == '\n' {
+                        output.push('\n');
+                        break;
+                    }
+                }
+                continue;
+            }
+        }
+
+        if ch == '\'' {
+            in_single_quote = true;
+        } else if ch == '"' {
+            in_double_quote = true;
+        } else if ch == '`' {
+            in_backtick = true;
+            template_brace_depth = 0;
+        }
+
         output.push(ch);
     }
 
@@ -312,5 +410,58 @@ fn contains_bun_runtime_config(value: &Value) -> bool {
                 || map.values().any(contains_bun_runtime_config)
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_ts_comments_removes_line_comments() {
+        let input = "const x = 1; // comment\nconst y = 2;";
+        assert_eq!(strip_ts_comments(input), "const x = 1; \nconst y = 2;");
+    }
+
+    #[test]
+    fn strip_ts_comments_removes_block_comments() {
+        let input = "const x = /* block */ 1;";
+        assert_eq!(strip_ts_comments(input), "const x =  1;");
+    }
+
+    #[test]
+    fn strip_ts_comments_preserves_urls_in_strings() {
+        let input = r#"destination: "https://example.com", bunVersion: "1.3.0""#;
+        assert_eq!(strip_ts_comments(input), input);
+    }
+
+    #[test]
+    fn strip_ts_comments_preserves_single_quoted_strings() {
+        let input = "const s = 'http://example.com';";
+        assert_eq!(strip_ts_comments(input), input);
+    }
+
+    #[test]
+    fn strip_ts_comments_preserves_template_literals() {
+        let input = "const t = `https://example.com/${path}`;";
+        assert_eq!(strip_ts_comments(input), input);
+    }
+
+    #[test]
+    fn strip_ts_comments_preserves_escaped_quotes() {
+        let input = r#"const s = "he said \"hello\"";//end"#;
+        assert_eq!(
+            strip_ts_comments(input),
+            r#"const s = "he said \"hello\"";"#
+        );
+    }
+
+    #[test]
+    fn strip_ts_comments_strips_comments_inside_template_expressions() {
+        let input = "const t = `${
+  // expr comment
+  1 + 2
+}`;";
+        assert_eq!(strip_ts_comments(input), "const t = `${\n  \n  1 + 2\n}`;");
     }
 }

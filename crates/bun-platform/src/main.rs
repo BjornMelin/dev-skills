@@ -287,7 +287,6 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let paths = PlatformPaths::discover()?;
-    paths.ensure()?;
 
     match cli.command {
         None => {
@@ -337,7 +336,7 @@ fn run() -> Result<()> {
                 process::exit(1);
             }
             let commands = run_validation_commands(&root, &config.validation_commands)?;
-            if !commands.is_empty() {
+            if output.format != OutputMode::Json && !commands.is_empty() {
                 println!("Validated {} command(s).", commands.len());
             }
         }
@@ -530,15 +529,17 @@ fn benchmark_root(
     let iterations = iterations.max(1);
     let mut audit_ms = Vec::new();
     let mut plan_fix_ms = Vec::new();
+    let mut bench_config = config.clone();
+    bench_config.write_cache = false;
 
     for _ in 0..iterations {
         let audit_started = Instant::now();
-        let findings = run_audit(root, config, paths)?;
+        let findings = run_audit(root, &bench_config, paths)?;
         let audit_elapsed = audit_started.elapsed().as_secs_f64() * 1000.0;
         audit_ms.push(audit_elapsed);
 
         let fix_started = Instant::now();
-        let fixes = plan_safe_fixes(root, config)?;
+        let fixes = plan_safe_fixes(root, &bench_config)?;
         let fix_elapsed = fix_started.elapsed().as_secs_f64() * 1000.0;
         plan_fix_ms.push(fix_elapsed);
 

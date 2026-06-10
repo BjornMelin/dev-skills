@@ -79,7 +79,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         }
     }
 
-    let signals = infer_signals(&snapshot);
+    let signals = infer_signals(&snapshot)?;
     let mut findings = Vec::new();
     let package_json_path = root.join("package.json");
     let package_json = snapshot.read_json::<PackageJson>(&package_json_path)?;
@@ -171,7 +171,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                     },
                 ));
             }
-            if OTHER_PACKAGE_MANAGER_RE.is_match(&command) {
+            if signals.bun_first && OTHER_PACKAGE_MANAGER_RE.is_match(&command) {
                 findings.push(create_finding(
           &root,
           "scripts-no-npm-in-bun-repos",
@@ -374,8 +374,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
       ));
         }
         if has_bun_lockfile(&root)
-            && Regex::new(r"(?ms)^\s*\[install\].*^\s*frozenLockfile\s*=\s*false")?
-                .is_match(&bunfig)
+            && toml_table_has_bool(&bunfig, "install", "frozenLockfile", false)
         {
             findings.push(create_finding(
         &root,
@@ -391,9 +390,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         },
       ));
         }
-        if signals.bun_first
-            && Regex::new(r"(?ms)^\s*\[run\].*^\s*bun\s*=\s*false")?.is_match(&bunfig)
-        {
+        if signals.bun_first && toml_table_has_bool(&bunfig, "run", "bun", false) {
             findings.push(create_finding(
         &root,
         "runtime-bun-run-bun-flag",
@@ -546,6 +543,7 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
       "disabledRules": snapshot.config.disabled_rules,
       "severityOverrides": snapshot.config.severity_overrides,
       "excludeDirs": snapshot.config.exclude_dirs,
+      "baselineKeys": snapshot.config.baseline_keys,
       "includePaths": snapshot
         .config
         .include_paths
@@ -556,6 +554,30 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
       "maxFiles": snapshot.config.max_files,
       "maxBytes": snapshot.config.max_bytes,
     }))?);
+    // Hash unconditional root inputs so cache invalidates when they change
+    // even if the scan is scoped with --include.
+    for name in [
+        "package.json",
+        "tsconfig.json",
+        "bunfig.toml",
+        ".gitignore",
+        "vercel.json",
+        "vercel.ts",
+    ] {
+        let path = snapshot.root.join(name);
+        hasher.update(name.as_bytes());
+        if let Ok(metadata) = fs::metadata(&path) {
+            hasher.update(metadata.len().to_string().as_bytes());
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                .map(|value| value.as_millis())
+                .unwrap_or(0);
+            hasher.update(modified.to_string().as_bytes());
+        }
+    }
+
     let mut files = snapshot.walk_files()?;
     files.sort();
     for path in files {
@@ -579,12 +601,12 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn infer_signals(snapshot: &RepoSnapshot<'_>) -> RepoSignals {
+fn infer_signals(snapshot: &RepoSnapshot<'_>) -> Result<RepoSignals> {
     let package_json = snapshot
         .read_json::<PackageJson>(&snapshot.root.join("package.json"))
         .ok()
         .flatten();
-    let vercel_bun_enabled = detect_vercel_bun_enabled(snapshot);
+    let vercel_bun_enabled = detect_vercel_bun_enabled(snapshot)?;
     let scripts = package_json
         .as_ref()
         .and_then(|pkg| pkg.scripts.clone())
@@ -604,33 +626,29 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> RepoSignals {
             .unwrap_or(false)
         || vercel_bun_enabled
         || scripts.iter().any(|value| BUN_COMMAND_RE.is_match(value));
-    RepoSignals {
+    Ok(RepoSignals {
         bun_first,
         vercel_bun_enabled,
         has_workspaces,
-    }
+    })
 }
 
-fn detect_vercel_bun_enabled(snapshot: &RepoSnapshot<'_>) -> bool {
+fn detect_vercel_bun_enabled(snapshot: &RepoSnapshot<'_>) -> Result<bool> {
     let vercel_json_path = snapshot.root.join("vercel.json");
-    if let Ok(Some(json)) = snapshot.read_json::<serde_json::Value>(&vercel_json_path)
-        && json
+    match snapshot.read_json::<serde_json::Value>(&vercel_json_path)? {
+        Some(json) => Ok(json
             .get("bunVersion")
             .and_then(|value| value.as_str())
-            .is_some()
-    {
-        return true;
+            .is_some()),
+        None => Ok(snapshot
+            .read_text(&snapshot.root.join("vercel.ts"))?
+            .map(|text| {
+                Regex::new(r#"bunVersion\s*:\s*["']"#)
+                    .map(|re| re.is_match(&text))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false)),
     }
-    snapshot
-        .read_text(&snapshot.root.join("vercel.ts"))
-        .ok()
-        .flatten()
-        .map(|text| {
-            Regex::new(r#"bunVersion\s*:\s*["']"#)
-                .map(|re| re.is_match(&text))
-                .unwrap_or(false)
-        })
-        .unwrap_or(false)
 }
 
 fn normalize_findings(mut findings: Vec<Finding>, config: &AuditConfig) -> Vec<Finding> {
@@ -810,7 +828,7 @@ fn run_github_actions_adapter(
     let install_re = Regex::new(r"\b(npm ci|npm install|pnpm install|yarn install)\b")?;
     let npx_re = Regex::new(r"\bnpx\b")?;
     let bun_install_re = Regex::new(r"\bbun install\b")?;
-    let bun_frozen_re = Regex::new(r"\bbun install --frozen-lockfile\b|\bbun ci\b")?;
+    let bun_frozen_re = Regex::new(r"\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
     if !workflow_dir.is_dir() {
         return Ok(findings);
     }
@@ -848,10 +866,9 @@ fn run_github_actions_adapter(
             ));
         }
         if has_bun_lockfile(snapshot.root)
-            && bun_install_re.is_match(&content)
-            && !bun_frozen_re.is_match(&content)
+            && let Some(mut options) =
+                find_first_unfrozen_bun_install(&content, &bun_install_re, &bun_frozen_re)
         {
-            let mut options = line_hit(&content, &bun_install_re);
             options.suggested_fix =
                 Some("Prefer `bun install --frozen-lockfile` or `bun ci` in CI.".to_string());
             findings.push(create_finding(
@@ -876,7 +893,7 @@ fn run_docker_adapter(
     let node_from_re = Regex::new(r"\bFROM\s+node[:\s]")?;
     let install_re = Regex::new(r"\b(npm ci|npm install|pnpm install|yarn install)\b")?;
     let bun_install_re = Regex::new(r"\bbun install\b")?;
-    let bun_frozen_re = Regex::new(r"\bbun install --frozen-lockfile\b|\bbun ci\b")?;
+    let bun_frozen_re = Regex::new(r"\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
     for file in files {
         if !is_dockerfile(file) {
             continue;
@@ -909,16 +926,18 @@ fn run_docker_adapter(
             ));
         }
         if has_bun_lockfile(snapshot.root)
-            && bun_install_re.is_match(&content)
-            && !bun_frozen_re.is_match(&content)
+            && let Some(mut options) =
+                find_first_unfrozen_bun_install(&content, &bun_install_re, &bun_frozen_re)
         {
+            options.suggested_fix =
+                Some("Prefer `bun install --frozen-lockfile` or `bun ci` in CI.".to_string());
             findings.push(create_finding(
                 snapshot.root,
                 "pm-bun-install-ci-frozen-lockfile",
                 Severity::Info,
                 file,
                 "Dockerfile runs `bun install` without frozen lockfile mode.",
-                line_hit(&content, &bun_install_re),
+                options,
             ));
         }
     }
@@ -996,6 +1015,30 @@ fn toml_table_has_positive_integer(content: &str, table: &str, key: &str) -> boo
     false
 }
 
+fn toml_table_has_bool(content: &str, table: &str, key: &str, expected: bool) -> bool {
+    let target_header = format!("[{table}]");
+    let key_prefix = format!("{key}=");
+    let expected_str = if expected { "true" } else { "false" };
+    let mut in_table = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_table = trimmed == target_header;
+            continue;
+        }
+        if !in_table {
+            continue;
+        }
+        let normalized = trimmed.replace(' ', "");
+        if let Some(value) = normalized.strip_prefix(&key_prefix) {
+            return value == expected_str;
+        }
+    }
+
+    false
+}
+
 struct MatchHit {
     line: usize,
     column: usize,
@@ -1032,4 +1075,52 @@ fn line_hit(content: &str, regex: &Regex) -> FindingOptions {
             ..Default::default()
         })
         .unwrap_or_default()
+}
+
+fn find_first_unfrozen_bun_install(
+    content: &str,
+    bun_install_re: &Regex,
+    bun_frozen_re: &Regex,
+) -> Option<FindingOptions> {
+    for mat in bun_install_re.find_iter(content) {
+        let start = mat.start();
+        let block = extract_command_block(content, start);
+        if !bun_frozen_re.is_match(block) {
+            let line_num = content[..start].chars().filter(|&c| c == '\n').count() + 1;
+            let line_start = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_end = content[start..]
+                .find('\n')
+                .map(|i| start + i)
+                .unwrap_or(content.len());
+            let line = &content[line_start..line_end];
+            return Some(FindingOptions {
+                line: Some(line_num),
+                column: Some(start - line_start + 1),
+                snippet: Some(line.trim_end().to_string()),
+                ..Default::default()
+            });
+        }
+    }
+    None
+}
+
+fn extract_command_block(content: &str, start: usize) -> &str {
+    let line_start = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let mut block_end = content[start..]
+        .find('\n')
+        .map(|i| start + i)
+        .unwrap_or(content.len());
+    loop {
+        let trimmed = content[line_start..block_end].trim_end();
+        if !trimmed.ends_with('\\') || block_end >= content.len() {
+            break;
+        }
+        if let Some(next_nl) = content[block_end + 1..].find('\n') {
+            block_end += 1 + next_nl;
+        } else {
+            block_end = content.len();
+            break;
+        }
+    }
+    &content[line_start..block_end]
 }
