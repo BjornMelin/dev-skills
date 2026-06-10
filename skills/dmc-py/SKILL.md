@@ -145,11 +145,14 @@ Select components by use case:
 
 Load these on demand:
 
-- [references/core-patterns-and-components.md](references/core-patterns-and-components.md) for theming, styling, callbacks, Pages, component categories, asset templates, and utility scripts.
-- [references/best-practices.md](references/best-practices.md) for the consolidated DMC best-practices rule index.
-- [references/best-practices-expanded.md](references/best-practices-expanded.md) for the expanded compiled rule reference.
-- [references/common-tasks-and-troubleshooting.md](references/common-tasks-and-troubleshooting.md) for forms, modals, loading states, charts, common errors, debug tips, and DMC v2 gotchas.
 - [references/components-quick-ref.md](references/components-quick-ref.md) for component selector and API reminders.
+- [references/theming-patterns.md](references/theming-patterns.md) for MantineProvider themes, color schemes, and theme toggles.
+- [references/styling-guide.md](references/styling-guide.md) for style props, responsive values, and Styles API usage.
+- [references/callbacks-advanced.md](references/callbacks-advanced.md) for pattern-matching, clientside, background, and DMC-specific callback props.
+- [references/multi-page-apps.md](references/multi-page-apps.md) for Dash Pages and AppShell layouts.
+- [references/charts-data-formats.md](references/charts-data-formats.md) for chart data and series shapes.
+- [references/date-pickers-guide.md](references/date-pickers-guide.md) for date picker APIs and localization.
+- [references/dash-fundamentals.md](references/dash-fundamentals.md) for Dash core state, caching, and performance patterns.
 - [references/migration-v2.md](references/migration-v2.md) when upgrading older DMC code.
 
 ## Operating Rules
@@ -158,4 +161,4 @@ Load these on demand:
 - Check the installed DMC version with `pip show dash-mantine-components` before using version-sensitive APIs.
 - Prefer official docs via `scripts/fetch_docs.py` when API details matter.
 - Use DMC v2/Mantine 8 patterns; do not preserve old v0/v1 compatibility unless the repo requires it.
-- For reviews and refactors, apply the best-practices rules in `rules/` by priority before broad redesign.
+- For reviews and refactors, use `$dmc-best-practices` before broad redesign.
