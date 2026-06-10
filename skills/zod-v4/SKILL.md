@@ -1,324 +1,144 @@
 ---
 name: zod-v4
-description: Expert guidance for Zod v4 schema validation in TypeScript. Use when designing schemas, migrating from Zod 3, handling validation errors, generating JSON Schema/OpenAPI, using codecs/transforms, or integrating with React Hook Form, tRPC, Hono, or Next.js. Covers all Zod v4 APIs including top-level string formats, strictObject/looseObject, metadata, registries, branded types, and recursive schemas.
+description: Zod v4 TypeScript schema design, Zod 3 to 4 migration, validation boundaries, errors, codecs, JSON Schema/OpenAPI, metadata, Zod Mini/Core, RHF/tRPC/Hono/Next integrations, and rule-aware audits for Zod 4.4.3.
 ---
 
-# Zod v4 Schema Validation
+# Zod v4
+
+Rule-first Zod v4.4.3 guidance for TypeScript. Start with the highest-risk
+matching rule, then load the linked reference only when deeper API detail is
+needed.
 
 ## Quick Start
 
 ```bash
-pnpm add zod@^4.3.5
+bun add zod@^4.4.3
 ```
 
-```typescript
-import { z } from 'zod';
+```ts
+import { z } from "zod";
 
-// Define schema
 const User = z.object({
-  name: z.string().min(1),
-  email: z.email(),
-  age: z.number().positive(),
+  name: z.string().min(1, { error: "Required" }),
+  email: z.email({ error: "Invalid email" }),
 });
 
-// Parse (throws on error)
-const user = User.parse({ name: "Alice", email: "alice@example.com", age: 30 });
-
-// Safe parse (returns result)
-const result = User.safeParse(data);
-if (result.success) {
-  result.data; // validated
-} else {
-  console.log(z.prettifyError(result.error));
-}
-
-// Type inference
 type User = z.infer<typeof User>;
 ```
 
-## Versioning + Imports (v4.3.5)
-
-- Use `import { z } from "zod"` for v4 (package root now exports v4).
-- Use `import * as z from "zod/mini"` for Zod Mini.
-- Use `import * as z from "zod/v3"` only if you must stay on v3.
-
-## Workflow: Determine Task Type
-
-**Designing new schemas?**
-→ Read [API Reference](references/api-reference.md)
-
-**Migrating from Zod 3?**
-→ Read [Migration Guide](references/migration-guide.md)
-
-**Working with codecs, errors, JSON Schema, or metadata?**
-→ Read [Advanced Features](references/advanced-features.md)
-
-**Integrating with frameworks (RHF, tRPC, Hono, Next.js)?**
-→ Read [Ecosystem Patterns](references/ecosystem-patterns.md)
-
----
-
-## Key v4 Concepts
-
-### Top-Level String Formats
-
-v4 moved string validators to top-level functions:
-
-```typescript
-// v4 style (preferred)
-z.email()
-z.uuid()
-z.url()
-z.ipv4()
-z.ipv6()
-z.iso.date()
-z.iso.datetime()
-
-// v3 style (deprecated but works)
-z.string().email()
-```
-
-### Object Variants
-
-```typescript
-z.object({})        // Allows unknown keys (default)
-z.strictObject({})  // Rejects unknown keys
-z.looseObject({})   // Explicitly allows unknown keys
-```
-
-### Unified Error Parameter
-
-```typescript
-// String message
-z.string().min(5, { error: "Too short" });
-
-// Function for dynamic messages
-z.string({
-  error: (iss) => iss.input === undefined ? "Required" : "Invalid"
-});
-```
-
-### Type Inference
-
-```typescript
-const Schema = z.object({ name: z.string() });
-type Schema = z.infer<typeof Schema>;
-
-// For transforms, get input/output separately
-const Transformed = z.string().transform(s => s.length);
-type Input = z.input<typeof Transformed>;   // string
-type Output = z.output<typeof Transformed>; // number
-```
-
----
-
-## Common Patterns
-
-### Discriminated Unions
-
-```typescript
-const Event = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("click"), x: z.number(), y: z.number() }),
-  z.object({ type: z.literal("keypress"), key: z.string() }),
-]);
-```
-
-### Exhaustive Records
-
-```typescript
-const Status = z.enum(["pending", "active", "done"]);
-
-// All keys required
-z.record(Status, z.number())  // { pending: number; active: number; done: number }
-
-// Keys optional
-z.partialRecord(Status, z.number())  // { pending?: number; active?: number; done?: number }
-```
-
-### Recursive Schemas
-
-```typescript
-const Category = z.object({
-  name: z.string(),
-  get subcategories() { return z.array(Category) }
-});
-```
-
-### Branded Types
-
-```typescript
-const UserId = z.string().brand<"UserId">();
-const PostId = z.string().brand<"PostId">();
-
-type UserId = z.infer<typeof UserId>;
-// Cannot assign UserId to PostId
-```
-
-### Transforms and Pipes
-
-```typescript
-// Transform
-z.string().transform(s => s.toUpperCase())
-
-// Pipe (chain schemas)
-z.pipe(
-  z.string(),
-  z.coerce.number(),
-  z.number().positive()
-)
-```
-
-### Default Values
-
-```typescript
-// Output default (v4)
-z.string().default("guest")
-
-// Input default (pre-transform)
-z.string().transform(s => s.toUpperCase()).prefault("hello")
-// Missing => "HELLO"
-```
-
----
-
-## Error Handling
-
-### Pretty Print
-
-```typescript
-const result = schema.safeParse(data);
-if (!result.success) {
-  console.log(z.prettifyError(result.error));
-  // ✖ Invalid email
-  //   → at email
-}
-```
-
-### Flat Structure (Forms)
-
-```typescript
-const flat = z.flattenError(result.error);
-// { formErrors: [], fieldErrors: { email: ["Invalid email"] } }
-```
-
-### Tree Structure (Nested)
-
-```typescript
-const tree = z.treeifyError(result.error);
-// { properties: { email: { errors: ["Invalid email"] } } }
-```
-
----
-
-## JSON Schema / OpenAPI
-
-```typescript
-const schema = z.object({
-  name: z.string(),
-  email: z.email(),
-}).meta({ id: "User", title: "User" });
-
-// Generate JSON Schema
-const jsonSchema = z.toJSONSchema(schema);
-
-// For OpenAPI 3.0
-z.toJSONSchema(schema, { target: "openapi-3.0" });
-
-// Using registry for multiple schemas
-z.globalRegistry.add(schema, schema.meta());
-const allSchemas = z.toJSONSchema(z.globalRegistry);
-```
-
----
-
-## v3 to v4 Migration Quick Reference
-
-| v3 | v4 |
-|----|----|
-| `z.string().email()` | `z.email()` |
-| `z.nativeEnum(MyEnum)` | `z.enum(MyEnum)` |
-| `{ message: "..." }` | `{ error: "..." }` |
-| `.strict()` | `z.strictObject({})` |
-| `.passthrough()` | `z.looseObject({})` |
-| `.merge(other)` | `.extend(other.shape)` |
-| `z.record(valueSchema)` | `z.record(z.string(), valueSchema)` |
-| `.deepPartial()` | Nest `.partial()` manually |
-| `error.format()` | `z.treeifyError(error)` |
-| `error.flatten()` | `z.flattenError(error)` |
-
-### Breaking Changes
-
-- **Numbers**: No `Infinity`, stricter `.safe()` and `.int()`
-- **UUID**: RFC 4122 compliant (use `z.guid()` for permissive)
-- **Defaults in optional**: `z.string().default("x").optional()` now applies default
-- **z.unknown()**: No longer implicitly optional
-- **Error precedence**: Schema-level wins over global
-
-Run codemod: `npx zod-v3-to-v4`
-
----
-
-## Framework Integration Quick Start
-
-### React Hook Form
-
-```typescript
-import { zodResolver } from '@hookform/resolvers/zod';
-
-const { register, handleSubmit, formState: { errors } } = useForm({
-  resolver: zodResolver(schema),
-});
-```
-
-### tRPC
-
-```typescript
-publicProcedure
-  .input(z.object({ id: z.string() }))
-  .query(({ input }) => getById(input.id))
-```
-
-### Hono
-
-```typescript
-import { zValidator } from '@hono/zod-validator';
-
-app.post('/users', zValidator('json', schema), (c) => {
-  const data = c.req.valid('json');
-});
-```
-
-### Next.js Server Actions
-
-```typescript
-'use server';
-
-const result = schema.safeParse(Object.fromEntries(formData));
-if (!result.success) {
-  return { errors: z.flattenError(result.error).fieldErrors };
-}
-```
-
-## Offline Stack Scanner
-
-Run the local scanner before Zod migrations or validation reviews:
+## Route By Task
+
+| Task | Start Here |
+| --- | --- |
+| v3 migration or deprecated API cleanup | `rules/_index.md`, then `references/migration-v3-to-v4.md` |
+| User input, env, HTTP, DB, queue, or JSON boundaries | `parse-*`, `schema-*`, and `references/codecs-v4.md` |
+| Current schema APIs, string formats, records, template literals, XOR, defaults | `references/schema-surface-v4.md` |
+| UI/API/CLI error messages | `error-*`, `migrate-error-*`, and `references/errors-v4.md` |
+| Object composition, strictness, or refined schemas | `object-*` rules |
+| JSON Schema/OpenAPI export | `jsonschema-*`, `meta-*`, and `references/json-schema-v4.md` |
+| Bidirectional wire/internal transforms | `codec-*` and `references/codecs-v4.md` |
+| React Hook Form, tRPC, Hono, or Next.js actions | `references/ecosystem-*.md` |
+| Zod Mini, package exports, or library-author work | `references/package-surfaces-v4.md` |
+| Repo audit before a migration | `references/audit.md` and `scripts/zod-audit.ts` |
+
+## Priority Rules
+
+1. **Validate at boundaries**: use `safeParse` for untrusted input, `parseAsync`
+   for async refinements/transforms, and never trust `JSON.parse` output.
+2. **Prefer current v4 APIs**: top-level string formats, `z.enum`, `z.object`
+   plus `z.strictObject` or `z.looseObject`, unified `{ error }`, top-level
+   error formatters, and `z.toJSONSchema`.
+3. **Avoid false enforcement**: default imports, namespace root imports, and
+   one-arg `z.record(valueSchema)` are valid in Zod 4.4.3; treat them as local
+   style or migration-advisory findings, not package-invalid code.
+4. **Use codecs when direction matters**: prefer `z.codec`, `z.decode`,
+   `z.encode`, and `z.invertCodec` for reversible wire/internal mappings.
+5. **Use `zod/v4/core` only for library tooling**: app code normally imports
+   from `zod`; bundle-sensitive app code can use `zod/mini`; schema tooling and
+   library adapters should read `references/package-surfaces-v4.md`.
+
+## Rule Categories
+
+| Priority | Category | Prefix |
+| --- | --- | --- |
+| 1 | Migration + deprecations | `migrate-` |
+| 2 | Parsing + boundaries | `parse-` |
+| 3 | Error handling | `error-` |
+| 4 | Objects + composition | `object-` |
+| 5 | Schema definitions | `schema-` |
+| 6 | Metadata + registries | `meta-` |
+| 7 | JSON Schema/OpenAPI | `jsonschema-` |
+| 8 | Codecs | `codec-` |
+| 9 | Package surfaces | `package-` |
+
+Start with `rules/_index.md`. Each rule file has the failure mode, compact
+bad/good examples, and linked references when nuance matters.
+
+## Automation
+
+Resolve `skill_dir` as the directory containing this skill before running
+bundled scripts.
+
+### Zod Audit
+
+Run the Zod-specific report-only scanner:
 
 ```bash
-python3 skills/zod-v4/scripts/ai_stack_scan.py --root <repo> --pretty
+bun "$skill_dir/scripts/zod-audit.ts" --root . --format text
 ```
 
-It emits `ai_stack_scan.v1`, uses no network by default, skips symlinks, and
-flags likely Zod v4 migration signals such as pre-v4 dependency specs,
-deprecated string-format methods, legacy error parameters, `z.nativeEnum`, and
-`error.errors`. Verify each signal against current Zod docs/source before
-editing. Keep full scanner JSON local; share only specific redacted signals
-externally.
+Useful commands:
 
----
+```bash
+bun "$skill_dir/scripts/zod-audit.ts" --list-rules
+bun "$skill_dir/scripts/zod-audit.ts" --list-checks
+bun "$skill_dir/scripts/zod-audit.ts" --explain migrate-top-level-string-formats
+```
 
-## Reference Files
+Use `--fail-on warn|error|info` only after reviewing whether advisory rules are
+appropriate for the target repo.
 
-- [API Reference](references/api-reference.md) - All schema types, methods, and validation APIs
-- [Advanced Features](references/advanced-features.md) - Codecs, error handling, metadata, JSON Schema
-- [Migration Guide](references/migration-guide.md) - Complete v3 to v4 migration reference
-- [Ecosystem Patterns](references/ecosystem-patterns.md) - Framework integrations and organization patterns
+### AI Stack Scanner
+
+Use the shared dependency-free scanner for broad AI-stack migration signals:
+
+```bash
+python3 "$skill_dir/scripts/ai_stack_scan.py" --root . --family zod-v4 --pretty
+```
+
+Treat scanner output as private local evidence. Verify each signal against the
+current code and Zod docs/source before editing.
+
+### Rule Maintenance
+
+```bash
+bun "$skill_dir/scripts/build-rules-index.ts"
+bun "$skill_dir/scripts/check-skill-integrity.ts"
+```
+
+### Schema Runner
+
+Load a schema from a local module and exercise parse, decode/encode, or JSON
+Schema behavior:
+
+```bash
+bun "$skill_dir/scripts/zod-run.ts" --module src/schemas/user.ts --export User --mode safeParse --input '{"name":"A","email":"a@b.com"}'
+bun "$skill_dir/scripts/zod-run.ts" --module src/schemas/date.ts --export IsoDate --mode encode --input '"2026-05-13T00:00:00.000Z"'
+bun "$skill_dir/scripts/zod-run.ts" --module src/schemas/user.ts --export User --mode toJSONSchema --io input --target openapi-3.0
+```
+
+`zod-run.ts` imports the target module, so avoid modules with heavy side
+effects.
+
+## References
+
+- Reference router: `references/index.md`
+- Migration checklist: `references/migration-v3-to-v4.md`
+- Schema surface highlights: `references/schema-surface-v4.md`
+- Errors and formatting: `references/errors-v4.md`, `references/error-formatting-v4.md`
+- Metadata and JSON Schema: `references/metadata-registries-v4.md`, `references/json-schema-v4.md`
+- Codecs: `references/codecs-v4.md`
+- Package surfaces, Mini, Core, and library authors: `references/package-surfaces-v4.md`
+- Ecosystem: `references/ecosystem-react-hook-form.md`, `references/ecosystem-trpc.md`, `references/ecosystem-hono.md`, `references/ecosystem-nextjs-server-actions.md`
+- Audit guide: `references/audit.md`
+- Rule template: `assets/templates/rule-template.md`
