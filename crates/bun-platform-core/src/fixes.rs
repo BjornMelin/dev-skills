@@ -279,7 +279,7 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn strip_ts_comments(text: &str) -> String {
+pub(crate) fn strip_ts_comments(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     let mut in_block = false;

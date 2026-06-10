@@ -1,5 +1,6 @@
 use crate::{
     config::AuditConfig,
+    fixes::strip_ts_comments,
     state::PlatformPaths,
     types::{Confidence, Finding, Severity},
 };
@@ -561,20 +562,20 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
         "tsconfig.json",
         "bunfig.toml",
         ".gitignore",
+        ".nvmrc",
+        "bun.lock",
+        "bun.lockb",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "middleware.ts",
         "vercel.json",
         "vercel.ts",
     ] {
         let path = snapshot.root.join(name);
         hasher.update(name.as_bytes());
-        if let Ok(metadata) = fs::metadata(&path) {
-            hasher.update(metadata.len().to_string().as_bytes());
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
-                .map(|value| value.as_millis())
-                .unwrap_or(0);
-            hasher.update(modified.to_string().as_bytes());
+        if let Ok(content) = fs::read(&path) {
+            hasher.update(&content);
         }
     }
 
@@ -643,6 +644,7 @@ fn detect_vercel_bun_enabled(snapshot: &RepoSnapshot<'_>) -> Result<bool> {
         None => Ok(snapshot
             .read_text(&snapshot.root.join("vercel.ts"))?
             .map(|text| {
+                let text = strip_ts_comments(&text);
                 Regex::new(r#"bunVersion\s*:\s*["']"#)
                     .map(|re| re.is_match(&text))
                     .unwrap_or(false)
@@ -698,17 +700,19 @@ fn normalize_findings(mut findings: Vec<Finding>, config: &AuditConfig) -> Vec<F
 fn run_adapters(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Result<Vec<Finding>> {
     let requested = resolve_adapter_ids(signals, &snapshot.config.adapters);
     let mut findings = Vec::new();
+    let files = if requested.contains("github-actions") || requested.contains("docker") {
+        snapshot.walk_files()?
+    } else {
+        Vec::new()
+    };
     if requested.contains("vercel") {
         findings.extend(run_vercel_adapter(snapshot, signals)?);
     }
-    if requested.contains("github-actions") && snapshot.root.join(".github/workflows").is_dir() {
-        findings.extend(run_github_actions_adapter(snapshot, signals)?);
+    if requested.contains("github-actions") {
+        findings.extend(run_github_actions_adapter(snapshot, signals, &files)?);
     }
-    if requested.contains("docker") {
-        let files = snapshot.walk_files()?;
-        if files.iter().any(|path| is_dockerfile(path)) {
-            findings.extend(run_docker_adapter(snapshot, signals, &files)?);
-        }
+    if requested.contains("docker") && files.iter().any(|path| is_dockerfile(path)) {
+        findings.extend(run_docker_adapter(snapshot, signals, &files)?);
     }
     if requested.contains("monorepo") && signals.has_workspaces {
         findings.extend(run_monorepo_adapter(snapshot)?);
@@ -822,19 +826,21 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
 fn run_github_actions_adapter(
     snapshot: &RepoSnapshot<'_>,
     signals: &RepoSignals,
+    files: &[PathBuf],
 ) -> Result<Vec<Finding>> {
     let workflow_dir = snapshot.root.join(".github/workflows");
     let mut findings = Vec::new();
     let install_re = Regex::new(r"\b(npm ci|npm install|pnpm install|yarn install)\b")?;
     let npx_re = Regex::new(r"\bnpx\b")?;
     let bun_install_re = Regex::new(r"\bbun install\b")?;
-    let bun_frozen_re = Regex::new(r"\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
+    let bun_frozen_re = Regex::new(r"(?s)\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
     if !workflow_dir.is_dir() {
         return Ok(findings);
     }
-    for entry in fs::read_dir(workflow_dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    for path in files {
+        if !path.starts_with(&workflow_dir) {
+            continue;
+        }
         let name = path
             .file_name()
             .and_then(|value| value.to_str())
@@ -842,7 +848,7 @@ fn run_github_actions_adapter(
         if !name.ends_with(".yml") && !name.ends_with(".yaml") {
             continue;
         }
-        let Some(content) = snapshot.read_text(&path)? else {
+        let Some(content) = snapshot.read_text(path)? else {
             continue;
         };
         if signals.bun_first && install_re.is_match(&content) {
@@ -850,7 +856,7 @@ fn run_github_actions_adapter(
                 snapshot.root,
                 "scripts-no-npm-in-bun-repos",
                 Severity::Warn,
-                &path,
+                path,
                 "GitHub Actions workflow uses npm/pnpm/yarn install steps in a Bun-first repo.",
                 line_hit(&content, &install_re),
             ));
@@ -860,7 +866,7 @@ fn run_github_actions_adapter(
                 snapshot.root,
                 "pm-bunx-vs-npx",
                 Severity::Warn,
-                &path,
+                path,
                 "GitHub Actions workflow uses npx. Prefer bunx in Bun-first repos.",
                 line_hit(&content, &npx_re),
             ));
@@ -875,7 +881,7 @@ fn run_github_actions_adapter(
                 snapshot.root,
                 "pm-bun-install-ci-frozen-lockfile",
                 Severity::Info,
-                &path,
+                path,
                 "GitHub Actions workflow runs `bun install` without frozen lockfile mode.",
                 options,
             ));
@@ -893,7 +899,7 @@ fn run_docker_adapter(
     let node_from_re = Regex::new(r"\bFROM\s+node[:\s]")?;
     let install_re = Regex::new(r"\b(npm ci|npm install|pnpm install|yarn install)\b")?;
     let bun_install_re = Regex::new(r"\bbun install\b")?;
-    let bun_frozen_re = Regex::new(r"\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
+    let bun_frozen_re = Regex::new(r"(?s)\bbun install\b.*--frozen-lockfile\b|\bbun ci\b")?;
     for file in files {
         if !is_dockerfile(file) {
             continue;

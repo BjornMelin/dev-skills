@@ -278,6 +278,101 @@ fn reports_adapter_findings() {
 }
 
 #[test]
+fn ignores_commented_vercel_ts_bun_version() {
+    let _env = TestEnv::new("commented-vercel-ts");
+    let root = unique_temp_dir("commented-vercel-ts-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(
+        root.join("package.json"),
+        r#"{"private":true,"scripts":{"dev":"next dev","build":"next build"}}"#,
+    )
+    .expect("package");
+    fs::write(
+        root.join("vercel.ts"),
+        "export default {\n  // bunVersion: \"1.x\",\n};\n",
+    )
+    .expect("vercel.ts");
+
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-nextjs-bun-runtime-scripts")
+    );
+}
+
+#[test]
+fn include_scope_excludes_github_workflow_findings() {
+    let _env = TestEnv::new("include-workflow");
+    let root = copy_fixture("github-actions");
+    let paths = PlatformPaths::discover().expect("paths");
+    let overrides = bun_platform_core::CliOverrides {
+        include_paths: vec![PathBuf::from("package.json")],
+        ..Default::default()
+    };
+    let config = load_audit_config(&root, None, &overrides).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.file.contains(".github/workflows"))
+    );
+}
+
+#[test]
+fn multiline_frozen_bun_install_is_not_reported() {
+    let _env = TestEnv::new("multiline-frozen-install");
+    let root = copy_fixture("github-actions");
+    fs::write(
+        root.join(".github/workflows/ci.yml"),
+        "name: ci\non: [push]\njobs:\n  validate:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          bun install \\\n            --production \\\n            --frozen-lockfile\n",
+    )
+    .expect("workflow");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "pm-bun-install-ci-frozen-lockfile")
+    );
+}
+
+#[test]
+fn cache_fingerprint_includes_direct_root_inputs() {
+    let _env = TestEnv::new("cache-root-inputs");
+    let root = copy_fixture("github-actions");
+    let paths = PlatformPaths::discover().expect("paths");
+    let overrides = bun_platform_core::CliOverrides {
+        include_paths: vec![PathBuf::from("package.json")],
+        write_cache: true,
+        ..Default::default()
+    };
+    let config = load_audit_config(&root, None, &overrides).expect("config");
+
+    let initial = run_audit(&root, &config, &paths).expect("initial audit");
+    assert!(
+        !initial
+            .iter()
+            .any(|finding| finding.file.ends_with(".nvmrc"))
+    );
+
+    fs::write(root.join(".nvmrc"), "22\n").expect("nvmrc");
+    let updated = run_audit(&root, &config, &paths).expect("updated audit");
+
+    assert!(
+        updated
+            .iter()
+            .any(|finding| finding.file.ends_with(".nvmrc"))
+    );
+}
+
+#[test]
 fn explicit_vercel_adapter_reports_missing_bun_version() {
     let _env = TestEnv::new("explicit-vercel");
     let root = unique_temp_dir("explicit-vercel-root");
