@@ -1,0 +1,51 @@
+Benchmark the local hot path by timing audit and plan-fixes over repeated iterations. This is intended for fixture or scoped-repo performance tracking, not vendor-backed release-sync work.
+
+Usage: bun-platform benchmark [OPTIONS]
+
+Options:
+      --root <PATH>
+          Repository root to inspect. Defaults to the current working directory.
+
+      --config <PATH>
+          Path to bun-platform.config.json. If provided, the file must exist and parse successfully.
+
+      --baseline <PATH>
+          Optional baseline file override. Accepts an array of suppression keys or an object with suppressionKeys.
+
+      --include <PATH>
+          Restrict the scan to one or more included paths.
+
+      --exclude <DIR>
+          Exclude an additional directory name from recursive scanning.
+
+      --adapter <ID>
+          Enable a specific adapter set instead of auto-detection.
+
+      --max-files <N>
+          Maximum number of files to scan before failing.
+
+      --max-bytes <N>
+          Maximum cumulative bytes to scan before failing.
+
+      --write-cache
+          Write scan-cache entries under the dev-skills Bun platform cache.
+
+      --iterations <ITERATIONS>
+          Number of repeated iterations to measure.
+          
+          [default: 3]
+
+      --format <FORMAT>
+          Output format for benchmark results.
+          
+          [default: text]
+          [possible values: text, json, md]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Example:
+  bun-platform benchmark --root ./fixtures/github-actions --iterations 5 --format json

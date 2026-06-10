@@ -1,0 +1,30 @@
+Refresh Bun release notes and Vercel Bun runtime snapshots for the bun-dev skill, regenerate indexes, and write the resulting report to external state. Use --status for a local report or --dry-run for a non-mutating preview.
+
+Usage: bun-platform release-sync [OPTIONS]
+
+Options:
+      --skill-root <PATH>
+          Override the bun-dev skill root. Defaults to $BUN_PLATFORM_SKILL_ROOT or ~/.agents/skills/bun-dev.
+
+      --status
+          Print the current local release-sync report and integrity state without fetching remote docs.
+
+      --dry-run
+          Fetch remote docs and report which skill files would change without mutating them.
+
+      --format <FORMAT>
+          Output format for status, preview, or sync reporting.
+          
+          [default: text]
+          [possible values: text, json, md]
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Examples:
+  bun-platform release-sync
+  bun-platform release-sync --status --format json
+  bun-platform release-sync --dry-run

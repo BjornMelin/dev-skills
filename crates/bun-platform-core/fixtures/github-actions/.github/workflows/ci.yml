@@ -1,0 +1,10 @@
+name: ci
+on: [push]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install
+      - run: npx prisma generate
+      - run: bun install
