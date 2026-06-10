@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +114,8 @@ def collect_python_dependencies(
         path = Path(file)
         try:
             data = tomllib.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            print(f"warning: unable to parse {path}: {exc}", file=sys.stderr)
             continue
         project = data.get("project") if isinstance(data, dict) else None
         if not isinstance(project, dict):

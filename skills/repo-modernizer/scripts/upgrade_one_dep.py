@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 from pathlib import Path
+
+DEPENDENCY_SELECTOR_RE = re.compile(r"^[A-Za-z0-9@._:/-]+$")
 
 
 def main() -> None:
@@ -25,6 +28,9 @@ def main() -> None:
         choices=["runtime-pinned", "semver-only", "always-latest"],
     )
     args = parser.parse_args()
+
+    if not DEPENDENCY_SELECTOR_RE.fullmatch(args.dependency) or ".." in args.dependency:
+        raise SystemExit(f"Invalid dependency selector: {args.dependency}")
 
     script = Path(__file__).resolve().parent / "gh_deps_intel.py"
     cmd = [

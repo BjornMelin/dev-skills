@@ -2982,7 +2982,7 @@ fn resolve_skill_roots(
     if let Some(skills_root) = explicit_skills_root {
         let skills_root = canonicalize_existing_dir(skills_root, "skills root")?;
         let repo_root = match explicit_repo_root {
-            Some(repo_root) => canonicalize_existing_dir(repo_root, "repo root")?,
+            Some(repo_root) => canonicalize_repo_root(repo_root)?,
             None => skills_root
                 .parent()
                 .map(Path::to_path_buf)
@@ -3005,17 +3005,16 @@ fn resolve_skill_roots(
 }
 
 fn canonicalize_existing_dir(path: &Path, label: &str) -> Result<PathBuf> {
-    let canonical = fs::canonicalize(path)
-        .with_context(|| format!("failed to canonicalize {label} {}", path.display()))?;
-    let metadata = fs::symlink_metadata(&canonical)
-        .with_context(|| format!("failed to inspect {label} {}", canonical.display()))?;
+    let metadata = fs::symlink_metadata(path)
+        .with_context(|| format!("failed to inspect {label} {}", path.display()))?;
     if metadata.file_type().is_symlink() {
-        bail!("refusing to use symlinked {label}: {}", canonical.display());
+        bail!("refusing to use symlinked {label}: {}", path.display());
     }
     if !metadata.is_dir() {
-        bail!("{label} is not a directory: {}", canonical.display());
+        bail!("{label} is not a directory: {}", path.display());
     }
-    Ok(canonical)
+    fs::canonicalize(path)
+        .with_context(|| format!("failed to canonicalize {label} {}", path.display()))
 }
 
 fn audit_skill_text(
@@ -3058,8 +3057,15 @@ fn audit_markdown_tree(
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         return Ok(());
     }
-    let mut stack = vec![root.to_path_buf()];
-    while let Some(dir) = stack.pop() {
+    let mut remaining = SKILL_INVENTORY_MAX_RESOURCE_ENTRIES;
+    let mut stack = vec![(root.to_path_buf(), 0_usize)];
+    while let Some((dir, depth)) = stack.pop() {
+        if depth >= SKILL_INVENTORY_MAX_RESOURCE_DEPTH {
+            bail!(
+                "markdown audit exceeded max directory depth at {}",
+                dir.display()
+            );
+        }
         for entry in fs::read_dir(&dir)
             .with_context(|| format!("failed to read directory {}", dir.display()))?
         {
@@ -3071,8 +3077,15 @@ fn audit_markdown_tree(
             if metadata.file_type().is_symlink() {
                 continue;
             }
+            if remaining == 0 {
+                bail!(
+                    "markdown audit exceeded max entry count under {}",
+                    root.display()
+                );
+            }
+            remaining = remaining.saturating_sub(1);
             if metadata.is_dir() {
-                stack.push(path);
+                stack.push((path, depth + 1));
                 continue;
             }
             if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
@@ -3136,8 +3149,15 @@ fn audit_generated_python_artifacts(
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         return Ok(());
     }
-    let mut stack = vec![scripts_dir.to_path_buf()];
-    while let Some(dir) = stack.pop() {
+    let mut remaining = SKILL_INVENTORY_MAX_RESOURCE_ENTRIES;
+    let mut stack = vec![(scripts_dir.to_path_buf(), 0_usize)];
+    while let Some((dir, depth)) = stack.pop() {
+        if depth >= SKILL_INVENTORY_MAX_RESOURCE_DEPTH {
+            bail!(
+                "generated Python artifact audit exceeded max directory depth at {}",
+                dir.display()
+            );
+        }
         for entry in fs::read_dir(&dir)
             .with_context(|| format!("failed to read directory {}", dir.display()))?
         {
@@ -3149,6 +3169,13 @@ fn audit_generated_python_artifacts(
             if metadata.file_type().is_symlink() {
                 continue;
             }
+            if remaining == 0 {
+                bail!(
+                    "generated Python artifact audit exceeded max entry count under {}",
+                    scripts_dir.display()
+                );
+            }
+            remaining = remaining.saturating_sub(1);
             if metadata.is_dir() {
                 if path.file_name().and_then(|name| name.to_str()) == Some("__pycache__") {
                     issues.push(SkillAuditIssue {
@@ -3161,7 +3188,7 @@ fn audit_generated_python_artifacts(
                     });
                     continue;
                 }
-                stack.push(path);
+                stack.push((path, depth + 1));
             } else if path.extension().and_then(|ext| ext.to_str()) == Some("pyc") {
                 issues.push(SkillAuditIssue {
                     severity: SkillInventoryDiagnosticSeverity::Warning,
