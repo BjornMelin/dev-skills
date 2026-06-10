@@ -383,7 +383,7 @@ pub(crate) fn vercel_ts_has_bun_runtime(text: &str) -> bool {
         return false;
     }
     let bun_version_re = Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#).expect("valid regex");
-    let runtime_re = Regex::new(r#"runtime\s*:\s*["']bun["']"#).expect("valid regex");
+    let runtime_re = Regex::new(r#"runtime\s*:\s*["']bun(?:@[^"']+)?["']"#).expect("valid regex");
     if let Some(captures) = bun_version_re.captures(&text)
         && captures
             .get(1)

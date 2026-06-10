@@ -574,6 +574,7 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
     ] {
         let path = snapshot.root.join(name);
         hasher.update(name.as_bytes());
+        hasher.update([u8::from(path.is_file())]);
         if let Ok(content) = fs::read(&path) {
             hasher.update(&content);
         }
@@ -769,7 +770,8 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
     ));
     }
 
-    if let Some(middleware) = snapshot.read_text(&root.join("middleware.ts"))?
+    if signals.vercel_bun_enabled
+        && let Some(middleware) = snapshot.read_text(&root.join("middleware.ts"))?
         && !Regex::new(r#"runtime\s*=\s*['"]nodejs['"]"#)?.is_match(&middleware)
     {
         findings.push(create_finding(

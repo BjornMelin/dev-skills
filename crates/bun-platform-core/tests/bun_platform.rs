@@ -381,6 +381,33 @@ fn detects_only_active_vercel_ts_bun_runtime_config() {
 }
 
 #[test]
+fn detects_version_pinned_vercel_ts_bun_runtime() {
+    let _env = TestEnv::new("pinned-vercel-ts");
+    let root = unique_temp_dir("pinned-vercel-ts-root");
+    fs::create_dir_all(&root).expect("root");
+    fs::write(
+        root.join("package.json"),
+        r#"{"private":true,"scripts":{"dev":"next dev","build":"next build"}}"#,
+    )
+    .expect("package");
+    fs::write(
+        root.join("vercel.ts"),
+        "export default {\n  runtime: \"bun@1.3.14\",\n};\n",
+    )
+    .expect("vercel.ts");
+
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    assert!(
+        findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-nextjs-bun-runtime-scripts")
+    );
+}
+
+#[test]
 fn include_scope_excludes_github_workflow_findings() {
     let _env = TestEnv::new("include-workflow");
     let root = copy_fixture("github-actions");
@@ -449,6 +476,35 @@ fn cache_fingerprint_includes_direct_root_inputs() {
 }
 
 #[test]
+fn cache_fingerprint_distinguishes_missing_and_empty_files() {
+    let _env = TestEnv::new("cache-file-existence");
+    let root = copy_fixture("github-actions");
+    let paths = PlatformPaths::discover().expect("paths");
+    let overrides = bun_platform_core::CliOverrides {
+        include_paths: vec![PathBuf::from("package.json")],
+        write_cache: true,
+        ..Default::default()
+    };
+    let config = load_audit_config(&root, None, &overrides).expect("config");
+
+    let initial = run_audit(&root, &config, &paths).expect("initial audit");
+    assert!(
+        !initial
+            .iter()
+            .any(|finding| finding.file.ends_with(".nvmrc"))
+    );
+
+    fs::write(root.join(".nvmrc"), "").expect("empty nvmrc");
+    let updated = run_audit(&root, &config, &paths).expect("updated audit");
+
+    assert!(
+        updated
+            .iter()
+            .any(|finding| finding.file.ends_with(".nvmrc"))
+    );
+}
+
+#[test]
 fn explicit_vercel_adapter_reports_missing_bun_version() {
     let _env = TestEnv::new("explicit-vercel");
     let root = unique_temp_dir("explicit-vercel-root");
@@ -473,6 +529,11 @@ fn explicit_vercel_adapter_reports_missing_bun_version() {
         !findings
             .iter()
             .any(|finding| finding.rule_id == "vercel-bun-install-detection")
+    );
+    assert!(
+        !findings
+            .iter()
+            .any(|finding| finding.rule_id == "vercel-bun-runtime-limitations")
     );
 }
 
