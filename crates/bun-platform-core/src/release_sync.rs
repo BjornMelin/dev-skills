@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use regex::Regex;
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::{collections::HashSet, fs, path::PathBuf, time::Duration};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 pub fn run_release_sync(
@@ -312,9 +312,9 @@ fn build_references_index_content() -> String {
         "Refresh vendor-backed refs:".to_string(),
         "".to_string(),
         "```bash".to_string(),
-        "codex-dev --json bun references sync".to_string(),
-        "codex-dev --json bun references status".to_string(),
-        "codex-dev --json bun references plan".to_string(),
+        "bun-platform release-sync".to_string(),
+        "bun-platform release-sync --status --format json".to_string(),
+        "bun-platform release-sync --dry-run --format json".to_string(),
         "```".to_string(),
         "".to_string(),
         "## Bun".to_string(),
@@ -360,6 +360,7 @@ fn fetch_bun_release_snapshot() -> Result<String> {
 fn fetch_markdown_snapshot(url: &str, user_agent: &str) -> Result<String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(user_agent)
+        .timeout(Duration::from_secs(10))
         .build()?;
     let markdown_url = resolve_markdown_url(&client, url)?;
     let body = client
@@ -374,6 +375,7 @@ fn fetch_markdown_snapshot(url: &str, user_agent: &str) -> Result<String> {
 fn fetch_vercel_runtime_snapshot() -> Result<String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent("bun-dev-skill/1.0 (+https://vercel.com)")
+        .timeout(Duration::from_secs(10))
         .build()?;
     let html = client
         .get(VERCEL_BUN_RUNTIME_URL)

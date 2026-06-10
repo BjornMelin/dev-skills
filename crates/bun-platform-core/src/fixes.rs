@@ -4,12 +4,17 @@ use crate::{
     types::{FixKind, PlannedFix, VERIFIED_BUN_VERSION},
 };
 use anyhow::{Context, Result};
+use regex::Regex;
 use serde_json::{Map, Value};
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::LazyLock,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+static NPX_COMMAND_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bnpx\b").expect("valid regex"));
 
 pub fn plan_safe_fixes(root: &Path, _config: &AuditConfig) -> Result<Vec<PlannedFix>> {
     let root = root
@@ -120,9 +125,9 @@ fn normalize_scripts(
     if bun_first {
         for value in scripts.values_mut() {
             if let Some(command) = value.as_str()
-                && command.contains("npx")
+                && NPX_COMMAND_RE.is_match(command)
             {
-                *value = Value::String(command.replace("npx", "bunx"));
+                *value = Value::String(NPX_COMMAND_RE.replace_all(command, "bunx").into_owned());
                 rewrote_npx = true;
             }
         }

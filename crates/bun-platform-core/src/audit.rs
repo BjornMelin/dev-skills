@@ -12,11 +12,25 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
+    sync::LazyLock,
     time::UNIX_EPOCH,
 };
 use walkdir::{DirEntry, WalkDir};
 
 const ENGINE_VERSION: &str = "bun-platform-rust-v1";
+static OTHER_PACKAGE_MANAGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(npm|pnpm|yarn)\b").expect("valid regex"));
+static ORCHESTRATION_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\bconcurrently\b|\bnpm-run-all\b|\brun-p\b").expect("valid regex")
+});
+static TS_RUNTIME_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\b(ts-node|tsx)\b").expect("valid regex"));
+static BUN_COMMAND_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bbun(x)?\b").expect("valid regex"));
+static BUN_RUN_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bbun\s+run\s+").expect("valid regex"));
+static POSITIVE_INTEGER_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[1-9]\d*$").expect("valid regex"));
 
 #[derive(Clone, Debug, Default)]
 struct RepoSignals {
@@ -104,9 +118,6 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
     }
 
     if let Some(package_json) = package_json.as_ref() {
-        let other_package_manager_re = Regex::new(r"\b(npm|pnpm|yarn)\b")?;
-        let orchestration_re = Regex::new(r"\bconcurrently\b|\bnpm-run-all\b|\brun-p\b")?;
-        let ts_runtime_re = Regex::new(r"\b(ts-node|tsx)\b")?;
         if package_json.package_manager.is_none() {
             findings.push(create_finding(
                 &root,
@@ -159,7 +170,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                     },
                 ));
             }
-            if other_package_manager_re.is_match(&command) {
+            if OTHER_PACKAGE_MANAGER_RE.is_match(&command) {
                 findings.push(create_finding(
           &root,
           "scripts-no-npm-in-bun-repos",
@@ -171,7 +182,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
           FindingOptions::default(),
         ));
             }
-            if orchestration_re.is_match(&command) {
+            if ORCHESTRATION_RE.is_match(&command) {
                 findings.push(create_finding(
                     &root,
                     "scripts-bun-run-parallel-sequential",
@@ -193,7 +204,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                     FindingOptions::default(),
                 ));
             }
-            if ts_runtime_re.is_match(&command) {
+            if TS_RUNTIME_RE.is_match(&command) {
                 findings.push(create_finding(
           &root,
           "runtime-ts-direct-execution",
@@ -344,7 +355,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
     }
 
     if let Some(bunfig) = bunfig {
-        if Regex::new(r"(?ms)^\s*\[test\].*^\s*retry\s*=\s*[1-9]")?.is_match(&bunfig) {
+        if toml_table_has_positive_integer(&bunfig, "test", "retry") {
             findings.push(create_finding(
         &root,
         "test-bun-retry",
@@ -587,11 +598,7 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> RepoSignals {
             .map(|value| value.starts_with("bun@"))
             .unwrap_or(false)
         || vercel_bun_enabled
-        || scripts.iter().any(|value| {
-            Regex::new(r"\bbun(x)?\b")
-                .map(|re| re.is_match(value))
-                .unwrap_or(false)
-        });
+        || scripts.iter().any(|value| BUN_COMMAND_RE.is_match(value));
     RepoSignals {
         bun_first,
         vercel_bun_enabled,
@@ -674,13 +681,11 @@ fn run_adapters(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Result<Ve
     if requested.contains("github-actions") && snapshot.root.join(".github/workflows").is_dir() {
         findings.extend(run_github_actions_adapter(snapshot, signals)?);
     }
-    if requested.contains("docker")
-        && snapshot
-            .walk_files()?
-            .iter()
-            .any(|path| is_dockerfile(path))
-    {
-        findings.extend(run_docker_adapter(snapshot, signals)?);
+    if requested.contains("docker") {
+        let files = snapshot.walk_files()?;
+        if files.iter().any(|path| is_dockerfile(path)) {
+            findings.extend(run_docker_adapter(snapshot, signals, &files)?);
+        }
     }
     if requested.contains("monorepo") && signals.has_workspaces {
         findings.extend(run_monorepo_adapter(snapshot)?);
@@ -857,17 +862,21 @@ fn run_github_actions_adapter(
     Ok(findings)
 }
 
-fn run_docker_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Result<Vec<Finding>> {
+fn run_docker_adapter(
+    snapshot: &RepoSnapshot<'_>,
+    signals: &RepoSignals,
+    files: &[PathBuf],
+) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
     let node_from_re = Regex::new(r"\bFROM\s+node[:\s]")?;
     let install_re = Regex::new(r"\b(npm ci|npm install|pnpm install|yarn install)\b")?;
     let bun_install_re = Regex::new(r"\bbun install\b")?;
     let bun_frozen_re = Regex::new(r"\bbun install --frozen-lockfile\b|\bbun ci\b")?;
-    for file in snapshot.walk_files()? {
-        if !is_dockerfile(&file) {
+    for file in files {
+        if !is_dockerfile(file) {
             continue;
         }
-        let Some(content) = snapshot.read_text(&file)? else {
+        let Some(content) = snapshot.read_text(file)? else {
             continue;
         };
         if signals.bun_first && node_from_re.is_match(&content) {
@@ -879,7 +888,7 @@ fn run_docker_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
                 snapshot.root,
                 "runtime-bun-vs-node-choose",
                 Severity::Info,
-                &file,
+                file,
                 "Dockerfile still uses a Node base image in a Bun-first repo.",
                 options,
             ));
@@ -889,7 +898,7 @@ fn run_docker_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
                 snapshot.root,
                 "scripts-no-npm-in-bun-repos",
                 Severity::Warn,
-                &file,
+                file,
                 "Dockerfile uses npm/pnpm/yarn install commands in a Bun-first repo.",
                 line_hit(&content, &install_re),
             ));
@@ -902,7 +911,7 @@ fn run_docker_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
                 snapshot.root,
                 "pm-bun-install-ci-frozen-lockfile",
                 Severity::Info,
-                &file,
+                file,
                 "Dockerfile runs `bun install` without frozen lockfile mode.",
                 line_hit(&content, &bun_install_re),
             ));
@@ -913,14 +922,13 @@ fn run_docker_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
 
 fn run_monorepo_adapter(snapshot: &RepoSnapshot<'_>) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
-    let bun_run_re = Regex::new(r"^\s*bun run ")?;
     let filter_re = Regex::new(r"--filter|--workspaces")?;
     let package_json = snapshot.read_json::<PackageJson>(&snapshot.root.join("package.json"))?;
     for (name, command) in package_json.and_then(|pkg| pkg.scripts).unwrap_or_default() {
         if !["build", "test", "lint", "typecheck"].contains(&name.as_str()) {
             continue;
         }
-        if bun_run_re.is_match(&command) && !filter_re.is_match(&command) {
+        if BUN_RUN_RE.is_match(&command) && !filter_re.is_match(&command) {
             findings.push(create_finding(
         snapshot.root,
         "scripts-bun-filter-and-workspaces",
@@ -954,6 +962,29 @@ fn is_js_like(path: &Path) -> bool {
         path.extension().and_then(|value| value.to_str()),
         Some("ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs")
     )
+}
+
+fn toml_table_has_positive_integer(content: &str, table: &str, key: &str) -> bool {
+    let target_header = format!("[{table}]");
+    let key_prefix = format!("{key}=");
+    let mut in_table = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_table = trimmed == target_header;
+            continue;
+        }
+        if !in_table {
+            continue;
+        }
+        let normalized = trimmed.replace(' ', "");
+        if let Some(value) = normalized.strip_prefix(&key_prefix) {
+            return POSITIVE_INTEGER_RE.is_match(value);
+        }
+    }
+
+    false
 }
 
 struct MatchHit {

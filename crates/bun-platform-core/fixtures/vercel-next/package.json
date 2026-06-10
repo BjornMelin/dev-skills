@@ -1,7 +1,7 @@
 {
   "name": "vercel-next-fixture",
   "private": true,
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@1.3.14",
   "scripts": {
     "dev": "next dev",
     "build": "next build"

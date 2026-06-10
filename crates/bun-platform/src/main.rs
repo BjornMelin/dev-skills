@@ -287,6 +287,7 @@ fn main() {
 fn run() -> Result<()> {
     let cli = Cli::parse();
     let paths = PlatformPaths::discover()?;
+    paths.ensure()?;
 
     match cli.command {
         None => {
@@ -474,8 +475,12 @@ fn map_severity(value: SeverityArg) -> Severity {
 fn run_validation_commands(root: &Path, configured: &[String]) -> Result<Vec<String>> {
     let package_json_path = root.join("package.json");
     let package_json = if package_json_path.is_file() {
-        let text = std::fs::read_to_string(&package_json_path)?;
-        serde_json::from_str::<serde_json::Value>(&text).ok()
+        let text = std::fs::read_to_string(&package_json_path)
+            .with_context(|| format!("failed to read {}", package_json_path.display()))?;
+        Some(
+            serde_json::from_str::<serde_json::Value>(&text)
+                .with_context(|| format!("failed to parse {}", package_json_path.display()))?,
+        )
     } else {
         None
     };
@@ -501,8 +506,9 @@ fn run_validation_commands(root: &Path, configured: &[String]) -> Result<Vec<Str
     };
 
     for command in &commands {
-        let status = Command::new("zsh")
-            .arg("-lc")
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+        let status = Command::new(&shell)
+            .arg("-c")
             .arg(command)
             .current_dir(root)
             .stdin(Stdio::null())

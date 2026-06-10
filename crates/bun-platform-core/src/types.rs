@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-pub const VERIFIED_BUN_VERSION: &str = "1.3.13";
-pub const BUN_RELEASE_NOTES_URL: &str = "https://bun.com/blog/release-notes/bun-v1.3.13";
+pub const VERIFIED_BUN_VERSION: &str = "1.3.14";
+pub const BUN_RELEASE_NOTES_URL: &str = "https://bun.com/blog/bun-v1.3.14";
 pub const VERCEL_BUN_RUNTIME_URL: &str = "https://vercel.com/docs/functions/runtimes/bun";
 pub const REF_BUN_RELEASE_NOTES: &str = "ref-bun-release-notes-latest.md";
 pub const REF_BUN_CAPABILITIES: &str = "ref-bun-capabilities-latest.md";
@@ -58,6 +58,9 @@ pub struct Finding {
     pub suppression_key: String,
 }
 
+/// A safe package.json rewrite plan. `rule_id` is the primary single-rule
+/// identifier for older consumers; `rule_ids` is the canonical list to read
+/// when one edit satisfies multiple rules.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PlannedFix {
     pub rule_id: String,

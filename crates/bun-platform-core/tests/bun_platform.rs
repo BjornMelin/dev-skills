@@ -113,7 +113,7 @@ fn plans_and_applies_safe_package_json_fixes() {
     apply_safe_fixes(&root, &config, &paths).expect("apply");
     let package_json =
         fs::read_to_string(root.join("package.json")).expect("package.json after fixes");
-    assert!(package_json.contains("\"packageManager\": \"bun@1.3.13\""));
+    assert!(package_json.contains("\"packageManager\": \"bun@1.3.14\""));
     assert!(package_json.contains("\"gen\": \"bunx prisma generate\""));
     assert!(!root.join(".bun-platform").exists());
 }
@@ -376,7 +376,7 @@ fn config_schema_and_template_stay_aligned() {
 #[ignore = "networked release-sync preview"]
 fn previews_release_sync_without_mutating_the_skill() {
     let _env = TestEnv::new("release-preview");
-    let skill_root = PathBuf::from("/home/bjorn/.agents/skills/bun-dev");
+    let skill_root = repo_root().join("skills/bun-dev");
     if !skill_root.is_dir() {
         return;
     }
