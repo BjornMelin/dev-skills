@@ -18,7 +18,12 @@ CACHE_TTL_SECONDS = 60 * 60 * 12
 
 
 class RegistryCache:
-    """Small TTL cache for registry API responses."""
+    """Small TTL cache for registry API responses.
+
+    Args:
+        path: Cache file path, defaulting to CACHE_PATH.
+        ttl_seconds: Cache entry lifetime, defaulting to CACHE_TTL_SECONDS.
+    """
 
     def __init__(
         self, path: Path = CACHE_PATH, ttl_seconds: int = CACHE_TTL_SECONDS

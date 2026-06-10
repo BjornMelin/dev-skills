@@ -45,6 +45,20 @@ def _read_text(path: Path) -> str | None:
     return txt or None
 
 
+def _load_pyproject(path: Path) -> dict[str, Any]:
+    try:
+        import tomllib as toml_parser
+    except ModuleNotFoundError:
+        try:
+            import tomli as toml_parser
+        except ModuleNotFoundError as exc:
+            raise RuntimeError(
+                "pyproject parsing requires Python 3.11+ or tomli"
+            ) from exc
+
+    return toml_parser.loads(path.read_text(encoding="utf-8"))
+
+
 def _workspace_globs_from_package_json(pkg: dict[str, Any]) -> list[str]:
     ws = pkg.get("workspaces")
     if isinstance(ws, list):
@@ -263,9 +277,7 @@ def _detect_python_runtime(root: Path, pyproject_files: list[Path]) -> dict[str,
 
     for pp in pyproject_files:
         try:
-            import tomllib
-
-            data = tomllib.loads(pp.read_text(encoding="utf-8"))
+            data = _load_pyproject(pp)
             project = data.get("project") if isinstance(data, dict) else None
             if isinstance(project, dict) and isinstance(
                 project.get("requires-python"), str

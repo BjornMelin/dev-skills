@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "opensrc-inspect",
+  "status": "archived",
+  "archived_at": "2026-06-10T00:00:00Z",
+  "replacement": "opensrc",
+  "source_path": "skills/opensrc-inspect",
+  "archived_path": "archive/skills/opensrc-inspect",
+  "reason": "Merged into opensrc as the canonical source-inspection lane; retained for source history without remaining active.",
+  "restore": "Move this directory back to skills/opensrc-inspect only if opensrc no longer owns source-level dependency inspection."
+}

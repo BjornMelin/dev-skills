@@ -472,7 +472,14 @@ def run_enrich(
 
 
 def run_analyze(enriched: dict[str, Any]) -> dict[str, Any]:
-    """Analyze enriched dependencies and optionally attach repo usage maps."""
+    """Analyze enriched dependencies and optionally attach repo usage maps.
+
+    Args:
+        enriched: Enrich-stage payload with repo metadata, including repo_root.
+
+    Returns:
+        Analyze-stage payload containing dependency impact data and repo usage.
+    """
     repo_root = Path(enriched["repo_root"])
     deep_repo_map = bool(enriched.get("deep_repo_map"))
     analyzed: list[dict[str, Any]] = []
@@ -516,7 +523,17 @@ def run_report(
     out_dir: Path,
     compatibility_policy: str = "runtime-pinned",
 ) -> dict[str, Any]:
-    """Write reports for analyzed dependency data and return output paths."""
+    """Write reports for analyzed dependency data and return output paths.
+
+    Args:
+        analyzed: Analyze-stage dependency data.
+        out_dir: Directory where Markdown and JSON reports are written.
+        compatibility_policy: Target-version policy, defaulting to
+            runtime-pinned.
+
+    Returns:
+        Report-stage payload with generated report paths and warnings.
+    """
     paths = write_reports(
         out_dir=out_dir,
         repo_root=analyzed["repo_root"],
@@ -537,7 +554,11 @@ def run_report(
 
 
 def run_rate_limit_diag() -> dict[str, Any]:
-    """Return the current GitHub API rate-limit payload."""
+    """Return the current GitHub API rate-limit payload.
+
+    Returns:
+        GitHub API rate-limit response with resource and rate details.
+    """
     gh = GitHubClient(mode="safe")
     data = gh.get_rate_limit()
     gh.flush_cache()
@@ -545,7 +566,16 @@ def run_rate_limit_diag() -> dict[str, Any]:
 
 
 def save_stage_json(out_dir: Path, name: str, payload: dict[str, Any]) -> str:
-    """Write a stage payload under an output directory and return its path."""
+    """Write a stage payload under an output directory and return its path.
+
+    Args:
+        out_dir: Target output directory.
+        name: Stage name for the output file, without the .json suffix.
+        payload: JSON-serializable stage data.
+
+    Returns:
+        Path string for the written JSON file.
+    """
     ensure_dir(out_dir)
     path = out_dir / f"{name}.json"
     write_json(path, payload)

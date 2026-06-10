@@ -29,7 +29,14 @@ class GitHubApiError(RuntimeError):
 
 
 class GitHubClient:
-    """Rate-limit aware GitHub API client with simple JSON file caching."""
+    """Rate-limit aware GitHub API client with simple JSON file caching.
+
+    Args:
+        mode: Operation mode, either safe or fast.
+        max_retries: Maximum retry attempts for rate-limited requests.
+        min_interval_seconds: Minimum delay between safe-mode requests.
+        cache_ttl_seconds: Number of seconds before cached responses expire.
+    """
 
     def __init__(
         self,
