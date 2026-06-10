@@ -8,12 +8,11 @@
   ],
   "includePaths": [],
   "excludeDirs": [
-    "vendor",
-    ".bun-platform"
+    "vendor"
   ],
   "baseline": "./bun-platform-baseline.json",
   "maxFiles": 5000,
   "maxBytes": 50000000,
   "validationCommands": [],
-  "manageGitignore": true
+  "writeCache": false
 }
