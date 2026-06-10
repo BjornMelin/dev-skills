@@ -492,7 +492,7 @@ fn run_validation_commands(root: &Path, configured: &[String]) -> Result<Vec<Str
         .unwrap_or_default();
     let commands = if configured.is_empty() {
         let mut defaults = Vec::new();
-        if root.join("bun.lockb").is_file() {
+        if root.join("bun.lockb").is_file() || root.join("bun.lock").is_file() {
             defaults.push("bun install --frozen-lockfile".to_string());
         }
         for script in ["lint", "typecheck", "test", "build"] {

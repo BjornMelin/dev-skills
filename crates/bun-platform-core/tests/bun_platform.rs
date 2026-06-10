@@ -173,9 +173,14 @@ fn respects_disabled_rules_and_baseline_suppressions() {
             .iter()
             .any(|finding| finding.rule_id == "pm-bunx-vs-npx")
     );
+    assert!(plan_safe_fixes(&root, &config).expect("plan").is_empty());
 }
 
 #[test]
+// TestEnv::new isolates state; copy_fixture starts with bun.lockb, then
+// fs::remove_file/fs::write swaps in bun.lock so PlatformPaths::discover,
+// load_audit_config, and run_audit must still produce pm-no-mixed-lockfiles in
+// findings.
 fn recognizes_current_bun_lockfile_name() {
     let _env = TestEnv::new("bun-lock");
     let root = copy_fixture("mixed-lockfiles");

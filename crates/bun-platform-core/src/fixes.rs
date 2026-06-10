@@ -16,7 +16,7 @@ use std::{
 static NPX_COMMAND_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\bnpx\b").expect("valid regex"));
 
-pub fn plan_safe_fixes(root: &Path, _config: &AuditConfig) -> Result<Vec<PlannedFix>> {
+pub fn plan_safe_fixes(root: &Path, config: &AuditConfig) -> Result<Vec<PlannedFix>> {
     let root = root
         .canonicalize()
         .with_context(|| format!("failed to resolve {}", root.display()))?;
@@ -32,11 +32,28 @@ pub fn plan_safe_fixes(root: &Path, _config: &AuditConfig) -> Result<Vec<Planned
     let original = json.clone();
     let mut rule_ids = Vec::new();
     let mut descriptions = Vec::new();
+    let policy = FixPolicy {
+        package_json_path: &package_json_path,
+        config,
+    };
 
     if let Value::Object(root_map) = &mut json {
         let bun_first = is_bun_first_repo(&root, root_map);
-        normalize_package_manager(root_map, bun_first, &mut rule_ids, &mut descriptions);
-        normalize_scripts(&root, root_map, bun_first, &mut rule_ids, &mut descriptions);
+        normalize_package_manager(
+            root_map,
+            bun_first,
+            &policy,
+            &mut rule_ids,
+            &mut descriptions,
+        );
+        normalize_scripts(
+            &root,
+            root_map,
+            bun_first,
+            &policy,
+            &mut rule_ids,
+            &mut descriptions,
+        );
     }
 
     if json == original || rule_ids.is_empty() {
@@ -88,23 +105,55 @@ pub fn apply_safe_fixes(
     Ok(fixes)
 }
 
+struct FixPolicy<'a> {
+    package_json_path: &'a Path,
+    config: &'a AuditConfig,
+}
+
+impl FixPolicy<'_> {
+    fn allows(&self, rule_id: &str) -> bool {
+        if self
+            .config
+            .disabled_rules
+            .iter()
+            .any(|value| value == rule_id)
+        {
+            return false;
+        }
+        let suppression_key = format!(
+            "{rule_id}:{}",
+            self.package_json_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("package.json")
+        );
+        !self
+            .config
+            .baseline_keys
+            .iter()
+            .any(|value| value == &suppression_key)
+    }
+}
+
 fn normalize_package_manager(
     root_map: &mut Map<String, Value>,
     bun_first: bool,
+    policy: &FixPolicy<'_>,
     rule_ids: &mut Vec<String>,
     descriptions: &mut Vec<String>,
 ) {
+    const RULE_ID: &str = "pm-package-manager-field";
     let package_manager = root_map
         .get("packageManager")
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
-    if package_manager.is_empty() && bun_first {
+    if package_manager.is_empty() && bun_first && policy.allows(RULE_ID) {
         root_map.insert(
             "packageManager".to_string(),
             Value::String(format!("bun@{VERIFIED_BUN_VERSION}")),
         );
-        rule_ids.push("pm-package-manager-field".to_string());
+        rule_ids.push(RULE_ID.to_string());
         descriptions.push(format!("add packageManager bun@{VERIFIED_BUN_VERSION}"));
     }
 }
@@ -113,6 +162,7 @@ fn normalize_scripts(
     root: &Path,
     root_map: &mut Map<String, Value>,
     bun_first: bool,
+    policy: &FixPolicy<'_>,
     rule_ids: &mut Vec<String>,
     descriptions: &mut Vec<String>,
 ) {
@@ -122,7 +172,8 @@ fn normalize_scripts(
     };
     let mut rewrote_npx = false;
 
-    if bun_first {
+    const NPX_RULE_ID: &str = "pm-bunx-vs-npx";
+    if bun_first && policy.allows(NPX_RULE_ID) {
         for value in scripts.values_mut() {
             if let Some(command) = value.as_str()
                 && NPX_COMMAND_RE.is_match(command)
@@ -133,10 +184,11 @@ fn normalize_scripts(
         }
     }
     if rewrote_npx {
-        rule_ids.push("pm-bunx-vs-npx".to_string());
+        rule_ids.push(NPX_RULE_ID.to_string());
         descriptions.push("rewrite npx invocations to bunx".to_string());
     }
-    if vercel_bun_enabled {
+    const VERCEL_RULE_ID: &str = "vercel-nextjs-bun-runtime-scripts";
+    if vercel_bun_enabled && policy.allows(VERCEL_RULE_ID) {
         let mut changed = false;
         if scripts
             .get("dev")
@@ -163,7 +215,7 @@ fn normalize_scripts(
             changed = true;
         }
         if changed {
-            rule_ids.push("vercel-nextjs-bun-runtime-scripts".to_string());
+            rule_ids.push(VERCEL_RULE_ID.to_string());
             descriptions.push("normalize Next.js dev/build scripts for Bun runtime".to_string());
         }
     }
@@ -193,9 +245,17 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
     }
     fs::read_to_string(root.join("vercel.ts"))
         .map(|text| {
-            Regex::new(r#"bunVersion\s*:\s*["']"#)
+            let Some(captures) = Regex::new(r#"bunVersion\s*:\s*["']([^"']+)["']"#)
                 .expect("valid regex")
-                .is_match(&text)
+                .captures(&text)
+            else {
+                return false;
+            };
+            text.contains("export")
+                && captures
+                    .get(1)
+                    .map(|value| !value.as_str().trim().is_empty())
+                    .unwrap_or(false)
         })
         .unwrap_or(false)
 }
