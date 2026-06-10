@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use codex_dev_core::stable_text_hash;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
@@ -2245,6 +2246,182 @@ fn write_review_threads_fixture(source_dir: &std::path::Path, unresolved: bool) 
     .expect("write threads");
 }
 
+fn write_pr_review_thread_fixture(source_dir: &std::path::Path) {
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        serde_json::to_string_pretty(&json!([
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    {
+                                        "id": "thread-suggestion",
+                                        "isResolved": false,
+                                        "isOutdated": false,
+                                        "comments": {
+                                            "nodes": [
+                                                {
+                                                    "id": "comment-1",
+                                                    "author": {"login": "coderabbitai"},
+                                                    "path": "crates/codex-dev/src/lib.rs",
+                                                    "line": 13,
+                                                    "startLine": 12,
+                                                    "originalLine": 13,
+                                                    "originalStartLine": 12,
+                                                    "body": "This can be simplified.\n\n```suggestion\nlet answer = 42;\n```",
+                                                    "diffHunk": "@@ -12,2 +12,2 @@\n-let first = 40;\n-let second = 41;\n+let first = 1;\n+let second = 2;"
+                                                }
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
+                                        }
+                                    }
+                                ],
+                                "pageInfo": {"hasNextPage": false, "endCursor": null}
+                            }
+                        }
+                    }
+                }
+            }
+        ]))
+        .expect("thread fixture json"),
+    )
+    .expect("write detailed review threads");
+}
+
+fn write_pr_review_blank_line_thread_fixture(source_dir: &std::path::Path) {
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        serde_json::to_string_pretty(&json!([
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    {
+                                        "id": "thread-suggestion",
+                                        "isResolved": false,
+                                        "isOutdated": false,
+                                        "comments": {
+                                            "nodes": [
+                                                {
+                                                    "id": "comment-1",
+                                                    "author": {"login": "coderabbitai"},
+                                                    "path": "crates/codex-dev/src/lib.rs",
+                                                    "line": 14,
+                                                    "startLine": 12,
+                                                    "originalLine": 14,
+                                                    "originalStartLine": 12,
+                                                    "body": "Preserve spacing.\n\n```suggestion\nlet answer = 42;\n```",
+                                                    "diffHunk": "@@ -12,3 +12,3 @@\n-let first = 40;\n-\n-let second = 41;\n+let first = 1;\n+\n+let second = 2;"
+                                                }
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
+                                        }
+                                    }
+                                ],
+                                "pageInfo": {"hasNextPage": false, "endCursor": null}
+                            }
+                        }
+                    }
+                }
+            }
+        ]))
+        .expect("thread fixture json"),
+    )
+    .expect("write blank-line review threads");
+}
+
+fn write_pr_review_edge_blank_suggestion_fixture(source_dir: &std::path::Path) {
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        serde_json::to_string_pretty(&json!([
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    {
+                                        "id": "thread-suggestion",
+                                        "isResolved": false,
+                                        "isOutdated": false,
+                                        "comments": {
+                                            "nodes": [
+                                                {
+                                                    "id": "comment-1",
+                                                    "author": {"login": "coderabbitai"},
+                                                    "path": "crates/codex-dev/src/lib.rs",
+                                                    "line": 12,
+                                                    "originalLine": 12,
+                                                    "body": "Preserve edge blank lines.\n\n```suggestion\n\nlet answer = 42;\n\n```",
+                                                    "diffHunk": "@@ -12,1 +12,1 @@\n-let answer = 41;\n+let answer = 41;"
+                                                }
+                                            ],
+                                            "totalCount": 1,
+                                            "pageInfo": {"hasNextPage": false, "endCursor": null}
+                                        }
+                                    }
+                                ],
+                                "pageInfo": {"hasNextPage": false, "endCursor": null}
+                            }
+                        }
+                    }
+                }
+            }
+        ]))
+        .expect("thread fixture json"),
+    )
+    .expect("write edge-blank suggestion threads");
+}
+
+fn write_pr_suggestion_worklist(path: &std::path::Path, items: Value) {
+    let item_values = items.as_array().cloned().unwrap_or_default();
+    let unresolved_threads = item_values
+        .iter()
+        .filter(|item| item["status"].as_str() != Some("resolved"))
+        .count();
+    let actionable_items = item_values
+        .iter()
+        .filter(|item| item["status"].as_str() == Some("actionable"))
+        .count();
+    let suggestion_items = item_values
+        .iter()
+        .filter(|item| {
+            item["suggestions"]
+                .as_array()
+                .is_some_and(|suggestions| !suggestions.is_empty())
+        })
+        .count();
+    std::fs::write(
+        path,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": unresolved_threads,
+                "actionable_items": actionable_items,
+                "suggestion_items": suggestion_items,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": items,
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+}
+
 #[cfg(unix)]
 fn write_fake_gh(bin_dir: &std::path::Path) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt;
@@ -2747,7 +2924,10 @@ fn pr_plan_and_record_support_fixture_mode() {
                 .iter()
                 .any(|part| {
                     part.as_str().is_some_and(|part| {
-                        part.contains("endCursor") && part.contains("after:$endCursor")
+                        part.contains("endCursor")
+                            && part.contains("after:$endCursor")
+                            && part.contains("startLine")
+                            && part.contains("originalStartLine")
                     })
                 })
     }));
@@ -2758,7 +2938,8 @@ fn pr_plan_and_record_support_fixture_mode() {
                 .expect("command argv")
                 .iter()
                 .any(|part| {
-                    part == "bucket,completedAt,description,event,link,name,startedAt,state,workflow"
+                    part
+                        == "bucket,completedAt,description,event,link,name,startedAt,state,workflow"
                 })
     }));
     assert!(plan_commands.iter().any(|command| {
@@ -3660,6 +3841,2713 @@ fn pr_agent_action_apply_skips_non_failed_workflow_rerun() {
     let gh_log = std::fs::read_to_string(log).expect("gh log");
     assert!(gh_log.contains("api repos/BjornMelin/dev-skills/actions/runs/456"));
     assert!(!gh_log.contains("rerun-failed-jobs"));
+}
+
+#[test]
+fn pr_review_start_replays_sources_and_emits_worklist() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    write_pr_review_thread_fixture(&source_dir);
+    let capsule = init_capsule_fixture(&root, "pr-review-start", "PR review start");
+    let out = temp.path().join("out-worklist.json");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+            "--out",
+            out.to_str().expect("out path"),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["command"], "pr review start");
+    assert_eq!(json["result"]["schema"], "codex-dev.pr-review-worklist.v1");
+    assert_eq!(json["result"]["summary"]["actionable_items"], 1);
+    assert_eq!(json["result"]["summary"]["suggestion_items"], 1);
+    assert_eq!(json["result"]["items"][0]["provider"], "coderabbit");
+    assert_eq!(json["result"]["items"][0]["thread_id"], "thread-suggestion");
+    assert_eq!(
+        json["result"]["items"][0]["suggestions"][0]["apply_mode"],
+        "exact-hunk"
+    );
+    assert_eq!(
+        json["result"]["items"][0]["suggestions"][0]["original"],
+        "let first = 1;\nlet second = 2;"
+    );
+    let expected_worklist_path =
+        std::fs::canonicalize(std::path::Path::new(&capsule).join("pr-review-worklist.json"))
+            .expect("canonical worklist path");
+    assert_eq!(
+        json["result"]["worklist_path"],
+        expected_worklist_path.to_str().expect("worklist path")
+    );
+    assert_eq!(
+        json["result"]["out_path"],
+        std::fs::canonicalize(&out)
+            .expect("canonical out path")
+            .to_str()
+            .expect("out path")
+    );
+    assert!(expected_worklist_path.is_file());
+    assert!(out.is_file());
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:06:00Z",
+        ])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("pr-review-worklist.json"));
+}
+
+#[test]
+fn pr_review_start_rejects_fresh_source_replay() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    let capsule = init_capsule_fixture(&root, "pr-review-fresh", "PR review fresh");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--fresh",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("fresh conflict json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .is_some_and(|error| error.contains("--fresh cannot be combined with --source-dir"))
+    );
+}
+
+#[test]
+fn pr_review_start_blocks_non_authoritative_review_threads() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "comment-1",
+                      "author": {"login": "reviewer"},
+                      "path": "crates/codex-dev/src/lib.rs",
+                      "line": 12,
+                      "body": "Fix this."
+                    }
+                  ],
+                  "totalCount": 2,
+                  "pageInfo": {"hasNextPage": true, "endCursor": "comment-next"}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write paginated threads");
+    let capsule = init_capsule_fixture(&root, "pr-review-paginated", "PR review paginated");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic
+                .as_str()
+                .is_some_and(|diagnostic| diagnostic.contains("not authoritative")))
+    );
+}
+
+#[test]
+fn pr_review_start_ignores_resolved_threads_with_incomplete_comments() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    std::fs::write(
+        source_dir.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "resolved-thread",
+                "isResolved": true,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [],
+                  "totalCount": 101,
+                  "pageInfo": {"hasNextPage": true, "endCursor": "comment-next"}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write resolved paginated threads");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-resolved-paginated",
+        "PR review resolved paginated",
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["result"]["summary"]["actionable_items"], 0);
+    assert!(
+        json["result"]
+            .get("diagnostics")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty)
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_start_ignores_failed_review_thread_capture_before_parsing() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_fake_gh(&bin);
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-failed-thread-capture",
+        "PR review failed thread capture",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_TOKEN", "test-token")
+        .env("FAIL_THREADS", "1")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(json["ok"], false);
+    let diagnostics = json["result"]["diagnostics"]
+        .as_array()
+        .expect("diagnostics");
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .as_str()
+            .is_some_and(|diagnostic| diagnostic.contains("review-thread source was not captured"))
+    }));
+    assert!(!diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .as_str()
+            .is_some_and(|diagnostic| diagnostic.contains("missing comments"))
+    }));
+}
+
+#[test]
+fn pr_review_start_preserves_blank_lines_in_exact_suggestion_hunk() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    write_pr_review_blank_line_thread_fixture(&source_dir);
+    let capsule = init_capsule_fixture(&root, "pr-review-start", "PR review start");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(
+        json["result"]["items"][0]["suggestions"][0]["original"],
+        "let first = 1;\n\nlet second = 2;"
+    );
+}
+
+#[test]
+fn pr_review_start_preserves_edge_blank_lines_in_suggestion_replacement() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let source_dir = temp.path().join("sources");
+    write_pr_agent_source_fixtures(&source_dir, 48);
+    write_pr_review_edge_blank_suggestion_fixture(&source_dir);
+    let capsule = init_capsule_fixture(&root, "pr-review-start", "PR review start");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "start",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--source-dir",
+            source_dir.to_str().expect("source dir"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("worklist json");
+    assert_eq!(
+        json["result"]["items"][0]["suggestions"][0]["replacement"],
+        "\nlet answer = 42;\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_updates_only_exact_hunk_matches() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(src.join("lib.rs"), "let answer = 41;\n").expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 1,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 1,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the answer.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "let answer = 42;",
+                    "original": "let answer = 41;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "let answer = 42;\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_preserves_crlf_line_endings() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(
+        src.join("lib.rs"),
+        "fn value() {\r\n    let answer = 41;\r\n}\r\n",
+    )
+    .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the answer.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    let answer = 42;",
+                    "original": "    let answer = 41;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn value() {\r\n    let answer = 42;\r\n}\r\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_blocks_reindented_exact_hunk() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(
+        src.join("lib.rs"),
+        "fn value() {\n    let answer = 41;\n}\n",
+    )
+    .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 1,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the answer.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    let answer = 42;",
+                    "original": "let answer = 41;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "blocked");
+    assert_eq!(
+        json["result"]["actions"][0]["reason"],
+        "current hunk no longer matches suggestion hunk"
+    );
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("unchanged source"),
+        "fn value() {\n    let answer = 41;\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_replaces_full_multiline_hunk() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(
+        src.join("lib.rs"),
+        "fn value() {\n    let first = 1;\n    let second = 2;\n    finish();\n}\n",
+    )
+    .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 1,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 3,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use one value.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    let answer = 42;",
+                    "original": "    let first = 1;\n    let second = 2;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn value() {\n    let answer = 42;\n    finish();\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_applies_exact_replacement_indentation() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(src.join("lib.rs"), "fn value() {\n    old();\n}\n").expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 1,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use a block.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    if ready {\n        finish();\n    }",
+                    "original": "    old();",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn value() {\n    if ready {\n        finish();\n    }\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_does_not_reindent_replacement() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(src.join("lib.rs"), "fn value() {\n        finish();\n}\n")
+        .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Move this outward.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    finish();",
+                    "original": "        finish();",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn value() {\n    finish();\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_preserves_trailing_blank_original_line() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(
+        src.join("lib.rs"),
+        "fn value() {\n    first();\n\n    second();\n}\n",
+    )
+    .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 3,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Collapse this.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    answer();",
+                    "original": "    first();\n",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    assert_eq!(json["result"]["actions"][0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn value() {\n    answer();\n    second();\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_rejects_paths_outside_repo_root() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).expect("repo dir");
+    let outside = temp.path().join("outside.rs");
+    std::fs::write(&outside, "let answer = 41;\n").expect("outside file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-absolute",
+                "provider": "coderabbit",
+                "path": outside.to_str().expect("outside path"),
+                "line": 1,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the answer.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "let answer = 42;",
+                    "original": "let answer = 41;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            },
+            {
+                "id": "item-002",
+                "thread_id": "thread-parent",
+                "provider": "coderabbit",
+                "path": "../outside.rs",
+                "line": 1,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the answer.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "let answer = 43;",
+                    "original": "let answer = 41;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    let actions = json["result"]["actions"].as_array().expect("actions");
+    assert_eq!(actions.len(), 2);
+    assert!(actions.iter().all(|action| action["status"] == "blocked"));
+    assert!(actions.iter().all(|action| {
+        action["reason"].as_str().is_some_and(|reason| {
+            reason.contains("relative") || reason.contains("absolute") || reason.contains("..")
+        })
+    }));
+    assert_eq!(
+        std::fs::read_to_string(outside).expect("outside source"),
+        "let answer = 41;\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_applies_same_file_suggestions_from_bottom_to_top() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(
+        src.join("lib.rs"),
+        "fn demo() {\n    first();\n    second();\n}\n",
+    )
+    .expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-top",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Add an extra step.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    first();\n    extra();",
+                    "original": "    first();",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            },
+            {
+                "id": "item-002",
+                "thread_id": "thread-bottom",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 3,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use finish.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "    finish();",
+                    "original": "    second();",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    let actions = json["result"]["actions"].as_array().expect("actions");
+    assert_eq!(actions.len(), 2);
+    assert!(actions.iter().all(|action| action["status"] == "applied"));
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "fn demo() {\n    first();\n    extra();\n    finish();\n}\n"
+    );
+}
+
+#[test]
+fn pr_review_apply_suggestions_skips_outdated_items_by_default() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    let src = repo.join("src");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::write(src.join("lib.rs"), "let live = 1;\nlet stale = 1;\n").expect("source file");
+    let worklist = temp.path().join("worklist.json");
+    write_pr_suggestion_worklist(
+        &worklist,
+        json!([
+            {
+                "id": "item-001",
+                "thread_id": "thread-live",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 1,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "actionable",
+                "body_excerpt": "Use the live value.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "let live = 2;",
+                    "original": "let live = 1;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            },
+            {
+                "id": "item-002",
+                "thread_id": "thread-outdated",
+                "provider": "coderabbit",
+                "path": "src/lib.rs",
+                "line": 2,
+                "severity": "low",
+                "action": "apply-suggestion-or-verify",
+                "status": "outdated",
+                "body_excerpt": "Use the stale value.",
+                "suggestions": [{
+                    "id": "suggestion-001",
+                    "replacement": "let stale = 2;",
+                    "original": "let stale = 1;",
+                    "apply_mode": "exact-hunk"
+                }],
+                "hints": []
+            }
+        ]),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "apply-suggestions",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--apply",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("suggestion json");
+    let actions = json["result"]["actions"].as_array().expect("actions");
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0]["itemId"], "item-001");
+    assert_eq!(actions[0]["status"], "applied");
+    assert_eq!(
+        std::fs::read_to_string(src.join("lib.rs")).expect("updated source"),
+        "let live = 2;\nlet stale = 1;\n"
+    );
+}
+
+#[test]
+fn pr_review_closeout_plans_batch_thread_resolution_from_worklist() {
+    let temp = tempdir().expect("tempdir");
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "OtherOwner/other-repo",
+            "number": 999,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "github-review",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--commit",
+            "def456",
+            "--validation-command",
+            "cargo test -p codex-dev",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["result"]["schema"], "codex-dev.pr-review-closeout.v1");
+    assert_eq!(json["result"]["dry_run"], true);
+    assert_eq!(json["result"]["summary"]["planned"], 1);
+    assert_eq!(
+        json["result"]["threads"][0]["thread_id"],
+        "thread-suggestion"
+    );
+    assert!(
+        json["result"]["threads"][0]["command"]
+            .as_array()
+            .expect("command")
+            .iter()
+            .any(|part| part == "query=mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}")
+    );
+    assert_eq!(json["result"]["repository"], "BjornMelin/dev-skills");
+    assert_eq!(json["result"]["number"], 48);
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_skips_outdated_live_threads() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    std::fs::write(
+        fixtures.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": true,
+                "comments": {
+                  "nodes": [],
+                  "totalCount": 0,
+                  "pageInfo": {"hasNextPage": false, "endCursor": null}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write outdated threads");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-outdated-thread",
+        "PR review closeout outdated thread",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "provider": "github-review",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["result"]["summary"]["skipped"], 1);
+    assert_eq!(json["result"]["threads"][0]["status"], "skipped");
+    assert_eq!(
+        json["result"]["threads"][0]["reason"],
+        "thread is not currently unresolved"
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api graphql"));
+    assert!(!gh_log.contains("resolveReviewThread"));
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_changed_thread_comments() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    std::fs::write(
+        fixtures.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "comment-1",
+                      "author": {"login": "reviewer"},
+                      "path": "crates/codex-dev/src/lib.rs",
+                      "line": 12,
+                      "body": "Fix this."
+                    },
+                    {
+                      "id": "comment-2",
+                      "author": {"login": "reviewer"},
+                      "path": "crates/codex-dev/src/lib.rs",
+                      "line": 13,
+                      "body": "New feedback added after the worklist was captured."
+                    }
+                  ],
+                  "totalCount": 2,
+                  "pageInfo": {"hasNextPage": false, "endCursor": null}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write changed threads");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-changed-thread",
+        "PR review closeout changed thread",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert_eq!(json["result"]["threads"][0]["status"], "blocked");
+    assert_eq!(
+        json["result"]["threads"][0]["reason"],
+        "thread comments changed since worklist capture"
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api graphql"));
+    assert!(!gh_log.contains("resolveReviewThread"));
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_changed_thread_comment_beyond_excerpt() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    let shared_prefix = "a".repeat(420);
+    let captured_body = format!("{shared_prefix} captured suffix");
+    let fresh_body = format!("{shared_prefix} fresh suffix");
+    let body_excerpt = format!("{shared_prefix}...");
+    std::fs::write(
+        fixtures.join("gh-review-threads.json"),
+        serde_json::to_string_pretty(&json!([
+          {
+            "data": {
+              "repository": {
+                "pullRequest": {
+                  "reviewThreads": {
+                    "nodes": [
+                      {
+                        "id": "thread-suggestion",
+                        "isResolved": false,
+                        "isOutdated": false,
+                        "comments": {
+                          "nodes": [
+                            {
+                              "id": "comment-1",
+                              "author": {"login": "reviewer"},
+                              "path": "crates/codex-dev/src/lib.rs",
+                              "line": 12,
+                              "body": fresh_body
+                            }
+                          ],
+                          "totalCount": 1,
+                          "pageInfo": {"hasNextPage": false, "endCursor": null}
+                        }
+                      }
+                    ],
+                    "pageInfo": {"hasNextPage": false, "endCursor": null}
+                  }
+                }
+              }
+            }
+          }
+        ]))
+        .expect("threads json"),
+    )
+    .expect("write changed threads");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-changed-thread-tail",
+        "PR review closeout changed thread tail",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": body_excerpt,
+                "body_hash": stable_text_hash(&captured_body),
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert_eq!(json["result"]["threads"][0]["status"], "blocked");
+    assert_eq!(
+        json["result"]["threads"][0]["reason"],
+        "thread comments changed since worklist capture"
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api graphql"));
+    assert!(!gh_log.contains("resolveReviewThread"));
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_accepts_legacy_worklist_without_body_hash() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    std::fs::write(
+        fixtures.join("gh-review-threads.json"),
+        r#"[
+  {
+    "data": {
+      "repository": {
+        "pullRequest": {
+          "reviewThreads": {
+            "nodes": [
+              {
+                "id": "thread-suggestion",
+                "isResolved": false,
+                "isOutdated": false,
+                "comments": {
+                  "nodes": [
+                    {
+                      "id": "comment-1",
+                      "author": {"login": "reviewer"},
+                      "path": "crates/codex-dev/src/lib.rs",
+                      "line": 12,
+                      "body": "Fix this."
+                    }
+                  ],
+                  "totalCount": 1,
+                  "pageInfo": {"hasNextPage": false, "endCursor": null}
+                }
+              }
+            ],
+            "pageInfo": {"hasNextPage": false, "endCursor": null}
+          }
+        }
+      }
+    }
+  }
+]"#,
+    )
+    .expect("write unchanged threads");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-legacy-thread",
+        "PR review closeout legacy thread",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], true);
+    assert_eq!(json["result"]["summary"]["applied"], 1);
+    assert_eq!(json["result"]["threads"][0]["status"], "applied");
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("resolveReviewThread"));
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_incomplete_thread_comments() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    let comments = (1..=20)
+        .map(|index| {
+            json!({
+                "id": format!("comment-{index}"),
+                "author": {"login": "reviewer"},
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": index,
+                "body": format!("Comment {index}.")
+            })
+        })
+        .collect::<Vec<_>>();
+    std::fs::write(
+        fixtures.join("gh-review-threads.json"),
+        serde_json::to_string_pretty(&json!([
+            {
+                "data": {
+                    "repository": {
+                        "pullRequest": {
+                            "reviewThreads": {
+                                "nodes": [
+                                    {
+                                        "id": "thread-suggestion",
+                                        "isResolved": false,
+                                        "isOutdated": false,
+                                        "comments": {
+                                            "totalCount": 21,
+                                            "pageInfo": {"hasNextPage": true, "endCursor": "cursor-20"},
+                                            "nodes": comments
+                                        }
+                                    }
+                                ],
+                                "pageInfo": {"hasNextPage": false, "endCursor": null}
+                            }
+                        }
+                    }
+                }
+            }
+        ]))
+        .expect("threads json"),
+    )
+    .expect("write incomplete threads");
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-incomplete-comments",
+        "PR review closeout incomplete comments",
+    );
+    let worklist = temp.path().join("worklist.json");
+    let items = (1..=20)
+        .map(|index| {
+            json!({
+                "id": format!("item-{index:03}"),
+                "thread_id": "thread-suggestion",
+                "comment_id": format!("comment-{index}"),
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": index,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": format!("Comment {index}."),
+                "suggestions": [],
+                "hints": []
+            })
+        })
+        .collect::<Vec<_>>();
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 20,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": items,
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic
+                .as_str()
+                .is_some_and(|diagnostic| diagnostic.contains("comments were incomplete")))
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api graphql"));
+    assert!(!gh_log.contains("resolveReviewThread"));
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_without_expected_head_sha_even_with_worklist_head_sha() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_review_thread_fixture(&fixtures);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-missing-head",
+        "PR review closeout missing head",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic
+                .as_str()
+                .is_some_and(|diagnostic| diagnostic.contains("requires --expected-head-sha")))
+    );
+    assert!(!log.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_without_explicit_pr_identity() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_review_thread_fixture(&fixtures);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-missing-pr-identity",
+        "PR review closeout missing PR identity",
+    );
+    let worklist = temp.path().join("worklist.json");
+    std::fs::write(
+        &worklist,
+        serde_json::to_string_pretty(&json!({
+            "schema": "codex-dev.pr-review-worklist.v1",
+            "repository": "BjornMelin/dev-skills",
+            "number": 48,
+            "checked_at": "2026-05-09T05:05:00Z",
+            "head_sha": "abc123",
+            "source": "fixture",
+            "summary": {
+                "unresolved_threads": 1,
+                "actionable_items": 1,
+                "suggestion_items": 0,
+                "clusters": 1,
+                "fast_noop": false
+            },
+            "items": [{
+                "id": "item-001",
+                "thread_id": "thread-suggestion",
+                "comment_id": "comment-1",
+                "provider": "github-review",
+                "author": "reviewer",
+                "path": "crates/codex-dev/src/lib.rs",
+                "line": 12,
+                "severity": "low",
+                "action": "verify-and-fix-current-code",
+                "status": "actionable",
+                "body_excerpt": "Fix this.",
+                "suggestions": [],
+                "hints": []
+            }],
+            "clusters": [],
+            "diagnostics": []
+        }))
+        .expect("worklist json"),
+    )
+    .expect("write worklist");
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--worklist",
+            worklist.to_str().expect("worklist"),
+            "--commit",
+            "def456",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert!(
+        json["result"]["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("requires explicit --repo and --number"))
+    );
+    assert!(!log.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_without_validation_command() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_review_thread_fixture(&fixtures);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-missing-validation",
+        "PR review closeout missing validation",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--expected-head-sha",
+            "abc123",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic.as_str().is_some_and(
+                |diagnostic| diagnostic.contains("requires at least one --validation-command")
+            ))
+    );
+    assert!(!log.exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn pr_review_closeout_apply_blocks_failed_thread_capture() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let fixtures = temp.path().join("fixtures");
+    let bin = temp.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("bin dir");
+    write_pr_agent_source_fixtures(&fixtures, 48);
+    write_pr_review_thread_fixture(&fixtures);
+    write_fake_gh(&bin);
+    let log = temp.path().join("gh.log");
+    let capsule = init_capsule_fixture(
+        &root,
+        "pr-review-closeout-failed-thread-capture",
+        "PR review closeout failed thread capture",
+    );
+    let old_path = std::env::var("PATH").unwrap_or_default();
+    let test_path = format!("{}:{old_path}", bin.display());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("PATH", test_path)
+        .env("GH_FIXTURES", &fixtures)
+        .env("GH_LOG", &log)
+        .env("GH_TOKEN", "test-token")
+        .env("FAIL_THREADS", "1")
+        .args([
+            "--json",
+            "pr",
+            "review",
+            "closeout",
+            "--capsule",
+            &capsule,
+            "--repo",
+            "BjornMelin/dev-skills",
+            "--number",
+            "48",
+            "--thread-id",
+            "thread-suggestion",
+            "--expected-head-sha",
+            "abc123",
+            "--validation-command",
+            "cargo test -p codex-dev",
+            "--apply",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("closeout json");
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["result"]["summary"]["blocked"], 1);
+    assert!(
+        json["result"]["diagnostics"]
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|diagnostic| diagnostic.as_str().is_some_and(
+                |diagnostic| diagnostic.contains("fresh review-thread state capture failed")
+            ))
+    );
+    let gh_log = std::fs::read_to_string(log).expect("gh log");
+    assert!(gh_log.contains("api graphql"));
+    assert!(!gh_log.contains("threadId=thread-suggestion"));
+}
+
+#[test]
+fn review_ingest_turns_local_notes_into_queryable_worklist() {
+    let temp = tempdir().expect("tempdir");
+    let notes = temp.path().join("review.md");
+    std::fs::write(
+        &notes,
+        "# Findings\n\n- crates/codex-dev/src/lib.rs:12: fix command routing\n",
+    )
+    .expect("write notes");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "review",
+            "ingest",
+            "--source",
+            notes.to_str().expect("notes"),
+            "--kind",
+            "manual",
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("local review json");
+    assert_eq!(json["result"]["schema"], "codex-dev.review-worklist.v1");
+    assert_eq!(json["result"]["summary"]["items"], 1);
+    assert_eq!(
+        json["result"]["items"][0]["path"],
+        "crates/codex-dev/src/lib.rs"
+    );
+}
+
+#[test]
+fn commit_plan_expands_untracked_plugin_skill_directories() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).expect("repo dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+
+    let skill = repo.join("plugins/web-motion/skills/demo-skill");
+    std::fs::create_dir_all(&skill).expect("skill dir");
+    std::fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: demo-skill\ndescription: Demo skill.\n---\n\n# Demo\n",
+    )
+    .expect("skill md");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    assert_eq!(json["result"]["summary"]["changed_files"], 1);
+    assert_eq!(json["result"]["groups"][0]["scope"], "web-motion");
+    assert_eq!(
+        json["result"]["groups"][0]["files"][0],
+        "plugins/web-motion/skills/demo-skill/SKILL.md"
+    );
+    assert!(
+        json["result"]["groups"][0]["validation_commands"]
+            .as_array()
+            .expect("validation commands")
+            .iter()
+            .any(|command| command
+                .as_str()
+                .is_some_and(|command| command.contains("quick_validate.py")))
+    );
+}
+
+#[test]
+fn commit_plan_emits_repo_native_script_validation_commands() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(repo.join("plugins/native-motion/scripts")).expect("script dir");
+    std::fs::create_dir_all(repo.join("tools/eval")).expect("eval dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+
+    std::fs::write(
+        repo.join("plugins/native-motion/scripts/validate-atomic-skills.mjs"),
+        "console.log('ok');\n",
+    )
+    .expect("native validation script");
+    std::fs::write(
+        repo.join("tools/eval/skill_subagent_eval.py"),
+        "print('ok')\n",
+    )
+    .expect("eval script");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    let commands = json["result"]["groups"]
+        .as_array()
+        .expect("groups")
+        .iter()
+        .flat_map(|group| {
+            group["validation_commands"]
+                .as_array()
+                .expect("validation commands")
+        })
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    assert!(
+        commands.contains(&"node --check plugins/native-motion/scripts/validate-atomic-skills.mjs")
+    );
+    assert!(commands.contains(&"node plugins/native-motion/scripts/validate-atomic-skills.mjs"));
+    assert!(commands.contains(&"python3 -m py_compile tools/eval/skill_subagent_eval.py"));
+}
+
+#[test]
+fn commit_plan_prefers_code_type_for_code_plus_tests() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(&repo).expect("repo dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+
+    let src = repo.join("crates/codex-dev/src");
+    let tests = repo.join("crates/codex-dev/tests");
+    std::fs::create_dir_all(&src).expect("src dir");
+    std::fs::create_dir_all(&tests).expect("tests dir");
+    std::fs::write(src.join("review_workflow.rs"), "pub fn workflow() {}\n").expect("src file");
+    std::fs::write(tests.join("cli.rs"), "#[test]\nfn workflow() {}\n").expect("test file");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    assert_eq!(json["result"]["groups"][0]["scope"], "codex-dev");
+    assert_eq!(json["result"]["groups"][0]["commit_type"], "feat");
+    assert!(
+        json["result"]["groups"][0]["subject"]
+            .as_str()
+            .is_some_and(|subject| subject.starts_with("feat(codex-dev):"))
+    );
+}
+
+#[test]
+fn commit_plan_normalizes_root_and_repo_config_scopes() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(repo.join(".github/workflows")).expect("workflow dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+
+    std::fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo manifest");
+    std::fs::write(repo.join(".github/workflows/ci.yml"), "name: ci\n").expect("workflow file");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    let group = &json["result"]["groups"][0];
+    assert_eq!(json["result"]["summary"]["changed_files"], 2);
+    assert_eq!(json["result"]["summary"]["groups"], 1);
+    assert_eq!(group["scope"], "repo");
+    assert_eq!(group["commit_type"], "build");
+    let subject = group["subject"].as_str().expect("subject");
+    assert!(subject.starts_with("build(repo):"));
+
+    let validate_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["--json", "commit", "validate", "--subject", subject])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let validate_json: Value = serde_json::from_slice(&validate_output).expect("validate json");
+    assert_eq!(validate_json["result"]["ok"], true);
+}
+
+#[test]
+fn commit_plan_parses_nul_porcelain_paths_and_renames() {
+    let temp = tempdir().expect("tempdir");
+    let repo = temp.path().join("repo");
+    std::fs::create_dir_all(repo.join("docs")).expect("repo dir");
+    let git_status = std::process::Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(git_status.success());
+    for (key, value) in [
+        ("user.email", "test@example.test"),
+        ("user.name", "Test User"),
+    ] {
+        let status = std::process::Command::new("git")
+            .args(["config", key, value])
+            .current_dir(&repo)
+            .status()
+            .expect("git config");
+        assert!(status.success());
+    }
+
+    std::fs::write(repo.join("old name.md"), "old\n").expect("old file");
+    let add_status = std::process::Command::new("git")
+        .args(["add", "."])
+        .current_dir(&repo)
+        .status()
+        .expect("git add");
+    assert!(add_status.success());
+    let commit_status = std::process::Command::new("git")
+        .args(["commit", "-q", "-m", "init"])
+        .current_dir(&repo)
+        .status()
+        .expect("git commit");
+    assert!(commit_status.success());
+    let mv_status = std::process::Command::new("git")
+        .args(["mv", "old name.md", "new name.md"])
+        .current_dir(&repo)
+        .status()
+        .expect("git mv");
+    assert!(mv_status.success());
+    std::fs::write(repo.join("docs/file \"quote\".md"), "quoted\n").expect("quoted file");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "plan",
+            "--repo-root",
+            repo.to_str().expect("repo"),
+            "--checked-at",
+            "2026-05-09T05:05:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let json: Value = serde_json::from_slice(&output).expect("commit plan json");
+    assert_eq!(json["result"]["summary"]["changed_files"], 2);
+    let files = json["result"]["groups"]
+        .as_array()
+        .expect("groups")
+        .iter()
+        .flat_map(|group| group["files"].as_array().expect("files"))
+        .map(|file| file.as_str().expect("file"))
+        .collect::<Vec<_>>();
+    assert!(files.contains(&"new name.md"));
+    assert!(files.contains(&"docs/file \"quote\".md"));
+    assert!(!files.contains(&"old name.md"));
+}
+
+#[test]
+fn commit_validate_rejects_process_only_review_subjects() {
+    let bad_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "validate",
+            "--subject",
+            "fix(sdk): address generated client review feedback",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let bad_json: Value = serde_json::from_slice(&bad_output).expect("bad subject json");
+    assert_eq!(
+        bad_json["result"]["schema"],
+        "codex-dev.commit-validation.v1"
+    );
+    assert_eq!(bad_json["result"]["ok"], false);
+    assert!(
+        bad_json["result"]["errors"]
+            .as_array()
+            .expect("errors")
+            .iter()
+            .any(|error| error
+                .as_str()
+                .is_some_and(|error| error.contains("process wording")))
+    );
+
+    let good_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "commit",
+            "validate",
+            "--subject",
+            "fix(sdk): preserve generated client pagination",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let good_json: Value = serde_json::from_slice(&good_output).expect("good subject json");
+    assert_eq!(good_json["result"]["ok"], true);
+    assert_eq!(good_json["result"]["semver_impact"], "patch");
 }
 
 #[test]

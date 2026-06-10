@@ -32,6 +32,11 @@ pub const PR_CONTROL_PLAN_SCHEMA: &str = "codex-dev.pr-control-plan.v1";
 pub const PR_AGENT_STATE_SCHEMA: &str = "codex-dev.pr-agent-state.v1";
 pub const PR_AGENT_HOSTED_ACTION_SCHEMA: &str = "codex-dev.pr-agent-hosted-action.v1";
 pub const PR_AGENT_READINESS_SCHEMA: &str = "codex-dev.pr-agent-readiness.v1";
+pub const PR_REVIEW_WORKLIST_SCHEMA: &str = "codex-dev.pr-review-worklist.v1";
+pub const PR_REVIEW_CLOSEOUT_SCHEMA: &str = "codex-dev.pr-review-closeout.v1";
+pub const LOCAL_REVIEW_WORKLIST_SCHEMA: &str = "codex-dev.review-worklist.v1";
+pub const COMMIT_PLAN_SCHEMA: &str = "codex-dev.commit-plan.v1";
+pub const COMMIT_VALIDATION_SCHEMA: &str = "codex-dev.commit-validation.v1";
 pub const OUTPUT_SCHEMA: &str = "codex-dev.output.v1";
 pub const POLICY_GATES_SCHEMA: &str = "codex-dev.policy-gates.v1";
 pub const TASK_INDEX_SCHEMA: &str = "task_index.v1";
@@ -299,6 +304,53 @@ pub struct ReviewThreadSummary {
     pub last_checked_at: DateTime<Utc>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitHubReviewThread {
+    pub id: String,
+    pub is_resolved: bool,
+    pub is_outdated: bool,
+    pub comments: Vec<GitHubReviewComment>,
+    pub comments_total_count: Option<u64>,
+    pub comments_has_next_page: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitHubReviewThreads {
+    pub threads: Vec<GitHubReviewThread>,
+    pub has_next_page: bool,
+}
+
+impl GitHubReviewThreads {
+    pub fn is_complete(&self) -> bool {
+        !self.has_next_page
+    }
+}
+
+impl GitHubReviewThread {
+    pub fn comments_complete(&self) -> bool {
+        !self.comments_has_next_page
+            && self
+                .comments_total_count
+                .is_none_or(|count| count == self.comments.len() as u64)
+    }
+
+    pub fn comment_count(&self) -> u64 {
+        self.comments_total_count
+            .unwrap_or(self.comments.len() as u64)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GitHubReviewComment {
+    pub id: Option<String>,
+    pub author: Option<String>,
+    pub path: Option<String>,
+    pub line: Option<u64>,
+    pub start_line: Option<u64>,
+    pub body: Option<String>,
+    pub diff_hunk: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PrControlPlan {
     pub schema: String,
@@ -330,7 +382,6 @@ pub enum PrRecordSourceKind {
     GhReviews,
     GhReviewThreads,
     GhReviewComments,
-    ReviewPackRemaining,
 }
 
 impl PrRecordSourceKind {
@@ -342,7 +393,6 @@ impl PrRecordSourceKind {
             Self::GhReviews => "gh-reviews",
             Self::GhReviewThreads => "gh-review-threads",
             Self::GhReviewComments => "gh-review-comments",
-            Self::ReviewPackRemaining => "review-pack-remaining",
         }
     }
 }
@@ -364,9 +414,8 @@ impl FromStr for PrRecordSourceKind {
             "gh-reviews" => Ok(Self::GhReviews),
             "gh-review-threads" => Ok(Self::GhReviewThreads),
             "gh-review-comments" => Ok(Self::GhReviewComments),
-            "review-pack-remaining" => Ok(Self::ReviewPackRemaining),
             _ => Err(format!(
-                "unsupported PR evidence source kind '{value}' (expected one of: normalized, gh-pr-view, gh-pr-checks, gh-reviews, gh-review-threads, gh-review-comments, review-pack-remaining)"
+                "unsupported PR evidence source kind '{value}' (expected one of: normalized, gh-pr-view, gh-pr-checks, gh-reviews, gh-review-threads, gh-review-comments)"
             )),
         }
     }
@@ -989,6 +1038,189 @@ pub struct PrAgentAction {
     pub priority: PrAgentActionPriority,
     pub summary: String,
     pub reason: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewWorklist {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub checked_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_sha: Option<String>,
+    pub source: String,
+    pub summary: PrReviewWorklistSummary,
+    pub items: Vec<PrReviewWorkItem>,
+    pub clusters: Vec<PrReviewCluster>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewWorklistSummary {
+    pub unresolved_threads: u64,
+    pub actionable_items: u64,
+    pub suggestion_items: u64,
+    pub clusters: u64,
+    pub fast_noop: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewWorkItem {
+    pub id: String,
+    pub thread_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment_id: Option<String>,
+    pub provider: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
+    pub severity: String,
+    pub action: String,
+    pub status: String,
+    pub body_excerpt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suggestions: Vec<PrReviewSuggestion>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hints: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewSuggestion {
+    pub id: String,
+    pub replacement: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub original: Option<String>,
+    pub apply_mode: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewCluster {
+    pub id: String,
+    pub path_prefix: String,
+    pub item_ids: Vec<String>,
+    pub subagent_prompt: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewCloseoutReport {
+    pub schema: String,
+    pub repository: String,
+    pub number: u64,
+    pub generated_at: DateTime<Utc>,
+    pub dry_run: bool,
+    pub apply_requested: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expected_head_sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_head_sha: Option<String>,
+    pub ok: bool,
+    pub summary: PrReviewCloseoutSummary,
+    pub threads: Vec<PrReviewCloseoutThread>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewCloseoutSummary {
+    pub planned: u64,
+    pub applied: u64,
+    pub skipped: u64,
+    pub blocked: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PrReviewCloseoutThread {
+    pub thread_id: String,
+    pub work_item_id: String,
+    pub status: String,
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit_sha: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub validation_command: Option<String>,
+    pub command: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalReviewWorklist {
+    pub schema: String,
+    pub source: String,
+    pub kind: String,
+    pub checked_at: DateTime<Utc>,
+    pub summary: LocalReviewWorklistSummary,
+    pub items: Vec<LocalReviewWorkItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalReviewWorklistSummary {
+    pub items: u64,
+    pub actionable_items: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct LocalReviewWorkItem {
+    pub id: String,
+    pub source_line: u64,
+    pub status: String,
+    pub body_excerpt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CommitPlan {
+    pub schema: String,
+    pub checked_at: DateTime<Utc>,
+    pub repo_root: String,
+    pub ok: bool,
+    pub summary: CommitPlanSummary,
+    pub groups: Vec<CommitPlanGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CommitPlanSummary {
+    pub changed_files: u64,
+    pub staged_files: u64,
+    pub groups: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CommitPlanGroup {
+    pub id: String,
+    pub commit_type: String,
+    pub scope: String,
+    pub subject: String,
+    pub semver_impact: String,
+    pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source_work_items: Vec<String>,
+    pub validation_commands: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CommitValidationReport {
+    pub schema: String,
+    pub checked_at: DateTime<Utc>,
+    pub ok: bool,
+    pub subject: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commit_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub semver_impact: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -2686,15 +2918,18 @@ fn count_regular_files_bounded(
     for entry in fs::read_dir(path)
         .with_context(|| format!("failed to read resource directory {}", path.display()))?
     {
+        let entry = entry?;
+        let metadata = fs::symlink_metadata(entry.path())
+            .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
+        let file_type = metadata.file_type();
+        if is_generated_resource_entry(&entry.path(), &file_type) {
+            continue;
+        }
         if *remaining == 0 {
             capped = true;
             break;
         }
-        let entry = entry?;
         *remaining = remaining.saturating_sub(1);
-        let metadata = fs::symlink_metadata(entry.path())
-            .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
-        let file_type = metadata.file_type();
         if file_type.is_symlink() {
             continue;
         }
@@ -2708,6 +2943,14 @@ fn count_regular_files_bounded(
         }
     }
     Ok((count, capped))
+}
+
+fn is_generated_resource_entry(path: &Path, file_type: &fs::FileType) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    (file_type.is_dir() && name == "__pycache__")
+        || (file_type.is_file() && (name.ends_with(".pyc") || name.ends_with(".pyo")))
 }
 
 fn safe_inventory_skill_name<'a>(name: Option<&'a str>, directory: &'a str) -> &'a str {
@@ -3983,9 +4226,6 @@ fn normalize_pr_record_source(
         PrRecordSourceKind::GhReviewComments => {
             normalize_gh_review_comments(&args.source, checked_at)?
         }
-        PrRecordSourceKind::ReviewPackRemaining => {
-            normalize_review_pack_remaining(&args.source, checked_at)?
-        }
     };
 
     apply_pr_record_identity(
@@ -4174,6 +4414,132 @@ fn normalize_gh_review_threads(path: &Path, checked_at: DateTime<Utc>) -> Result
     Ok(partial_pr_evidence("unknown", Vec::new(), review_threads))
 }
 
+pub fn github_review_threads_from_graphql(value: &Value) -> Result<GitHubReviewThreads> {
+    let mut threads = Vec::new();
+    let has_next_page = collect_github_review_threads(value, &mut threads)?;
+    Ok(GitHubReviewThreads {
+        threads,
+        has_next_page,
+    })
+}
+
+fn collect_github_review_threads(value: &Value, out: &mut Vec<GitHubReviewThread>) -> Result<bool> {
+    if let Some(pages) = value.as_array()
+        && pages.iter().any(Value::is_object)
+    {
+        let mut last_has_next_page = None;
+        for page in pages {
+            let nodes = review_thread_nodes(page)
+                .with_context(|| "GitHub review-thread page is missing reviewThreads.nodes")?;
+            collect_github_review_thread_nodes(nodes, out)?;
+            last_has_next_page = review_threads_has_next_page(page);
+        }
+        return last_has_next_page.with_context(
+            || "GitHub review-thread pages are missing reviewThreads.pageInfo.hasNextPage",
+        );
+    }
+
+    let nodes = review_thread_nodes(value)
+        .with_context(|| "GitHub review-thread source is missing reviewThreads.nodes")?;
+    collect_github_review_thread_nodes(nodes, out)?;
+    review_threads_has_next_page(value).with_context(
+        || "GitHub review-thread source is missing reviewThreads.pageInfo.hasNextPage",
+    )
+}
+
+fn collect_github_review_thread_nodes(
+    nodes: &[Value],
+    out: &mut Vec<GitHubReviewThread>,
+) -> Result<()> {
+    for node in nodes {
+        out.push(github_review_thread_from_node(node)?);
+    }
+    Ok(())
+}
+
+fn github_review_thread_from_node(node: &Value) -> Result<GitHubReviewThread> {
+    let id = node
+        .get("id")
+        .and_then(Value::as_str)
+        .with_context(|| format!("GitHub review thread is missing id: {node}"))?;
+    let is_resolved = optional_bool(node, "isResolved")
+        .with_context(|| format!("GitHub review thread is missing isResolved: {node}"))?;
+    let is_outdated = optional_bool(node, "isOutdated")
+        .with_context(|| format!("GitHub review thread {id} is missing isOutdated"))?;
+    let comments = node
+        .get("comments")
+        .with_context(|| format!("GitHub review thread {id} is missing comments"))?;
+    let comments_total_count = comments
+        .get("totalCount")
+        .and_then(Value::as_u64)
+        .with_context(|| format!("GitHub review thread {id} is missing comments.totalCount"))?;
+    let comments_has_next_page = comments
+        .pointer("/pageInfo/hasNextPage")
+        .and_then(Value::as_bool)
+        .with_context(|| {
+            format!("GitHub review thread {id} is missing comments.pageInfo.hasNextPage")
+        })?;
+
+    Ok(GitHubReviewThread {
+        id: id.to_string(),
+        is_resolved,
+        is_outdated,
+        comments: collect_github_review_comments(Some(comments))?,
+        comments_total_count: Some(comments_total_count),
+        comments_has_next_page,
+    })
+}
+
+fn collect_github_review_comments(value: Option<&Value>) -> Result<Vec<GitHubReviewComment>> {
+    let Some(value) = value else {
+        return Ok(Vec::new());
+    };
+    let nodes = value
+        .get("nodes")
+        .and_then(Value::as_array)
+        .or_else(|| value.as_array());
+    let Some(nodes) = nodes else {
+        bail!("GitHub review-thread comments are missing nodes");
+    };
+    Ok(nodes
+        .iter()
+        .map(|comment| GitHubReviewComment {
+            id: json_scalar_key(comment.get("id"))
+                .or_else(|| json_scalar_key(comment.get("databaseId"))),
+            author: comment
+                .pointer("/author/login")
+                .or_else(|| comment.pointer("/user/login"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            path: comment
+                .get("path")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            line: comment
+                .get("line")
+                .or_else(|| comment.get("originalLine"))
+                .or_else(|| comment.get("original_line"))
+                .and_then(Value::as_u64),
+            start_line: comment
+                .get("startLine")
+                .or_else(|| comment.get("originalStartLine"))
+                .or_else(|| comment.get("start_line"))
+                .and_then(Value::as_u64),
+            body: comment
+                .get("body")
+                .or_else(|| comment.get("bodyText"))
+                .or_else(|| comment.get("text"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            diff_hunk: comment
+                .get("diffHunk")
+                .or_else(|| comment.get("diff_hunk"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        })
+        .collect())
+}
+
 fn normalize_gh_review_comments(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
     let value = read_json::<Value>(path)?;
     let comments = array_or_paginated_arrays(&value, "GitHub review comments")?;
@@ -4221,25 +4587,6 @@ fn review_comment_is_outdated(comment: &Value) -> bool {
             || comment.get("originalPosition").is_some()
             || comment.get("originalLine").is_some()
             || comment.get("original_line").is_some())
-}
-
-fn normalize_review_pack_remaining(path: &Path, checked_at: DateTime<Utc>) -> Result<PrEvidence> {
-    let contents =
-        fs::read_to_string(path).with_context(|| format!("failed to open {}", path.display()))?;
-    let unresolved = parse_review_pack_remaining(&contents)
-        .with_context(|| format!("failed to parse {}", path.display()))?;
-    Ok(partial_pr_evidence(
-        "unknown",
-        Vec::new(),
-        ReviewThreadSummary {
-            unresolved,
-            total: unresolved,
-            resolved: 0,
-            outdated: 0,
-            authoritative: true,
-            last_checked_at: checked_at,
-        },
-    ))
 }
 
 fn partial_pr_evidence(
@@ -4335,9 +4682,6 @@ fn merge_provider_pr_evidence(
         PrRecordSourceKind::GhReviewComments => {
             merge_review_comment_summary(&mut existing.review_threads, incoming.review_threads);
         }
-        PrRecordSourceKind::ReviewPackRemaining => {
-            merge_review_pack_summary(&mut existing.review_threads, incoming.review_threads);
-        }
         PrRecordSourceKind::Normalized => unreachable!("handled before merge"),
     }
 
@@ -4377,16 +4721,6 @@ fn merge_pr_number_field(
     }
     *existing = Some(incoming);
     Ok(())
-}
-
-fn merge_review_pack_summary(existing: &mut ReviewThreadSummary, incoming: ReviewThreadSummary) {
-    existing.unresolved = incoming.unresolved;
-    existing.total = existing
-        .total
-        .max(incoming.total)
-        .max(existing.unresolved + existing.resolved + existing.outdated);
-    existing.authoritative = true;
-    existing.last_checked_at = incoming.last_checked_at;
 }
 
 fn merge_review_comment_summary(existing: &mut ReviewThreadSummary, incoming: ReviewThreadSummary) {
@@ -4822,84 +5156,6 @@ fn review_threads_has_next_page(value: &Value) -> Option<bool> {
         .and_then(Value::as_bool)
 }
 
-fn parse_review_pack_remaining(contents: &str) -> Result<u64> {
-    let trimmed = contents.trim();
-    if let Ok(value) = serde_json::from_str::<Value>(trimmed)
-        && let Some(unresolved) = review_pack_remaining_from_json(&value)
-    {
-        return Ok(unresolved);
-    }
-    if let Ok(unresolved) = trimmed.parse::<u64>() {
-        return Ok(unresolved);
-    }
-    for line in contents.lines() {
-        if let Some(unresolved) = review_pack_count_from_line(line) {
-            return Ok(unresolved);
-        }
-    }
-    bail!("review-pack remaining output did not include an unresolved count")
-}
-
-fn review_pack_remaining_from_json(value: &Value) -> Option<u64> {
-    [
-        "/unresolved",
-        "/unresolved_threads",
-        "/remaining",
-        "/review_threads/unresolved",
-        "/result/unresolved",
-        "/result/unresolved_threads",
-        "/summary/unresolved",
-    ]
-    .iter()
-    .find_map(|pointer| value.pointer(pointer).and_then(Value::as_u64))
-}
-
-fn review_pack_count_from_line(value: &str) -> Option<u64> {
-    let lower = value.to_ascii_lowercase();
-    for key in [
-        "unresolved_threads",
-        "unresolved threads",
-        "unresolved",
-        "remaining",
-    ] {
-        let Some(index) = lower.find(key) else {
-            continue;
-        };
-        if let Some(count) = trailing_u64(value[..index].trim()) {
-            return Some(count);
-        }
-        if let Some(count) = leading_u64_after_key(&value[index + key.len()..]) {
-            return Some(count);
-        }
-    }
-    None
-}
-
-fn trailing_u64(value: &str) -> Option<u64> {
-    let token = value
-        .split(|ch: char| !ch.is_ascii_digit())
-        .rfind(|part| !part.is_empty())?;
-    if value.trim() == token {
-        token.parse().ok()
-    } else {
-        None
-    }
-}
-
-fn leading_u64_after_key(value: &str) -> Option<u64> {
-    let value =
-        value.trim_start_matches(|ch: char| ch.is_whitespace() || matches!(ch, ':' | '=' | '-'));
-    let digits = value
-        .chars()
-        .take_while(|ch| ch.is_ascii_digit())
-        .collect::<String>();
-    if digits.is_empty() {
-        None
-    } else {
-        digits.parse().ok()
-    }
-}
-
 fn empty_review_threads(checked_at: DateTime<Utc>) -> ReviewThreadSummary {
     ReviewThreadSummary {
         unresolved: 0,
@@ -5170,6 +5426,10 @@ pub fn stable_json_hash<T: Serialize>(value: &T) -> Result<String> {
 
 fn stable_prompt_hash(prompt: &str) -> String {
     stable_sha256_hash(prompt.as_bytes())
+}
+
+pub fn stable_text_hash(value: &str) -> String {
+    stable_sha256_hash(value.as_bytes())
 }
 
 fn stable_sha256_hash(bytes: &[u8]) -> String {
@@ -6204,6 +6464,25 @@ mod tests {
 
         assert_eq!(files, 0);
         assert!(capped);
+    }
+
+    #[test]
+    fn skills_inventory_resource_walk_ignores_python_cache_artifacts() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("scripts");
+        fs::create_dir_all(root.join("__pycache__")).expect("pycache dir");
+        fs::write(
+            root.join("__pycache__").join("deleted.cpython-312.pyc"),
+            b"cache",
+        )
+        .expect("pycache file");
+        fs::write(root.join("stale.pyc"), b"cache").expect("root pyc");
+        fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        assert_eq!(files, 1);
+        assert!(!capped);
     }
 
     fn pr_record_args(
@@ -7287,37 +7566,6 @@ mod tests {
     }
 
     #[test]
-    fn pr_record_normalizes_review_pack_zero_thread_output() {
-        let temp = tempdir().expect("tempdir");
-        let capsule = init_capsule(init_args(temp.path().join("tasks")))
-            .expect("init capsule")
-            .path;
-        let source = temp.path().join("review-pack-remaining.json");
-        fs::write(
-            &source,
-            serde_json::to_string_pretty(&json!({
-                "review_threads": { "unresolved": 0 }
-            }))
-            .expect("fixture json"),
-        )
-        .expect("write fixture");
-
-        let mut args = pr_record_args(capsule, source, PrRecordSourceKind::ReviewPackRemaining);
-        args.repository = Some("BjornMelin/dev-skills".to_string());
-        args.number = Some(46);
-        args.retrieved_at = Some("2026-05-09T04:59:00Z".parse().unwrap());
-        let result = record_pr_snapshot(args, "2026-05-09T05:00:00Z".parse().unwrap())
-            .expect("record remaining");
-
-        assert_eq!(result.pr.review_threads.unresolved, 0);
-        assert!(result.pr.review_threads.authoritative);
-        assert_eq!(
-            result.pr.sources[0].retrieved_at,
-            "2026-05-09T04:59:00Z".parse::<DateTime<Utc>>().unwrap()
-        );
-    }
-
-    #[test]
     fn pr_record_rejects_non_normalized_sources_without_identity() {
         let temp = tempdir().expect("tempdir");
         let capsule = init_capsule(init_args(temp.path().join("tasks")))
@@ -7466,18 +7714,7 @@ mod tests {
         );
         args.repository = Some("BjornMelin/dev-skills".to_string());
         args.number = Some(46);
-        record_pr_snapshot(args, checked_at).expect("record checks");
-
-        let remaining_source = temp.path().join("review-pack-remaining.txt");
-        fs::write(&remaining_source, "0 unresolved threads\n").expect("write fixture");
-        let mut args = pr_record_args(
-            capsule.clone(),
-            remaining_source,
-            PrRecordSourceKind::ReviewPackRemaining,
-        );
-        args.repository = Some("BjornMelin/dev-skills".to_string());
-        args.number = Some(46);
-        let result = record_pr_snapshot(args, checked_at).expect("record remaining");
+        let result = record_pr_snapshot(args, checked_at).expect("record checks");
 
         assert_eq!(
             result.pr.repository.as_deref(),
@@ -7495,7 +7732,7 @@ mod tests {
         assert_eq!(result.pr.checks.len(), 1);
         assert_eq!(result.pr.checks[0].name, "lint");
         assert_eq!(result.pr.checks[0].conclusion.as_deref(), Some("failure"));
-        assert_eq!(result.pr.review_threads.unresolved, 0);
+        assert_eq!(result.pr.review_threads.unresolved, 1);
         assert_eq!(result.pr.review_threads.resolved, 1);
         assert_eq!(result.pr.review_threads.outdated, 1);
         assert_eq!(result.pr.review_threads.total, 3);
@@ -7507,12 +7744,7 @@ mod tests {
                 .iter()
                 .map(|source| source.kind.as_str())
                 .collect::<Vec<_>>(),
-            vec![
-                "gh-pr-view",
-                "gh-review-threads",
-                "gh-pr-checks",
-                "review-pack-remaining"
-            ]
+            vec!["gh-pr-view", "gh-review-threads", "gh-pr-checks"]
         );
     }
 
@@ -7627,22 +7859,6 @@ mod tests {
         args.number = Some(46);
         let result = record_pr_snapshot(args, checked_at).expect("record empty checks");
         assert!(result.pr.checks.is_empty());
-    }
-
-    #[test]
-    fn review_pack_remaining_text_parser_uses_review_count_not_exit_code() {
-        assert_eq!(
-            parse_review_pack_remaining("exit 0; unresolved_threads: 5").expect("parse count"),
-            5
-        );
-        assert_eq!(
-            parse_review_pack_remaining("0 unresolved threads").expect("parse prefix count"),
-            0
-        );
-        assert!(
-            parse_review_pack_remaining("exit 0; no review count").is_err(),
-            "wrapper status without a review count must be rejected"
-        );
     }
 
     #[test]

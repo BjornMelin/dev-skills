@@ -1,6 +1,6 @@
 ---
 name: review-remediation
-description: Fix local review (Codex, Zen, notes) w/ verify. Not gh-pr-review-fix or babysit-pr.
+description: Fix local review (Codex, Zen, notes) w/ verify. Not gh-pr-review-fix or passive PR monitoring.
 ---
 
 # Review Remediation
@@ -17,15 +17,15 @@ Use this skill to normalize review inputs, turn them into an actionable checklis
 
 1. Read the repo `AGENTS.md`.
 2. Normalize the review source:
-   - Local file -> `/home/bjorn/.codex/skill-support/bin/review-pack ingest-local --source <file> --kind codex|zen|manual --out <json>`
+   - Local file -> `codex-dev --json review ingest --source <file> --kind codex|zen|manual --out <json>`
 3. Render a concise summary:
-   - `/home/bjorn/.codex/skill-support/bin/review-pack render --input <json> --format md`
+   - `codex-dev --json review render --worklist <json>`
 4. Build the remediation order:
    - correctness and safety first
    - review threads grouped by file or subsystem
    - minimal change that fully resolves the finding
 5. Verify with repo-native checks before considering a finding done.
-6. If the workflow becomes a continuous PR babysitting task, switch to `$babysit-pr`.
+6. If the workflow becomes passive PR monitoring, switch to `codex-dev --json pr readiness` plus GitHub status checks.
 
 ## Use When
 

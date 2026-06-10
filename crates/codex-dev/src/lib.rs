@@ -38,6 +38,12 @@ use codex_dev_core::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+mod review_workflow;
+use review_workflow::{
+    CommitCommand, PrReviewCommand, ReviewCommand, handle_commit_command, handle_pr_review_command,
+    handle_review_command,
+};
+
 const POLICY_DOCS_CHECK_SCHEMA: &str = "codex-dev.policy-docs-check.v1";
 const POLICY_EXPLAIN_SCHEMA: &str = "policy_explain.v1";
 const RESEARCH_EVIDENCE_IMPORT_SCHEMA: &str = "research_evidence_import.v1";
@@ -65,7 +71,9 @@ const GITHUB_TOKEN_ENV_VARS: &[&str] = &[
     "GITHUB_ENTERPRISE_TOKEN",
 ];
 const GH_PR_VIEW_JSON_FIELDS: &str = "number,url,state,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,headRefOid,headRefName,baseRefName,baseRefOid,updatedAt,labels";
-const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:10){nodes{id path line originalLine url}}}}}}}";
+// Per-thread comment pagination is intentionally not expanded here; worklist and
+// closeout paths fail closed when comments.pageInfo.hasNextPage is true.
+const PR_REVIEW_THREADS_QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$endCursor:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$endCursor){pageInfo{hasNextPage endCursor} nodes{id isResolved isOutdated comments(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{id author{login} path line startLine originalLine originalStartLine body diffHunk url}}}}}}}";
 const RESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
 const UNRESOLVE_REVIEW_THREAD_MUTATION: &str = "mutation($threadId:ID!){unresolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}";
 
@@ -129,7 +137,24 @@ impl Cli {
                 PrCommand::Plan(_) => "pr plan",
                 PrCommand::Readiness(_) => "pr readiness",
                 PrCommand::Record(_) => "pr record",
+                PrCommand::Review { command } => match command {
+                    PrReviewCommand::Start(_) => "pr review start",
+                    PrReviewCommand::Refresh(_) => "pr review refresh",
+                    PrReviewCommand::Query(_) => "pr review query",
+                    PrReviewCommand::Render(_) => "pr review render",
+                    PrReviewCommand::ApplySuggestions(_) => "pr review apply-suggestions",
+                    PrReviewCommand::Closeout(_) => "pr review closeout",
+                },
                 PrCommand::Status(_) => "pr status",
+            },
+            Commands::Review { command } => match command {
+                ReviewCommand::Ingest(_) => "review ingest",
+                ReviewCommand::Render(_) => "review render",
+                ReviewCommand::Query(_) => "review query",
+            },
+            Commands::Commit { command } => match command {
+                CommitCommand::Plan(_) => "commit plan",
+                CommitCommand::Validate(_) => "commit validate",
             },
             Commands::Subagents { command } => match command {
                 SubagentsCommand::Plan(_) => "subagents record-plan",
@@ -194,6 +219,16 @@ enum Commands {
     Pr {
         #[command(subcommand)]
         command: PrCommand,
+    },
+    /// Ingest and query local review-note worklists.
+    Review {
+        #[command(subcommand)]
+        command: ReviewCommand,
+    },
+    /// Plan and validate scoped semantic Conventional Commit groups.
+    Commit {
+        #[command(subcommand)]
+        command: CommitCommand,
     },
     /// Record subspawn plans, outcomes, and synthesis into task capsules.
     Subagents {
@@ -305,6 +340,11 @@ enum PrCommand {
     Plan(PrPlanArgs),
     /// Normalize and record a PR evidence source into a task capsule.
     Record(PrRecordCliArgs),
+    /// Capture, query, patch, and close hosted PR review work.
+    Review {
+        #[command(subcommand)]
+        command: PrReviewCommand,
+    },
     /// Print the PR snapshot currently stored in a task capsule.
     Status(PrStatusArgs),
 }
@@ -2195,6 +2235,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     result: serde_json::to_value(result)?,
                 })
             }
+            PrCommand::Review { command } => handle_pr_review_command(command),
             PrCommand::Status(args) => {
                 let result = pr_status(&args.capsule)?;
                 Ok(CommandOutput {
@@ -2205,6 +2246,8 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Review { command } => handle_review_command(command),
+        Commands::Commit { command } => handle_commit_command(command),
     }
 }
 
@@ -4390,37 +4433,57 @@ pub fn pr_control_plan(
                 ],
             ),
             pr_control_command(
-                "review-pack-start",
-                "Fresh hosted review-thread bundle",
+                "codex-dev-pr-review-start",
+                "First-class hosted review worklist",
                 [
-                    "review-pack",
+                    "codex-dev",
+                    "--json",
+                    "pr",
+                    "review",
                     "start",
                     "--repo",
                     &repository,
-                    "--pr",
+                    "--number",
                     &number.to_string(),
                     "--fresh",
                 ],
             ),
             pr_control_command_with_manual_input(
-                "review-pack-remaining",
-                "Unresolved review-thread count from bundle",
+                "codex-dev-commit-plan",
+                "Scoped semantic Conventional Commit grouping plan",
                 [
-                    "review-pack",
-                    "remaining",
+                    "codex-dev",
+                    "--json",
+                    "commit",
+                    "plan",
+                    "--worklist",
+                    "<pr-review-worklist.json>",
+                ],
+                "replace <pr-review-worklist.json> with the path emitted by `codex-dev pr review start`",
+            ),
+            pr_control_command_with_manual_input(
+                "codex-dev-pr-review-closeout",
+                "Batch resolve verified fixed hosted review threads",
+                [
+                    "codex-dev",
+                    "--json",
+                    "pr",
+                    "review",
+                    "closeout",
                     "--repo",
                     &repository,
-                    "--pr",
+                    "--number",
                     &number.to_string(),
-                    "--previous",
-                    "<bundle.json>",
+                    "--worklist",
+                    "<pr-review-worklist.json>",
+                    "--expected-head-sha",
+                    "<pushed-head-sha>",
+                    "--commit",
+                    "<semantic-fix-commit-sha>",
+                    "--validation-command",
+                    "<passed-validation-command>",
                 ],
-                "replace <bundle.json> with the bundle path produced by review-pack start",
-            ),
-            pr_control_command(
-                "gh-pr-review-fix",
-                "Verify-first hosted review remediation workflow",
-                ["gh-pr-review-fix", "pr", &number.to_string()],
+                "replace placeholders after fixes are validated, committed, pushed, and fresh PR head state is known; add --apply only for hosted closeout",
             ),
         ],
     })
@@ -8921,7 +8984,7 @@ fn pr_control_command<const N: usize>(
         id: id.to_string(),
         name: name.to_string(),
         command: command.iter().map(|part| (*part).to_string()).collect(),
-        source: "gh-pr-review-fix / review-pack / gh".to_string(),
+        source: "codex-dev pr review / gh-pr-review-fix / gh".to_string(),
         required: true,
         network: true,
         secrets: true,

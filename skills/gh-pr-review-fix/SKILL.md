@@ -1,70 +1,58 @@
 ---
 name: gh-pr-review-fix
-description: Fetch unresolved GitHub PR review threads, normalize them, fix them end-to-end, verify the results, and re-check until the PR is clean or blocked. Use when the user wants GitHub PR comments resolved with minimal verified fixes. Do not use for local review files, Codex reviews, or Zen reviews; review-remediation owns those.
+description: "Fix unresolved GitHub PR review threads with codex-dev: fetch hosted state, verify, patch, validate, commit, push, and close out."
 ---
 
 # GitHub PR Review Fix
 
-Use this skill as the sole GitHub PR review remediation workflow.
+Use this as the sole active GitHub PR review remediation workflow. The canonical implementation is `codex-dev`; this skill is the operating procedure.
 
-## Autonomous Invocation
+## Default Behavior
 
-If the user explicitly invokes `$gh-pr-review-fix` with no extra detail:
+When the user invokes `$gh-pr-review-fix`, run the full closeout loop unless blocked:
 
-1. Read the repo `AGENTS.md`.
-2. Infer the target repo and PR with `scripts/prepare_pr_bundle.py`.
-3. Fetch a normalized unresolved-thread bundle.
-4. Prioritize valid findings by file and severity.
-5. Apply the minimal fixes that fully resolve the findings.
-6. Run repo-native verification.
-7. Create one scoped conventional commit and push if checks pass.
-8. Re-fetch unresolved threads and continue until zero remain or the workflow is blocked.
+1. Read repo `AGENTS.md` and inspect `git status --short`.
+2. Capture fresh hosted review work:
+   - `codex-dev --json pr review start --repo <owner/repo> --number <pr> --fresh`
+3. If the worklist reports zero actionable unresolved items, stop with a no-op summary.
+4. Verify each item against current code; skip stale findings with a brief reason.
+5. Apply minimal fixes, using exact suggestion fences only when `codex-dev pr review apply-suggestions` reports an exact hunk match.
+6. Run focused repo-native validation, then broad required gates once before publishing.
+7. Create scoped, semantically grouped, reviewable Conventional Commits following `references/closeout-and-commits.md`.
+8. Push the PR branch once after all intended semantic commits pass validation.
+9. Re-capture fresh PR head/thread state and resolve every matching fixed hosted thread:
+   - `codex-dev --json pr review closeout --repo <owner/repo> --number <pr> --worklist <json> --expected-head-sha <pushed-head> --commit <sha> --validation-command <cmd> --apply`
+10. Re-run `codex-dev --json pr review start --fresh --repo <owner/repo> --number <pr>` and continue until zero actionable unresolved items remain or a real blocker appears.
 
-Stop and ask only when the repo/PR cannot be inferred, GitHub auth is unavailable, the worktree is too ambiguous to safely stage, or repo policy conflicts with automatic remediation.
+## Hosted Closeout Policy
 
-## Workflow
+- Default is fix, commit, push, and resolve fixed hosted threads.
+- Do not auto-reply by default. Reply only when a finding cannot be fixed/resolved cleanly or the user asks for comments.
+- Resolve only current hosted thread IDs that map to verified fixes or already-fixed current head state.
+- Never resolve when the PR head changed unexpectedly, validation failed, the finding was skipped, or the thread cannot be matched to closeout evidence.
 
-1. Read the repo `AGENTS.md`.
-2. Prepare the target bundle:
-   - `python3 scripts/prepare_pr_bundle.py --out <json>`
-   - or pass `--repo`, `--pr`, or `--url` when the target is known
-3. Render the review summary:
-   - `/home/bjorn/.codex/skill-support/bin/review-pack render --input <json> --format md`
-4. Work file-by-file:
-   - resolve correctness and safety findings first
-   - prefer reviewer suggestion blocks when they are valid
-   - keep changes minimal and scoped
-5. Verify with repo-native checks before considering a finding done.
-6. Use `$commit` only if you need help staging a mixed tree; otherwise keep this workflow self-contained.
-7. Re-run `scripts/prepare_pr_bundle.py` after each pass to confirm what remains unresolved.
-8. If the task becomes passive or continuous monitoring rather than active remediation, switch to `$babysit-pr`.
+## Commit Policy
 
-## Use When
+- Read `references/closeout-and-commits.md` before committing.
+- Use `codex-dev --json commit plan` to inspect semantic groups in a mixed tree.
+- Use `codex-dev --json commit validate --subject "<subject>"` before committing.
+- `codex-dev commit validate` owns forbidden process-wording checks; do not maintain a second local phrase list here.
 
-- The user asks to fix GitHub PR review comments end-to-end.
-- The current task is centered on unresolved review threads in a PR.
+## Route Away
 
-## Do Not Use When
-
-- The input is a local review file, Codex review, Zen review, or manual notes.
-- The task is passive PR monitoring.
-- The task is only CI remediation with no review-thread context.
-
-## Direct Tool Policy
-
-- Use GitHub CLI or GitHub connector/API as the source of truth for PR metadata and review threads.
-- Use Context7 for current API docs when the fix touches changing library APIs.
-- Use Exa or `web.run` only when a review fix needs current external confirmation.
-- Do not route through `context7-research` or `web-research-stack`.
+- Local review file, Codex review, Zen review, or manual notes -> `$review-remediation`.
+- Passive post-push monitoring -> `codex-dev --json pr readiness` plus GitHub status checks.
+- CI-only failure with no review-thread context -> GitHub plugin or `gh` workflow-log remediation.
 
 ## Outputs
 
-- normalized PR review bundle
-- short prioritized remediation summary
-- verified fixes
-- commit and push summary when a commit is created
-- terminal status: `completed`, `blocked`, or `needs-user`
+- `codex-dev.pr-review-worklist.v1` worklist
+- verified fix/skipped-item summary
+- validation commands and outcomes
+- semantic commit SHAs
+- `codex-dev.pr-review-closeout.v1` thread-to-commit closeout evidence
+- terminal status: `completed`, `blocked`, or `no-op`
 
 ## Resources
 
-- `scripts/prepare_pr_bundle.py`
+- `references/closeout-and-commits.md`

@@ -46,6 +46,8 @@ The crate owns:
   registry issue warnings, and missing-agent diagnostics;
 - evidence summaries used by status/render output, including total count,
   count by kind, and latest record by kind;
+- first-class PR review remediation, local review, closeout, and commit
+  planning JSON contracts used by `codex-dev` command output;
 - narrow JSON/JSONL file helpers used by `codex-dev` when recording policy
   and evidence appender output.
 
@@ -53,7 +55,7 @@ The crate does not own:
 
 - Clap command definitions or shell UX;
 - Ratatui/crossterm terminal rendering;
-- `gh`, `review-pack`, CodeRabbit, or hosted GitHub API calls;
+- `gh`, CodeRabbit, or hosted GitHub API calls;
 - subprocess execution for policy gates;
 - default executable policy-gate or hosted PR command recipes;
 - compatibility shims for obsolete capsule layouts.
@@ -69,7 +71,7 @@ reads use no-follow file opens where the platform supports it.
 ## Dependency Policy
 
 `codex-dev-core` should stay free of CLI/TUI dependencies. It must not depend on
-`clap`, `ratatui`, `crossterm`, `review-pack`, `gh`, or provider SDKs. Keep
+`clap`, `ratatui`, `crossterm`, `gh`, or provider SDKs. Keep
 dependencies limited to serde, time, error handling, and local filesystem
 contract helpers unless a future issue proves a new dependency is unavoidable.
 

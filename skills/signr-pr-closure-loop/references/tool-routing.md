@@ -5,10 +5,10 @@ Use this matrix to avoid rebuilding workflows that already exist elsewhere.
 ## Primary lanes
 
 - PR discovery, review bundles, and thread-aware remediation
-  - Prefer GitHub plugin reads plus `review-pack`.
+  - Prefer GitHub plugin reads plus `codex-dev pr review`.
   - Use `$gh-pr-review-fix` as the active review-remediation router.
 - GitHub Actions failure diagnosis
-  - Use `$github:gh-fix-ci`.
+  - Use the GitHub plugin or `gh` workflow-log remediation.
   - Inspect the exact failed run and logs before editing.
 - Expo and EAS
   - Prefer `$expo:expo-cicd-workflows` for workflow shape and validation.
@@ -27,7 +27,7 @@ Use this matrix to avoid rebuilding workflows that already exist elsewhere.
   - Else prefer `$docs-align`.
   - Else perform a direct authority-doc sweep anchored on the changed concerns.
 - Post-push monitoring and late-arriving feedback
-  - Use `$babysit-pr`.
+  - Use `codex-dev --json pr readiness` plus GitHub status checks.
 - Commit shaping
   - Use `$commit`.
 

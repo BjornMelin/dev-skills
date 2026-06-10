@@ -909,7 +909,18 @@ def load_quick_validator(
 
 
 def tracked_files(root: Path, prefix: str) -> set[Path]:
-    """Return tracked files below a repo prefix."""
+    """Return tracked files below a repo prefix.
+
+    Args:
+        root: Repository root used as the git working directory.
+        prefix: Repo-relative path prefix to list.
+
+    Returns:
+        A set of absolute pathlib.Path objects for tracked files under the prefix.
+
+    Raises:
+        RuntimeError: If git ls-files times out.
+    """
     command = ["git", "ls-files", "-z", "--", prefix]
     try:
         completed = subprocess.run(  # noqa: S603
@@ -929,7 +940,9 @@ def tracked_files(root: Path, prefix: str) -> set[Path]:
     files = set()
     for raw_path in completed.stdout.split(b"\0"):
         if raw_path:
-            files.add(root / raw_path.decode())
+            path = root / raw_path.decode()
+            if path.is_file() and not path.is_symlink():
+                files.add(path)
     return files
 
 

@@ -117,7 +117,11 @@ cargo run -q -p codex-dev -- --json research import-bundle --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr review --help
 cargo run -q -p codex-dev -- --json pr readiness --help
+cargo run -q -p codex-dev -- --json review --help
+cargo run -q -p codex-dev -- --json commit plan --help
+cargo run -q -p codex-dev -- --json commit validate --subject "fix(codex-dev): preserve review-thread closeout evidence"
 tmp=$(mktemp -d)
 cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --branch validation/smoke --root "$tmp" --id validation-smoke --created-at 2026-05-09T04:00:00Z
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
@@ -359,6 +363,16 @@ Validate all skills:
 for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
 ```
 
+Validate plugin-contained skills and local plugin source:
+
+```bash
+for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
+node plugins/web-motion/scripts/validate-atomic-skills.mjs
+node plugins/native-motion/scripts/validate-atomic-skills.mjs
+node --check tools/skill/overhaul_motion_plugins.mjs
+rg --files -g '*.json' plugins | xargs -r jq empty
+```
+
 Package changed skills:
 
 ```bash
@@ -525,7 +539,11 @@ cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help
 cargo run -q -p codex-dev -- --json pr agent-action --help
+cargo run -q -p codex-dev -- --json pr review --help
 cargo run -q -p codex-dev -- --json pr readiness --help
+cargo run -q -p codex-dev -- --json review --help
+cargo run -q -p codex-dev -- --json commit plan --help
+cargo run -q -p codex-dev -- --json commit validate --subject "fix(codex-dev): preserve review-thread closeout evidence"
 cargo clippy -p codex-dev-tui --all-targets -- -D warnings
 cargo check -p codex-dev-tui
 cargo test -p codex-dev-tui

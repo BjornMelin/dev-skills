@@ -1,10 +1,10 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-05-21T06:23:35.662731888Z",
+  "generatedAt": "2026-06-05T01:22:41.487093171Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "25e9f54916244da7c0ef8d39c257b13150ff8a2c",
-  "skillsCount": 57,
-  "totalSkillDirectories": 57,
+  "sourceCommit": "a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d",
+  "skillsCount": 60,
+  "totalSkillDirectories": 60,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -18,8 +18,8 @@
       "path": "skills/agents-md-maintainer",
       "skillMdPath": "skills/agents-md-maintainer/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/agents-md-maintainer",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/agents-md-maintainer/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/agents-md-maintainer",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/agents-md-maintainer/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill agents-md-maintainer -g -a codex -y",
@@ -65,8 +65,8 @@
       "path": "skills/ai-sdk-agents",
       "skillMdPath": "skills/ai-sdk-agents/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-agents",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-agents/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-agents",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-agents/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill ai-sdk-agents -g -a codex -y",
@@ -91,11 +91,11 @@
       ],
       "resources": {
         "references": 7,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 9
+        "total": 8
       },
       "exposure": {
         "readme_catalog": true,
@@ -114,8 +114,8 @@
       "path": "skills/ai-sdk-core",
       "skillMdPath": "skills/ai-sdk-core/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-core",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-core/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-core",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-core/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill ai-sdk-core -g -a codex -y",
@@ -140,11 +140,11 @@
       ],
       "resources": {
         "references": 10,
-        "scripts": 5,
+        "scripts": 2,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 15
+        "total": 12
       },
       "exposure": {
         "readme_catalog": true,
@@ -163,8 +163,8 @@
       "path": "skills/ai-sdk-ui",
       "skillMdPath": "skills/ai-sdk-ui/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-ui",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ai-sdk-ui/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-ui",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ai-sdk-ui/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill ai-sdk-ui -g -a codex -y",
@@ -189,11 +189,11 @@
       ],
       "resources": {
         "references": 8,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 10
+        "total": 9
       },
       "exposure": {
         "readme_catalog": true,
@@ -206,14 +206,62 @@
       }
     },
     {
+      "name": "autoreview",
+      "slug": "autoreview",
+      "description": "Run a Codex-only structured code review closeout for local, branch, or commit diffs. Use when the user asks for autoreview, Codex review, structured closeout review, final review before commit/ship, or review after non-trivial code edits.",
+      "path": "skills/autoreview",
+      "skillMdPath": "skills/autoreview/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/autoreview",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/autoreview/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill autoreview -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill autoreview -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill autoreview"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Packaged",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "package_available",
+        "has_scripts",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_references"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 2,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/autoreview.skill",
+        "present": true,
+        "rejected": false
+      }
+    },
+    {
       "name": "aws-architecture",
       "slug": "aws-architecture",
       "description": "Architect AWS infrastructure and application integrations with production-grade service selection, boundaries, rollout thinking, and verification. Use when the user asks for AWS architecture, infra design, service selection, or AWS-backed implementation planning. Do not use for repo-specific Nova guidance unless the active repo adapter calls into it.",
       "path": "skills/aws-architecture",
       "skillMdPath": "skills/aws-architecture/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/aws-architecture",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/aws-architecture/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/aws-architecture",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/aws-architecture/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill aws-architecture -g -a codex -y",
@@ -258,8 +306,8 @@
       "path": "skills/browser-workbench-setup",
       "skillMdPath": "skills/browser-workbench-setup/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/browser-workbench-setup",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/browser-workbench-setup/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/browser-workbench-setup",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/browser-workbench-setup/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill browser-workbench-setup -g -a codex -y",
@@ -307,8 +355,8 @@
       "path": "skills/bun-audit",
       "skillMdPath": "skills/bun-audit/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/bun-audit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/bun-audit/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/bun-audit",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/bun-audit/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill bun-audit -g -a codex -y",
@@ -354,8 +402,8 @@
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/bun-dev",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/bun-dev/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/bun-dev",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/bun-dev/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill bun-dev -g -a codex -y",
@@ -404,8 +452,8 @@
       "path": "skills/caveman-compress",
       "skillMdPath": "skills/caveman-compress/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/caveman-compress",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/caveman-compress/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/caveman-compress",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/caveman-compress/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill caveman-compress -g -a codex -y",
@@ -451,8 +499,8 @@
       "path": "skills/codex-sdk",
       "skillMdPath": "skills/codex-sdk/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/codex-sdk",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/codex-sdk/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/codex-sdk",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/codex-sdk/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill codex-sdk -g -a codex -y",
@@ -478,11 +526,11 @@
       ],
       "resources": {
         "references": 11,
-        "scripts": 8,
-        "assets": 14,
+        "scripts": 4,
+        "assets": 12,
         "templates": 0,
         "agents": 0,
-        "total": 33
+        "total": 27
       },
       "exposure": {
         "readme_catalog": true,
@@ -501,8 +549,8 @@
       "path": "skills/codex-utils",
       "skillMdPath": "skills/codex-utils/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/codex-utils",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/codex-utils/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/codex-utils",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/codex-utils/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill codex-utils -g -a codex -y",
@@ -548,8 +596,8 @@
       "path": "skills/commit",
       "skillMdPath": "skills/commit/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/commit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/commit/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/commit",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/commit/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill commit -g -a codex -y",
@@ -595,8 +643,8 @@
       "path": "skills/context7-research",
       "skillMdPath": "skills/context7-research/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/context7-research",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/context7-research/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/context7-research",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/context7-research/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill context7-research -g -a codex -y",
@@ -621,11 +669,11 @@
       ],
       "resources": {
         "references": 3,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 1,
         "templates": 0,
         "agents": 0,
-        "total": 6
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,
@@ -644,8 +692,8 @@
       "path": "skills/convex-audit",
       "skillMdPath": "skills/convex-audit/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-audit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-audit/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-audit",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-audit/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill convex-audit -g -a codex -y",
@@ -670,11 +718,11 @@
       ],
       "resources": {
         "references": 4,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 7
+        "total": 6
       },
       "exposure": {
         "readme_catalog": true,
@@ -693,8 +741,8 @@
       "path": "skills/convex-best-practices",
       "skillMdPath": "skills/convex-best-practices/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-best-practices",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-best-practices/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-best-practices",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-best-practices/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill convex-best-practices -g -a codex -y",
@@ -741,8 +789,8 @@
       "path": "skills/convex-component-adoption-planner",
       "skillMdPath": "skills/convex-component-adoption-planner/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-component-adoption-planner",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-component-adoption-planner/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-component-adoption-planner",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-component-adoption-planner/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill convex-component-adoption-planner -g -a codex -y",
@@ -790,8 +838,8 @@
       "path": "skills/convex-feature-spec",
       "skillMdPath": "skills/convex-feature-spec/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-feature-spec",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/convex-feature-spec/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-feature-spec",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/convex-feature-spec/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill convex-feature-spec -g -a codex -y",
@@ -816,11 +864,11 @@
       ],
       "resources": {
         "references": 3,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 6
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,
@@ -839,8 +887,8 @@
       "path": "skills/dash-audit",
       "skillMdPath": "skills/dash-audit/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dash-audit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dash-audit/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dash-audit",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dash-audit/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill dash-audit -g -a codex -y",
@@ -865,11 +913,11 @@
       ],
       "resources": {
         "references": 2,
-        "scripts": 4,
+        "scripts": 2,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 7
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,
@@ -888,8 +936,8 @@
       "path": "skills/deep-researcher",
       "skillMdPath": "skills/deep-researcher/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/deep-researcher",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/deep-researcher/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/deep-researcher",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/deep-researcher/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill deep-researcher -g -a codex -y",
@@ -915,11 +963,11 @@
       "improvementSignals": [],
       "resources": {
         "references": 2,
-        "scripts": 3,
+        "scripts": 2,
         "assets": 0,
         "templates": 6,
         "agents": 1,
-        "total": 12
+        "total": 11
       },
       "exposure": {
         "readme_catalog": true,
@@ -938,8 +986,8 @@
       "path": "skills/dmc-best-practices",
       "skillMdPath": "skills/dmc-best-practices/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dmc-best-practices",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dmc-best-practices/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dmc-best-practices",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dmc-best-practices/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill dmc-best-practices -g -a codex -y",
@@ -985,8 +1033,8 @@
       "path": "skills/dmc-py",
       "skillMdPath": "skills/dmc-py/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dmc-py",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/dmc-py/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dmc-py",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/dmc-py/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill dmc-py -g -a codex -y",
@@ -1011,11 +1059,11 @@
       ],
       "resources": {
         "references": 9,
-        "scripts": 8,
-        "assets": 8,
+        "scripts": 4,
+        "assets": 4,
         "templates": 0,
         "agents": 0,
-        "total": 25
+        "total": 17
       },
       "exposure": {
         "readme_catalog": true,
@@ -1034,8 +1082,8 @@
       "path": "skills/docker-architect",
       "skillMdPath": "skills/docker-architect/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/docker-architect",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/docker-architect/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/docker-architect",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/docker-architect/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill docker-architect -g -a codex -y",
@@ -1061,11 +1109,11 @@
       ],
       "resources": {
         "references": 5,
-        "scripts": 8,
+        "scripts": 5,
         "assets": 13,
         "templates": 0,
         "agents": 0,
-        "total": 26
+        "total": 23
       },
       "exposure": {
         "readme_catalog": true,
@@ -1084,8 +1132,8 @@
       "path": "skills/docs-align",
       "skillMdPath": "skills/docs-align/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/docs-align",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/docs-align/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/docs-align",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/docs-align/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill docs-align -g -a codex -y",
@@ -1094,14 +1142,12 @@
       },
       "readinessLabels": [
         "Valid",
-        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
         "has_scripts",
-        "has_agents",
-        "resource_rich"
+        "has_agents"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
@@ -1109,11 +1155,11 @@
       ],
       "resources": {
         "references": 0,
-        "scripts": 4,
+        "scripts": 2,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 5
+        "total": 3
       },
       "exposure": {
         "readme_catalog": true,
@@ -1126,14 +1172,65 @@
       }
     },
     {
+      "name": "firecrawl",
+      "slug": "firecrawl",
+      "description": "Use this skill for Firecrawl CLI web work: web search, URL scraping, site mapping, crawling, structured extraction, page interaction, monitoring changes, offline site download via x download, and parsing local documents such as PDF, DOCX, XLSX, HTML, DOC, ODT, or RTF. Trigger for requests to search the web, look up current info, fetch/read/scrape a URL, extract website data, crawl docs, click/fill/login/paginate a page, monitor page changes, save a site offline, or parse a document. Do not trigger for generic local file reads/edits, git/deploy/code tasks, or Firecrawl app integration work.",
+      "license": "ISC",
+      "path": "skills/firecrawl",
+      "skillMdPath": "skills/firecrawl/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/firecrawl",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/firecrawl/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill firecrawl -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill firecrawl -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill firecrawl"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Packaged",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "package_available",
+        "has_references",
+        "has_scripts",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure"
+      ],
+      "resources": {
+        "references": 15,
+        "scripts": 2,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 18
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/firecrawl.skill",
+        "present": true,
+        "rejected": false
+      }
+    },
+    {
       "name": "gh-deps-intel",
       "slug": "gh-deps-intel",
       "description": "JS/TS + Python dep upgrade intel (monorepos). Outdated package-manager checks + GitHub release/changelog → Markdown+JSON. Audits, compatible bumps, deprecations, breaking changes, full upgrades.",
       "path": "skills/gh-deps-intel",
       "skillMdPath": "skills/gh-deps-intel/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/gh-deps-intel",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/gh-deps-intel/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/gh-deps-intel",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/gh-deps-intel/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill gh-deps-intel -g -a codex -y",
@@ -1177,12 +1274,12 @@
     {
       "name": "gh-pr-review-fix",
       "slug": "gh-pr-review-fix",
-      "description": "Fetch unresolved GitHub PR review threads, normalize them, fix them end-to-end, verify the results, and re-check until the PR is clean or blocked. Use when the user wants GitHub PR comments resolved with minimal verified fixes. Do not use for local review files, Codex reviews, or Zen reviews; review-remediation owns those.",
+      "description": "Fix unresolved GitHub PR review threads end-to-end with codex-dev pr review: fetch fresh hosted state, verify still-valid findings, implement minimal fixes, validate, create scoped semantic Conventional Commits, push, and resolve the fixed hosted threads. Do not use for local Codex, Zen, or manual review files; review-remediation owns those.",
       "path": "skills/gh-pr-review-fix",
       "skillMdPath": "skills/gh-pr-review-fix/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/gh-pr-review-fix",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/gh-pr-review-fix/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/gh-pr-review-fix",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/gh-pr-review-fix/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill gh-pr-review-fix -g -a codex -y",
@@ -1195,21 +1292,20 @@
       ],
       "qualitySignals": [
         "readme_catalogued",
-        "has_scripts",
+        "has_references",
         "has_agents"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_references"
+        "missing_dist_package"
       ],
       "resources": {
-        "references": 0,
-        "scripts": 2,
+        "references": 1,
+        "scripts": 0,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 3
+        "total": 2
       },
       "exposure": {
         "readme_catalog": true,
@@ -1228,8 +1324,8 @@
       "path": "skills/grill-me",
       "skillMdPath": "skills/grill-me/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/grill-me",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/grill-me/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/grill-me",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/grill-me/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill grill-me -g -a codex -y",
@@ -1269,14 +1365,65 @@
       }
     },
     {
+      "name": "kimi-ui-advisor",
+      "slug": "kimi-ui-advisor",
+      "description": "Explicit-only Kimi Code CLI frontend/UI advisor for UI audits, redesigns, components, screenshots, before/after comparison, layout, styling, accessibility, responsive behavior, and visual polish. Use only when the user explicitly invokes `$kimi-ui-advisor` and wants Codex to ask Kimi for structured UI suggestions, then review, apply, and verify them in the repo.",
+      "path": "skills/kimi-ui-advisor",
+      "skillMdPath": "skills/kimi-ui-advisor/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/kimi-ui-advisor",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/kimi-ui-advisor/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill kimi-ui-advisor -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill kimi-ui-advisor -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill kimi-ui-advisor"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_scripts",
+        "has_assets",
+        "has_templates",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package"
+      ],
+      "resources": {
+        "references": 3,
+        "scripts": 1,
+        "assets": 2,
+        "templates": 1,
+        "agents": 1,
+        "total": 8
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/kimi-ui-advisor.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
       "name": "langgraph-multiagent",
       "slug": "langgraph-multiagent",
       "description": "Architect-level development, audit, and migration of multi-agent systems using LangGraph (v1+) and LangChain (v1+). Use when building or refactoring supervisor/subagent architectures, orchestrator-worker workflows, routing/hand-offs, agentic RAG, memory (short + long-term), state + context engineering, guardrails + human-in-the-loop, MCP tool integration, observability (LangSmith/OpenTelemetry), deployment, and performance/cost optimization -- or when migrating off deprecated patterns like `langgraph.prebuilt.create_react_agent` and libraries like `langgraph-supervisor(-py)`, LlamaIndex agents, CrewAI, Agno, or OpenAI Agents.",
       "path": "skills/langgraph-multiagent",
       "skillMdPath": "skills/langgraph-multiagent/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/langgraph-multiagent",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/langgraph-multiagent/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/langgraph-multiagent",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/langgraph-multiagent/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill langgraph-multiagent -g -a codex -y",
@@ -1302,11 +1449,11 @@
       ],
       "resources": {
         "references": 27,
-        "scripts": 10,
-        "assets": 33,
+        "scripts": 5,
+        "assets": 21,
         "templates": 0,
         "agents": 0,
-        "total": 70
+        "total": 53
       },
       "exposure": {
         "readme_catalog": true,
@@ -1325,8 +1472,8 @@
       "path": "skills/new-branch",
       "skillMdPath": "skills/new-branch/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/new-branch",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/new-branch/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/new-branch",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/new-branch/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill new-branch -g -a codex -y",
@@ -1372,8 +1519,8 @@
       "path": "skills/notebook-ml-architect",
       "skillMdPath": "skills/notebook-ml-architect/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/notebook-ml-architect",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/notebook-ml-architect/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/notebook-ml-architect",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/notebook-ml-architect/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill notebook-ml-architect -g -a codex -y",
@@ -1398,11 +1545,11 @@
       ],
       "resources": {
         "references": 3,
-        "scripts": 6,
-        "assets": 7,
+        "scripts": 3,
+        "assets": 5,
         "templates": 0,
         "agents": 0,
-        "total": 16
+        "total": 11
       },
       "exposure": {
         "readme_catalog": true,
@@ -1421,8 +1568,8 @@
       "path": "skills/opensrc",
       "skillMdPath": "skills/opensrc/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/opensrc",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/opensrc/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/opensrc",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/opensrc/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill opensrc -g -a codex -y",
@@ -1468,8 +1615,8 @@
       "path": "skills/opensrc-inspect",
       "skillMdPath": "skills/opensrc-inspect/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/opensrc-inspect",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/opensrc-inspect/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/opensrc-inspect",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/opensrc-inspect/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill opensrc-inspect -g -a codex -y",
@@ -1515,8 +1662,8 @@
       "path": "skills/platform-architect",
       "skillMdPath": "skills/platform-architect/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/platform-architect",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/platform-architect/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/platform-architect",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/platform-architect/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill platform-architect -g -a codex -y",
@@ -1541,11 +1688,11 @@
       ],
       "resources": {
         "references": 4,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 7
+        "total": 6
       },
       "exposure": {
         "readme_catalog": true,
@@ -1564,8 +1711,8 @@
       "path": "skills/pytest-dev",
       "skillMdPath": "skills/pytest-dev/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/pytest-dev",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/pytest-dev/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/pytest-dev",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/pytest-dev/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill pytest-dev -g -a codex -y",
@@ -1590,11 +1737,11 @@
       ],
       "resources": {
         "references": 4,
-        "scripts": 6,
+        "scripts": 3,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 10
+        "total": 7
       },
       "exposure": {
         "readme_catalog": true,
@@ -1613,8 +1760,8 @@
       "path": "skills/repo-context-builder",
       "skillMdPath": "skills/repo-context-builder/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-context-builder",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-context-builder/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-context-builder",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-context-builder/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill repo-context-builder -g -a codex -y",
@@ -1640,11 +1787,11 @@
       ],
       "resources": {
         "references": 2,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 2,
         "templates": 0,
         "agents": 1,
-        "total": 7
+        "total": 6
       },
       "exposure": {
         "readme_catalog": true,
@@ -1663,8 +1810,8 @@
       "path": "skills/repo-docs-align",
       "skillMdPath": "skills/repo-docs-align/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-docs-align",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-docs-align/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-docs-align",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-docs-align/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill repo-docs-align -g -a codex -y",
@@ -1691,11 +1838,11 @@
       ],
       "resources": {
         "references": 3,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 4,
         "agents": 1,
-        "total": 10
+        "total": 9
       },
       "exposure": {
         "readme_catalog": true,
@@ -1714,8 +1861,8 @@
       "path": "skills/repo-modernize-upgrade-audit",
       "skillMdPath": "skills/repo-modernize-upgrade-audit/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-modernize-upgrade-audit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/repo-modernize-upgrade-audit/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-modernize-upgrade-audit",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/repo-modernize-upgrade-audit/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill repo-modernize-upgrade-audit -g -a codex -y",
@@ -1759,12 +1906,12 @@
     {
       "name": "review-remediation",
       "slug": "review-remediation",
-      "description": "Fix local review (Codex, Zen, notes) w/ verify. Not gh-pr-review-fix or babysit-pr.",
+      "description": "Fix local review (Codex, Zen, notes) w/ verify. Not gh-pr-review-fix or passive PR monitoring.",
       "path": "skills/review-remediation",
       "skillMdPath": "skills/review-remediation/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/review-remediation",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/review-remediation/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/review-remediation",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/review-remediation/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill review-remediation -g -a codex -y",
@@ -1773,15 +1920,12 @@
       },
       "readinessLabels": [
         "Valid",
-        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
         "has_references",
-        "has_scripts",
-        "has_agents",
-        "resource_rich"
+        "has_agents"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
@@ -1789,11 +1933,11 @@
       ],
       "resources": {
         "references": 2,
-        "scripts": 1,
+        "scripts": 0,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 4
+        "total": 3
       },
       "exposure": {
         "readme_catalog": true,
@@ -1813,8 +1957,8 @@
       "path": "skills/rust-cli-clap",
       "skillMdPath": "skills/rust-cli-clap/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-cli-clap",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-cli-clap/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-cli-clap",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-cli-clap/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-cli-clap -g -a codex -y",
@@ -1863,8 +2007,8 @@
       "path": "skills/rust-expert",
       "skillMdPath": "skills/rust-expert/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-expert",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-expert/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-expert",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-expert/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-expert -g -a codex -y",
@@ -1914,8 +2058,8 @@
       "path": "skills/rust-mega-eng",
       "skillMdPath": "skills/rust-mega-eng/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-mega-eng",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-mega-eng/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-mega-eng",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-mega-eng/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-mega-eng -g -a codex -y",
@@ -1963,8 +2107,8 @@
       "path": "skills/rust-tauri-apps",
       "skillMdPath": "skills/rust-tauri-apps/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-tauri-apps",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-tauri-apps/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-tauri-apps",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-tauri-apps/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tauri-apps -g -a codex -y",
@@ -2014,8 +2158,8 @@
       "path": "skills/rust-tui-ratatui",
       "skillMdPath": "skills/rust-tui-ratatui/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-tui-ratatui",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-tui-ratatui/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-tui-ratatui",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-tui-ratatui/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tui-ratatui -g -a codex -y",
@@ -2065,8 +2209,8 @@
       "path": "skills/rust-web-services",
       "skillMdPath": "skills/rust-web-services/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-web-services",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/rust-web-services/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-web-services",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/rust-web-services/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-web-services -g -a codex -y",
@@ -2116,8 +2260,8 @@
       "path": "skills/sentry-cli-fix-issues",
       "skillMdPath": "skills/sentry-cli-fix-issues/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/sentry-cli-fix-issues",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/sentry-cli-fix-issues/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/sentry-cli-fix-issues",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/sentry-cli-fix-issues/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill sentry-cli-fix-issues -g -a codex -y",
@@ -2166,8 +2310,8 @@
       "path": "skills/sentry-triage-to-pr",
       "skillMdPath": "skills/sentry-triage-to-pr/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/sentry-triage-to-pr",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/sentry-triage-to-pr/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/sentry-triage-to-pr",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/sentry-triage-to-pr/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill sentry-triage-to-pr -g -a codex -y",
@@ -2216,8 +2360,8 @@
       "path": "skills/ship-branch",
       "skillMdPath": "skills/ship-branch/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ship-branch",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/ship-branch/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ship-branch",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/ship-branch/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill ship-branch -g -a codex -y",
@@ -2262,8 +2406,8 @@
       "path": "skills/signr-pr-closure-loop",
       "skillMdPath": "skills/signr-pr-closure-loop/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/signr-pr-closure-loop",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/signr-pr-closure-loop/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/signr-pr-closure-loop",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/signr-pr-closure-loop/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill signr-pr-closure-loop -g -a codex -y",
@@ -2309,8 +2453,8 @@
       "path": "skills/streamdown",
       "skillMdPath": "skills/streamdown/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/streamdown",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/streamdown/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/streamdown",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/streamdown/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill streamdown -g -a codex -y",
@@ -2335,11 +2479,11 @@
       ],
       "resources": {
         "references": 3,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 5
+        "total": 4
       },
       "exposure": {
         "readme_catalog": true,
@@ -2358,8 +2502,8 @@
       "path": "skills/streamlit-master-architect",
       "skillMdPath": "skills/streamlit-master-architect/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/streamlit-master-architect",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/streamlit-master-architect/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/streamlit-master-architect",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/streamlit-master-architect/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill streamlit-master-architect -g -a codex -y",
@@ -2385,11 +2529,11 @@
       ],
       "resources": {
         "references": 13,
-        "scripts": 12,
+        "scripts": 6,
         "assets": 0,
-        "templates": 24,
+        "templates": 16,
         "agents": 0,
-        "total": 49
+        "total": 35
       },
       "exposure": {
         "readme_catalog": true,
@@ -2408,8 +2552,8 @@
       "path": "skills/subagent-creator",
       "skillMdPath": "skills/subagent-creator/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/subagent-creator",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/subagent-creator/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/subagent-creator",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/subagent-creator/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill subagent-creator -g -a codex -y",
@@ -2435,11 +2579,11 @@
       "improvementSignals": [],
       "resources": {
         "references": 2,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 20,
         "agents": 1,
-        "total": 25
+        "total": 24
       },
       "exposure": {
         "readme_catalog": true,
@@ -2458,8 +2602,8 @@
       "path": "skills/subspawn",
       "skillMdPath": "skills/subspawn/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/subspawn",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/subspawn/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/subspawn",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/subspawn/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill subspawn -g -a codex -y",
@@ -2486,11 +2630,11 @@
       ],
       "resources": {
         "references": 0,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 12,
         "agents": 1,
-        "total": 15
+        "total": 14
       },
       "exposure": {
         "readme_catalog": true,
@@ -2509,8 +2653,8 @@
       "path": "skills/supabase-ts",
       "skillMdPath": "skills/supabase-ts/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/supabase-ts",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/supabase-ts/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/supabase-ts",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/supabase-ts/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill supabase-ts -g -a codex -y",
@@ -2536,11 +2680,11 @@
       ],
       "resources": {
         "references": 9,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 11
+        "total": 10
       },
       "exposure": {
         "readme_catalog": true,
@@ -2559,8 +2703,8 @@
       "path": "skills/taste-metaskill",
       "skillMdPath": "skills/taste-metaskill/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/taste-metaskill",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/taste-metaskill/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/taste-metaskill",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/taste-metaskill/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill taste-metaskill -g -a codex -y",
@@ -2610,8 +2754,8 @@
       "path": "skills/technical-writing",
       "skillMdPath": "skills/technical-writing/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/technical-writing",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/technical-writing/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/technical-writing",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/technical-writing/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill technical-writing -g -a codex -y",
@@ -2657,8 +2801,8 @@
       "path": "skills/upgrade-pack-generator",
       "skillMdPath": "skills/upgrade-pack-generator/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/upgrade-pack-generator",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/upgrade-pack-generator/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/upgrade-pack-generator",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/upgrade-pack-generator/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill upgrade-pack-generator -g -a codex -y",
@@ -2685,11 +2829,11 @@
       ],
       "resources": {
         "references": 18,
-        "scripts": 20,
+        "scripts": 10,
         "assets": 3,
         "templates": 0,
         "agents": 1,
-        "total": 42
+        "total": 32
       },
       "exposure": {
         "readme_catalog": true,
@@ -2708,8 +2852,8 @@
       "path": "skills/vitest-dev",
       "skillMdPath": "skills/vitest-dev/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/vitest-dev",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/vitest-dev/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/vitest-dev",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/vitest-dev/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill vitest-dev -g -a codex -y",
@@ -2757,8 +2901,8 @@
       "path": "skills/zod-v4",
       "skillMdPath": "skills/zod-v4/SKILL.md",
       "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/zod-v4",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/25e9f54916244da7c0ef8d39c257b13150ff8a2c/skills/zod-v4/SKILL.md"
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/zod-v4",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/a94fe61a5cc0aeb8e512dcfa47ff26b81f33295d/skills/zod-v4/SKILL.md"
       },
       "installCommands": {
         "codexGlobal": "npx skills add BjornMelin/dev-skills --skill zod-v4 -g -a codex -y",
@@ -2784,11 +2928,11 @@
       ],
       "resources": {
         "references": 4,
-        "scripts": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 0,
-        "total": 6
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,
