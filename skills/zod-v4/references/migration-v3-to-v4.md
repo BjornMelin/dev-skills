@@ -26,17 +26,17 @@ This is a short, decision-oriented checklist. For exact fixes, jump to the linke
 
 ## String Format APIs
 
-- Replace `z.string().email()/url()/uuid()/...` with top-level formats: `rules/migrate-top-level-string-formats.md`
+- Replace `z.string().email()/url()/uuid()/…` with top-level formats: `rules/migrate-top-level-string-formats.md`
 
 ## Enums
 
-- Replace `z.nativeEnum(...)` with `z.enum(...)`: `rules/migrate-nativeenum-to-enum.md`
+- Replace `z.nativeEnum(…)` with `z.enum(…)`: `rules/migrate-nativeenum-to-enum.md`
 
 ## Objects
 
-- Replace `.strict()/.passthrough()/.strip()` with `z.strictObject(...)` / `z.looseObject(...)` / default behavior:
+- Replace `.strict()/.passthrough()/.strip()` with `z.strictObject(…)` / `z.looseObject(…)` / default behavior:
 - `rules/migrate-object-strict-passthrough-strip.md`
-- Replace `.merge(...)` with `.extend(other.shape)` or object spread:
+- Replace `.merge(…)` with `.extend(other.shape)` or object spread:
 - `rules/migrate-object-merge-to-extend-shape.md`
 
 ## Records
@@ -49,13 +49,13 @@ behavior, but explicit keys make migrations and enum-key behavior clearer.
 
 ## Errors
 
-- Replace `err.format()` / `err.flatten()` / `z.formatError(...)` with:
+- Replace `err.format()` / `err.flatten()` / `z.formatError(…)` with:
 - `z.treeifyError(err)` / `z.flattenError(err)`:
 - `rules/migrate-error-format-flatten.md`
 
 ## Promises
 
-- Avoid `z.promise(...)` (deprecated); `await` then parse:
+- Avoid `z.promise(…)` (deprecated); `await` then parse:
 - `rules/migrate-z-promise-deprecated.md`
 
 ## Package Surfaces

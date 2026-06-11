@@ -39,4 +39,4 @@ export function acceptsSchema(schema: z4.$ZodType) {
   Standard Schema before building a Zod-specific adapter.
 - When switching on first-party schema/check types, include a non-throwing
   default branch so new Zod schema types do not break the library.
-- See `references/package-surfaces-v4.md`.
+- See [package-surfaces-v4](../references/package-surfaces-v4.md).

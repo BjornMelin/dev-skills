@@ -1,5 +1,5 @@
 ---
-title: Remember: z.record(z.enum(...), value) is exhaustive in v4 (use partialRecord for optional keys)
+title: Remember: z.record(z.enum(…), value) is exhaustive in v4 (use partialRecord for optional keys)
 impact: HIGH
 tags: schema, records, enums
 ---

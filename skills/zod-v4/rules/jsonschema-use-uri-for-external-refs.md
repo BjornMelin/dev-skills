@@ -1,5 +1,5 @@
 ---
-title: Use uri: (id) => ... to generate external $ref URIs for catalogs
+title: Use uri: (id) => … to generate external $ref URIs for catalogs
 impact: LOW
 tags: jsonschema, refs
 ---

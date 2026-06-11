@@ -8,7 +8,7 @@ tags: migrate, promises
 
 ## Why
 
-In Zod v4, `z.promise(...)` is deprecated. If you suspect a value might be a promise, await it and validate the resolved value.
+In Zod v4, `z.promise(…)` is deprecated. If you suspect a value might be a promise, await it and validate the resolved value.
 
 ## Bad
 

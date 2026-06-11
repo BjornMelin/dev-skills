@@ -1,5 +1,5 @@
 ---
-title: Do not use z.url({ protocols: [...] }); use regex protocol/hostname options or z.httpUrl
+title: Do not use z.url({ protocols: […] }); use regex protocol/hostname options or z.httpUrl
 impact: HIGH
 tags: urls, footgun
 ---

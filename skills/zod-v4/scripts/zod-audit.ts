@@ -161,7 +161,10 @@ function isIncluded(filePath: string, includeExts: readonly string[]): boolean {
 }
 
 function hasZodImport(content: string): boolean {
-  return /\bfrom\s+["']zod(?:\/[^"']*)?["']/.test(content);
+  return (
+    /\bfrom\s+["']zod(?:\/[^"']*)?["']/.test(content) ||
+    /\brequire\s*\(\s*["']zod(?:\/[^"']*)?["']\s*\)/.test(content)
+  );
 }
 
 function lineColFromIndex(content: string, idx: number): Readonly<{
