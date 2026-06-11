@@ -50,7 +50,7 @@ Use `z.stringFormat(name, validatorOrRegex)` for custom named string formats.
 
 ## Template Literals
 
-Use `z.templateLiteral([...])` for template-literal-shaped strings instead of
+Use `z.templateLiteral([…])` for template-literal-shaped strings instead of
 ad hoc regexes when the parts map naturally to schemas:
 
 ```ts
@@ -82,7 +82,7 @@ Use `z.looseRecord()` when non-matching keys should pass through.
 
 ## Unions and XOR
 
-Use discriminated unions when a stable discriminator exists. Use `z.xor([...])`
+Use discriminated unions when a stable discriminator exists. Use `z.xor([…])`
 when exactly one branch must match:
 
 ```ts
