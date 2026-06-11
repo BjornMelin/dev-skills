@@ -63,7 +63,7 @@ Use when:
 
 Route to:
 
-- `runtime-bun-native-apis`
+- `perf-prefer-bun-native-apis`
 
 ### Crypto, WebSocket, and compatibility improvements
 
@@ -94,7 +94,7 @@ Use when:
 Route to:
 
 - `runtime-webview-automation`
-- `runtime-bun-native-apis`
+- `perf-prefer-bun-native-apis`
 
 ### Markdown in terminal
 
@@ -105,7 +105,7 @@ Route to:
 Route to:
 
 - `runtime-markdown-entrypoints`
-- `runtime-bun-native-apis`
+- `perf-prefer-bun-native-apis`
 
 ### Cron split is now first-class
 

@@ -68,7 +68,7 @@ rewrite mature Vitest, Jest, or Playwright suites without a migration plan.
 - Test flags: `rules/test-bun-test-runner.md`
 - CI installs and reproducibility: `rules/pm-bun-install-ci-frozen-lockfile.md`
 - Package manager pin: `rules/pm-package-manager-field.md`
-- Runtime APIs and file serving: `rules/runtime-bun-native-apis.md`
+- Runtime APIs and file serving: `rules/perf-prefer-bun-native-apis.md`
 - Standalone HTML: `rules/build-bun-compile-browser.md`
 
 ## Release-Sync Note
