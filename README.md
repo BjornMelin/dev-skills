@@ -290,7 +290,7 @@ active catalog.
 | `subspawn` | Bounded Codex subagent delegation with strict wait and evidence-first synthesis. | [skills/subspawn/SKILL.md](skills/subspawn/SKILL.md) |
 | `supabase-ts` | Supabase with Next/React/TS: SSR auth, RLS, storage, realtime, Edge Functions, pgvector, deploy. | [skills/supabase-ts/SKILL.md](skills/supabase-ts/SKILL.md) |
 | `taste-metaskill` | Route frontend UI work to focused visual-taste references (premium, distinct, anti-generic). | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
-| `technical-writing` | Internal engineering docs: specs, architecture, runbooks, API references, and changelogs. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
+| `technical-writing` | Internal engineering docs: PRDs, specs, architecture, runbooks, migrations, and maintainer guides. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
 | `vitest-dev` | Vitest for TypeScript + Next.js: stable suites, fast local + CI, sharding. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
 | `zod-v4` | Zod v4: schemas, v3 migration, errors, JSON Schema/OpenAPI, framework hooks. | [skills/zod-v4/SKILL.md](skills/zod-v4/SKILL.md) |
