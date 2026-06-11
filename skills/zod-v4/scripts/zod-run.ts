@@ -161,9 +161,9 @@ function pickSchemaExport(
   exportName?: string,
 ): unknown {
   if (exportName) return mod[exportName];
-  if ("default" in mod) return mod.default;
   if ("schema" in mod) return mod.schema;
   if ("Schema" in mod) return mod.Schema;
+  if ("default" in mod) return mod.default;
   return undefined;
 }
 
