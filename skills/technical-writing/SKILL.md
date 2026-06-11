@@ -47,7 +47,7 @@ Normalize the request into one primary mode before drafting.
 
 ```yaml
 technical_writing_mode:
-  primary_mode: spec | architecture | adr | runbook | migration | internal-guide
+  primary_mode: prd | spec | architecture | adr | runbook | migration | internal-guide
   audience: engineers | operators | mixed | unknown
   source_of_truth: repo | incident-notes | existing-doc | mixed | unknown
   lifecycle_state: draft | review | rewrite | maintenance
