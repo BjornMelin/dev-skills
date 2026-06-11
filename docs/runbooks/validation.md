@@ -28,6 +28,8 @@ cargo deny check advisories
 cargo audit
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
+cargo package --list -p bun-platform-core
+cargo package --list -p bun-platform
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 ```
@@ -79,8 +81,9 @@ shape.
 
 ## codex-dev Operating Layer
 
-Run after changing `crates/codex-dev-core/`, `crates/codex-dev/`, root Cargo
-files, or the `codex-dev` architecture/spec docs:
+Run after changing `crates/codex-dev-core/`, `crates/codex-dev/`,
+`crates/bun-platform-core/`, `crates/bun-platform/`, root Cargo files, or the
+`codex-dev` architecture/spec docs:
 
 ```bash
 cargo fmt --all --check
@@ -89,17 +92,27 @@ cargo tree -d --target all
 cargo deny check bans licenses sources
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
+cargo package --list -p bun-platform-core
+cargo package --list -p bun-platform
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo clippy -p bun-platform-core --all-targets -- -D warnings
+cargo clippy -p bun-platform --all-targets -- -D warnings
 cargo check -p codex-dev-core
 cargo check -p codex-dev
+cargo check -p bun-platform-core
+cargo check -p bun-platform
 cargo test -p codex-dev-core
 cargo test -p codex-dev
+cargo test -p bun-platform-core
+cargo test -p bun-platform
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
+cargo run -q -p bun-platform -- --help
+cargo run -q -p bun-platform -- completions zsh >/tmp/bun-platform.zsh
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
@@ -112,6 +125,10 @@ cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json skills sync-kimi --dry-run --project-root "$PWD"
 cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
+cargo run -q -p codex-dev -- --json bun doctor
+cargo run -q -p codex-dev -- --json bun audit --root crates/bun-platform-core/fixtures/github-actions
+cargo run -q -p codex-dev -- --json bun fixes plan --root crates/bun-platform-core/fixtures/safe-fixes
+cargo run -q -p codex-dev -- --json bun references status
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json research import-bundle --help
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
@@ -535,6 +552,10 @@ cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
 cargo run -q -p codex-dev -- --json skills sync-kimi --dry-run --project-root "$PWD"
 cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
+cargo run -q -p codex-dev -- --json bun doctor
+cargo run -q -p codex-dev -- --json bun audit --root crates/bun-platform-core/fixtures/github-actions
+cargo run -q -p codex-dev -- --json bun fixes plan --root crates/bun-platform-core/fixtures/safe-fixes
+cargo run -q -p codex-dev -- --json bun references status
 cargo run -q -p codex-dev -- --json task list
 cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25
 cargo run -q -p codex-dev -- --json pr agent --help

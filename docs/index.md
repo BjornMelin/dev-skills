@@ -7,7 +7,7 @@ skill-authoring systems added to this repository:
 - `codex-dev`: current CLI for local task capsule lifecycle, structured
   evidence, subspawn plan/outcome/synthesis capture, repo-native policy gates,
   profile-aware validation manifests, read-only skill inventory, PR evidence
-  capture, and apply-gated PR agent actions.
+  capture, Bun platform audits/remediation, and apply-gated PR agent actions.
 - `codex-dev-tui`: optional Ratatui workbench for `codex-dev` capsules with
   Overview, Evidence, Subagents, PR, PR Agent, Validation, and Help panels.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
@@ -48,11 +48,14 @@ out of version control.
 - [codex-dev CLI Reference](reference/codex-dev-cli.md): command guide for
   local task capsule lifecycle, evidence appenders, subspawn
   plan/outcome/synthesis capture, policy gates, local readiness and skill
-  inventory reports, public Agent Skills Lab catalog generation, PR evidence
-  capture, and apply-gated PR actions and closeout readiness reports.
+  inventory reports, public Agent Skills Lab catalog generation, Bun platform
+  workflows, PR evidence capture, and apply-gated PR actions and closeout
+  readiness reports.
 - [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.
+- [Bun Platform Reference](reference/bun-platform.md): native `codex-dev bun`
+  commands, compatibility shim, config, state, and skill integration.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning across Overview, Evidence, Subagents,
   PR, PR Agent, Validation, and Help panels.

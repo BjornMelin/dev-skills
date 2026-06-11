@@ -2,7 +2,7 @@
 
 ## Why
 
-`bun test` in Bun v1.3.10 supports a global retry count for flaky environments.
+`bun test` in Bun v1.3.13 supports a global retry count for flaky environments.
 
 Use retries for CI stability without per-test duplication.
 

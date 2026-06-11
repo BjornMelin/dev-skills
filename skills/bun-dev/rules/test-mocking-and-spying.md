@@ -4,7 +4,7 @@
 
 Bun’s test runner includes first-class mocking/spying. Use it to avoid adding extra test frameworks unless you need ecosystem-specific features.
 
-Newer Bun versions (including v1.3.10) also support `Symbol.dispose` for mocks/spies, which pairs well with `using` for automatic cleanup.
+Newer Bun versions (including v1.3.13) also support `Symbol.dispose` for mocks/spies, which pairs well with `using` for automatic cleanup.
 
 ## Do
 

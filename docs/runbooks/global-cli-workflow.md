@@ -5,6 +5,7 @@ available from any directory:
 
 - `codex-research`
 - `codex-dev`
+- `bun-platform` (temporary Bun platform compatibility shim)
 - `codex-dev-tui`
 
 This repo intentionally uses Cargo-native install/update commands. It does not
@@ -20,6 +21,7 @@ git checkout main
 git pull --ff-only
 cargo install --path crates/codex-research --locked --force
 cargo install --path crates/codex-dev --locked --force
+cargo install --path crates/bun-platform --locked --force
 cargo install --path crates/codex-dev-tui --locked --force
 ```
 
@@ -34,6 +36,7 @@ tmp=$(mktemp -d)
 cd "$tmp"
 codex-research --help >/dev/null
 codex-dev --help >/dev/null
+bun-platform --help >/dev/null
 codex-dev-tui --help >/dev/null
 ```
 
@@ -49,6 +52,7 @@ Smoke artifact generation from source:
 ```bash
 cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
+cargo run -q -p bun-platform -- completions zsh >/tmp/bun-platform.zsh
 cargo run -q -p codex-dev-tui -- completions zsh >/tmp/codex-dev-tui.zsh
 cargo run -q -p codex-research -- manpage >/tmp/codex-research.1
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
@@ -61,12 +65,15 @@ Generate completions from installed binaries:
 mkdir -p ~/.local/share/dev-skills/completions/{bash,zsh,fish}
 codex-research completions bash > ~/.local/share/dev-skills/completions/bash/codex-research
 codex-dev completions bash > ~/.local/share/dev-skills/completions/bash/codex-dev
+bun-platform completions bash > ~/.local/share/dev-skills/completions/bash/bun-platform
 codex-dev-tui completions bash > ~/.local/share/dev-skills/completions/bash/codex-dev-tui
 codex-research completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-research
 codex-dev completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-dev
+bun-platform completions zsh > ~/.local/share/dev-skills/completions/zsh/_bun-platform
 codex-dev-tui completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-dev-tui
 codex-research completions fish > ~/.local/share/dev-skills/completions/fish/codex-research.fish
 codex-dev completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev.fish
+bun-platform completions fish > ~/.local/share/dev-skills/completions/fish/bun-platform.fish
 codex-dev-tui completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev-tui.fish
 ```
 
@@ -101,6 +108,11 @@ root="$repo/target/codex-dev-install-smoke/codex-dev"
 rm -rf "$root"
 cargo install --path crates/codex-dev --locked --offline --force --root "$root"
 (cd /tmp && "$root/bin/codex-dev" --help >/dev/null && "$root/bin/codex-dev" completions zsh >/dev/null && "$root/bin/codex-dev" manpage >/dev/null)
+
+root="$repo/target/codex-dev-install-smoke/bun-platform"
+rm -rf "$root"
+cargo install --path crates/bun-platform --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/bun-platform" --help >/dev/null && "$root/bin/bun-platform" completions zsh >/dev/null)
 
 root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"

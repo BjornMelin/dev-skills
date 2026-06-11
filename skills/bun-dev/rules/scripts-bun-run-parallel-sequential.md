@@ -6,7 +6,7 @@ Running multiple scripts (or workspace scripts) is a common need in monorepos an
 - `--parallel` for concurrent runs
 - `--sequential` for ordered runs
 
-These flags are available in Bun v1.3.10+.
+These flags are available in Bun v1.3.13+.
 
 This reduces the need for extra dependencies like `concurrently` for simple cases.
 

@@ -9,7 +9,13 @@ use std::process::{Command, ExitCode, Stdio};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+mod bun;
+
 use anyhow::{Context, Result, bail};
+use bun::{
+    BunCommand, ToolCommand, bun_command_name, handle_bun_command, handle_tool_command,
+    tool_command_name,
+};
 use chrono::{DateTime, SecondsFormat, TimeDelta, Utc};
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
@@ -107,6 +113,8 @@ impl Cli {
             Commands::Research { command } => match command {
                 ResearchCommand::ImportBundle(_) => "research import-bundle",
             },
+            Commands::Bun { command } => bun_command_name(command),
+            Commands::Tool { command } => tool_command_name(command),
             Commands::Policy { command } => match command {
                 PolicyCommand::Manifest(_) => "policy manifest",
                 PolicyCommand::Explain(_) => "policy explain",
@@ -191,6 +199,16 @@ enum Commands {
     Research {
         #[command(subcommand)]
         command: ResearchCommand,
+    },
+    /// Audit and maintain Bun-first repositories and bun-dev skill references.
+    Bun {
+        #[command(subcommand)]
+        command: BunCommand,
+    },
+    /// Import reports from external tools into task capsules.
+    Tool {
+        #[command(subcommand)]
+        command: ToolCommand,
     },
     /// Plan or run repo-native validation policy gates.
     Policy {
@@ -1814,6 +1832,8 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
         },
+        Commands::Bun { command } => handle_bun_command(command),
+        Commands::Tool { command } => handle_tool_command(command),
         Commands::Subagents { command } => match command {
             SubagentsCommand::Plan(args) => {
                 let result = record_subagent_plan(args.into_core())?;
@@ -8184,6 +8204,40 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "Failure means codex-dev CLI code has Rust lints or warnings that must be fixed before review.",
         ),
         policy_gate(
+            "bun-platform-core-clippy",
+            "bun-platform-core Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "bun-platform-core",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means Bun platform core has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "bun-platform-clippy",
+            "bun-platform Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "bun-platform",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the temporary Bun platform shim has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
             "codex-dev-core-check",
             "codex-dev-core cargo check",
             ["cargo", "check", "-p", "codex-dev-core"],
@@ -8200,6 +8254,22 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "Failure means codex-dev does not typecheck.",
         ),
         policy_gate(
+            "bun-platform-core-check",
+            "bun-platform-core cargo check",
+            ["cargo", "check", "-p", "bun-platform-core"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means Bun platform core does not typecheck.",
+        ),
+        policy_gate(
+            "bun-platform-check",
+            "bun-platform cargo check",
+            ["cargo", "check", "-p", "bun-platform"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the temporary Bun platform shim does not typecheck.",
+        ),
+        policy_gate(
             "codex-dev-core-test",
             "codex-dev-core tests",
             ["cargo", "test", "-p", "codex-dev-core"],
@@ -8214,6 +8284,22 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "docs/runbooks/validation.md#codex-dev-operating-layer",
             ["cargo"],
             "Failure means codex-dev CLI behavior or integration fixtures regressed.",
+        ),
+        policy_gate(
+            "bun-platform-core-test",
+            "bun-platform-core tests",
+            ["cargo", "test", "-p", "bun-platform-core"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means Bun platform audit, fix, reference, or fixture behavior regressed.",
+        ),
+        policy_gate(
+            "bun-platform-test",
+            "bun-platform tests",
+            ["cargo", "test", "-p", "bun-platform"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the temporary Bun platform CLI contract regressed.",
         ),
         policy_gate(
             "codex-dev-help",
@@ -8247,6 +8333,31 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
             ["cargo"],
             "Failure means codex-dev cannot generate a manpage from its Clap contract.",
+        ),
+        policy_gate(
+            "bun-platform-help",
+            "bun-platform help smoke",
+            ["cargo", "run", "-q", "-p", "bun-platform", "--", "--help"],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the temporary Bun platform shim cannot render its top-level Clap contract.",
+        ),
+        policy_gate(
+            "bun-platform-completion-zsh",
+            "bun-platform zsh completion smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "bun-platform",
+                "--",
+                "completions",
+                "zsh",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means bun-platform cannot generate shell completions from its Clap contract.",
         ),
         policy_gate(
             "codex-dev-policy-manifest",
@@ -8287,6 +8398,84 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "docs/runbooks/validation.md#codex-dev-operating-layer",
             ["cargo"],
             "Failure means the skill inventory JSON contract regressed.",
+        ),
+        policy_gate(
+            "codex-dev-bun-doctor-smoke",
+            "codex-dev Bun doctor smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "bun",
+                "doctor",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the native Bun platform doctor contract regressed.",
+        ),
+        policy_gate(
+            "codex-dev-bun-audit-smoke",
+            "codex-dev Bun audit smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "bun",
+                "audit",
+                "--root",
+                "crates/bun-platform-core/fixtures/github-actions",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the native Bun audit JSON contract regressed.",
+        ),
+        policy_gate(
+            "codex-dev-bun-fixes-plan-smoke",
+            "codex-dev Bun fixes plan smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "bun",
+                "fixes",
+                "plan",
+                "--root",
+                "crates/bun-platform-core/fixtures/safe-fixes",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the native Bun fix-planning JSON contract regressed.",
+        ),
+        policy_gate(
+            "codex-dev-bun-references-status-smoke",
+            "codex-dev Bun references status smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "codex-dev",
+                "--",
+                "--json",
+                "bun",
+                "references",
+                "status",
+            ],
+            "docs/runbooks/validation.md#codex-dev-operating-layer",
+            ["cargo"],
+            "Failure means the native Bun reference status contract regressed.",
         ),
         policy_gate(
             "codex-dev-pr-plan-smoke",
@@ -8979,6 +9168,22 @@ fn supply_chain_gates() -> Vec<PolicyGate> {
             "Failure means codex-dev is missing package metadata or would package unexpected invalid content.",
         ),
         policy_gate(
+            "cargo-package-bun-platform-core-list",
+            "bun-platform-core package file list",
+            ["cargo", "package", "--list", "-p", "bun-platform-core"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means bun-platform-core is missing package metadata or would package unexpected invalid content.",
+        ),
+        policy_gate(
+            "cargo-package-bun-platform-list",
+            "bun-platform package file list",
+            ["cargo", "package", "--list", "-p", "bun-platform"],
+            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
+            ["cargo"],
+            "Failure means bun-platform is missing package metadata or would package unexpected invalid content.",
+        ),
+        policy_gate(
             "cargo-package-codex-dev-tui-list",
             "codex-dev-tui package file list",
             ["cargo", "package", "--list", "-p", "codex-dev-tui"],
@@ -9001,13 +9206,21 @@ fn local_cli_install_smoke_gates() -> Vec<PolicyGate> {
     vec![
         local_cli_install_smoke_gate("codex-research", "crates/codex-research"),
         local_cli_install_smoke_gate("codex-dev", "crates/codex-dev"),
+        local_cli_install_smoke_gate("bun-platform", "crates/bun-platform"),
         local_cli_install_smoke_gate("codex-dev-tui", "crates/codex-dev-tui"),
     ]
 }
 
 fn local_cli_install_smoke_gate(binary: &'static str, crate_path: &'static str) -> PolicyGate {
+    let artifact_smoke = if binary == "bun-platform" {
+        format!("\"$root/bin/{binary}\" completions zsh >/dev/null")
+    } else {
+        format!(
+            "\"$root/bin/{binary}\" completions zsh >/dev/null && \"$root/bin/{binary}\" manpage >/dev/null"
+        )
+    };
     let command = format!(
-        "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null && \"$root/bin/{binary}\" completions zsh >/dev/null && \"$root/bin/{binary}\" manpage >/dev/null)"
+        "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null && {artifact_smoke})"
     );
     PolicyGate {
         id: format!("cargo-install-{binary}-smoke"),
@@ -10452,17 +10665,29 @@ enabled = false
                 "cargo-fmt",
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
+                "bun-platform-core-clippy",
+                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
+                "bun-platform-core-check",
+                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
+                "bun-platform-core-test",
+                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
+                "bun-platform-help",
+                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
+                "codex-dev-bun-doctor-smoke",
+                "codex-dev-bun-audit-smoke",
+                "codex-dev-bun-fixes-plan-smoke",
+                "codex-dev-bun-references-status-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -10534,17 +10759,29 @@ enabled = false
                 "cargo-fmt",
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
+                "bun-platform-core-clippy",
+                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
+                "bun-platform-core-check",
+                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
+                "bun-platform-core-test",
+                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
+                "bun-platform-help",
+                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
+                "codex-dev-bun-doctor-smoke",
+                "codex-dev-bun-audit-smoke",
+                "codex-dev-bun-fixes-plan-smoke",
+                "codex-dev-bun-references-status-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -10578,6 +10815,8 @@ enabled = false
                 "cargo-deny-policy",
                 "cargo-package-codex-dev-core-list",
                 "cargo-package-codex-dev-list",
+                "cargo-package-bun-platform-core-list",
+                "cargo-package-bun-platform-list",
                 "cargo-package-codex-dev-tui-list",
                 "cargo-package-codex-research-list",
             ],
@@ -10588,17 +10827,29 @@ enabled = false
                 "cargo-fmt",
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
+                "bun-platform-core-clippy",
+                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
+                "bun-platform-core-check",
+                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
+                "bun-platform-core-test",
+                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
+                "bun-platform-help",
+                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
                 "codex-dev-skills-inventory-smoke",
+                "codex-dev-bun-doctor-smoke",
+                "codex-dev-bun-audit-smoke",
+                "codex-dev-bun-fixes-plan-smoke",
+                "codex-dev-bun-references-status-smoke",
                 "codex-dev-pr-plan-smoke",
                 "docs-links",
                 "diff-check",
@@ -10621,6 +10872,7 @@ enabled = false
                 "codex-research-manpage",
                 "cargo-install-codex-research-smoke",
                 "cargo-install-codex-dev-smoke",
+                "cargo-install-bun-platform-smoke",
                 "cargo-install-codex-dev-tui-smoke",
                 "codex-dev-bootstrap-status",
                 "bootstrap-pack-validate",
@@ -10641,6 +10893,8 @@ enabled = false
                 "cargo-deny-policy",
                 "cargo-package-codex-dev-core-list",
                 "cargo-package-codex-dev-list",
+                "cargo-package-bun-platform-core-list",
+                "cargo-package-bun-platform-list",
                 "cargo-package-codex-dev-tui-list",
                 "cargo-package-codex-research-list",
             ],

@@ -55,6 +55,8 @@ cargo deny check advisories
 cargo audit
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
+cargo package --list -p bun-platform-core
+cargo package --list -p bun-platform
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo run -q -p codex-dev -- --json policy manifest --profile release

@@ -3,6 +3,9 @@ use codex_dev_core::stable_text_hash;
 use serde_json::{Value, json};
 use tempfile::tempdir;
 
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
 fn write_subspawn_plan_fixture(root: &std::path::Path) -> std::path::PathBuf {
     let path = root.join("subspawn-plan.json");
     std::fs::write(
@@ -112,6 +115,136 @@ fn codex_dev_generates_manpage() {
         .stdout(predicates::str::contains("codex-dev"))
         // The roff renderer escapes hyphens in command names as `\-`.
         .stdout(predicates::str::contains("codex\\-dev\\-capsule"));
+}
+
+#[test]
+fn bun_validate_plan_rejects_malformed_package_json() {
+    let temp = tempdir().expect("tempdir");
+    let package_json = temp.path().join("package.json");
+    std::fs::write(&package_json, "{ invalid json").expect("write package.json");
+    std::fs::write(
+        temp.path().join("bun-platform.config.json"),
+        r#"{"validationCommands":["exit 0"]}"#,
+    )
+    .expect("write bun config");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "bun",
+            "validate",
+            "plan",
+            "--root",
+            temp.path().to_str().expect("utf8 temp path"),
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("validation error json");
+
+    assert_eq!(json["ok"], false);
+    assert_eq!(json["command"], "bun validate plan");
+    let message = json["result"]["error"]["message"]
+        .as_str()
+        .expect("error message");
+    assert!(message.contains("failed to parse"));
+    assert!(message.contains(package_json.to_str().expect("utf8 package path")));
+}
+
+#[cfg(unix)]
+#[test]
+fn bun_validate_run_uses_configured_platform_shell() {
+    let temp = tempdir().expect("tempdir");
+    let marker = temp.path().join("shell-used");
+    let shell = temp.path().join("validation-shell");
+    std::fs::write(
+        &shell,
+        format!(
+            "#!/bin/sh\nprintf used > '{}'\nexec /bin/sh \"$@\"\n",
+            marker.display()
+        ),
+    )
+    .expect("write validation shell");
+    let mut permissions = std::fs::metadata(&shell)
+        .expect("validation shell metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&shell, permissions).expect("make validation shell executable");
+    std::fs::write(
+        temp.path().join("bun-platform.config.json"),
+        r#"{"validationCommands":["exit 0"]}"#,
+    )
+    .expect("write bun config");
+
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("SHELL", &shell)
+        .args([
+            "--json",
+            "bun",
+            "validate",
+            "run",
+            "--root",
+            temp.path().to_str().expect("utf8 temp path"),
+        ])
+        .assert()
+        .success();
+
+    assert_eq!(
+        std::fs::read_to_string(marker).expect("read shell marker"),
+        "used"
+    );
+}
+
+#[test]
+fn bun_doctor_discovers_tracked_skill_from_workspace_crate() {
+    let crate_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let repo_root = crate_dir
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .current_dir(crate_dir)
+        .args(["--json", "bun", "doctor"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("doctor json");
+
+    assert_eq!(
+        json["result"]["skill_root"],
+        repo_root
+            .join("skills/bun-dev")
+            .to_str()
+            .expect("skill root")
+    );
+}
+
+#[test]
+fn tool_import_requires_source_command_for_exit_code() {
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "tool",
+            "import",
+            "--capsule",
+            "missing-capsule",
+            "--tool",
+            "example",
+            "--report",
+            "missing-report.json",
+            "--source-exit-code",
+            "1",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("--source-command"));
 }
 
 fn init_capsule_fixture(root: &std::path::Path, id: &str, title: &str) -> String {
@@ -875,7 +1008,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
             .iter()
             .any(|signal| signal.as_str() == Some("resource_rich"))
     );
-    assert_eq!(skills[0]["resources"]["total"], 3);
+    assert_eq!(skills[0]["resources"]["total"], 4);
     assert_eq!(skills[1]["name"], "beta-skill");
     assert_eq!(skills[1]["path"], "skills/beta-skill");
     assert!(
