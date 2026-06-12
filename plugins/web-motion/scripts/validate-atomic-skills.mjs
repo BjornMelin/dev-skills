@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 
 const pluginRoot = path.resolve(import.meta.dirname, '..');
 const skillsRoot = path.join(pluginRoot, 'skills');
+const pluginName = path.basename(pluginRoot);
 const tick = String.fromCharCode(96);
 
 const requiredSkills = [
@@ -104,12 +105,59 @@ function relativeList(dir, filter) {
   return listFiles(dir).map((file) => path.relative(dir, file)).filter(filter).sort();
 }
 
+function validateClaudePluginSupport() {
+  const claudeManifestPath = path.join(pluginRoot, '.claude-plugin', 'plugin.json');
+  const marketplacePath = path.join(pluginRoot, '..', '..', '.claude-plugin', 'marketplace.json');
+
+  if (!existsSync(claudeManifestPath)) {
+    fail('missing .claude-plugin/plugin.json');
+    return;
+  }
+  if (!existsSync(marketplacePath)) {
+    fail('missing root .claude-plugin/marketplace.json');
+    return;
+  }
+
+  const claudeManifest = json(claudeManifestPath);
+  if (claudeManifest.name !== pluginName) {
+    fail(`.claude-plugin/plugin.json name ${claudeManifest.name} does not match ${pluginName}`);
+  }
+  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(String(claudeManifest.version || ''))) {
+    fail('.claude-plugin/plugin.json must include a semver version for strict Claude Code validation');
+  }
+  if (Object.hasOwn(claudeManifest, 'interface')) {
+    fail('.claude-plugin/plugin.json must not include Codex-only interface metadata');
+  }
+  if (Object.hasOwn(claudeManifest, 'skills')) {
+    fail('.claude-plugin/plugin.json should rely on Claude Code default skills/ discovery');
+  }
+
+  const marketplace = json(marketplacePath);
+  if (marketplace.name !== 'bjorn-dev-skills') {
+    fail(`root marketplace name ${marketplace.name} does not match bjorn-dev-skills`);
+  }
+  const entry = Array.isArray(marketplace.plugins)
+    ? marketplace.plugins.find((plugin) => plugin.name === pluginName)
+    : null;
+  if (!entry) {
+    fail(`root marketplace missing ${pluginName} entry`);
+    return;
+  }
+  if (entry.source !== `./plugins/${pluginName}`) {
+    fail(`${pluginName}: marketplace source must be ./plugins/${pluginName}`);
+  }
+  if (entry.version) {
+    fail(`${pluginName}: marketplace entry must omit version; plugin.json is the Claude version authority`);
+  }
+}
+
 if (!existsSync(path.join(pluginRoot, '.codex-plugin', 'plugin.json'))) {
   fail('missing .codex-plugin/plugin.json');
 }
 if (!existsSync(path.join(pluginRoot, 'scripts', 'motion-skillkit.mjs'))) {
   fail('missing scripts/motion-skillkit.mjs');
 }
+validateClaudePluginSupport();
 
 for (const skill of requiredSkills) {
   const skillDir = path.join(skillsRoot, skill);
