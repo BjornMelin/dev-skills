@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "native-motion",
+  "displayName": "Native Motion",
+  "version": "0.1.0",
+  "description": "Self-contained native motion skills for Expo and React Native apps.",
+  "author": {
+    "name": "Bjorn Melin",
+    "url": "https://github.com/BjornMelin"
+  },
+  "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/native-motion",
+  "repository": "https://github.com/BjornMelin/dev-skills",
+  "license": "MIT",
+  "keywords": [
+    "native-motion",
+    "expo",
+    "react-native",
+    "reanimated",
+    "worklets",
+    "nativewind",
+    "expo-ui",
+    "lottie",
+    "skia",
+    "rive",
+    "react-three-fiber"
+  ]
+}

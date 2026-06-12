@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "web-motion",
+  "displayName": "Web Motion",
+  "version": "0.1.0",
+  "description": "Self-contained web motion skills for production frontend apps.",
+  "author": {
+    "name": "Bjorn Melin",
+    "url": "https://github.com/BjornMelin"
+  },
+  "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/web-motion",
+  "repository": "https://github.com/BjornMelin/dev-skills",
+  "license": "MIT",
+  "keywords": [
+    "web-motion",
+    "react",
+    "motion",
+    "gsap",
+    "css",
+    "waapi",
+    "tailwind",
+    "lottie",
+    "three",
+    "react-three-fiber",
+    "typegpu",
+    "rive"
+  ]
+}

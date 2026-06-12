@@ -100,6 +100,7 @@ out of version control.
 - [Deep Research Workflow](cookbooks/deep-research-workflow.md)
 - [GitHub Archaeology](cookbooks/github-archaeology.md)
 - [Context7 and Source Validation](cookbooks/context7-source-validation.md)
+- [Claude Code Motion Plugins](cookbooks/claude-code-motion-plugins.md)
 - [Subagent Fanout](cookbooks/subagent-fanout.md)
 - [Evidence Ledgers and Reports](cookbooks/evidence-ledgers.md)
 - [Repo Bootstrap Packs](cookbooks/repo-bootstrap-packs.md)
