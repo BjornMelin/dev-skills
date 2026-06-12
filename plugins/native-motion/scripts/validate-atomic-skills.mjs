@@ -146,7 +146,7 @@ function validateClaudePluginSupport() {
   if (entry.source !== `./plugins/${pluginName}`) {
     fail(`${pluginName}: marketplace source must be ./plugins/${pluginName}`);
   }
-  if (entry.version) {
+  if (Object.hasOwn(entry, 'version')) {
     fail(`${pluginName}: marketplace entry must omit version; plugin.json is the Claude version authority`);
   }
 }
