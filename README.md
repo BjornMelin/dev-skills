@@ -43,6 +43,7 @@ Key docs:
 - [Rust skill suite](docs/reference/rust-skill-suite.md)
 - [Memory guidance proposals](docs/cookbooks/memory-guidance-proposals.md)
 - [Codex prompt library](docs/prompts/codex-scenario-prompts.md)
+- [Claude Code motion plugin install](docs/cookbooks/claude-code-motion-plugins.md)
 
 For local live-provider testing, copy `.env.example` to an untracked `.env` and
 export it in your shell before running provider commands.
@@ -69,10 +70,14 @@ archive/
     <skill-name>/
       archive.json        # required archive metadata
       SKILL.md            # retained source; not active
+.claude-plugin/
+  marketplace.json        # Claude Code marketplace catalog
 plugins/
   <plugin-name>/
     .codex-plugin/
       plugin.json         # Codex plugin manifest
+    .claude-plugin/
+      plugin.json         # Claude Code plugin manifest
     skills/
       <skill-name>/
         SKILL.md          # plugin-scoped skill entrypoint
@@ -229,10 +234,22 @@ active catalog.
 
 ### Local Plugin Skill Bundles
 
-| Plugin | Skills | Description | Source |
+Install both motion plugins in Claude Code:
+
+```bash
+claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/native-motion
+claude plugin install web-motion@bjorn-dev-skills
+claude plugin install native-motion@bjorn-dev-skills
+```
+
+After installing inside an active Claude Code session, run `/reload-plugins`.
+See the [Claude Code motion plugin install cookbook](docs/cookbooks/claude-code-motion-plugins.md)
+for local development and validation commands.
+
+| Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
-| `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [plugins/native-motion/.codex-plugin/plugin.json](plugins/native-motion/.codex-plugin/plugin.json) |
-| `web-motion` | `gsap-core`, `gsap-frameworks`, `gsap-performance`, `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-utils`, `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [plugins/web-motion/.codex-plugin/plugin.json](plugins/web-motion/.codex-plugin/plugin.json) |
+| `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [Codex](plugins/native-motion/.codex-plugin/plugin.json), [Claude Code](plugins/native-motion/.claude-plugin/plugin.json) |
+| `web-motion` | `gsap-core`, `gsap-frameworks`, `gsap-performance`, `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-utils`, `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |

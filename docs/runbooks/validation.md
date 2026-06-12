@@ -384,10 +384,13 @@ Validate plugin-contained skills and local plugin source:
 
 ```bash
 for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done
+claude plugin validate . --strict
+claude plugin validate ./plugins/web-motion --strict
+claude plugin validate ./plugins/native-motion --strict
 node plugins/web-motion/scripts/validate-atomic-skills.mjs
 node plugins/native-motion/scripts/validate-atomic-skills.mjs
 node --check tools/skill/overhaul_motion_plugins.mjs
-rg --files -g '*.json' plugins | xargs -r jq empty
+rg --files -g '*.json' .claude-plugin plugins | xargs -r jq empty
 ```
 
 Package changed skills:
