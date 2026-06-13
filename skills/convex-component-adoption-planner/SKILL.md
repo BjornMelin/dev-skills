@@ -1,20 +1,20 @@
 ---
 name: convex-component-adoption-planner
-description: Researches a Convex component against Signr's live backend graph, asks scored one-at-a-time design questions, and produces a reusable adoption or rejection package with `PLAN.md` and `CODEX_FULL_PROMPT.md`.
+description: Researches a Convex component against a private app's live backend graph, asks scored one-at-a-time design questions, and produces a reusable adoption or rejection package with `PLAN.md` and `CODEX_FULL_PROMPT.md`.
 ---
 
 # Convex Component Adoption Planner
 
-Use this skill when Signr needs a serious answer to any of these:
+Use this skill when a private Convex app needs a serious answer to any of these:
 
 - Should we adopt a specific Convex component?
 - Which Convex component best fits a planned feature?
-- How should a component integrate into Signr without creating duplicate ownership?
+- How should a component integrate without creating duplicate ownership?
 - Generate a fresh-session execution package for adopting or explicitly rejecting a component.
 
 ## Core stance
 
-- Always inspect Signr's current durable owner before recommending a component.
+- Always inspect the app's current durable owner before recommending a component.
 - Prefer one canonical owner. If a component would create a second source of truth, recommend against it unless the plan is a full hard-cut replacement.
 - Keep deterministic prep in the helper CLI. Keep architecture, ownership, and recommendation judgment in the model.
 - Use live Convex docs first. If the user asks for the latest or current component state, fetch it.
@@ -68,7 +68,7 @@ Do not treat the helper output as the recommendation. It only prepares determini
 - `packages/backend/convex/convex.config.ts`
 - `packages/backend/convex/schema.ts`
 - feature-specific backend modules and specs
-- if the feature is already planned, the matching files under `.agents/signr-implementation-prompts-modernization-package/docs/implementation-prompts/`
+- if the feature is already planned, the matching repo-local planning or prompt files under `.agents/`
 
 4. Fetch the live component markdown page and inspect the package source:
 
@@ -92,11 +92,11 @@ Do not hard-depend on any of these tools. Degrade cleanly when absent.
    - Prefer `doctor` then `component`.
    - Use `scaffold --stdout` when you want to inspect the starter package before writing it.
    - Use `scaffold` without `--stdout` when you are ready to create the package files.
-2. Map the current durable owner in Signr before recommending anything.
+2. Map the current durable owner in the target app before recommending anything.
 3. Read only the exact repo files that govern the feature boundary.
 4. Fetch live docs for the components index and the specific component page.
 5. Inspect dependency source with `opensrc` when package behavior, tables, or APIs matter.
-6. Check whether the modernization-package prompts already define the feature. If they do, include prompt-package alignment in the plan.
+6. Check whether repo-local planning or prompt docs already define the feature. If they do, include alignment in the plan.
 7. Ask one design question at a time with `request_user_input` only when local context cannot close the branch safely.
 8. Produce the package described in `references/package-spec.md`.
 

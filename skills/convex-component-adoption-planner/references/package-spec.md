@@ -1,6 +1,6 @@
 # Package specification
 
-This reference defines the output package for Convex component adoption work in Signr.
+This reference defines the output package for Convex component adoption work in a private app.
 
 ## Output folder
 
@@ -27,7 +27,7 @@ Include these sections:
    - final choice table
    - weighted scores
    - unresolved items, if any
-3. `Current Signr ownership map`
+3. `Current ownership map`
    - current mounted components
    - app-owned feature boundary
    - duplicate-ownership risks
@@ -39,7 +39,7 @@ Include these sections:
 5. `Repo context to read in a fresh session`
    - exact backend files
    - exact specs
-   - exact modernization-package prompt files, if the feature is already planned
+   - exact repo-local planning or prompt files, if the feature is already planned
 6. `Context regathering commands`
    - `curl` commands
    - `opensrc` commands
@@ -53,7 +53,7 @@ Include these sections:
 8. `Implementation sequence`
    - exact files expected to change
    - migration plan if replacing an existing owner
-   - prompt-package updates required in the same workstream
+   - repo-local planning or prompt updates required in the same workstream
 9. `Validation`
    - repo validation commands to run later
    - focused smoke checks
@@ -72,16 +72,16 @@ Include:
 4. Exact external URLs to fetch
 5. Exact shell commands to regather context
 6. Required implementation order
-7. Prompt-package alignment instructions
+7. Repo-local planning or prompt alignment instructions
 8. Validation commands to run at the end
 9. Final response contract
 
-## Prompt-package alignment rule
+## Repo-local planning alignment rule
 
-If the feature is already represented in:
+If the feature is already represented in repo-local planning or prompt files under:
 
 ```text
-.agents/signr-implementation-prompts-modernization-package/docs/implementation-prompts/
+.agents/
 ```
 
 then the plan must explicitly decide whether those docs need to change and list the exact files.
@@ -90,7 +90,7 @@ At minimum, inspect:
 
 - the feature plan markdown
 - the matching codex trigger prompt
-- the modernization-package `README.md` when discoverability changes
+- the local planning or prompt package `README.md` when discoverability changes
 - `prompt-status-ledger.json` when prompt lifecycle or state changes
 
 ## Tooling posture

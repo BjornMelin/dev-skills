@@ -327,17 +327,28 @@ fn build_component_output(args: ComponentArgs) -> Result<ComponentOutput> {
     let component_dir = plan_group_dir.join(&docs_slug);
     let plan_md = component_dir.join("PLAN.md");
     let codex_full_prompt_md = component_dir.join("CODEX_FULL_PROMPT.md");
-    let component_markdown =
-        format!("https://www.convex.dev/components/{0}/{0}.md", docs_slug);
+    let component_markdown = format!("https://www.convex.dev/components/{0}/{0}.md", docs_slug);
 
-    let feature_query = feature_slug
-        .as_deref()
-        .unwrap_or("component adoption");
+    let feature_query = feature_slug.as_deref().unwrap_or("component adoption");
     let repo_grep = if let Some(feature) = &feature_slug {
         format!("{docs_slug}|{feature}")
     } else {
         docs_slug.clone()
     };
+
+    let repo_components_command = rg_existing_paths_command(
+        "app\\.use|components\\.",
+        &repo_root,
+        &[
+            "packages/backend/convex/convex.config.ts",
+            "packages/backend/convex",
+        ],
+    );
+    let repo_feature_command = rg_existing_paths_command(
+        &repo_grep,
+        &repo_root,
+        &["packages/backend", "docs", ".agents"],
+    );
 
     let commands = vec![
         SuggestedCommand {
@@ -374,15 +385,13 @@ fn build_component_output(args: ComponentArgs) -> Result<ComponentOutput> {
         },
         SuggestedCommand {
             name: "repo-components",
-            command: "rg -n \"app\\.use|components\\.\" packages/backend/convex/convex.config.ts packages/backend/convex".to_string(),
+            command: repo_components_command,
             reason: "map current mounted components and component call sites",
             available: Some(command_exists("rg")),
         },
         SuggestedCommand {
             name: "repo-feature",
-            command: format!(
-                "rg -n \"{repo_grep}\" packages/backend docs .agents/signr-implementation-prompts-modernization-package"
-            ),
+            command: repo_feature_command,
             reason: "find feature ownership and prompt-package overlap",
             available: Some(command_exists("rg")),
         },
@@ -391,7 +400,7 @@ fn build_component_output(args: ComponentArgs) -> Result<ComponentOutput> {
     let mut notes = vec![
         "Docs URL is inferred from the slug. If the components index shows a different mapping, rerun with --docs-slug.".to_string(),
         "The helper prepares research inputs only. It does not decide whether the component should be adopted.".to_string(),
-        "If the feature already exists in the modernization-package prompts, prompt-package alignment belongs in the same plan.".to_string(),
+        "If the feature already exists in the repo-local planning or prompt docs, repo-local planning alignment belongs in the same plan.".to_string(),
     ];
 
     if feature_slug.is_none() {
@@ -599,6 +608,20 @@ fn command_exists(name: &str) -> bool {
     env::split_paths(&path_var).any(|dir| dir.join(name).exists())
 }
 
+fn rg_existing_paths_command(pattern: &str, repo_root: &Path, candidates: &[&str]) -> String {
+    let paths: Vec<&str> = candidates
+        .iter()
+        .copied()
+        .filter(|candidate| repo_root.join(candidate).exists())
+        .collect();
+    let search_paths = if paths.is_empty() {
+        ".".to_string()
+    } else {
+        paths.join(" ")
+    };
+    format!("rg -n \"{pattern}\" {search_paths}")
+}
+
 fn infer_docs_slug(component: &str) -> String {
     let base = component
         .rsplit('/')
@@ -650,6 +673,10 @@ fn build_plan_stub(output: &ComponentOutput) -> String {
         .feature_slug
         .clone()
         .unwrap_or_else(|| "REPLACE_ME_FEATURE_SLUG".to_string());
+    let repo_components_command =
+        command_by_name(output, "repo-components").unwrap_or("rg -n \"app\\.use|components\\.\" .");
+    let repo_feature_command =
+        command_by_name(output, "repo-feature").unwrap_or("rg -n \"REPLACE_ME_FEATURE\" .");
 
     format!(
         "# Convex component adoption plan\n\n\
@@ -671,14 +698,14 @@ fn build_plan_stub(output: &ComponentOutput) -> String {
 - `packages/backend/convex/convex.config.ts`\n\
 - `packages/backend/convex/schema.ts`\n\
 - `REPLACE_ME_FEATURE_FILES`\n\
-- `REPLACE_ME_PROMPT_PACKAGE_FILES_IF_APPLICABLE`\n\n\
+- `REPLACE_ME_REPO_LOCAL_PLANNING_FILES_IF_APPLICABLE`\n\n\
 ## Context regathering commands\n\n\
 ```bash\n\
 curl -s {components_index}\n\
 curl -s {component_markdown}\n\
 opensrc path {package}\n\
-rg -n \"app\\.use|components\\.\" packages/backend/convex/convex.config.ts packages/backend/convex\n\
-rg -n \"{feature}|{docs_slug}\" packages/backend docs .agents/signr-implementation-prompts-modernization-package\n\
+{repo_components_command}\n\
+{repo_feature_command}\n\
 ```\n\n\
 ## Preferred architecture\n\n\
 - Current durable owner: `REPLACE_ME`\n\
@@ -701,7 +728,17 @@ bun run validate:local:agent\n\
         feature = feature,
         components_index = output.docs.components_index,
         component_markdown = output.docs.component_markdown,
+        repo_components_command = repo_components_command,
+        repo_feature_command = repo_feature_command,
     )
+}
+
+fn command_by_name<'a>(output: &'a ComponentOutput, name: &str) -> Option<&'a str> {
+    output
+        .commands
+        .iter()
+        .find(|command| command.name == name)
+        .map(|command| command.command.as_str())
 }
 
 fn build_prompt_stub(output: &ComponentOutput) -> String {
@@ -712,7 +749,7 @@ fn build_prompt_stub(output: &ComponentOutput) -> String {
 
     format!(
         "# Fresh-session execution prompt\n\n\
-You are working in the Signr repo. Adopt or definitively reject the Convex component `{package}` for the `{feature}` workstream.\n\n\
+You are working in the target private app repo. Adopt or definitively reject the Convex component `{package}` for the `{feature}` workstream.\n\n\
 ## Locked inputs\n\n\
 - Package: `{package}`\n\
 - Docs slug: `{docs_slug}`\n\
@@ -724,7 +761,7 @@ You are working in the Signr repo. Adopt or definitively reject the Convex compo
 - `packages/backend/convex/convex.config.ts`\n\
 - `packages/backend/convex/schema.ts`\n\
 - `REPLACE_ME_FEATURE_FILES`\n\
-- `REPLACE_ME_PROMPT_PACKAGE_FILES_IF_APPLICABLE`\n\n\
+- `REPLACE_ME_REPO_LOCAL_PLANNING_FILES_IF_APPLICABLE`\n\n\
 ## Regather external context\n\n\
 ```bash\n\
 curl -s {components_index}\n\
@@ -732,7 +769,7 @@ curl -s {component_markdown}\n\
 opensrc path {package}\n\
 ```\n\n\
 ## Required output\n\n\
-Update `PLAN.md` and this prompt with final locked decisions, exact integration steps, prompt-package alignment, and validation commands.\n\n\
+Update `PLAN.md` and this prompt with final locked decisions, exact integration steps, repo-local planning alignment, and validation commands.\n\n\
 ## Final response contract\n\n\
 - state adopt vs reject\n\
 - explain durable ownership\n\
