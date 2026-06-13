@@ -8,8 +8,8 @@ Total packages: 288
 
 | Package | Classification | Docs | API reference | GitHub repo | npm | llms.txt | Changelog/release notes | Migration guide | Examples | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `@signr/backend` | internal-workspace | null | null | null | null | null | null | null | null | Internal Signr workspace package from the uploaded manifests; no external package source was assigned. |
-| `@signr/shared` | internal-workspace | null | null | null | null | null | null | null | null | Internal Signr workspace package from the uploaded manifests; no external package source was assigned. |
+| `@private-workspace/backend` | internal-workspace | null | null | null | null | null | null | null | null | Internal private workspace package from the uploaded manifests; no external package source was assigned. |
+| `@private-workspace/shared` | internal-workspace | null | null | null | null | null | null | null | null | Internal private workspace package from the uploaded manifests; no external package source was assigned. |
 
 ## AI / model / content processing
 

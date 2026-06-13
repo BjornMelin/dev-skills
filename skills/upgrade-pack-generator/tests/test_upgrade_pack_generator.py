@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import subprocess
 import sys
 import tempfile
@@ -27,19 +28,30 @@ import research_upgrade_pack  # type: ignore  # noqa: E402
 import solve_constraints  # type: ignore  # noqa: E402
 
 
+class FrozenDateTime(dt.datetime):
+    """Frozen clock for tests that assert age-window labels."""
+
+    @classmethod
+    def now(cls, tz: dt.tzinfo | None = None) -> "FrozenDateTime":
+        frozen = cls(2026, 5, 1, tzinfo=dt.timezone.utc)
+        if tz is None:
+            return cls(2026, 5, 1)
+        return frozen.astimezone(tz)
+
+
 def write_text(path: Path, content: str) -> None:
     """Write a UTF-8 fixture file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(textwrap.dedent(content).strip() + "\n", encoding="utf-8")
 
 
-def make_signr_like_repo(root: Path) -> None:
+def make_private_workspace_repo(root: Path) -> None:
     """Create a minimal monorepo fixture covering Next, Expo, Convex, and Turborepo."""
     write_text(
         root / "package.json",
         """
         {
-          "name": "signr",
+          "name": "private-workspace",
           "private": true,
           "packageManager": "bun@1.3.12",
           "workspaces": ["apps/*", "packages/backend", "packages/shared"],
@@ -49,7 +61,7 @@ def make_signr_like_repo(root: Path) -> None:
             "test": "turbo run test",
             "build": "turbo run build",
             "validate:local:agent": "bun run scripts/validate-local-agent.mjs",
-            "convex:verify:release": "bun run --filter @signr/backend convex:verify:release"
+            "convex:verify:release": "bun run --filter @private-workspace/backend convex:verify:release"
           },
           "devDependencies": {
             "turbo": "2.9.6",
@@ -80,7 +92,7 @@ def make_signr_like_repo(root: Path) -> None:
         root / "apps/web/package.json",
         """
         {
-          "name": "@signr/web",
+          "name": "@private-workspace/web",
           "private": true,
           "scripts": {
             "typegen": "next typegen",
@@ -114,7 +126,7 @@ def make_signr_like_repo(root: Path) -> None:
         root / "apps/mobile/package.json",
         """
         {
-          "name": "@signr/mobile",
+          "name": "@private-workspace/mobile",
           "private": true,
           "main": "expo-router/entry",
           "scripts": {
@@ -160,7 +172,7 @@ def make_signr_like_repo(root: Path) -> None:
         root / "packages/backend/package.json",
         """
         {
-          "name": "@signr/backend",
+          "name": "@private-workspace/backend",
           "private": true,
           "scripts": {
             "lint": "eslint . --max-warnings=0",
@@ -181,7 +193,7 @@ def make_signr_like_repo(root: Path) -> None:
     write_text(root / "packages/backend/convex/schema.ts", "export const tables = defineTable({});")
     write_text(root / "packages/backend/convex/_generated/api.d.ts", "export {};")
 
-    write_text(root / "packages/shared/package.json", '{"name":"@signr/shared","private":true}')
+    write_text(root / "packages/shared/package.json", '{"name":"@private-workspace/shared","private":true}')
     write_text(root / "apps/web/turbo.json", '{"extends":["//"],"tasks":{"lint":{}}}')
     write_text(root / "apps/mobile/turbo.json", '{"extends":["//"],"tasks":{"lint":{}}}')
     write_text(root / "packages/backend/turbo.json", '{"extends":["//"],"tasks":{"typecheck":{}}}')
@@ -272,7 +284,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         """Framework detection should ignore `.agents` and `.codex` package manifests."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
             context = common.detect_repo_context(root)
             self.assertIn("nextjs", context["frameworks_detected"])
             self.assertIn("expo", context["frameworks_detected"])
@@ -285,20 +297,20 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         """Next.js monorepo packs should anchor on the owning workspace."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
             manifest = self.build_manifest(root, "next")
             enriched = enrich_manifest.enrich_next_manifest(manifest, root)
             self.assertEqual(enriched["current_version"], "16.2.4")
             self.assertEqual(enriched["target_surface"]["workspace_path"], "apps/web")
             self.assertEqual(enriched["plan_basename"], "nextjs-apps-web-v16-upgrade-and-optimization")
-            self.assertIn("bun run --filter @signr/web typecheck", enriched["verification_commands"])
+            self.assertIn("bun run --filter @private-workspace/web typecheck", enriched["verification_commands"])
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
     def test_expo_convex_and_turborepo_owner_selection(self, _mock_fetch) -> None:
         """Expo, Convex, and Turborepo should resolve the expected owner surfaces."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
 
             expo_manifest = enrich_manifest.enrich_expo_manifest(self.build_manifest(root, "expo"), root)
             self.assertEqual(expo_manifest["target_surface"]["workspace_path"], "apps/mobile")
@@ -340,7 +352,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         """Family enrichment should populate qualification plans and local overlay notes."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
 
             next_manifest = enrich_manifest.enrich_next_manifest(self.build_manifest(root, "next"), root)
             next_plan = next_manifest["qualification_plan"]
@@ -407,7 +419,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         """Research stage should produce a complete snapshot for built-in family packs."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
             manifest = enrich_manifest.enrich_next_manifest(self.build_manifest(root, "next"), root)
             opensrc_root = root / "opensrc-cache" / "next"
             write_text(opensrc_root / "CHANGELOG.md", "# Changelog")
@@ -586,7 +598,9 @@ class UpgradePackGeneratorTests(unittest.TestCase):
                 ]
             }
 
-            with patch.object(research_upgrade_pack, "run_shell", side_effect=fake_run_shell):
+            with patch.object(
+                research_upgrade_pack, "run_shell", side_effect=fake_run_shell
+            ), patch.object(research_upgrade_pack.dt, "datetime", FrozenDateTime):
                 snapshot, bundle = research_upgrade_pack.generate_snapshot(manifest, root, web_findings)
 
             self.assertEqual(snapshot["research_status"], "complete")
@@ -924,7 +938,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
             out = Path(tmp) / "rendered"
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
             manifest = self.build_manifest(root, "expo")
             enriched = enrich_manifest.enrich_expo_manifest(manifest, root)
             manifest_path = Path(tmp) / "upgrade-pack.yaml"
@@ -1128,7 +1142,7 @@ class UpgradePackGeneratorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / "repo"
             out = Path(tmp) / "rendered"
-            make_signr_like_repo(root)
+            make_private_workspace_repo(root)
             manifest = self.build_manifest(root, "convex")
             enriched = enrich_manifest.enrich_convex_manifest(manifest, root)
             manifest_path = Path(tmp) / "upgrade-pack.yaml"
