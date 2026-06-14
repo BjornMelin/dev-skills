@@ -167,9 +167,9 @@ Observed in upstream `v0.7.2` source:
 - workspace/link/file/git protocol specs are explicitly filtered so they do not
   get treated as registry versions
 
-Observed in this session:
-- `opensrc path react --cwd /home/bjorn/repos/signr` resolved `19.2.0`
-- `opensrc path zod --cwd /home/bjorn/repos/signr` resolved `4.3.6`
+Observed in a Bun workspace fixture:
+- `opensrc path react --cwd /tmp/example-bun-workspace` resolved a workspace-installed React package.
+- `opensrc path zod --cwd /tmp/example-bun-workspace` resolved a workspace-installed Zod package.
 
 Interpretation:
 - opensrc can still work correctly in Bun workspaces when `node_modules` is
