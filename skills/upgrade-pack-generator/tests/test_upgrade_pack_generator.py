@@ -33,6 +33,14 @@ class FrozenDateTime(dt.datetime):
 
     @classmethod
     def now(cls, tz: dt.tzinfo | None = None) -> "FrozenDateTime":
+        """Return a deterministic timestamp for test assertions.
+
+        Args:
+            tz: Optional timezone for the returned timestamp.
+
+        Returns:
+            FrozenDateTime: Fixed timestamp, timezone-aware when `tz` is set.
+        """
         frozen = cls(2026, 5, 1, tzinfo=dt.timezone.utc)
         if tz is None:
             return cls(2026, 5, 1)
@@ -46,7 +54,14 @@ def write_text(path: Path, content: str) -> None:
 
 
 def make_private_workspace_repo(root: Path) -> None:
-    """Create a minimal monorepo fixture covering Next, Expo, Convex, and Turborepo."""
+    """Create a minimal monorepo fixture for framework coverage tests.
+
+    Args:
+        root: Repository root where fixture files are created.
+
+    Returns:
+        None.
+    """
     write_text(
         root / "package.json",
         """
@@ -193,7 +208,10 @@ def make_private_workspace_repo(root: Path) -> None:
     write_text(root / "packages/backend/convex/schema.ts", "export const tables = defineTable({});")
     write_text(root / "packages/backend/convex/_generated/api.d.ts", "export {};")
 
-    write_text(root / "packages/shared/package.json", '{"name":"@private-workspace/shared","private":true}')
+    write_text(
+        root / "packages/shared/package.json",
+        '{"name":"@private-workspace/shared","private":true}',
+    )
     write_text(root / "apps/web/turbo.json", '{"extends":["//"],"tasks":{"lint":{}}}')
     write_text(root / "apps/mobile/turbo.json", '{"extends":["//"],"tasks":{"lint":{}}}')
     write_text(root / "packages/backend/turbo.json", '{"extends":["//"],"tasks":{"typecheck":{}}}')
@@ -303,7 +321,10 @@ class UpgradePackGeneratorTests(unittest.TestCase):
             self.assertEqual(enriched["current_version"], "16.2.4")
             self.assertEqual(enriched["target_surface"]["workspace_path"], "apps/web")
             self.assertEqual(enriched["plan_basename"], "nextjs-apps-web-v16-upgrade-and-optimization")
-            self.assertIn("bun run --filter @private-workspace/web typecheck", enriched["verification_commands"])
+            self.assertIn(
+                "bun run --filter @private-workspace/web typecheck",
+                enriched["verification_commands"],
+            )
 
     @patch.object(enrich_manifest, "fetch_doc_metadata", return_value=("Doc", "April 1, 2026"))
     def test_expo_convex_and_turborepo_owner_selection(self, _mock_fetch) -> None:
@@ -600,7 +621,9 @@ class UpgradePackGeneratorTests(unittest.TestCase):
 
             with patch.object(
                 research_upgrade_pack, "run_shell", side_effect=fake_run_shell
-            ), patch.object(research_upgrade_pack.dt, "datetime", FrozenDateTime):
+            ), patch.object(
+                research_upgrade_pack.dt, "datetime", FrozenDateTime
+            ):
                 snapshot, bundle = research_upgrade_pack.generate_snapshot(manifest, root, web_findings)
 
             self.assertEqual(snapshot["research_status"], "complete")
