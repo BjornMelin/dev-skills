@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::Component;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use anyhow::{Context, Result, bail};
@@ -3231,6 +3232,12 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     if source_commit.is_empty() {
         bail!("source_commit must not be empty");
     }
+    if matches!(
+        source_commit_exists(&inventory.repo_root, &source_commit),
+        Some(false)
+    ) {
+        bail!("source_commit does not resolve to a commit in this repository: {source_commit}");
+    }
     let skills = inventory
         .skills
         .iter()
@@ -3253,6 +3260,26 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
         },
         skills,
     })
+}
+
+fn source_commit_exists(repo_root: &Path, source_commit: &str) -> Option<bool> {
+    if !repo_root.join(".git").exists() {
+        return None;
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .args([
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            &format!("{source_commit}^{{commit}}"),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    Some(output.status.success())
 }
 
 fn agent_skills_catalog_skill(
@@ -3798,12 +3825,33 @@ fn skill_package_status(
                 rejected: true,
             }
         }
-        Ok(_) => SkillPackageStatus {
-            path: package_path,
-            present: true,
-            rejected: false,
-        },
+        Ok(_) => {
+            if matches!(git_tracks_path(repo_root, &package_path), Some(false)) {
+                return SkillPackageStatus {
+                    path: package_path,
+                    present: false,
+                    rejected: false,
+                };
+            }
+            SkillPackageStatus {
+                path: package_path,
+                present: true,
+                rejected: false,
+            }
+        }
     }
+}
+
+fn git_tracks_path(repo_root: &Path, repo_relative_path: &str) -> Option<bool> {
+    if !repo_root.join(".git").exists() {
+        return None;
+    }
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "--error-unmatch", "--", repo_relative_path])
+        .current_dir(repo_root)
+        .output()
+        .ok()?;
+    Some(output.status.success())
 }
 
 fn count_regular_files_bounded(
@@ -7384,6 +7432,140 @@ mod tests {
 
         assert_eq!(files, 1);
         assert!(!capped);
+    }
+
+    #[test]
+    fn agent_skills_catalog_emits_active_inventory_for_valid_source_commit() {
+        let temp = tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        fs::create_dir_all(repo.join("skills/alpha-skill")).expect("alpha skill dir");
+        fs::create_dir_all(repo.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation runbook");
+        fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
+        fs::write(
+            repo.join("skills/alpha-skill/SKILL.md"),
+            r#"---
+name: alpha-skill
+description: Alpha skill.
+---
+
+# Alpha
+"#,
+        )
+        .expect("alpha skill");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("init")
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.email", "codex-dev@example.com"])
+            .status()
+            .expect("git config email");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.name", "Codex Dev"])
+            .status()
+            .expect("git config name");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["add", "."])
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["commit", "-m", "seed"])
+            .status()
+            .expect("git commit");
+        let source_commit = String::from_utf8(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .expect("git rev-parse")
+                .stdout,
+        )
+        .expect("utf8 commit")
+        .trim()
+        .to_string();
+
+        fs::create_dir_all(repo.join("skills/beta-skill")).expect("beta skill dir");
+        fs::write(
+            repo.join("skills/beta-skill/SKILL.md"),
+            r#"---
+name: beta-skill
+description: Beta skill.
+---
+
+# Beta
+"#,
+        )
+        .expect("beta skill");
+
+        let catalog = agent_skills_catalog(AgentSkillsCatalogArgs {
+            repo_root: Some(repo.clone()),
+            generated_at: None,
+            source_repository: "https://github.com/example/dev-skills".to_string(),
+            source_commit,
+        })
+        .expect("catalog");
+
+        assert_eq!(catalog.total_skill_directories, 2);
+        assert_eq!(catalog.skills_count, 2);
+        assert_eq!(catalog.skills[0].slug, "alpha-skill");
+        assert_eq!(catalog.skills[1].slug, "beta-skill");
+    }
+
+    #[test]
+    fn agent_skills_catalog_rejects_invalid_source_commit() {
+        let temp = tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        fs::create_dir_all(repo.join("skills/alpha-skill")).expect("alpha skill dir");
+        fs::create_dir_all(repo.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation runbook");
+        fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
+        fs::write(
+            repo.join("skills/alpha-skill/SKILL.md"),
+            r#"---
+name: alpha-skill
+description: Alpha skill.
+---
+
+# Alpha
+"#,
+        )
+        .expect("alpha skill");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("init")
+            .status()
+            .expect("git init");
+
+        let error = agent_skills_catalog(AgentSkillsCatalogArgs {
+            repo_root: Some(repo),
+            generated_at: None,
+            source_repository: "https://github.com/example/dev-skills".to_string(),
+            source_commit: "missing-source-commit".to_string(),
+        })
+        .expect_err("invalid source commit rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("source_commit does not resolve to a commit")
+        );
     }
 
     fn pr_record_args(

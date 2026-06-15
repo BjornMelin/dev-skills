@@ -680,6 +680,44 @@ fn skills_inventory_emits_stable_json_report() {
 }
 
 #[test]
+fn skills_inventory_ignores_untracked_dist_bundles_in_git_repos() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let status = std::process::Command::new("git")
+        .arg("init")
+        .current_dir(&repo)
+        .status()
+        .expect("git init");
+    assert!(status.success());
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "inventory",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T08:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills inventory json");
+    let alpha = json["result"]["skills"]
+        .as_array()
+        .expect("skills")
+        .iter()
+        .find(|skill| skill["directory"] == "alpha-skill")
+        .expect("alpha skill entry");
+    assert_eq!(alpha["package"]["present"], false);
+    assert_eq!(alpha["package"]["rejected"], false);
+}
+
+#[test]
 fn skills_validate_accepts_installed_skills_root() {
     let temp = tempdir().expect("tempdir");
     let repo = write_skill_inventory_repo(temp.path());
