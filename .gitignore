@@ -27,6 +27,8 @@ Icon?
 .local/
 .codex/agents/
 .codex/agent-backups/
+.codex/config.toml
+.codex/goals/
 .codex/kimi/
 .codex/tasks/
 .codex/research/
