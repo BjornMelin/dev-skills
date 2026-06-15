@@ -374,6 +374,15 @@ Validate one skill:
 python3 tools/skill/quick_validate.py skills/<skill-name>
 ```
 
+Validate the `kimi-ui-agent` skill-local Bun CLI:
+
+```bash
+bun install --cwd skills/kimi-ui-agent --frozen-lockfile
+bun run --cwd skills/kimi-ui-agent typecheck
+bun test --cwd skills/kimi-ui-agent
+bun skills/kimi-ui-agent/scripts/kimi-ui-agent.ts doctor --json
+```
+
 Validate all skills:
 
 ```bash

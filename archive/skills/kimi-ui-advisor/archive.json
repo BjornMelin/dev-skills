@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "kimi-ui-advisor",
+  "status": "archived",
+  "archived_at": "2026-06-15T00:00:00Z",
+  "replacement": "kimi-ui-agent",
+  "source_path": "skills/kimi-ui-advisor",
+  "archived_path": "archive/skills/kimi-ui-advisor",
+  "reason": "Superseded by kimi-ui-agent, which owns Kimi-powered UI advisory, setup/profile, adapter generation, and plan-first worktree orchestration as one canonical workflow.",
+  "restore": "Move this directory back to skills/kimi-ui-advisor only if kimi-ui-agent no longer owns read-only Kimi UI advice or a separate advisor is intentionally restored."
+}
