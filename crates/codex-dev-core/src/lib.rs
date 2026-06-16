@@ -3228,20 +3228,20 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     if source_repository.is_empty() {
         bail!("source_repository must not be empty");
     }
-    let source_commit = args.source_commit.trim().to_string();
-    if source_commit.is_empty() {
+    let requested_source_commit = args.source_commit.trim().to_string();
+    if requested_source_commit.is_empty() {
         bail!("source_commit must not be empty");
     }
-    if matches!(
-        source_commit_exists(&inventory.repo_root, &source_commit),
-        Some(false)
-    ) {
-        bail!("source_commit does not resolve to a commit in this repository: {source_commit}");
-    }
-    let skills = inventory
+    let source_commit = canonical_source_commit(&inventory.repo_root, &requested_source_commit)?
+        .unwrap_or(requested_source_commit);
+    let valid_skills = inventory
         .skills
         .iter()
         .filter(|skill| skill.validation.valid)
+        .collect::<Vec<_>>();
+    verify_agent_skills_catalog_paths(&inventory.repo_root, &source_commit, &valid_skills)?;
+    let skills = valid_skills
+        .iter()
         .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_commit))
         .collect::<Vec<_>>();
 
@@ -3262,9 +3262,9 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     })
 }
 
-fn source_commit_exists(repo_root: &Path, source_commit: &str) -> Option<bool> {
+fn canonical_source_commit(repo_root: &Path, source_commit: &str) -> Result<Option<String>> {
     if !repo_root.join(".git").exists() {
-        return None;
+        return Ok(None);
     }
     let output = Command::new("git")
         .arg("-C")
@@ -3275,11 +3275,56 @@ fn source_commit_exists(repo_root: &Path, source_commit: &str) -> Option<bool> {
             "--quiet",
             &format!("{source_commit}^{{commit}}"),
         ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .with_context(|| {
+            format!("failed to run git rev-parse while validating source_commit {source_commit}")
+        })?;
+    if !output.status.success() {
+        bail!("source_commit does not resolve to a commit in this repository: {source_commit}");
+    }
+    let canonical = String::from_utf8(output.stdout)
+        .context("git rev-parse emitted non-UTF-8 output")?
+        .trim()
+        .to_string();
+    if canonical.is_empty() {
+        bail!("git rev-parse emitted an empty source commit for {source_commit}");
+    }
+    Ok(Some(canonical))
+}
+
+fn verify_agent_skills_catalog_paths(
+    repo_root: &Path,
+    source_commit: &str,
+    skills: &[&SkillInventoryEntry],
+) -> Result<()> {
+    if !repo_root.join(".git").exists() {
+        return Ok(());
+    }
+    for skill in skills {
+        for path in [&skill.path, &skill.skill_md] {
+            if !git_tree_path_exists(repo_root, source_commit, path)? {
+                bail!("source_commit {source_commit} does not contain catalog path: {path}");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn git_tree_path_exists(repo_root: &Path, source_commit: &str, path: &str) -> Result<bool> {
+    let object = format!("{source_commit}:{path}");
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo_root)
+        .args(["cat-file", "-e", &object])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .output()
-        .ok()?;
-    Some(output.status.success())
+        .with_context(|| {
+            format!("failed to run git cat-file while validating catalog path {path}")
+        })?;
+    Ok(output.status.success())
 }
 
 fn agent_skills_catalog_skill(
@@ -3826,12 +3871,31 @@ fn skill_package_status(
             }
         }
         Ok(_) => {
-            if matches!(git_tracks_path(repo_root, &package_path), Some(false)) {
-                return SkillPackageStatus {
-                    path: package_path,
-                    present: false,
-                    rejected: false,
-                };
+            match git_tracks_path(repo_root, &package_path) {
+                Ok(Some(false)) => {
+                    return SkillPackageStatus {
+                        path: package_path,
+                        present: false,
+                        rejected: false,
+                    };
+                }
+                Ok(Some(true) | None) => {}
+                Err(error) => {
+                    diagnostics.push(SkillInventoryDiagnostic {
+                        severity: SkillInventoryDiagnosticSeverity::Warning,
+                        code: "package_git_query_error".to_string(),
+                        skill: Some(directory.to_string()),
+                        message: format!(
+                            "failed to inspect git tracking status for {}: {error:#}",
+                            package_path
+                        ),
+                    });
+                    return SkillPackageStatus {
+                        path: package_path,
+                        present: false,
+                        rejected: true,
+                    };
+                }
             }
             SkillPackageStatus {
                 path: package_path,
@@ -3842,16 +3906,16 @@ fn skill_package_status(
     }
 }
 
-fn git_tracks_path(repo_root: &Path, repo_relative_path: &str) -> Option<bool> {
+fn git_tracks_path(repo_root: &Path, repo_relative_path: &str) -> Result<Option<bool>> {
     if !repo_root.join(".git").exists() {
-        return None;
+        return Ok(None);
     }
     let output = std::process::Command::new("git")
         .args(["ls-files", "--error-unmatch", "--", repo_relative_path])
         .current_dir(repo_root)
         .output()
-        .ok()?;
-    Some(output.status.success())
+        .with_context(|| format!("failed to run git ls-files for {repo_relative_path}"))?;
+    Ok(Some(output.status.success()))
 }
 
 fn count_regular_files_bounded(
@@ -7435,7 +7499,91 @@ mod tests {
     }
 
     #[test]
-    fn agent_skills_catalog_emits_active_inventory_for_valid_source_commit() {
+    fn agent_skills_catalog_canonicalizes_source_commit() {
+        let temp = tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        fs::create_dir_all(repo.join("skills/alpha-skill")).expect("alpha skill dir");
+        fs::create_dir_all(repo.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation runbook");
+        fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
+        fs::write(
+            repo.join("skills/alpha-skill/SKILL.md"),
+            r#"---
+name: alpha-skill
+description: Alpha skill.
+---
+
+# Alpha
+"#,
+        )
+        .expect("alpha skill");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("init")
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.email", "codex-dev@example.com"])
+            .status()
+            .expect("git config email");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.name", "Codex Dev"])
+            .status()
+            .expect("git config name");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["add", "."])
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["commit", "-m", "seed"])
+            .status()
+            .expect("git commit");
+        let expected_source_commit = String::from_utf8(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .expect("git rev-parse")
+                .stdout,
+        )
+        .expect("utf8 commit")
+        .trim()
+        .to_string();
+
+        let catalog = agent_skills_catalog(AgentSkillsCatalogArgs {
+            repo_root: Some(repo.clone()),
+            generated_at: None,
+            source_repository: "https://github.com/example/dev-skills".to_string(),
+            source_commit: "HEAD".to_string(),
+        })
+        .expect("catalog");
+
+        assert_eq!(catalog.source_commit, expected_source_commit);
+        assert_eq!(catalog.total_skill_directories, 1);
+        assert_eq!(catalog.skills_count, 1);
+        assert_eq!(catalog.skills[0].slug, "alpha-skill");
+        assert!(
+            catalog.skills[0]
+                .source_urls
+                .skill_md
+                .contains(&catalog.source_commit)
+        );
+    }
+
+    #[test]
+    fn agent_skills_catalog_rejects_paths_missing_from_source_commit() {
         let temp = tempdir().expect("tempdir");
         let repo = temp.path().join("repo");
         fs::create_dir_all(repo.join("skills/alpha-skill")).expect("alpha skill dir");
@@ -7511,18 +7659,18 @@ description: Beta skill.
         )
         .expect("beta skill");
 
-        let catalog = agent_skills_catalog(AgentSkillsCatalogArgs {
+        let error = agent_skills_catalog(AgentSkillsCatalogArgs {
             repo_root: Some(repo.clone()),
             generated_at: None,
             source_repository: "https://github.com/example/dev-skills".to_string(),
             source_commit,
         })
-        .expect("catalog");
+        .expect_err("stale source commit should be rejected");
 
-        assert_eq!(catalog.total_skill_directories, 2);
-        assert_eq!(catalog.skills_count, 2);
-        assert_eq!(catalog.skills[0].slug, "alpha-skill");
-        assert_eq!(catalog.skills[1].slug, "beta-skill");
+        assert!(
+            format!("{error:#}").contains("does not contain catalog path: skills/beta-skill"),
+            "unexpected error: {error:#}"
+        );
     }
 
     #[test]
