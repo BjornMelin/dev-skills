@@ -194,6 +194,13 @@ async function launch(args: ParsedArgs): Promise<CliResult> {
   return ok("launch", { runId: run.runId, command, note: "Review command before running. Autonomous/yolo modes are intentionally omitted." }, "launch command rendered");
 }
 
+/**
+ * Parses arguments, dispatches a CLI command, and prints the result.
+ *
+ * @param argv - Raw CLI arguments after the executable name.
+ * @param cwd - Working directory used for project discovery.
+ * @returns Process exit code for the command.
+ */
 export async function runCli(argv: string[], cwd = process.cwd()): Promise<number> {
   let args: ParsedArgs = { command: "parse", flags: new Map(), rest: [], json: argv.includes("--json") || argv.includes("--json=true") || argv.includes("--json=1") };
   let result: CliResult;

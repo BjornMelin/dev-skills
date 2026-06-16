@@ -78,6 +78,12 @@ function scanForDirs(projectRoot: string, names: string[], maxDepth = 4): string
   return Array.from(new Set(found)).sort();
 }
 
+/**
+ * Scans a project for frontend stack, ownership, and validation signals.
+ *
+ * @param projectRoot - Project root to inspect.
+ * @returns Project scan used to generate durable setup context.
+ */
 export function scanProject(projectRoot: string): ProjectScan {
   const pkg = readJsonIfExists(join(projectRoot, "package.json"));
   const frameworks = new Set<string>();
@@ -128,6 +134,12 @@ export function scanProject(projectRoot: string): ProjectScan {
   };
 }
 
+/**
+ * Detects the active JavaScript package manager from lockfiles or package metadata.
+ *
+ * @param projectRoot - Project root to inspect.
+ * @returns Package manager name, or null when detection is inconclusive.
+ */
 export function detectPackageManager(projectRoot: string): string | null {
   if (existsSync(join(projectRoot, "bun.lock")) || existsSync(join(projectRoot, "bun.lockb"))) return "bun";
   if (existsSync(join(projectRoot, "pnpm-lock.yaml"))) return "pnpm";
@@ -166,6 +178,13 @@ function portableScan(scan: ProjectScan): Omit<ProjectScan, "projectRoot"> {
   return portable;
 }
 
+/**
+ * Builds generated project profile writes for setup and refresh commands.
+ *
+ * @param projectRoot - Project root receiving generated context files.
+ * @param existing - Existing project config to preserve, if any.
+ * @returns Managed writes for config, profile, maps, validation notes, and freshness lock.
+ */
 export function profileWrites(projectRoot: string, existing?: ProjectConfig | null): ManagedWrite[] {
   const scan = scanProject(projectRoot);
   const config = existing || defaultConfig(projectRoot);

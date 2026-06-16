@@ -11,6 +11,11 @@ type JsonRpc = {
   error?: { code: number; message: string; data?: unknown };
 };
 
+/**
+ * Supported MCP stdio frame encodings.
+ *
+ * @see https://modelcontextprotocol.io/specification
+ */
 export type McpFrameFormat = "line" | "content-length";
 
 type ParsedFrame = {
@@ -194,6 +199,14 @@ function contentLength(header: string): number {
   return length;
 }
 
+/**
+ * Parses complete JSON-RPC frames from an MCP stdio buffer.
+ *
+ * @param buffer - Raw bytes received from stdin.
+ * @returns Parsed frames plus the unconsumed partial buffer.
+ * @throws When a frame is malformed or exceeds the maximum supported size.
+ * @see https://modelcontextprotocol.io/specification
+ */
 export function readMcpFrames(buffer: Buffer): { frames: ParsedFrame[]; remaining: Buffer } {
   const frames: ParsedFrame[] = [];
   let remaining = buffer;
@@ -229,6 +242,14 @@ export function readMcpFrames(buffer: Buffer): { frames: ParsedFrame[]; remainin
   return { frames, remaining };
 }
 
+/**
+ * Encodes a JSON-RPC message for the selected MCP stdio framing mode.
+ *
+ * @param message - JSON-RPC response or notification to encode.
+ * @param format - Frame format to use for the encoded message.
+ * @returns Encoded message ready for stdout.
+ * @see https://modelcontextprotocol.io/specification
+ */
 export function encodeMcpMessage(message: JsonRpc, format: McpFrameFormat): string {
   const body = JSON.stringify(message);
   if (format === "content-length") {
@@ -247,6 +268,13 @@ function rpcError(id: JsonRpc["id"], code: number, message: string): JsonRpc {
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message } };
 }
 
+/**
+ * Handles one Kimi UI Agent MCP JSON-RPC request.
+ *
+ * @param request - Parsed JSON-RPC request or notification.
+ * @returns JSON-RPC response, or undefined for notifications.
+ * @see https://modelcontextprotocol.io/specification
+ */
 export async function handleJsonRpc(request: JsonRpc): Promise<JsonRpc | undefined> {
   if (request.id === undefined) return undefined;
 
@@ -274,6 +302,11 @@ export async function handleJsonRpc(request: JsonRpc): Promise<JsonRpc | undefin
   }
 }
 
+/**
+ * Runs the Kimi UI Agent MCP server over process stdio.
+ *
+ * @see https://modelcontextprotocol.io/specification
+ */
 export async function runMcpServer(): Promise<void> {
   let buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0);
   let responseFormat: McpFrameFormat = "line";

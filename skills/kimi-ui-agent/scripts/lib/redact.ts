@@ -6,6 +6,13 @@ const BUILTIN_PATTERNS: { pattern: RegExp; replacement: string }[] = [
   { pattern: /\b(api[_-]?key["']?\s*[:=]\s*["']?)[A-Za-z0-9._~+/=-]{12,}/gi, replacement: "$1[REDACTED]" },
 ];
 
+/**
+ * Redacts built-in secret shapes and project-configured literal strings.
+ *
+ * @param input - Text to redact before persistence or prompt generation.
+ * @param extraPatterns - Additional literal strings to replace; regex syntax is not executed.
+ * @returns Redacted text with matched values replaced by `[REDACTED]`.
+ */
 export function redact(input: string, extraPatterns: string[] = []): string {
   let output = input;
   for (const { pattern, replacement } of BUILTIN_PATTERNS) {

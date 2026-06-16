@@ -227,6 +227,7 @@ export function writeRun(run: RunRecord): void {
  *
  * @param runId - Run identifier.
  * @returns The canonical run record.
+ * @throws When the run does not exist or has an unsupported schema.
  */
 export function loadRun(runId: string): RunRecord {
   const safe = safeSegment(runId, "run id");
@@ -286,6 +287,7 @@ export function updateRunState(run: RunRecord, state: RunRecord["state"]): RunRe
  * @param command - Lifecycle command to apply.
  * @param options - Apply mode plus command-specific message or reason.
  * @returns Updated run record.
+ * @throws When apply mode is missing or required command fields are absent.
  */
 export function applyRunCommand(
   runId: string,

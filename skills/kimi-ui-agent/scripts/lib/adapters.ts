@@ -1,5 +1,7 @@
 import { join } from "node:path";
 import type { ManagedWrite } from "./types";
+
+/** Adapter rendering options for project-local harness integrations. */
 export type AdapterOptions = {
   cliCommand: string;
 };
@@ -9,6 +11,12 @@ type CommandParts = {
   args: string[];
 };
 
+/**
+ * Renders all project-local adapter files for supported harnesses.
+ *
+ * @param options - Adapter rendering options, including the CLI command to invoke.
+ * @returns Managed writes for Codex, Kimi Code, Claude Code, and MCP snippets.
+ */
 export function adapterWrites(options: AdapterOptions): ManagedWrite[] {
   const command = options.cliCommand;
   return [
@@ -107,6 +115,13 @@ function claudePluginTemplate(command: string): Record<string, unknown> {
   };
 }
 
+/**
+ * Splits a shell-style command into executable and argument parts.
+ *
+ * @param command - Shell-style command string with quote and escape support.
+ * @returns Executable command and argument array.
+ * @throws When the command is empty or contains an unterminated quoted segment.
+ */
 export function commandParts(command: string): CommandParts {
   const parts: string[] = [];
   let current = "";
