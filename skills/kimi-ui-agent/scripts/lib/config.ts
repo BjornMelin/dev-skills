@@ -30,15 +30,7 @@ export function defaultConfig(projectRoot: string): ProjectConfig {
       "**/pnpm-lock.yaml",
       "**/yarn.lock",
     ],
-    allowedRoots: ["."],
     branchPrefix: "kimi-ui",
-    artifactDir: ".agents/kimi-ui-agent/runs",
-    stateScope: "xdg",
-    adapters: {
-      codex: true,
-      kimiCode: true,
-      claudeCode: true,
-    },
     redaction: {
       extraPatterns: [],
     },
@@ -79,7 +71,7 @@ export function baseProfileWrites(projectRoot: string, config: ProjectConfig): M
     {
       path: configRel,
       action: "create",
-      reason: "canonical project policy and adapter defaults",
+      reason: "canonical project policy",
       content: `${JSON.stringify(config, null, 2)}\n`,
     },
     {

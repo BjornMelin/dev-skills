@@ -61,6 +61,20 @@ describe("project setup", () => {
     }
   });
 
+  test("does not invent Bun validation commands when package manager is unknown", () => {
+    const root = tempProject();
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({
+        scripts: { lint: "eslint .", test: "vitest" },
+      }),
+    );
+
+    const scan = scanProject(root);
+    expect(scan.packageManager).toBe(null);
+    expect(scan.validationCommands).toEqual([]);
+  });
+
   test("scan skips symlinked frontend directories", () => {
     const root = tempProject();
     const outside = tempProject();

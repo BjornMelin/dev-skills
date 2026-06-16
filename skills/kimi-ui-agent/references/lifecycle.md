@@ -5,7 +5,8 @@ Use this reference when starting, continuing, finalizing, or debugging runs.
 ## Commands
 
 ```bash
-KIMI_UI_AGENT_CLI="skills/kimi-ui-agent/scripts/kimi-ui-agent.ts"
+KIMI_UI_AGENT_SKILL_DIR="${KIMI_UI_AGENT_SKILL_DIR:-${CODEX_HOME:-$HOME/.codex}/skills/kimi-ui-agent}"
+KIMI_UI_AGENT_CLI="${KIMI_UI_AGENT_CLI:-$KIMI_UI_AGENT_SKILL_DIR/scripts/kimi-ui-agent.ts}"
 bun "$KIMI_UI_AGENT_CLI" --json start --task "Improve dashboard loading states" --dry-run
 bun "$KIMI_UI_AGENT_CLI" --json start --task "Improve dashboard loading states" --apply
 bun "$KIMI_UI_AGENT_CLI" --json status --run-id <run-id>

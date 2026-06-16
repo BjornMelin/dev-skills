@@ -1,9 +1,6 @@
 import { join } from "node:path";
 import type { ManagedWrite } from "./types";
-import { shellQuote } from "./paths";
-
 export type AdapterOptions = {
-  projectRoot: string;
   cliCommand: string;
 };
 
@@ -108,10 +105,6 @@ function claudePluginTemplate(command: string): Record<string, unknown> {
       },
     },
   };
-}
-
-export function renderLaunchCommand(command: string, runId: string): string {
-  return `${command} launch --run-id ${shellQuote(runId)} --apply`;
 }
 
 export function commandParts(command: string): CommandParts {

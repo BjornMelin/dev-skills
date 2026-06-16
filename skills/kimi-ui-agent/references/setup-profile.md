@@ -11,8 +11,8 @@ harness-assisted refinement by the active agent.
 
 Committed files:
 
-- `config.json`: machine-readable policy for protected paths, branch prefix,
-  adapter defaults, artifact locations, and redaction extensions.
+- `config.json`: machine-readable policy for protected paths, branch prefix, and
+  redaction extensions.
 - `project-profile.md`: concise stack and product notes.
 - `frontend-map.md`: route, app, and component ownership map.
 - `design-system.md`: tokens, component conventions, density, accessibility,
@@ -38,7 +38,8 @@ The CLI owns JSON schemas and safe writes. The harness owns interpretation.
 Use:
 
 ```bash
-KIMI_UI_AGENT_CLI="skills/kimi-ui-agent/scripts/kimi-ui-agent.ts"
+KIMI_UI_AGENT_SKILL_DIR="${KIMI_UI_AGENT_SKILL_DIR:-${CODEX_HOME:-$HOME/.codex}/skills/kimi-ui-agent}"
+KIMI_UI_AGENT_CLI="${KIMI_UI_AGENT_CLI:-$KIMI_UI_AGENT_SKILL_DIR/scripts/kimi-ui-agent.ts}"
 bun "$KIMI_UI_AGENT_CLI" --json profile --refresh --dry-run
 bun "$KIMI_UI_AGENT_CLI" --json profile --refresh --apply
 ```

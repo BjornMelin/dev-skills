@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { adapterWrites, commandParts, renderLaunchCommand } from "../lib/adapters";
+import { adapterWrites, commandParts } from "../lib/adapters";
 
 const temps: string[] = [];
 const testDir = dirname(fileURLToPath(import.meta.url));
@@ -22,7 +22,7 @@ afterEach(() => {
 
 describe("adapters", () => {
   test("renders all project-local adapters without secrets", () => {
-    const writes = adapterWrites({ projectRoot: "/tmp/project", cliCommand: "kimi-ui-agent" });
+    const writes = adapterWrites({ cliCommand: "kimi-ui-agent" });
     const paths = writes.map((write) => write.path);
     expect(paths).toContain(".agents/skills/kimi-ui-agent/SKILL.md");
     expect(paths).toContain(".kimi-code/skills/kimi-ui-agent/SKILL.md");
@@ -33,7 +33,7 @@ describe("adapters", () => {
 
   test("splits shell-style CLI command into MCP executable and args", () => {
     const command = "bun 'skills/kimi ui/scripts/kimi-ui-agent.ts'";
-    const writes = adapterWrites({ projectRoot: "/tmp/project", cliCommand: command });
+    const writes = adapterWrites({ cliCommand: command });
     const kimiMcp = JSON.parse(writes.find((write) => write.path.endsWith("mcp.kimi-ui-agent.example.json"))?.content || "{}");
     const server = kimiMcp.mcpServers.kimi_ui_agent;
 
@@ -44,12 +44,6 @@ describe("adapters", () => {
     const codexSnippet = writes.find((write) => write.path.endsWith("config-snippet.toml"))?.content || "";
     expect(codexSnippet).toContain('command = "bun"');
     expect(codexSnippet).toContain('args = ["skills/kimi ui/scripts/kimi-ui-agent.ts","mcp"]');
-  });
-
-  test("renders launch command from shell command without treating it as one executable", () => {
-    expect(renderLaunchCommand("bun 'skills/kimi-ui-agent/scripts/kimi-ui-agent.ts'", "run-launch-abc123")).toBe(
-      "bun 'skills/kimi-ui-agent/scripts/kimi-ui-agent.ts' launch --run-id 'run-launch-abc123' --apply",
-    );
   });
 
   test("install defaults project adapters to the bundled Bun CLI", () => {

@@ -50,7 +50,7 @@ function parseArgv(argv: string[]): ParsedArgs {
     if (!command) command = arg;
     else rest.push(arg);
   }
-  return { command: command || "help", flags, rest, json: flags.has("json") };
+  return { command: command || "help", flags, rest, json: flagBoolValue(flags.get("json"), "json") };
 }
 
 function flag(args: ParsedArgs, name: string): string | undefined {
@@ -59,8 +59,23 @@ function flag(args: ParsedArgs, name: string): string | undefined {
   return value;
 }
 
+function flagBoolValue(value: string | boolean | undefined, name: string): boolean {
+  if (value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1"].includes(normalized)) return true;
+  if (["false", "0"].includes(normalized)) return false;
+  throw new Error(`--${name} must be a boolean`);
+}
+
 function bool(args: ParsedArgs, name: string): boolean {
-  return args.flags.get(name) === true;
+  return flagBoolValue(args.flags.get(name), name);
+}
+
+function applyMode(args: ParsedArgs): boolean {
+  const apply = bool(args, "apply");
+  if (apply && bool(args, "dry-run")) throw new Error("--apply cannot be combined with --dry-run");
+  return apply;
 }
 
 function requireFlag(args: ParsedArgs, name: string): string {
@@ -103,48 +118,49 @@ async function initProject(args: ParsedArgs, cwd: string): Promise<CliResult> {
   const writes = profileWrites(projectRoot, config).filter((write) =>
     [".agents/kimi-ui-agent/config.json", ".agents/kimi-ui-agent/runs/.gitignore"].includes(write.path),
   );
-  if (bool(args, "apply")) ensureProfileDirs(projectRoot);
-  writeManaged(projectRoot, writes, bool(args, "apply"));
-  return ok("init", { projectRoot, apply: bool(args, "apply"), writes: writesSummary(writes) }, bool(args, "apply") ? "init applied" : "init dry-run");
+  const apply = applyMode(args);
+  if (apply) ensureProfileDirs(projectRoot);
+  writeManaged(projectRoot, writes, apply);
+  return ok("init", { projectRoot, apply, writes: writesSummary(writes) }, apply ? "init applied" : "init dry-run");
 }
 
 async function setupProject(args: ParsedArgs, cwd: string): Promise<CliResult> {
   const projectRoot = projectRootFrom(cwd, flag(args, "project-dir") || flag(args, "project-root"));
   const existing = loadConfig(projectRoot);
   const writes = profileWrites(projectRoot, existing);
-  if (bool(args, "apply")) ensureProfileDirs(projectRoot);
-  writeManaged(projectRoot, writes, bool(args, "apply"));
-  return ok("setup", { projectRoot, apply: bool(args, "apply"), writes: writesSummary(writes) }, bool(args, "apply") ? "setup applied" : "setup dry-run");
+  const apply = applyMode(args);
+  if (apply) ensureProfileDirs(projectRoot);
+  writeManaged(projectRoot, writes, apply);
+  return ok("setup", { projectRoot, apply, writes: writesSummary(writes) }, apply ? "setup applied" : "setup dry-run");
 }
 
 async function installProject(args: ParsedArgs, cwd: string): Promise<CliResult> {
   const projectRoot = projectRootFrom(cwd, flag(args, "project-dir") || flag(args, "project-root"));
   const target = flag(args, "target") || "project";
-  if (!["project", "user", "all"].includes(target)) throw new Error("--target must be project, user, or all");
-  if (target !== "project") {
-    throw new Error("user/global adapter writes are intentionally not implemented; use project target");
-  }
+  if (target !== "project") throw new Error("--target currently supports only project");
   const cliCommand = flag(args, "command") || defaultCliCommand();
-  const writes = adapterWrites({ projectRoot, cliCommand });
-  writeManaged(projectRoot, writes, bool(args, "apply"));
-  return ok("install", { projectRoot, target, apply: bool(args, "apply"), writes: writesSummary(writes) }, bool(args, "apply") ? "install applied" : "install dry-run");
+  const writes = adapterWrites({ cliCommand });
+  const apply = applyMode(args);
+  writeManaged(projectRoot, writes, apply);
+  return ok("install", { projectRoot, target, apply, writes: writesSummary(writes) }, apply ? "install applied" : "install dry-run");
 }
 
 async function start(args: ParsedArgs, cwd: string): Promise<CliResult> {
   const projectRoot = projectRootFrom(cwd, flag(args, "project-dir") || flag(args, "project-root"));
   const task = requireFlag(args, "task");
   const runId = flag(args, "run-id");
-  const result = startRun({ projectRoot, task, apply: bool(args, "apply"), ...(runId ? { runId } : {}) });
+  const apply = applyMode(args);
+  const result = startRun({ projectRoot, task, apply, ...(runId ? { runId } : {}) });
   return ok(
     "start",
     {
-      apply: bool(args, "apply"),
+      apply,
       run: result.run,
       writes: writesSummary(result.writes),
       launchCommand: result.launchCommand,
       applyCommand: result.applyCommand,
     },
-    bool(args, "apply") ? "run started" : "start dry-run",
+    apply ? "run started" : "start dry-run",
   );
 }
 
@@ -158,7 +174,7 @@ async function writeRunCommand(args: ParsedArgs, command: "reply" | "continue" |
   const message = flag(args, "message");
   const reason = flag(args, "reason");
   const run = applyRunCommand(safeSegment(requireFlag(args, "run-id"), "run id"), command, {
-    apply: bool(args, "apply"),
+    apply: applyMode(args),
     ...(command === "reply" && message ? { message } : {}),
     ...(reason ? { reason } : {}),
   });
@@ -179,13 +195,14 @@ async function launch(args: ParsedArgs): Promise<CliResult> {
 }
 
 export async function runCli(argv: string[], cwd = process.cwd()): Promise<number> {
-  const args = parseArgv(argv);
-  if (args.command === "mcp") {
-    await runMcpServer();
-    return 0;
-  }
+  let args: ParsedArgs = { command: "parse", flags: new Map(), rest: [], json: argv.includes("--json") || argv.includes("--json=true") || argv.includes("--json=1") };
   let result: CliResult;
   try {
+    args = parseArgv(argv);
+    if (args.command === "mcp") {
+      await runMcpServer();
+      return 0;
+    }
     if (args.command === "help") {
       if (args.json) {
         printResult(ok("help", { usage: usage() }, "help rendered"), true);

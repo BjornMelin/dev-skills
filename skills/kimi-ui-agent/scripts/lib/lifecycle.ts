@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import type { ManagedWrite, RunRecord } from "./types";
@@ -17,6 +17,7 @@ import {
 import { RUNS_GITIGNORE_CONTENT, RUNS_GITIGNORE_REL, loadConfig } from "./config";
 import { redact } from "./redact";
 
+/** Inputs required to plan or create a delegated Kimi UI Agent worktree run. */
 export type StartOptions = {
   projectRoot: string;
   task: string;
@@ -24,6 +25,7 @@ export type StartOptions = {
   runId?: string;
 };
 
+/** Parent-controller commands that mutate an existing delegated run. */
 export type RunCommand = "reply" | "continue" | "finalize" | "abort";
 
 const ARTIFACT_FILE_NAMES = [
@@ -94,6 +96,12 @@ function controllerCommand(): string {
   return "kimi-ui-agent";
 }
 
+/**
+ * Builds canonical run metadata without writing files or creating a worktree.
+ *
+ * @param options - Project root, task text, apply mode, and optional run id.
+ * @returns Normalized run state ready for preview or persistence.
+ */
 export function buildRunRecord(options: StartOptions): RunRecord {
   const runId = safeSegment(options.runId || runIdFromTime(), "run id");
   const config = loadConfig(options.projectRoot);
@@ -117,6 +125,12 @@ export function buildRunRecord(options: StartOptions): RunRecord {
   };
 }
 
+/**
+ * Prepares a delegated run and optionally applies the required worktree writes.
+ *
+ * @param options - Run creation options and apply mode.
+ * @returns The run record, planned writes, launch command, and apply command.
+ */
 export function startRun(options: StartOptions): { run: RunRecord; writes: ManagedWrite[]; launchCommand: string; applyCommand: string } {
   const run = buildRunRecord(options);
   const prompt = buildPrompt(run);
@@ -197,12 +211,23 @@ function buildPrompt(run: RunRecord): string {
   return `You are running as Kimi UI Agent for a frontend/UI task.\n\nTask:\n${redact(run.task)}\n\nRules:\n- Stay inside this git worktree: ${run.worktreePath}\n- Start in plan mode and write your proposed plan to .agents/kimi-ui-agent/runs/${run.runId}/PLAN.md.\n- If you need decisions, write them to QUESTIONS.md and stop.\n- Do not touch protected paths from .agents/kimi-ui-agent/protected-paths.md unless the parent agent explicitly approves.\n- When complete, write RESULT.md and CHANGED_FILES.txt.\n`;
 }
 
+/**
+ * Persists a normalized run record in the parent controller state directory.
+ *
+ * @param run - Run record to validate and write.
+ */
 export function writeRun(run: RunRecord): void {
   const normalized = normalizeRunRecord(run);
   ensureDir(dirname(runStatePath(run.runId)));
   writeFileSync(runStatePath(run.runId), `${JSON.stringify({ ...normalized, updatedAt: nowIso() }, null, 2)}\n`);
 }
 
+/**
+ * Loads and normalizes a persisted run by id.
+ *
+ * @param runId - Run identifier.
+ * @returns The canonical run record.
+ */
 export function loadRun(runId: string): RunRecord {
   const safe = safeSegment(runId, "run id");
   const path = runStatePath(safe);
@@ -212,19 +237,38 @@ export function loadRun(runId: string): RunRecord {
   return normalizeRunRecord(parsed, safe);
 }
 
+/**
+ * Appends content to a supported run artifact and records the event.
+ *
+ * @param run - Canonical run record.
+ * @param file - Supported artifact filename.
+ * @param content - Text to append.
+ */
 export function appendArtifact(run: RunRecord, file: string, content: string): void {
   const target = artifactWritePath(run, file);
-  const previous = existsSync(target) ? readFileSync(target, "utf8") : "";
-  writeFileSync(target, `${previous}${content}\n`, "utf8");
+  appendFileSync(target, `${content}\n`, "utf8");
   appendEvent(run, file.replace(/\.md$/i, "").toLowerCase(), { file });
 }
 
+/**
+ * Appends a structured event to the run event log.
+ *
+ * @param run - Canonical run record.
+ * @param event - Event name.
+ * @param data - Additional event fields.
+ */
 export function appendEvent(run: RunRecord, event: string, data: Record<string, unknown> = {}): void {
   const target = artifactWritePath(run, "events.jsonl");
-  const previous = existsSync(target) ? readFileSync(target, "utf8") : "";
-  writeFileSync(target, `${previous}${JSON.stringify({ ts: nowIso(), event, runId: run.runId, ...data })}\n`, "utf8");
+  appendFileSync(target, `${JSON.stringify({ ts: nowIso(), event, runId: run.runId, ...data })}\n`, "utf8");
 }
 
+/**
+ * Updates persisted run state and mirrors it into the worktree artifact record.
+ *
+ * @param run - Existing run record.
+ * @param state - New lifecycle state.
+ * @returns Updated run record.
+ */
 export function updateRunState(run: RunRecord, state: RunRecord["state"]): RunRecord {
   const next = normalizeRunRecord({ ...run, state, updatedAt: nowIso() });
   writeRun(next);
@@ -235,6 +279,14 @@ export function updateRunState(run: RunRecord, state: RunRecord["state"]): RunRe
   return next;
 }
 
+/**
+ * Applies a parent-controller command to a run after explicit mutation approval.
+ *
+ * @param runId - Run identifier.
+ * @param command - Lifecycle command to apply.
+ * @param options - Apply mode plus command-specific message or reason.
+ * @returns Updated run record.
+ */
 export function applyRunCommand(
   runId: string,
   command: RunCommand,
@@ -253,6 +305,12 @@ export function applyRunCommand(
   return updateRunState(run, "aborted");
 }
 
+/**
+ * Returns run state with the list of currently materialized artifacts.
+ *
+ * @param runId - Run identifier.
+ * @returns Run state plus artifact filenames.
+ */
 export function statusRun(runId: string): RunRecord & { artifacts: string[] } {
   const run = loadRun(runId);
   const artifacts = existsSync(run.artifactDir)
@@ -261,6 +319,12 @@ export function statusRun(runId: string): RunRecord & { artifacts: string[] } {
   return { ...run, artifacts };
 }
 
+/**
+ * Reads the delegated worktree git status for status reporting.
+ *
+ * @param run - Canonical run record.
+ * @returns Short git status text, or null when status cannot be read.
+ */
 export function worktreeSummary(run: RunRecord): string | null {
   try {
     return execFileSync("git", ["status", "--short"], {

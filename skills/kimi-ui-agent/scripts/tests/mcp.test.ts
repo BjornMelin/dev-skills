@@ -68,6 +68,11 @@ describe("MCP stdio framing", () => {
     expect(partial.remaining.length).toBe(split);
   });
 
+  test("caps unterminated Content-Length header buffers", () => {
+    const oversized = Buffer.concat([Buffer.from("Content-Length: 1\r\n"), Buffer.alloc(10 * 1024 * 1024 + 1)]);
+    expect(() => readMcpFrames(oversized)).toThrow(/maximum size/);
+  });
+
   test("writes Content-Length headers using body byte length", () => {
     const framed = encodeMcpMessage(initialize, "content-length");
     const [header, body] = framed.split("\r\n\r\n");

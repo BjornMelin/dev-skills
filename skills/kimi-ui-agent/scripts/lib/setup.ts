@@ -102,9 +102,10 @@ export function scanProject(projectRoot: string): ProjectScan {
   if (hasDep(pkg, "sass")) styling.add("Sass");
 
   const scripts = (pkg?.scripts && typeof pkg.scripts === "object" ? pkg.scripts : {}) as Record<string, unknown>;
+  const runner = packageRunner(projectRoot);
   for (const key of ["lint", "typecheck", "test", "build", "storybook", "test:e2e"]) {
-    if (typeof scripts[key] === "string") {
-      validationCommands.add(`${packageRunner(projectRoot)} ${key}`);
+    if (runner && typeof scripts[key] === "string") {
+      validationCommands.add(`${runner} ${key}`);
     }
   }
 
@@ -140,13 +141,13 @@ export function detectPackageManager(projectRoot: string): string | null {
   return null;
 }
 
-function packageRunner(projectRoot: string): string {
+function packageRunner(projectRoot: string): string | null {
   const pm = detectPackageManager(projectRoot);
   if (pm === "bun") return "bun run";
   if (pm === "pnpm") return "pnpm";
   if (pm === "yarn") return "yarn";
   if (pm === "npm") return "npm run";
-  return "bun run";
+  return null;
 }
 
 function editableProfileWrite(projectRoot: string, write: ManagedWrite): ManagedWrite {

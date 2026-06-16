@@ -13,11 +13,7 @@ export function redact(input: string, extraPatterns: string[] = []): string {
   }
   for (const source of extraPatterns) {
     if (!source.trim()) continue;
-    try {
-      output = output.replace(new RegExp(source, "g"), "[REDACTED]");
-    } catch {
-      output = output.replaceAll(source, "[REDACTED]");
-    }
+    output = output.replaceAll(source, "[REDACTED]");
   }
   return output;
 }

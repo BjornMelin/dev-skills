@@ -9,7 +9,8 @@ normal skill installs do not add a `kimi-ui-agent` binary to PATH.
 ## Command Surface
 
 ```bash
-KIMI_UI_AGENT_CLI="skills/kimi-ui-agent/scripts/kimi-ui-agent.ts"
+KIMI_UI_AGENT_SKILL_DIR="${KIMI_UI_AGENT_SKILL_DIR:-${CODEX_HOME:-$HOME/.codex}/skills/kimi-ui-agent}"
+KIMI_UI_AGENT_CLI="${KIMI_UI_AGENT_CLI:-$KIMI_UI_AGENT_SKILL_DIR/scripts/kimi-ui-agent.ts}"
 bun "$KIMI_UI_AGENT_CLI" --json doctor
 bun "$KIMI_UI_AGENT_CLI" --json setup --dry-run
 bun "$KIMI_UI_AGENT_CLI" --json setup --apply

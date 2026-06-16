@@ -127,6 +127,39 @@ describe("run lifecycle", () => {
     expect(JSON.parse(result.stdout).ok).toBe(true);
   });
 
+  test("boolean flags honor inline true and false values", () => {
+    const root = tempDir("kimi-ui-agent-project-");
+    const help = spawnSync(process.execPath, [cliPath, "--json=false", "--help"], { cwd: root, encoding: "utf8" });
+    expect(help.status).toBe(0);
+    expect(help.stdout.startsWith("kimi-ui-agent")).toBe(true);
+    expect(() => JSON.parse(help.stdout)).toThrow();
+
+    const initFalse = spawnSync(process.execPath, [cliPath, "--json", "init", "--project-dir", root, "--apply=false"], {
+      encoding: "utf8",
+    });
+    expect(initFalse.status).toBe(0);
+    expect(JSON.parse(initFalse.stdout).result.apply).toBe(false);
+    expect(existsSync(join(root, ".agents", "kimi-ui-agent", "config.json"))).toBe(false);
+
+    const initTrue = spawnSync(process.execPath, [cliPath, "--json", "init", "--project-dir", root, "--apply=true"], {
+      encoding: "utf8",
+    });
+    expect(initTrue.status).toBe(0);
+    expect(JSON.parse(initTrue.stdout).result.apply).toBe(true);
+    expect(existsSync(join(root, ".agents", "kimi-ui-agent", "config.json"))).toBe(true);
+  });
+
+  test("--apply and --dry-run cannot be combined", () => {
+    const root = tempDir("kimi-ui-agent-project-");
+    const result = spawnSync(process.execPath, [cliPath, "--json", "setup", "--project-dir", root, "--apply", "--dry-run"], {
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stdout).message).toContain("--apply cannot be combined with --dry-run");
+    expect(existsSync(join(root, ".agents", "kimi-ui-agent", "config.json"))).toBe(false);
+  });
+
   test("launch shell-quotes worktree paths and submits the prompt file", () => {
     const root = tempDir("kimi-ui-agent-project-");
     const stateHome = join(tempDir("kimi-ui-agent-state-parent-"), "state-$(touch pwned)");
@@ -157,6 +190,21 @@ describe("run lifecycle", () => {
       appendArtifact(run, "ABORTED.md", "scope changed");
 
       expect(statusRun(run.runId).artifacts).toEqual(["ANSWERS.md", "ABORTED.md", "events.jsonl"]);
+    });
+  });
+
+  test("appendArtifact preserves existing artifact content", () => {
+    const root = tempDir("kimi-ui-agent-project-");
+    const stateHome = tempDir("kimi-ui-agent-state-");
+    withStateHome(stateHome, () => {
+      const run = buildRunRecord({ projectRoot: root, task: "Improve UI", runId: "run-append-abc123", apply: false });
+      appendArtifact(run, "ANSWERS.md", "first");
+      appendArtifact(run, "ANSWERS.md", "second");
+
+      const answers = readFileSync(join(run.artifactDir, "ANSWERS.md"), "utf8");
+      expect(answers).toContain("first");
+      expect(answers).toContain("second");
+      expect(readFileSync(join(run.artifactDir, "events.jsonl"), "utf8").trim().split("\n")).toHaveLength(2);
     });
   });
 

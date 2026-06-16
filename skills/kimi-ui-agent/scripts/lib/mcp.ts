@@ -201,7 +201,10 @@ export function readMcpFrames(buffer: Buffer): { frames: ParsedFrame[]; remainin
   while (remaining.length > 0) {
     if (startsWithContentLength(remaining)) {
       const end = headerEnd(remaining);
-      if (!end) break;
+      if (!end) {
+        if (remaining.length > MAX_MESSAGE_BYTES) throw new Error("MCP message exceeds maximum size");
+        break;
+      }
       const length = contentLength(remaining.toString("ascii", 0, end.index));
       const bodyStart = end.index + end.length;
       const bodyEnd = bodyStart + length;

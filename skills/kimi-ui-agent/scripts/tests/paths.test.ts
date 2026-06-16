@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { resolveInside, safeSegment, slugify } from "../lib/paths";
+import { commandExists, resolveInside, safeSegment, slugify } from "../lib/paths";
 import { redact } from "../lib/redact";
 
 describe("path safety", () => {
@@ -17,6 +17,11 @@ describe("path safety", () => {
   test("slugify keeps stable shell-friendly output", () => {
     expect(slugify("Improve Dashboard UI!")).toBe("improve-dashboard-ui");
   });
+
+  test("commandExists reports available and missing commands", () => {
+    expect(commandExists("git")).toBe(true);
+    expect(commandExists("definitely-not-a-real-kimi-ui-agent-command")).toBe(false);
+  });
 });
 
 describe("redaction", () => {
@@ -26,5 +31,10 @@ describe("redaction", () => {
     expect(redact(`token ${bareSecret}`)).not.toContain(bareSecret);
     expect(redact("TOKEN=abc123456789secret")).toContain("TOKEN=[REDACTED]");
     expect(redact("Authorization: Bearer abc123456789secret")).toContain("Bearer [REDACTED]");
+  });
+
+  test("treats extra redaction patterns as literals", () => {
+    expect(redact("literal (a+)+ value", ["(a+)+"])).toBe("literal [REDACTED] value");
+    expect(redact("aaaaab", ["(a+)+$"])).toBe("aaaaab");
   });
 });

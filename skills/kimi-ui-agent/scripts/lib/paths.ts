@@ -1,5 +1,5 @@
 import { lstatSync, mkdirSync, realpathSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -116,9 +116,13 @@ export function displayPath(path: string, root: string): string {
 
 export function commandExists(name: string): boolean {
   try {
-    execFileSync("sh", ["-lc", `command -v ${shellQuote(name)} >/dev/null 2>&1`], {
-      stdio: "ignore",
-    });
+    if (platform() === "win32") {
+      execFileSync("where.exe", [name], { stdio: "ignore" });
+    } else {
+      execFileSync("sh", ["-lc", `command -v ${shellQuote(name)} >/dev/null 2>&1`], {
+        stdio: "ignore",
+      });
+    }
     return true;
   } catch {
     return false;

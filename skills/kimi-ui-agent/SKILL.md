@@ -18,7 +18,8 @@ verification.
 2. Run:
 
    ```bash
-   KIMI_UI_AGENT_CLI="${KIMI_UI_AGENT_CLI:-skills/kimi-ui-agent/scripts/kimi-ui-agent.ts}"
+   KIMI_UI_AGENT_SKILL_DIR="${KIMI_UI_AGENT_SKILL_DIR:-${CODEX_HOME:-$HOME/.codex}/skills/kimi-ui-agent}"
+   KIMI_UI_AGENT_CLI="${KIMI_UI_AGENT_CLI:-$KIMI_UI_AGENT_SKILL_DIR/scripts/kimi-ui-agent.ts}"
    bun "$KIMI_UI_AGENT_CLI" --json doctor
    ```
 
