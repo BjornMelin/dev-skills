@@ -160,7 +160,7 @@ describe("run lifecycle", () => {
     expect(existsSync(join(root, ".agents", "kimi-ui-agent", "config.json"))).toBe(false);
   });
 
-  test("launch shell-quotes worktree paths and submits the prompt file", () => {
+  test("launch shell-quotes worktree paths and opens interactive plan mode", () => {
     const root = tempDir("kimi-ui-agent-project-");
     const stateHome = join(tempDir("kimi-ui-agent-state-parent-"), "state-$(touch pwned)");
     withStateHome(stateHome, () => {
@@ -174,9 +174,11 @@ describe("run lifecycle", () => {
 
       expect(result.status).toBe(0);
       const parsed = JSON.parse(result.stdout);
-      expect(parsed.result.command).toBe(`cd '${run.worktreePath}' && kimi --prompt "$(cat '.agents/kimi-ui-agent/runs/${run.runId}/KIMI_PROMPT.md')"`);
+      expect(parsed.result.command).toBe(`cd '${run.worktreePath}' && kimi --plan`);
+      expect(parsed.result.promptCommand).toBe(`cd '${run.worktreePath}' && cat '.agents/kimi-ui-agent/runs/${run.runId}/KIMI_PROMPT.md'`);
+      expect(parsed.result.promptPath).toBe(`.agents/kimi-ui-agent/runs/${run.runId}/KIMI_PROMPT.md`);
       expect(parsed.result.command).not.toContain(`cd "${run.worktreePath}"`);
-      expect(parsed.result.command).not.toContain("--plan <");
+      expect(parsed.result.command).not.toContain("--prompt");
     });
   });
 

@@ -46,9 +46,10 @@ editable Markdown context files and refresh machine-owned JSON evidence.
 Applied `start` runs snapshot existing setup context into the isolated worktree
 so uncommitted profile/protection files are available to the launched Kimi
 session.
-`launch` renders a prompt-mode Kimi command that submits the generated
-`KIMI_PROMPT.md`; Kimi Code does not accept `--prompt` together with `--plan`,
-so plan-first behavior is enforced by the generated run prompt and artifacts.
+`launch` renders an interactive `kimi --plan` command plus a separate
+`promptCommand` that prints the generated `KIMI_PROMPT.md` for review and
+manual paste. Non-interactive `--prompt` mode is intentionally omitted because
+plan-first review needs an interactive Kimi session.
 
 ## Adapters
 

@@ -190,8 +190,19 @@ async function writeRunCommand(args: ParsedArgs, command: "reply" | "continue" |
 async function launch(args: ParsedArgs): Promise<CliResult> {
   const run = loadRun(safeSegment(requireFlag(args, "run-id"), "run id"));
   const promptPath = `.agents/kimi-ui-agent/runs/${run.runId}/KIMI_PROMPT.md`;
-  const command = `cd ${shellQuote(run.worktreePath)} && kimi --prompt "$(cat ${shellQuote(promptPath)})"`;
-  return ok("launch", { runId: run.runId, command, note: "Review command before running. Autonomous/yolo modes are intentionally omitted." }, "launch command rendered");
+  const command = `cd ${shellQuote(run.worktreePath)} && kimi --plan`;
+  const promptCommand = `cd ${shellQuote(run.worktreePath)} && cat ${shellQuote(promptPath)}`;
+  return ok(
+    "launch",
+    {
+      runId: run.runId,
+      command,
+      promptPath,
+      promptCommand,
+      note: "Run promptCommand, review the generated prompt, then paste it into the interactive plan-mode Kimi session. Non-interactive --prompt and autonomous/yolo modes are intentionally omitted.",
+    },
+    "launch command rendered",
+  );
 }
 
 /**

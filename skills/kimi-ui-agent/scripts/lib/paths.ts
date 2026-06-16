@@ -222,7 +222,7 @@ export function commandExists(name: string): boolean {
     if (platform() === "win32") {
       execFileSync("where.exe", [name], { stdio: "ignore" });
     } else {
-      execFileSync("sh", ["-lc", `command -v ${shellQuote(name)} >/dev/null 2>&1`], {
+      execFileSync("sh", ["-c", `command -v ${shellQuote(name)} >/dev/null 2>&1`], {
         stdio: "ignore",
       });
     }
