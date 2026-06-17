@@ -655,6 +655,7 @@ pub struct AgentSkillsCatalogArgs {
     pub generated_at: Option<DateTime<Utc>>,
     pub source_repository: String,
     pub source_commit: String,
+    pub source_ref: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -664,6 +665,7 @@ pub struct AgentSkillsCatalogReport {
     pub generated_at: DateTime<Utc>,
     pub source_repository: String,
     pub source_commit: String,
+    pub source_ref: String,
     pub skills_count: usize,
     pub total_skill_directories: usize,
     pub install_commands: AgentSkillsCatalogInstallCommands,
@@ -3234,6 +3236,13 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     }
     let source_commit = canonical_source_commit(&inventory.repo_root, &requested_source_commit)?
         .unwrap_or(requested_source_commit);
+    let source_ref = args
+        .source_ref
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&source_commit)
+        .to_string();
     let valid_skills = inventory
         .skills
         .iter()
@@ -3242,7 +3251,7 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     verify_agent_skills_catalog_paths(&inventory.repo_root, &source_commit, &valid_skills)?;
     let skills = valid_skills
         .iter()
-        .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_commit))
+        .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_ref))
         .collect::<Vec<_>>();
 
     Ok(AgentSkillsCatalogReport {
@@ -3250,6 +3259,7 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
         generated_at,
         source_repository,
         source_commit,
+        source_ref,
         skills_count: skills.len(),
         total_skill_directories: inventory.total,
         install_commands: AgentSkillsCatalogInstallCommands {
@@ -7583,6 +7593,7 @@ description: Alpha skill.
             generated_at: None,
             source_repository: "https://github.com/example/dev-skills".to_string(),
             source_commit: "HEAD".to_string(),
+            source_ref: None,
         })
         .expect("catalog");
 
@@ -7595,6 +7606,22 @@ description: Alpha skill.
                 .source_urls
                 .skill_md
                 .contains(&catalog.source_commit)
+        );
+
+        let catalog = agent_skills_catalog(AgentSkillsCatalogArgs {
+            repo_root: Some(repo.clone()),
+            generated_at: None,
+            source_repository: "https://github.com/example/dev-skills".to_string(),
+            source_commit: "HEAD".to_string(),
+            source_ref: Some("main".to_string()),
+        })
+        .expect("catalog with source ref");
+
+        assert_eq!(catalog.source_commit, expected_source_commit);
+        assert_eq!(catalog.source_ref, "main");
+        assert_eq!(
+            catalog.skills[0].source_urls.skill_md,
+            "https://github.com/example/dev-skills/blob/main/skills/alpha-skill/SKILL.md"
         );
     }
 
@@ -7680,6 +7707,7 @@ description: Beta skill.
             generated_at: None,
             source_repository: "https://github.com/example/dev-skills".to_string(),
             source_commit,
+            source_ref: None,
         })
         .expect_err("stale source commit should be rejected");
 
@@ -7767,6 +7795,7 @@ description: Alpha skill.
             generated_at: None,
             source_repository: "https://github.com/example/dev-skills".to_string(),
             source_commit,
+            source_ref: None,
         })
         .expect_err("stale package source commit should be rejected");
 
@@ -7810,6 +7839,7 @@ description: Alpha skill.
             generated_at: None,
             source_repository: "https://github.com/example/dev-skills".to_string(),
             source_commit: "missing-source-commit".to_string(),
+            source_ref: None,
         })
         .expect_err("invalid source commit rejected");
 

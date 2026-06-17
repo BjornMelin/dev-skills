@@ -299,7 +299,8 @@ cargo run -q -p codex-dev -- --json skills catalog \
   --repo-root /path/to/dev-skills \
   --generated-at 2026-05-20T08:00:00Z \
   --source-repository https://github.com/BjornMelin/dev-skills \
-  --source-commit 0123456789abcdef
+  --source-commit 0123456789abcdef \
+  --source-ref main
 ```
 
 Compact shape:
@@ -332,6 +333,11 @@ Compact shape:
 generating deterministic fixtures or when a workflow needs to pin links to a
 known commit or release branch. In Git checkouts, the value must resolve to a
 commit before catalog generation continues.
+
+`sourceRef` defaults to `sourceCommit` and controls the GitHub `sourceUrls`
+ref. Use `--source-ref main` for tracked PR artifacts that should link to the
+published branch after merge while `sourceCommit` still validates the local
+tree.
 
 ## skills inventory
 

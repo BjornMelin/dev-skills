@@ -985,6 +985,8 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
             "https://github.com/example/dev-skills/",
             "--source-commit",
             "abc123",
+            "--source-ref",
+            "main",
             "--out",
             out.to_str().expect("out path"),
         ])
@@ -1006,6 +1008,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
         "https://github.com/example/dev-skills"
     );
     assert_eq!(envelope["result"]["sourceCommit"], "abc123");
+    assert_eq!(envelope["result"]["sourceRef"], "main");
     assert_eq!(envelope["result"]["skillsCount"], 2);
     assert_eq!(envelope["result"]["totalSkillDirectories"], 2);
     assert!(envelope["result"].get("validSkillsCount").is_none());
@@ -1026,7 +1029,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
     assert_eq!(skills[0]["skillMdPath"], "skills/alpha-skill/SKILL.md");
     assert_eq!(
         skills[0]["sourceUrls"]["skillMd"],
-        "https://github.com/example/dev-skills/blob/abc123/skills/alpha-skill/SKILL.md"
+        "https://github.com/example/dev-skills/blob/main/skills/alpha-skill/SKILL.md"
     );
     assert_eq!(
         skills[0]["installCommands"]["codexGlobal"],
