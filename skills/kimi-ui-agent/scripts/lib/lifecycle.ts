@@ -136,7 +136,7 @@ export function startRun(options: StartOptions): { run: RunRecord; writes: Manag
   const prompt = buildPrompt(run);
   const writes = [...setupContextWrites(run), ...runArtifactWrites(run, prompt)];
   const launchCommand = `${controllerCommand()} launch --run-id ${shellQuote(run.runId)}`;
-  const applyCommand = `${controllerCommand()} start --task ${shellQuote(run.task)} --run-id ${shellQuote(run.runId)} --apply`;
+  const applyCommand = `${controllerCommand()} start --task ${shellQuote(run.task)} --run-id ${shellQuote(run.runId)} --project-dir ${shellQuote(run.projectRoot)} --apply`;
   if (options.apply) {
     if (existsSync(runStatePath(run.runId)) || existsSync(run.worktreePath) || existsSync(run.artifactDir)) {
       throw new Error(`run already exists: ${run.runId}`);

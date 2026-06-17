@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Buffer } from "node:buffer";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach } from "bun:test";
@@ -13,6 +14,17 @@ function tempDir(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   temps.push(dir);
   return dir;
+}
+
+function tempGitProject(): string {
+  const root = tempDir("kimi-ui-agent-project-");
+  execFileSync("git", ["init"], { cwd: root, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "kimi-ui-agent@example.com"], { cwd: root });
+  execFileSync("git", ["config", "user.name", "Kimi UI Agent"], { cwd: root });
+  writeFileSync(join(root, "README.md"), "# Test\n", "utf8");
+  execFileSync("git", ["add", "README.md"], { cwd: root });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: root, stdio: "ignore" });
+  return root;
 }
 
 async function withStateHome<T>(stateHome: string, action: () => T | Promise<T>): Promise<T> {
@@ -82,6 +94,29 @@ describe("MCP stdio framing", () => {
 });
 
 describe("MCP lifecycle tools", () => {
+  test("start can apply a reviewed run id", async () => {
+    const root = tempGitProject();
+    const stateHome = tempDir("kimi-ui-agent-state-");
+    await withStateHome(stateHome, async () => {
+      const dryRun = await handleJsonRpc({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "start", arguments: { projectRoot: root, task: "Improve UI", runId: "run-reviewed-abc123" } },
+      });
+      expect(dryRun?.error).toBeUndefined();
+
+      const applied = await handleJsonRpc({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "start", arguments: { projectRoot: root, task: "Improve UI", runId: "run-reviewed-abc123", apply: true } },
+      });
+      expect(applied?.error).toBeUndefined();
+      expect(JSON.stringify(applied?.result)).toContain("run-reviewed-abc123");
+    });
+  });
+
   test("reply requires explicit apply before mutating artifacts", async () => {
     const root = tempDir("kimi-ui-agent-project-");
     const stateHome = tempDir("kimi-ui-agent-state-");

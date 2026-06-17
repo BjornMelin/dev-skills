@@ -38,6 +38,7 @@ function toolSchemas(): Record<string, unknown>[] {
         required: ["task"],
         properties: {
           task: { type: "string" },
+          runId: { type: "string" },
           projectRoot: { type: "string" },
           apply: { type: "boolean", default: false },
         },
@@ -128,11 +129,12 @@ function assertNoUnknown(args: Record<string, unknown>, allowed: string[]): void
 
 async function callTool(name: string, rawArgs: Record<string, unknown>): Promise<unknown> {
   if (name === "start") {
-    assertNoUnknown(rawArgs, ["task", "projectRoot", "apply"]);
+    assertNoUnknown(rawArgs, ["task", "runId", "projectRoot", "apply"]);
     const projectRoot = projectRootFrom(process.cwd(), getString(rawArgs, "projectRoot", false));
     const task = getString(rawArgs, "task")!;
+    const runId = getString(rawArgs, "runId", false);
     const apply = rawArgs.apply === true;
-    return startRun({ projectRoot, task, apply });
+    return startRun({ projectRoot, task, apply, ...(runId ? { runId } : {}) });
   }
   if (name === "status") {
     assertNoUnknown(rawArgs, ["runId"]);

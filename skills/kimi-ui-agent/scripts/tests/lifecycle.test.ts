@@ -80,9 +80,10 @@ describe("run lifecycle", () => {
 
   test("start dry-run returns an apply command pinned to the previewed run id", () => {
     const root = tempGitProject();
+    const caller = tempDir("kimi-ui-agent-caller-");
     const stateHome = tempDir("kimi-ui-agent-state-");
-    const result = spawnSync(process.execPath, [cliPath, "--json", "start", "--task", "Improve empty states"], {
-      cwd: root,
+    const result = spawnSync(process.execPath, [cliPath, "--json", "start", "--project-dir", root, "--task", "Improve empty states"], {
+      cwd: caller,
       encoding: "utf8",
       env: { ...process.env, XDG_STATE_HOME: stateHome },
     });
@@ -94,6 +95,7 @@ describe("run lifecycle", () => {
     expect(parsed.result.applyCommand).toContain("scripts/kimi-ui-agent.ts");
     expect(parsed.result.applyCommand).toContain("start --task 'Improve empty states'");
     expect(parsed.result.applyCommand).toContain(`--run-id '${runId}'`);
+    expect(parsed.result.applyCommand).toContain(`--project-dir '${root}'`);
     expect(parsed.result.applyCommand).toContain("--apply");
   });
 
