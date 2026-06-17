@@ -3244,11 +3244,7 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
         .filter(|value| !value.is_empty())
         .unwrap_or(&validation_commit)
         .to_string();
-    let source_commit = if args.source_ref.is_some() {
-        source_ref.clone()
-    } else {
-        validation_commit.clone()
-    };
+    let source_commit = validation_commit.clone();
     let valid_skills = inventory
         .skills
         .iter()
@@ -7623,7 +7619,7 @@ description: Alpha skill.
         })
         .expect("catalog with source ref");
 
-        assert_eq!(catalog.source_commit, "main");
+        assert_eq!(catalog.source_commit, expected_source_commit);
         assert_eq!(catalog.source_ref, "main");
         assert_eq!(
             catalog.skills[0].source_urls.skill_md,

@@ -1007,7 +1007,7 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
         envelope["result"]["sourceRepository"],
         "https://github.com/example/dev-skills"
     );
-    assert_eq!(envelope["result"]["sourceCommit"], "main");
+    assert_eq!(envelope["result"]["sourceCommit"], "abc123");
     assert_eq!(envelope["result"]["sourceRef"], "main");
     assert_eq!(envelope["result"]["skillsCount"], 2);
     assert_eq!(envelope["result"]["totalSkillDirectories"], 2);
