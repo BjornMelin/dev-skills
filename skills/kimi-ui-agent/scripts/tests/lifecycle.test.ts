@@ -121,6 +121,30 @@ describe("run lifecycle", () => {
     expect(readFileSync(join(run.worktreePath, ".agents", "kimi-ui-agent", "project-profile.md"), "utf8")).toContain("Product context");
   });
 
+  test("start --apply rejects reused run ids", () => {
+    const root = tempGitProject();
+    const stateHome = tempDir("kimi-ui-agent-state-");
+    const args = [cliPath, "--json", "start", "--task", "Improve UI", "--run-id", "run-reuse-abc123", "--apply"];
+    const first = spawnSync(process.execPath, args, {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, XDG_STATE_HOME: stateHome },
+    });
+    expect(first.status).toBe(0);
+
+    const run = JSON.parse(first.stdout).result.run;
+    writeFileSync(join(run.artifactDir, "PLAN.md"), "existing plan\n", "utf8");
+    const second = spawnSync(process.execPath, args, {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, XDG_STATE_HOME: stateHome },
+    });
+
+    expect(second.status).toBe(1);
+    expect(JSON.parse(second.stdout).message).toContain("run already exists: run-reuse-abc123");
+    expect(readFileSync(join(run.artifactDir, "PLAN.md"), "utf8")).toBe("existing plan\n");
+  });
+
   test("--json --help returns machine-readable output", () => {
     const result = spawnSync(process.execPath, [cliPath, "--json", "--help"], { encoding: "utf8" });
     expect(result.status).toBe(0);

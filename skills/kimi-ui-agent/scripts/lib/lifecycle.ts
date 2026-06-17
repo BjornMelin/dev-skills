@@ -138,14 +138,15 @@ export function startRun(options: StartOptions): { run: RunRecord; writes: Manag
   const launchCommand = `${controllerCommand()} launch --run-id ${shellQuote(run.runId)}`;
   const applyCommand = `${controllerCommand()} start --task ${shellQuote(run.task)} --run-id ${shellQuote(run.runId)} --apply`;
   if (options.apply) {
+    if (existsSync(runStatePath(run.runId)) || existsSync(run.worktreePath) || existsSync(run.artifactDir)) {
+      throw new Error(`run already exists: ${run.runId}`);
+    }
     ensureDir(join(stateRoot(), "runs", run.runId));
     ensureDir(join(run.worktreePath, ".."));
-    if (!existsSync(run.worktreePath)) {
-      execFileSync("git", ["worktree", "add", "--quiet", "-b", run.branchName, run.worktreePath, "HEAD"], {
-        cwd: options.projectRoot,
-        stdio: ["ignore", "ignore", "pipe"],
-      });
-    }
+    execFileSync("git", ["worktree", "add", "--quiet", "-b", run.branchName, run.worktreePath, "HEAD"], {
+      cwd: options.projectRoot,
+      stdio: ["ignore", "ignore", "pipe"],
+    });
     for (const write of writes) {
       const target = prepareInsideWrite(run.worktreePath, write.path);
       if (write.path === RUNS_GITIGNORE_REL && existsSync(target)) continue;
