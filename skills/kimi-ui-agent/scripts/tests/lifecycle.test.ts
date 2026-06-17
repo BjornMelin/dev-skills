@@ -160,6 +160,16 @@ describe("run lifecycle", () => {
     expect(existsSync(join(root, ".agents", "kimi-ui-agent", "config.json"))).toBe(false);
   });
 
+  test("inline string flags preserve values containing equals signs", () => {
+    const root = tempDir("kimi-ui-agent-project-");
+    const result = spawnSync(process.execPath, [cliPath, "--json", "start", "--project-dir", root, "--task=Set aria-label=Close on button"], {
+      encoding: "utf8",
+    });
+
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).result.run.task).toBe("Set aria-label=Close on button");
+  });
+
   test("launch shell-quotes worktree paths and opens interactive plan mode", () => {
     const root = tempDir("kimi-ui-agent-project-");
     const stateHome = join(tempDir("kimi-ui-agent-state-parent-"), "state-$(touch pwned)");

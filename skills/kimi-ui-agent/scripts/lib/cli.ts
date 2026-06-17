@@ -32,7 +32,10 @@ function parseArgv(argv: string[]): ParsedArgs {
       continue;
     }
     if (arg.startsWith("--")) {
-      const [rawKey, inline] = arg.slice(2).split("=", 2);
+      const raw = arg.slice(2);
+      const equals = raw.indexOf("=");
+      const rawKey = equals === -1 ? raw : raw.slice(0, equals);
+      const inline = equals === -1 ? undefined : raw.slice(equals + 1);
       const key = rawKey || "";
       if (!key) throw new Error("empty flag name");
       if (inline !== undefined) {

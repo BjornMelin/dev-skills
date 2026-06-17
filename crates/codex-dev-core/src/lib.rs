@@ -3308,6 +3308,15 @@ fn verify_agent_skills_catalog_paths(
                 bail!("source_commit {source_commit} does not contain catalog path: {path}");
             }
         }
+        if skill.package.present
+            && !skill.package.rejected
+            && !git_tree_path_exists(repo_root, source_commit, &skill.package.path)?
+        {
+            bail!(
+                "source_commit {source_commit} does not contain catalog package path: {}",
+                skill.package.path
+            );
+        }
     }
     Ok(())
 }
@@ -3915,7 +3924,14 @@ fn git_tracks_path(repo_root: &Path, repo_relative_path: &str) -> Result<Option<
         .current_dir(repo_root)
         .output()
         .with_context(|| format!("failed to run git ls-files for {repo_relative_path}"))?;
-    Ok(Some(output.status.success()))
+    if output.status.success() {
+        return Ok(Some(true));
+    }
+    if output.status.code() == Some(1) {
+        return Ok(Some(false));
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    bail!("git ls-files failed for {repo_relative_path}: {stderr}");
 }
 
 fn count_regular_files_bounded(
@@ -7669,6 +7685,94 @@ description: Beta skill.
 
         assert!(
             format!("{error:#}").contains("does not contain catalog path: skills/beta-skill"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn agent_skills_catalog_rejects_package_missing_from_source_commit() {
+        let temp = tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        fs::create_dir_all(repo.join("skills/alpha-skill")).expect("alpha skill dir");
+        fs::create_dir_all(repo.join("skills/dist")).expect("dist dir");
+        fs::create_dir_all(repo.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation runbook");
+        fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
+        fs::write(
+            repo.join("skills/alpha-skill/SKILL.md"),
+            r#"---
+name: alpha-skill
+description: Alpha skill.
+---
+
+# Alpha
+"#,
+        )
+        .expect("alpha skill");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("init")
+            .status()
+            .expect("git init");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.email", "codex-dev@example.com"])
+            .status()
+            .expect("git config email");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["config", "user.name", "Codex Dev"])
+            .status()
+            .expect("git config name");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["add", "."])
+            .status()
+            .expect("git add");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["commit", "-m", "seed"])
+            .status()
+            .expect("git commit");
+        let source_commit = String::from_utf8(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(&repo)
+                .args(["rev-parse", "HEAD"])
+                .output()
+                .expect("git rev-parse")
+                .stdout,
+        )
+        .expect("utf8 commit")
+        .trim()
+        .to_string();
+
+        fs::write(repo.join("skills/dist/alpha-skill.skill"), b"package").expect("package file");
+        std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["add", "skills/dist/alpha-skill.skill"])
+            .status()
+            .expect("git add package");
+
+        let error = agent_skills_catalog(AgentSkillsCatalogArgs {
+            repo_root: Some(repo.clone()),
+            generated_at: None,
+            source_repository: "https://github.com/example/dev-skills".to_string(),
+            source_commit,
+        })
+        .expect_err("stale package source commit should be rejected");
+
+        assert!(
+            format!("{error:#}")
+                .contains("does not contain catalog package path: skills/dist/alpha-skill.skill"),
             "unexpected error: {error:#}"
         );
     }
