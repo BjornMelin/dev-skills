@@ -285,11 +285,12 @@ The command uses the standard `codex-dev.output.v1` JSON envelope. The public
 artifact itself lives at `result.schemaVersion:
 "agent_skills_lab_catalog.v1"` and is also written as raw JSON when `--out` is
 provided. It reuses the tracked skill inventory read model, includes only valid
-public skills, adds immutable source links from the source repository and
-commit, adds copyable `npx skills add` install commands, and converts package,
-docs, resource, and validation data into positive readiness labels for the
-portfolio marketplace. It does not package skills, call skills.sh, run network
-checks, mutate portfolio files, or expose local absolute paths.
+public skills, validates the source commit when run from a Git checkout, adds
+source links from the source repository and commit, adds copyable `npx skills
+add` install commands, and converts package, docs, resource, and validation data
+into positive readiness labels for the portfolio marketplace. It does not
+package skills, call skills.sh, run network checks, mutate portfolio files, or
+expose local absolute paths.
 
 Fixture-friendly options:
 
@@ -298,7 +299,8 @@ cargo run -q -p codex-dev -- --json skills catalog \
   --repo-root /path/to/dev-skills \
   --generated-at 2026-05-20T08:00:00Z \
   --source-repository https://github.com/BjornMelin/dev-skills \
-  --source-commit 0123456789abcdef
+  --source-commit 0123456789abcdef \
+  --source-ref main
 ```
 
 Compact shape:
@@ -329,7 +331,12 @@ Compact shape:
 
 `sourceCommit` defaults to `git rev-parse HEAD`. Pass it explicitly when
 generating deterministic fixtures or when a workflow needs to pin links to a
-known commit.
+known commit or release branch. In Git checkouts, the value must resolve to a
+commit before catalog generation continues.
+
+`sourceRef` defaults to `sourceCommit`. Use `--source-ref main` for tracked PR
+artifacts that should link to the published branch after merge; the command
+still validates catalog paths against the supplied `--source-commit`.
 
 ## skills inventory
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Kimi UI Agent"
+  short_description: "Kimi-powered UI orchestration"
+  default_prompt: "Use $kimi-ui-agent to set up, profile, and run a Kimi-powered frontend/UI planning and worktree orchestration workflow."
+
+policy:
+  allow_implicit_invocation: false

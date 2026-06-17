@@ -1199,9 +1199,12 @@ pub struct SkillsCatalogArgs {
         value_name = "URL"
     )]
     pub source_repository: String,
-    /// Source commit SHA used when building immutable GitHub source links.
+    /// Source commit SHA used to validate catalog paths.
     #[arg(long, value_name = "SHA")]
     pub source_commit: Option<String>,
+    /// Public Git ref used when building GitHub source links; defaults to source commit.
+    #[arg(long, value_name = "REF")]
+    pub source_ref: Option<String>,
     /// Write the raw catalog artifact to a path instead of only printing the JSON envelope.
     #[arg(long, value_name = "PATH")]
     pub out: Option<PathBuf>,
@@ -2060,6 +2063,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                     generated_at: args.generated_at,
                     source_repository: args.source_repository,
                     source_commit,
+                    source_ref: args.source_ref,
                 })?;
                 if let Some(out) = out {
                     if let Some(parent) =

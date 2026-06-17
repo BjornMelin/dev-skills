@@ -64,6 +64,9 @@ out of version control.
   safety signals.
 - [UI Audit Schema](reference/ui-audit-schema.md): shared `ui_audit.v1`
   contract for Dash, DMC, Streamlit, and browser-workbench audit evidence.
+- [`kimi-ui-agent`](reference/kimi-ui-agent.md): explicit Kimi-powered frontend/UI
+  repo profiling, adapter setup, and plan-first worktree orchestration skill and
+  CLI.
 - [Distribution Surface Gates](reference/distribution-surface-gates.md):
   `distribution_surface_gate.v1` contract for crates.io, signed binaries,
   cargo-vet, Tauri, and Axum escalation decisions.
@@ -85,6 +88,7 @@ out of version control.
 ## Skill References
 
 - [Deep Researcher Skill](reference/deep-researcher-skill.md)
+- [`kimi-ui-agent`](reference/kimi-ui-agent.md)
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
