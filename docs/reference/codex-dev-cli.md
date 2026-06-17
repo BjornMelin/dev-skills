@@ -334,10 +334,9 @@ generating deterministic fixtures or when a workflow needs to pin links to a
 known commit or release branch. In Git checkouts, the value must resolve to a
 commit before catalog generation continues.
 
-`sourceRef` defaults to `sourceCommit` and controls the GitHub `sourceUrls`
-ref. Use `--source-ref main` for tracked PR artifacts that should link to the
-published branch after merge while `sourceCommit` still validates the local
-tree.
+`sourceRef` defaults to `sourceCommit`. Use `--source-ref main` for tracked PR
+artifacts that should link to the published branch after merge; the command
+still validates catalog paths against the supplied `--source-commit`.
 
 ## skills inventory
 

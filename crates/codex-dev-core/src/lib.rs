@@ -3234,21 +3234,27 @@ pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsC
     if requested_source_commit.is_empty() {
         bail!("source_commit must not be empty");
     }
-    let source_commit = canonical_source_commit(&inventory.repo_root, &requested_source_commit)?
-        .unwrap_or(requested_source_commit);
+    let validation_commit =
+        canonical_source_commit(&inventory.repo_root, &requested_source_commit)?
+            .unwrap_or(requested_source_commit);
     let source_ref = args
         .source_ref
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .unwrap_or(&source_commit)
+        .unwrap_or(&validation_commit)
         .to_string();
+    let source_commit = if args.source_ref.is_some() {
+        source_ref.clone()
+    } else {
+        validation_commit.clone()
+    };
     let valid_skills = inventory
         .skills
         .iter()
         .filter(|skill| skill.validation.valid)
         .collect::<Vec<_>>();
-    verify_agent_skills_catalog_paths(&inventory.repo_root, &source_commit, &valid_skills)?;
+    verify_agent_skills_catalog_paths(&inventory.repo_root, &validation_commit, &valid_skills)?;
     let skills = valid_skills
         .iter()
         .map(|skill| agent_skills_catalog_skill(skill, &source_repository, &source_ref))
@@ -7617,7 +7623,7 @@ description: Alpha skill.
         })
         .expect("catalog with source ref");
 
-        assert_eq!(catalog.source_commit, expected_source_commit);
+        assert_eq!(catalog.source_commit, "main");
         assert_eq!(catalog.source_ref, "main");
         assert_eq!(
             catalog.skills[0].source_urls.skill_md,

@@ -117,6 +117,17 @@ describe("MCP lifecycle tools", () => {
     });
   });
 
+  test("start rejects non-boolean apply", async () => {
+    const response = await handleJsonRpc({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "start", arguments: { task: "Improve UI", apply: "true" } },
+    });
+
+    expect(response?.error?.message).toContain("apply must be a boolean");
+  });
+
   test("reply requires explicit apply before mutating artifacts", async () => {
     const root = tempDir("kimi-ui-agent-project-");
     const stateHome = tempDir("kimi-ui-agent-state-");

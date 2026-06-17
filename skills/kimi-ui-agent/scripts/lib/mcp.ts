@@ -133,6 +133,7 @@ async function callTool(name: string, rawArgs: Record<string, unknown>): Promise
     const projectRoot = projectRootFrom(process.cwd(), getString(rawArgs, "projectRoot", false));
     const task = getString(rawArgs, "task")!;
     const runId = getString(rawArgs, "runId", false);
+    if (rawArgs.apply !== undefined && typeof rawArgs.apply !== "boolean") throw new Error("apply must be a boolean");
     const apply = rawArgs.apply === true;
     return startRun({ projectRoot, task, apply, ...(runId ? { runId } : {}) });
   }
