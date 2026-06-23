@@ -389,13 +389,12 @@ where
     let Some(name) = callee_identifier(call) else {
         return;
     };
-    // Resolve through an alias imported from react-native-reanimated, and accept
-    // the canonical names directly (covers the common unaliased import).
-    let canonical = facts
-        .reanimated_imports
-        .get(name)
-        .map(String::as_str)
-        .unwrap_or(name);
+    // Resolve through an import from react-native-reanimated. Unaliased imports
+    // are recorded under their local name; bare local helpers named runOnJS are
+    // unrelated and must not be flagged.
+    let Some(canonical) = facts.reanimated_imports.get(name).map(String::as_str) else {
+        return;
+    };
     let replacement = match canonical {
         "runOnJS" => "scheduleOnRN",
         "runOnUI" => "scheduleOnUI",
@@ -491,17 +490,16 @@ where
     }
 }
 
-/// Rule 6: a NON-arrow named function passed to an animated hook or gesture
-/// callback that lacks a `'worklet'` directive.
+/// Rule 6: an extracted function passed to an animated hook or gesture callback
+/// that lacks a `'worklet'` directive.
 ///
-/// The babel worklets plugin auto-workletizes inline arrows in these positions,
-/// so this rule deliberately targets *extracted named functions* (function
-/// expressions with an identifier, e.g. `useDerivedValue(function compute() {
-/// ... })`) which are NOT auto-workletized. Confidence is medium because a
-/// project may workletize via a wrapper the static check cannot see.
+/// The babel worklets plugin auto-workletizes inline callbacks in these
+/// positions. It does not mark extracted functions passed by reference
+/// (`function fn() { ... }; useDerivedValue(fn)`). Confidence is medium because
+/// a project may workletize via a wrapper the static check cannot see.
 fn check_missing_worklet<'a, F>(
     call: &CallExpression<'a>,
-    _semantic: &Semantic<'a>,
+    semantic: &Semantic<'a>,
     _facts: &FileFacts,
     emit: &mut F,
 ) where
@@ -517,27 +515,23 @@ fn check_missing_worklet<'a, F>(
     let Some(first) = call.arguments.first().and_then(argument_expression) else {
         return;
     };
-    // Inline arrows are auto-workletized; only a named function expression is a
-    // concern.
-    if let Expression::FunctionExpression(function) = first.without_parentheses()
-        && function.id.is_some()
-        && let Some(body) = &function.body
-        && !function_body_has_worklet_directive(body)
-    {
-        let label = function
-            .id
-            .as_ref()
-            .map(|id| id.name.as_str())
-            .unwrap_or("function");
+    let Expression::Identifier(identifier) = first.without_parentheses() else {
+        return;
+    };
+    let Some((label, span, body)) = identifier_resolves_to_function_body(identifier, semantic)
+    else {
+        return;
+    };
+    if !function_body_has_worklet_directive(body) {
         emit(
             ids::WORKLETS_THREADING_MISSING_WORKLET,
             Severity::Medium,
             Confidence::Medium,
-            function.span,
+            span,
             format!(
-                "Named function `{label}` passed to an animated hook/gesture callback lacks a 'worklet' directive (the babel plugin only auto-workletizes inline arrows here)."
+                "Function `{label}` passed by reference to an animated hook/gesture callback lacks a 'worklet' directive."
             ),
-            "Add `'worklet';` as the first statement of the function, or inline it as an arrow.",
+            "Add `'worklet';` as the first statement of the function, or inline the callback.",
         );
     }
 }
@@ -806,6 +800,51 @@ fn identifier_resolves_to_shared_value(
         return expression_is_call_to(init, "useSharedValue");
     }
     false
+}
+
+/// Resolve an identifier reference to an extracted function body.
+fn identifier_resolves_to_function_body<'a>(
+    identifier: &oxc_ast::ast::IdentifierReference<'a>,
+    semantic: &Semantic<'a>,
+) -> Option<(&'a str, Span, &'a FunctionBody<'a>)> {
+    use oxc_ast::AstKind;
+
+    let scoping = semantic.scoping();
+    let reference_id = identifier.reference_id.get()?;
+    let symbol_id = scoping.get_reference(reference_id).symbol_id()?;
+    let declaration_node = scoping.symbol_declaration(symbol_id);
+    match semantic.nodes().kind(declaration_node) {
+        AstKind::Function(function) => {
+            let body = function.body.as_ref()?;
+            let label = function
+                .id
+                .as_ref()
+                .map(|id| id.name.as_str())
+                .unwrap_or(identifier.name.as_str());
+            Some((label, function.span, body))
+        }
+        AstKind::VariableDeclarator(declarator) => {
+            let Expression::FunctionExpression(function) =
+                declarator.init.as_ref()?.without_parentheses()
+            else {
+                return None;
+            };
+            let body = function.body.as_ref()?;
+            let label = function
+                .id
+                .as_ref()
+                .map(|id| id.name.as_str())
+                .or_else(|| {
+                    declarator
+                        .id
+                        .get_binding_identifier()
+                        .map(|id| id.name.as_str())
+                })
+                .unwrap_or(identifier.name.as_str());
+            Some((label, function.span, body))
+        }
+        _ => None,
+    }
 }
 
 /// Whether the node at `node_id` runs on the UI thread or inside an effect.

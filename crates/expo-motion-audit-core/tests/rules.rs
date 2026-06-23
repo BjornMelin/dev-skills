@@ -145,6 +145,19 @@ const fn = () => runOnUI(work)();"#,
 const fn = () => scheduleOnRN(setText, "done");"#,
     );
     assert!(!fired(&clean, ids::WORKLETS_THREADING_DEPRECATED_RUN_ON));
+
+    let local_helper = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function runOnJS(fn) {
+  return fn;
+}
+const fn = () => runOnJS(setText)("done");"#,
+    );
+    assert!(!fired(
+        &local_helper,
+        ids::WORKLETS_THREADING_DEPRECATED_RUN_ON
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -284,13 +297,14 @@ fn rule_missing_worklet_fires_for_named_function_and_arrow_is_clean() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const d = useDerivedValue(function compute() {
+        r#"function compute() {
   return sv.value * 2;
-});"#,
+}
+const d = useDerivedValue(compute);"#,
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_MISSING_WORKLET));
 
-    // Inline arrow -> auto-workletized by babel plugin -> does not fire.
+    // Inline callbacks -> auto-workletized by babel plugin -> do not fire.
     let clean_arrow = analyze(
         "src/Box.tsx",
         "tsx",
@@ -301,14 +315,27 @@ fn rule_missing_worklet_fires_for_named_function_and_arrow_is_clean() {
         ids::WORKLETS_THREADING_MISSING_WORKLET
     ));
 
+    let clean_function_expression = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"const d = useDerivedValue(function compute() {
+  return sv.value * 2;
+});"#,
+    );
+    assert!(!fired(
+        &clean_function_expression,
+        ids::WORKLETS_THREADING_MISSING_WORKLET
+    ));
+
     // Named function WITH a 'worklet' directive -> does not fire.
     let clean_worklet = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const d = useDerivedValue(function compute() {
+        r#"function compute() {
   'worklet';
   return sv.value * 2;
-});"#,
+}
+const d = useDerivedValue(compute);"#,
     );
     assert!(!fired(
         &clean_worklet,
