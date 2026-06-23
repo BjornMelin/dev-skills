@@ -4,8 +4,11 @@
 //! the expected rule id does (or does not) fire. Snippets are deliberately
 //! small so the assertion pins one behavior at a time.
 
+use std::collections::BTreeSet;
+
 use expo_motion_audit_core::config::{analyze_app_config, analyze_babel_config};
 use expo_motion_audit_core::rules::ids;
+use expo_motion_audit_core::scan::{ScanOptions, scan_root};
 use expo_motion_audit_core::source::source_type_for_extension;
 use expo_motion_audit_core::types::Finding;
 use expo_motion_audit_core::{TOOL_NAME, TOOL_VERSION, analyze_source, format_json};
@@ -196,6 +199,36 @@ fn rule_value_access_inside_worklet_does_not_fire() {
         &clean_effect,
         ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
     ));
+}
+
+#[test]
+fn rule_value_access_in_jsx_event_handler_does_not_fire() {
+    // Writing sv.value inside an onPress handler runs at event time on the JS
+    // thread, which is fine -> must not fire.
+    let clean = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function C() {
+  const sv = useSharedValue(0);
+  return <Pressable onPress={() => { sv.value = withTiming(1); }} />;
+}"#,
+    );
+    assert!(!fired(&clean, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+}
+
+#[test]
+fn rule_value_access_in_jsx_render_expression_still_fires() {
+    // Reading sv.value directly in a style prop (no intervening function) runs
+    // during render on the JS thread -> must still fire.
+    let bad = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function C() {
+  const sv = useSharedValue(0);
+  return <View style={{ width: sv.value }} />;
+}"#,
+    );
+    assert!(fired(&bad, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
 
 // ---------------------------------------------------------------------------
@@ -431,10 +464,10 @@ fn babel_config_worklets_plugin_last_is_clean() {
 
 #[test]
 fn babel_config_worklets_plugin_missing_fires() {
+    // No babel-preset-expo to supply the worklets plugin -> missing fires.
     let missing = analyze_babel_config(
         "babel.config.js",
         r#"module.exports = {
-  presets: ["babel-preset-expo"],
   plugins: ["some-other-plugin"],
 };"#,
     );
@@ -496,6 +529,93 @@ fn babel_config_plugin_tuple_form_resolves() {
     ));
 }
 
+#[test]
+fn babel_config_dynamic_plugins_property_is_informational() {
+    // `plugins` exists but is a variable, not an inline array -> low advisory,
+    // not the high missing finding.
+    let dynamic = analyze_babel_config(
+        "babel.config.js",
+        r#"const plugins = ["react-native-worklets/plugin"];
+module.exports = { plugins };"#,
+    );
+    assert!(fired(&dynamic, ids::CONFIG_UNABLE_TO_ANALYZE));
+    assert!(!fired(
+        &dynamic,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_expo_preset_only_is_clean() {
+    // babel-preset-expo auto-includes the worklets plugin; no plugins array is
+    // needed and the missing finding must be suppressed.
+    let preset_only = analyze_babel_config(
+        "babel.config.js",
+        r#"module.exports = { presets: ["babel-preset-expo"] };"#,
+    );
+    assert!(!fired(
+        &preset_only,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_expo_preset_with_other_plugins_is_clean() {
+    // Expo preset present, plugins array has unrelated plugins but not worklets
+    // -> still suppressed (the preset supplies it).
+    let preset_other = analyze_babel_config(
+        "babel.config.js",
+        r#"module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: ["some-other-plugin"],
+};"#,
+    );
+    assert!(!fired(
+        &preset_other,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_expo_preset_worklets_not_last_still_fires() {
+    // Even with the expo preset, an explicit worklets plugin that is not last is
+    // an ordering error and must still fire.
+    let not_last = analyze_babel_config(
+        "babel.config.js",
+        r#"module.exports = {
+  presets: ["babel-preset-expo"],
+  plugins: ["react-native-worklets/plugin", "x"],
+};"#,
+    );
+    assert!(fired(
+        &not_last,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_explicit_worklets_no_preset_is_clean() {
+    // Explicit worklets plugin (last) with no expo preset is correct.
+    let explicit = analyze_babel_config(
+        "babel.config.js",
+        r#"module.exports = { plugins: ["react-native-worklets/plugin"] };"#,
+    );
+    assert!(!fired(
+        &explicit,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_no_presets_no_plugins_still_fires_missing() {
+    // No presets and no plugins at all -> missing fires.
+    let empty = analyze_babel_config("babel.config.js", r#"module.exports = {};"#);
+    assert!(fired(
+        &empty,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
 // ---------------------------------------------------------------------------
 // Rule 12: app.json newArchEnabled.
 // ---------------------------------------------------------------------------
@@ -537,6 +657,44 @@ fn app_config_new_arch_absent_clean_when_reanimated_unused() {
 // ---------------------------------------------------------------------------
 // Output shape sanity.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Fix 4: dynamic app.config.js routes to the app-config analyzer.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn scan_dynamic_app_config_js_emits_unable_to_analyze() {
+    // Create a unique scratch directory under the system temp dir.
+    let mut dir = std::env::temp_dir();
+    dir.push(format!(
+        "expo-motion-audit-test-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&dir).expect("create temp scan dir");
+
+    let config_path = dir.join("app.config.js");
+    std::fs::write(
+        &config_path,
+        r#"module.exports = () => ({ expo: { name: "demo" } });"#,
+    )
+    .expect("write app.config.js");
+
+    let options = ScanOptions::new(dir.clone(), BTreeSet::new(), 1000);
+    let outcome = scan_root(&options).expect("scan succeeds");
+
+    // Clean up before asserting so a failed assertion still removes the dir.
+    let _ = std::fs::remove_dir_all(&dir);
+
+    assert!(
+        fired(&outcome.findings, ids::CONFIG_UNABLE_TO_ANALYZE),
+        "expected config.unable-to-analyze for dynamic app.config.js, got: {:#?}",
+        outcome.findings
+    );
+}
 
 #[test]
 fn json_output_has_stable_shape() {

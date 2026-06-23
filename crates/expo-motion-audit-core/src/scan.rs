@@ -6,6 +6,12 @@
 //!    imports `react-native-reanimated`.
 //! 2. Analyze the config files found during the walk, passing the
 //!    project-uses-Reanimated signal into the app-config rule.
+//!
+//! Both static (`app.json`, `app.config.json`) and dynamic
+//! (`app.config.js`/`.ts`/`.cjs`/`.mjs`) Expo app configs are routed to the
+//! app-config analyzer. The dynamic forms cannot be parsed as JSON and emit a
+//! `config.unable-to-analyze` advisory rather than being treated as ordinary
+//! source.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -37,8 +43,18 @@ const SKIP_DIRS: &[&str] = &[
 /// Babel config file names handled by the config rules.
 const BABEL_CONFIG_NAMES: &[&str] = &["babel.config.js", "babel.config.cjs"];
 
-/// App config file names handled by the config rules (static JSON forms only).
-const APP_CONFIG_NAMES: &[&str] = &["app.json", "app.config.json"];
+/// App config file names handled by the config rules. The static JSON forms
+/// (`app.json`, `app.config.json`) are analyzed directly; the dynamic forms
+/// (`app.config.js`/`.ts`/`.cjs`/`.mjs`) route to the same analyzer, where the
+/// JSON parse fails and a `config.unable-to-analyze` advisory is emitted.
+const APP_CONFIG_NAMES: &[&str] = &[
+    "app.json",
+    "app.config.json",
+    "app.config.js",
+    "app.config.ts",
+    "app.config.cjs",
+    "app.config.mjs",
+];
 
 /// Token used to detect whether a source file pulls in Reanimated, for the
 /// app-config New-Architecture rule.

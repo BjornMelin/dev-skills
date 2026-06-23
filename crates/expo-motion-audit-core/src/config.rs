@@ -3,18 +3,22 @@
 //! Babel config is parsed as CommonJS with oxc. The export may be either a
 //! direct `module.exports = { ... }` object or a function form
 //! `module.exports = function (api) { return { ... }; }`; both are handled. The
-//! analysis locates the `plugins` array (and `presets`-level plugin entries are
-//! ignored on purpose — the worklets plugin must be a top-level plugin).
+//! analysis locates the `plugins` array. `babel-preset-expo` in the `presets`
+//! array auto-includes `react-native-worklets/plugin`, so a config that relies
+//! on the preset (with no explicit worklets plugin) is treated as correct and
+//! the "missing" finding is suppressed; explicit ordering rules (deprecated
+//! plugin, worklets-present-but-not-last) still fire.
 //!
-//! App config is parsed as JSON with serde_json. Only the static `app.json` /
-//! `app.config.json` forms are analyzed; a dynamic `app.config.js`/`.ts` is
-//! reported as an informational low finding because it cannot be resolved
-//! statically.
+//! App config is parsed as JSON with serde_json. The static `app.json` /
+//! `app.config.json` forms are analyzed directly; the dynamic
+//! `app.config.js`/`.ts`/`.cjs`/`.mjs` forms fail the JSON parse and are
+//! reported as an informational `config.unable-to-analyze` low finding because
+//! they cannot be resolved statically.
 //!
 //! Limitation: babel config resolution is structural, not evaluative. A
-//! `plugins` array assembled dynamically (spread, conditional, computed) cannot
-//! be resolved and yields an informational low finding rather than a false
-//! high-severity one.
+//! `plugins` property that is not an inline array (assembled dynamically via a
+//! variable, spread, conditional, or computed) cannot be resolved and yields an
+//! informational low finding rather than a false high-severity one.
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{Expression, ObjectExpression, ObjectPropertyKind, PropertyKey, Statement};
@@ -29,6 +33,8 @@ use crate::types::{Category, Confidence, Finding, Severity};
 const WORKLETS_PLUGIN: &str = "react-native-worklets/plugin";
 /// The old, deprecated Reanimated babel plugin string.
 const DEPRECATED_REANIMATED_PLUGIN: &str = "react-native-reanimated/plugin";
+/// The Expo babel preset, which auto-includes the worklets plugin.
+const BABEL_PRESET_EXPO: &str = "babel-preset-expo";
 
 /// Analyze a `babel.config.js` (or `babel.config.cjs`) source string.
 ///
@@ -36,9 +42,11 @@ const DEPRECATED_REANIMATED_PLUGIN: &str = "react-native-reanimated/plugin";
 /// - [`ids::CONFIG_DEPRECATED_REANIMATED_PLUGIN`] (high) when the old
 ///   `react-native-reanimated/plugin` appears in the plugins array.
 /// - [`ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST`] (high) when the
-///   worklets plugin is absent, or present but not the last element.
+///   worklets plugin is absent (and `babel-preset-expo` is not present to supply
+///   it), or present but not the last element.
 /// - [`ids::CONFIG_UNABLE_TO_ANALYZE`] (low) when the export is too dynamic to
-///   resolve statically.
+///   resolve statically, including a `plugins` property that is present but not
+///   an inline array.
 #[must_use]
 pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
     let allocator = Allocator::default();
@@ -62,7 +70,27 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
         )];
     };
 
+    // `babel-preset-expo` auto-includes `react-native-worklets/plugin`, so a
+    // config that relies on the preset (with no explicit worklets plugin) is
+    // correct and must not be flagged as missing.
+    let has_expo_preset = has_babel_preset_expo(config_object);
+
     let Some(plugins) = object_property_array(config_object, "plugins") else {
+        // `plugins` is either absent, or present but not an inline array.
+        if object_has_property(config_object, "plugins") {
+            // Present but dynamic (identifier, conditional, spread, ...): cannot
+            // resolve statically, so this is informational, not a hard miss.
+            return vec![unable_to_analyze(
+                relative_path,
+                &line_index,
+                "babel.config `plugins` is not an inline array; it cannot be analyzed statically.",
+            )];
+        }
+        // Truly absent. If babel-preset-expo is present it supplies the worklets
+        // plugin, so there is nothing to report.
+        if has_expo_preset {
+            return Vec::new();
+        }
         // No plugins array at all: the worklets plugin is definitionally missing.
         return vec![missing_or_not_last(
             relative_path,
@@ -108,14 +136,18 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
         .any(|name| name.as_deref() == Some(WORKLETS_PLUGIN));
 
     if !has_worklets {
-        findings.push(missing_or_not_last(
-            relative_path,
-            &line_index,
-            plugins.span.start,
-            &format!(
-                "babel.config is missing `{WORKLETS_PLUGIN}`; it is required and must be last."
-            ),
-        ));
+        // The explicit worklets plugin is absent. babel-preset-expo supplies it,
+        // so only flag "missing" when the expo preset is not present.
+        if !has_expo_preset {
+            findings.push(missing_or_not_last(
+                relative_path,
+                &line_index,
+                plugins.span.start,
+                &format!(
+                    "babel.config is missing `{WORKLETS_PLUGIN}`; it is required and must be last."
+                ),
+            ));
+        }
     } else if !last_is_worklets {
         findings.push(missing_or_not_last(
             relative_path,
@@ -292,6 +324,31 @@ fn object_property_array<'a>(
         }
     }
     None
+}
+
+/// Whether an object literal has a property with the given key name, regardless
+/// of the property's value shape.
+fn object_has_property(object: &ObjectExpression<'_>, key_name: &str) -> bool {
+    object.properties.iter().any(|property| {
+        matches!(
+            property,
+            ObjectPropertyKind::ObjectProperty(property)
+                if property_key_name(&property.key) == Some(key_name)
+        )
+    })
+}
+
+/// Whether the config's `presets` array contains an entry resolving to
+/// `babel-preset-expo`. Presets may be a bare string (`"babel-preset-expo"`) or
+/// a tuple (`["babel-preset-expo", options]`); both resolve to the first
+/// string. `babel-preset-expo` auto-includes `react-native-worklets/plugin`.
+fn has_babel_preset_expo(object: &ObjectExpression<'_>) -> bool {
+    let Some(presets) = object_property_array(object, "presets") else {
+        return false;
+    };
+    collect_plugin_names(presets)
+        .iter()
+        .any(|name| name.as_deref() == Some(BABEL_PRESET_EXPO))
 }
 
 /// Collect the resolved string names of each plugins-array element, in order.

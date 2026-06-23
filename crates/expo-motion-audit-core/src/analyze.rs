@@ -831,11 +831,21 @@ fn identifier_resolves_to_shared_value(
 /// ancestor is a worklet (function body with a `'worklet'` directive), an
 /// animated-hook/gesture callback, an event handler, or a `useEffect`/
 /// `useLayoutEffect`/`useAnimatedReaction` call's callback argument.
+///
+/// JSX event handlers (`onPress={() => { sv.value = ... }}`) run at event time
+/// on the JS thread, so writing/reading a shared value there is fine. We treat
+/// an access as off the render path when it is inside a function that is the
+/// value of a JSX event-handler attribute. A bare expression in a JSX attribute
+/// with no intervening function (e.g. `style={{ width: sv.value }}`) is read
+/// during render and stays on the JS render path.
 fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> bool {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
     let mut current = node_id;
+    // Whether we have climbed through a function boundary on the way up. A JSX
+    // event handler only exempts the access if a function intervenes.
+    let mut passed_through_function = false;
     loop {
         let parent_id = nodes.parent_id(current);
         if parent_id == current {
@@ -850,6 +860,10 @@ fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::N
                 {
                     return true;
                 }
+                passed_through_function = true;
+            }
+            AstKind::ArrowFunctionExpression(_) => {
+                passed_through_function = true;
             }
             AstKind::FunctionBody(body) => {
                 if function_body_has_worklet_directive(body) {
@@ -861,10 +875,30 @@ fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::N
             AstKind::CallExpression(call) if call_is_ui_or_effect_context(call) => {
                 return true;
             }
+            // A JSX event-handler prop (`onPress={() => { ... }}`) runs at event
+            // time on the JS thread, but only when a function intervenes.
+            AstKind::JSXAttribute(attribute)
+                if passed_through_function && jsx_attribute_is_event_handler(attribute) =>
+            {
+                return true;
+            }
             _ => {}
         }
         current = parent_id;
     }
+}
+
+/// Whether a JSX attribute is an event handler: its name starts with `on`
+/// followed by an uppercase letter (e.g. `onPress`, `onChange`, `onScroll`,
+/// `onLongPress`).
+fn jsx_attribute_is_event_handler(attribute: &oxc_ast::ast::JSXAttribute<'_>) -> bool {
+    let Some(name) = jsx_attribute_name(&attribute.name) else {
+        return false;
+    };
+    let mut chars = name.chars();
+    chars.next() == Some('o')
+        && chars.next() == Some('n')
+        && chars.next().is_some_and(|c| c.is_ascii_uppercase())
 }
 
 /// Whether a call expression establishes a UI-thread or effect context for its
