@@ -10,7 +10,7 @@
 //! [`analyze_source`] and never return borrowed nodes, so callers are free of
 //! the arena's lifetime.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -97,6 +97,8 @@ struct FileFacts {
     configured_gsap_imports: BTreeSet<String>,
     /// Identifiers initialized from `gsap.timeline(...)`.
     timeline_handles: BTreeSet<String>,
+    /// Local import aliases for known plugins, keyed by local binding.
+    plugin_aliases: BTreeMap<String, String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -189,10 +191,11 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                     facts.imports_usegsap = true;
                     facts.uses_gsap_surface = true;
                 }
+                record_plugin_import_aliases(import, &mut facts);
                 record_configured_gsap_imports(import, &mut facts);
             }
             AstKind::IdentifierReference(identifier)
-                if KNOWN_PLUGINS.contains(&identifier.name.as_str())
+                if plugin_name_for_identifier(identifier.name.as_str(), &facts).is_some()
                     && !reference_is_ts_type_position(semantic, node.id()) =>
             {
                 facts.uses_gsap_surface = true;
@@ -243,7 +246,69 @@ fn record_configured_gsap_imports(
             facts
                 .configured_gsap_imports
                 .insert(named.local.name.as_str().to_string());
+            facts
+                .configured_gsap_imports
+                .insert(imported_name.to_string());
+            if KNOWN_PLUGINS.contains(&imported_name) {
+                facts.plugin_aliases.insert(
+                    named.local.name.as_str().to_string(),
+                    imported_name.to_string(),
+                );
+            }
         }
+    }
+}
+
+fn record_plugin_import_aliases(
+    import: &oxc_ast::ast::ImportDeclaration<'_>,
+    facts: &mut FileFacts,
+) {
+    let source = import.source.value.as_str();
+    if !import_source_is_gsap_package(source) {
+        return;
+    }
+    let source_plugin = plugin_name_from_import_source(source);
+    let Some(specifiers) = &import.specifiers else {
+        return;
+    };
+    for specifier in specifiers {
+        match specifier {
+            ImportDeclarationSpecifier::ImportSpecifier(named) => {
+                if named.import_kind.is_type() {
+                    continue;
+                }
+                let imported = named.imported.name();
+                let imported_name = imported.as_str();
+                let Some(plugin) = plugin_name_for_known_or_default(imported_name, source_plugin)
+                else {
+                    continue;
+                };
+                facts
+                    .plugin_aliases
+                    .insert(named.local.name.as_str().to_string(), plugin.to_string());
+            }
+            ImportDeclarationSpecifier::ImportDefaultSpecifier(default) => {
+                if let Some(plugin) = source_plugin {
+                    facts
+                        .plugin_aliases
+                        .insert(default.local.name.as_str().to_string(), plugin.to_string());
+                }
+            }
+            ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => {}
+        }
+    }
+}
+
+fn plugin_name_for_known_or_default<'a>(
+    imported_name: &'a str,
+    source_plugin: Option<&'a str>,
+) -> Option<&'a str> {
+    if KNOWN_PLUGINS.contains(&imported_name) {
+        Some(imported_name)
+    } else if imported_name == "default" {
+        source_plugin
+    } else {
+        None
     }
 }
 
@@ -299,6 +364,19 @@ fn import_source_is_configured_gsap_module(source: &str) -> bool {
         && (source == "lib/gsap" || source.ends_with("/lib/gsap") || source == "./gsap")
 }
 
+fn plugin_name_from_import_source(source: &str) -> Option<&str> {
+    let name = source.rsplit('/').next()?;
+    KNOWN_PLUGINS.contains(&name).then_some(name)
+}
+
+fn plugin_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Option<&'a str> {
+    if KNOWN_PLUGINS.contains(&name) {
+        Some(name)
+    } else {
+        facts.plugin_aliases.get(name).map(String::as_str)
+    }
+}
+
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
 ///
 /// Handles these argument shapes:
@@ -318,9 +396,9 @@ fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
         };
         match expression.without_parentheses() {
             Expression::Identifier(identifier) => {
-                facts
-                    .registered
-                    .insert(identifier.name.as_str().to_string());
+                let name = plugin_name_for_identifier(identifier.name.as_str(), facts)
+                    .unwrap_or_else(|| identifier.name.as_str());
+                facts.registered.insert(name.to_string());
             }
             // GSAP does not flatten plugin arrays; `[ScrollTrigger]` is one
             // invalid plugin argument, not a successful ScrollTrigger register.
@@ -495,7 +573,7 @@ fn check_call<'a, F>(
     }
 
     // ScrollTrigger.create({...}): the argument is a ScrollTrigger config.
-    if is_member_call(call, Some("ScrollTrigger"), "create")
+    if is_plugin_member_call(call, facts, "ScrollTrigger", "create")
         && let Some(config) = call.arguments.first().and_then(argument_expression)
         && let Expression::ObjectExpression(object) = config.without_parentheses()
     {
@@ -531,22 +609,19 @@ where
     // known plugin identifier, e.g. ScrollTrigger.create(...).
     if let Expression::StaticMemberExpression(member) = call.callee.without_parentheses()
         && let Expression::Identifier(object) = member.object.without_parentheses()
+        && let Some(name) = plugin_name_for_identifier(object.name.as_str(), facts)
+        && !facts.registered.contains(name)
+        && !facts.configured_gsap_imports.contains(name)
+        && !facts.configured_gsap_imports.contains("gsap")
     {
-        let name = object.name.as_str();
-        if KNOWN_PLUGINS.contains(&name)
-            && !facts.registered.contains(name)
-            && !facts.configured_gsap_imports.contains(name)
-            && !facts.configured_gsap_imports.contains("gsap")
-        {
-            emit(
-                ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
-                Severity::High,
-                Confidence::Medium,
-                member.span,
-                format!("`{name}` is used but never passed to gsap.registerPlugin in this file."),
-                "Call gsap.registerPlugin(<Plugin>) once before using the plugin.",
-            );
-        }
+        emit(
+            ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
+            Severity::High,
+            Confidence::Medium,
+            member.span,
+            format!("`{name}` is used but never passed to gsap.registerPlugin in this file."),
+            "Call gsap.registerPlugin(<Plugin>) once before using the plugin.",
+        );
     }
 
     // ScrollTrigger is also "used" when a gsap tween/timeline passes a
@@ -752,7 +827,10 @@ fn check_file_level(
     }
 
     // Rule 10: GSAP used in an App Router file without "use client".
-    if is_under_app(relative_path) && facts.uses_gsap_surface && !facts.has_use_client {
+    if is_under_app(relative_path)
+        && (facts.uses_gsap_surface || facts.imports_usegsap)
+        && !facts.has_use_client
+    {
         let span = program.span;
         let (line, column) = line_index.line_col(span.start);
         findings.push(Finding {
@@ -763,8 +841,7 @@ fn check_file_level(
             file: relative_path.to_string(),
             line,
             column,
-            message: "GSAP used in an app/ or pages/ file without a \"use client\" directive."
-                .to_string(),
+            message: "GSAP used in an app/ file without a \"use client\" directive.".to_string(),
             suggestion: "Add \"use client\" at the top of the file; GSAP needs the browser."
                 .to_string(),
         });
@@ -844,6 +921,25 @@ fn is_member_call(call: &CallExpression<'_>, expected_object: Option<&str>, meth
             Expression::Identifier(identifier) if identifier.name.as_str() == name
         ),
     }
+}
+
+fn is_plugin_member_call(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    plugin: &str,
+    method: &str,
+) -> bool {
+    let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
+        return false;
+    };
+    if member.property.name.as_str() != method {
+        return false;
+    }
+    matches!(
+        member.object.without_parentheses(),
+        Expression::Identifier(identifier)
+            if plugin_name_for_identifier(identifier.name.as_str(), facts) == Some(plugin)
+    )
 }
 
 /// Whether a call is a bare `name(...)` identifier call.

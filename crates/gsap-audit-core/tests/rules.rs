@@ -170,6 +170,37 @@ fn rule_plugin_used_without_register() {
     );
     assert!(!fired(&clean, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 
+    let aliased = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger as ST } from "gsap/ScrollTrigger";
+ST.create({ trigger: ".x" });"#,
+    );
+    assert!(fired(&aliased, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    let registered_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger as ST } from "gsap/ScrollTrigger";
+gsap.registerPlugin(ST);
+ST.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(
+        &registered_alias,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let default_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import ST from "gsap/ScrollTrigger";
+ST.create({ trigger: ".x" });"#,
+    );
+    assert!(fired(
+        &default_alias,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
     let custom_ease = analyze(
         "src/a.ts",
         "ts",
@@ -557,6 +588,14 @@ fn rule_scrub_toggleactions_in_scrolltrigger_create_fires() {
         &timeline,
         ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS
     ));
+
+    let aliased = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger as ST } from "gsap/ScrollTrigger";
+ST.create({ scrub: 1, toggleActions: "play none none none" });"#,
+    );
+    assert!(fired(&aliased, ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS));
 }
 
 #[test]
@@ -764,6 +803,17 @@ ScrollTrigger.create({ trigger: ".x" });"#,
     );
     assert!(!fired(
         &configured_plugin,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger as ST } from "@/lib/gsap";
+ST.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(
+        &configured_alias,
         ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
     ));
 
