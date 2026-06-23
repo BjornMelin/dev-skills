@@ -65,6 +65,26 @@ fn rule_gsdevtools_in_source() {
         r#"import { GSDevTools } from "gsap/GSDevTools"; GSDevTools.create();"#,
     );
     assert!(!fired(&fixture, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
+
+    let motion_path_helper = analyze(
+        "src/a.ts",
+        "ts",
+        r##"import { MotionPathHelper } from "gsap/MotionPathHelper"; MotionPathHelper.create(".dot", { path: "#path" });"##,
+    );
+    assert!(fired(
+        &motion_path_helper,
+        ids::PLUGINS_GSDEVTOOLS_IN_SOURCE
+    ));
+
+    let motion_path_helper_test = analyze(
+        "src/a.test.ts",
+        "ts",
+        r##"import { MotionPathHelper } from "gsap/MotionPathHelper"; MotionPathHelper.create(".dot", { path: "#path" });"##,
+    );
+    assert!(!fired(
+        &motion_path_helper_test,
+        ids::PLUGINS_GSDEVTOOLS_IN_SOURCE
+    ));
 }
 
 #[test]
@@ -1053,6 +1073,26 @@ fn rule_unscoped_selector_with_dependency_array_fires() {
 }"#,
     );
     assert!(fired(&concise_arrow, ids::REACT_UNSCOPED_SELECTOR));
+
+    let logical_guard = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C({ ready }) {
+  useGSAP(() => ready && gsap.to(".box", { x: 1 }));
+  return null;
+}"#,
+    );
+    assert!(fired(&logical_guard, ids::REACT_UNSCOPED_SELECTOR));
+
+    let conditional_guard = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C({ ready }) {
+  useGSAP(() => ready ? gsap.to(".box", { x: 1 }) : null);
+  return null;
+}"#,
+    );
+    assert!(fired(&conditional_guard, ids::REACT_UNSCOPED_SELECTOR));
 
     let aliased_hook = analyze(
         "src/a.tsx",

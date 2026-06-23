@@ -62,6 +62,8 @@ const PLUGIN_VARS: &[(&str, &str)] = &[
     ("pixi", "PixiPlugin"),
 ];
 
+const DEV_ONLY_PLUGINS: &[&str] = &["GSDevTools", "MotionPathHelper"];
+
 /// GSAP tween factory methods that take a vars object.
 const TWEEN_METHODS: &[&str] = &["to", "from", "fromTo", "set"];
 
@@ -521,20 +523,21 @@ fn check_node<'a, F>(
         AstKind::CallExpression(call) => {
             check_call(call, semantic, facts, emit);
         }
-        // Rule 2: GSDevTools referenced in non-test source. Skip TS type-only
-        // positions (e.g. `let x: GSDevTools`), which are erased at build time.
+        // Rule 2: dev-only helpers referenced in non-test source. Skip TS
+        // type-only positions (e.g. `let x: GSDevTools`), which are erased at build time.
         AstKind::IdentifierReference(identifier)
-            if identifier.name.as_str() == "GSDevTools"
+            if DEV_ONLY_PLUGINS.contains(&identifier.name.as_str())
                 && !is_test_or_fixture_path(relative_path)
                 && !reference_is_ts_type_position(semantic, node.id()) =>
         {
+            let name = identifier.name.as_str();
             emit(
                 ids::PLUGINS_GSDEVTOOLS_IN_SOURCE,
                 Severity::Medium,
                 Confidence::Medium,
                 identifier.span,
-                "GSDevTools referenced in source code.".to_string(),
-                "GSDevTools is a dev-only tool; gate it behind a dev flag or remove it before shipping.",
+                format!("{name} referenced in source code."),
+                "GSAP dev-only tools should be gated behind a dev flag or removed before shipping.",
             );
         }
         _ => {}
@@ -1532,6 +1535,15 @@ fn walk_expression<'a>(
         }
         Expression::AwaitExpression(await_expression) => {
             walk_expression(&await_expression.argument, callback);
+        }
+        Expression::LogicalExpression(logical) => {
+            walk_expression(&logical.left, callback);
+            walk_expression(&logical.right, callback);
+        }
+        Expression::ConditionalExpression(conditional) => {
+            walk_expression(&conditional.test, callback);
+            walk_expression(&conditional.consequent, callback);
+            walk_expression(&conditional.alternate, callback);
         }
         _ => {}
     }
