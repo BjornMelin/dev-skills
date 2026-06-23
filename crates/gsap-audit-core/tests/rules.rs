@@ -261,6 +261,23 @@ ST.create({ trigger: ".x" });"#,
         &registered_custom_ease,
         ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
     ));
+
+    for plugin in ["CustomWiggle", "CustomBounce"] {
+        let bad_source = format!(r#"{plugin}.create("namedEase", {{}});"#);
+        let bad = analyze("src/a.ts", "ts", &bad_source);
+        assert!(
+            fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER),
+            "expected missing-registration finding for {plugin}, got {bad:#?}"
+        );
+
+        let registered_source =
+            format!(r#"gsap.registerPlugin({plugin}); {plugin}.create("namedEase", {{}});"#);
+        let registered = analyze("src/a.ts", "ts", &registered_source);
+        assert!(
+            !fired(&registered, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER),
+            "expected registered {plugin} to be clean, got {registered:#?}"
+        );
+    }
 }
 
 #[test]
@@ -934,6 +951,37 @@ gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
     );
     assert!(!fired(
         &configured_gsap,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured_default_gsap = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import gsap from "@/lib/gsap";
+gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(!fired(
+        &configured_default_gsap,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured_default_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import animate from "@/lib/gsap";
+animate.to(".x", 1, { top: 0, scrollTrigger: { markers: true } });"#,
+    );
+    assert!(fired(&configured_default_alias, ids::CORE_GSAP2_SIGNATURE));
+    assert!(fired(
+        &configured_default_alias,
+        ids::CORE_LAYOUT_PROP_ANIMATION
+    ));
+    assert!(fired(
+        &configured_default_alias,
+        ids::SCROLLTRIGGER_MARKERS_IN_PROD
+    ));
+    assert!(!fired(
+        &configured_default_alias,
         ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
     ));
 

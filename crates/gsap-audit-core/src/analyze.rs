@@ -39,6 +39,8 @@ const KNOWN_PLUGINS: &[&str] = &[
     "MorphSVGPlugin",
     "InertiaPlugin",
     "CustomEase",
+    "CustomWiggle",
+    "CustomBounce",
     "ScrollToPlugin",
     "TextPlugin",
     "ScrambleTextPlugin",
@@ -245,32 +247,43 @@ fn record_configured_gsap_imports(
         return;
     };
     for specifier in specifiers {
-        let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier else {
-            continue;
-        };
-        if named.import_kind.is_type() {
-            continue;
-        }
-        let imported = named.imported.name();
-        let imported_name = imported.as_str();
-        if imported_name == "gsap" || KNOWN_PLUGINS.contains(&imported_name) {
-            facts
-                .configured_gsap_imports
-                .insert(named.local.name.as_str().to_string());
-            facts
-                .configured_gsap_imports
-                .insert(imported_name.to_string());
-            if imported_name == "gsap" {
+        match specifier {
+            ImportDeclarationSpecifier::ImportSpecifier(named) => {
+                if named.import_kind.is_type() {
+                    continue;
+                }
+                let imported = named.imported.name();
+                let imported_name = imported.as_str();
+                if imported_name == "gsap" || KNOWN_PLUGINS.contains(&imported_name) {
+                    facts
+                        .configured_gsap_imports
+                        .insert(named.local.name.as_str().to_string());
+                    facts
+                        .configured_gsap_imports
+                        .insert(imported_name.to_string());
+                    if imported_name == "gsap" {
+                        facts
+                            .gsap_bindings
+                            .insert(named.local.name.as_str().to_string());
+                    }
+                    if KNOWN_PLUGINS.contains(&imported_name) {
+                        facts.plugin_aliases.insert(
+                            named.local.name.as_str().to_string(),
+                            imported_name.to_string(),
+                        );
+                    }
+                }
+            }
+            ImportDeclarationSpecifier::ImportDefaultSpecifier(default) => {
+                facts
+                    .configured_gsap_imports
+                    .insert(default.local.name.as_str().to_string());
+                facts.configured_gsap_imports.insert("gsap".to_string());
                 facts
                     .gsap_bindings
-                    .insert(named.local.name.as_str().to_string());
+                    .insert(default.local.name.as_str().to_string());
             }
-            if KNOWN_PLUGINS.contains(&imported_name) {
-                facts.plugin_aliases.insert(
-                    named.local.name.as_str().to_string(),
-                    imported_name.to_string(),
-                );
-            }
+            ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => {}
         }
     }
 }
