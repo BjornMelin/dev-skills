@@ -4,7 +4,7 @@
   "status": "archived",
   "archived_at": "2026-06-22T00:00:00Z",
   "replacement": "gsap",
-  "source_path": "plugins/web-motion/skills/gsap-performance",
+  "source_path": "skills/gsap-performance",
   "archived_path": "archive/skills/gsap-performance",
   "reason": "Consolidated into the single 'gsap' skill (skills/gsap), which now owns all GSAP guidance for React/Next and vanilla JS via a lean router plus progressive-disclosure references and a unified gsap-audit CLI. Retained for source history.",
   "restore": "Move back to plugins/web-motion/skills/gsap-performance only if the consolidated 'gsap' skill no longer owns this domain."
