@@ -38,6 +38,7 @@ const KNOWN_PLUGINS: &[&str] = &[
     "DrawSVGPlugin",
     "MorphSVGPlugin",
     "InertiaPlugin",
+    "CustomEase",
 ];
 
 /// GSAP tween factory methods that take a vars object.
@@ -508,6 +509,7 @@ where
         if KNOWN_PLUGINS.contains(&name)
             && !facts.registered.contains(name)
             && !facts.configured_gsap_imports.contains(name)
+            && !facts.configured_gsap_imports.contains("gsap")
         {
             emit(
                 ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,

@@ -169,6 +169,26 @@ fn rule_plugin_used_without_register() {
         r#"gsap.registerPlugin(ScrollTrigger); ScrollTrigger.create({ trigger: ".x" });"#,
     );
     assert!(!fired(&clean, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    let custom_ease = analyze(
+        "src/a.ts",
+        "ts",
+        r#"CustomEase.create("hop", "M0,0 C0.1,0.8 0.2,1 1,0");"#,
+    );
+    assert!(fired(
+        &custom_ease,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let registered_custom_ease = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.registerPlugin(CustomEase); CustomEase.create("hop", "M0,0 C0.1,0.8 0.2,1 1,0");"#,
+    );
+    assert!(!fired(
+        &registered_custom_ease,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
 }
 
 #[test]
@@ -680,6 +700,18 @@ gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
     );
     assert!(!fired(
         &configured_gsap,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured_gsap_direct_plugin = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { gsap } from "@/lib/gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+ScrollTrigger.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(
+        &configured_gsap_direct_plugin,
         ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
     ));
 }
