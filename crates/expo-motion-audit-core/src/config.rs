@@ -74,6 +74,8 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
     // config that relies on the preset (with no explicit worklets plugin) is
     // correct and must not be flagged as missing.
     let has_expo_preset = has_babel_preset_expo(config_object);
+    let has_dynamic_presets = object_has_property(config_object, "presets")
+        && object_property_array(config_object, "presets").is_none();
 
     let Some(plugins) = object_property_array(config_object, "plugins") else {
         // `plugins` is either absent, or present but not an inline array.
@@ -90,6 +92,13 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
         // plugin, so there is nothing to report.
         if has_expo_preset {
             return Vec::new();
+        }
+        if has_dynamic_presets {
+            return vec![unable_to_analyze(
+                relative_path,
+                &line_index,
+                "babel.config `presets` is not an inline array; worklets plugin presence cannot be proven statically.",
+            )];
         }
         // No plugins array at all: the worklets plugin is definitionally missing.
         return vec![missing_or_not_last(
@@ -139,7 +148,13 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
         // The explicit worklets plugin is absent. babel-preset-expo supplies it,
         // so only flag "missing" when the expo preset is not present.
         if !has_expo_preset {
-            if plugin_names.iter().any(Option::is_none) {
+            if has_dynamic_presets {
+                findings.push(unable_to_analyze(
+                    relative_path,
+                    &line_index,
+                    "babel.config `presets` is not an inline array; worklets plugin presence cannot be proven statically.",
+                ));
+            } else if plugin_names.iter().any(Option::is_none) {
                 findings.push(unable_to_analyze(
                     relative_path,
                     &line_index,

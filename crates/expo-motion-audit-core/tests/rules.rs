@@ -233,6 +233,51 @@ fn rule_value_access_inside_worklet_does_not_fire() {
 }
 
 #[test]
+fn rule_value_access_in_non_callback_arguments_still_fires() {
+    let animated_arg = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function C() {
+  const sv = useSharedValue(0);
+  useAnimatedStyle(makeStyle(sv.value));
+  return null;
+}"#,
+    );
+    assert!(fired(
+        &animated_arg,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+
+    let effect_deps = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function C() {
+  const sv = useSharedValue(0);
+  useEffect(() => {}, [sv.value]);
+  return null;
+}"#,
+    );
+    assert!(fired(
+        &effect_deps,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+
+    let schedule_arg = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"function C() {
+  const sv = useSharedValue(0);
+  scheduleOnUI(worklet, sv.value);
+  return null;
+}"#,
+    );
+    assert!(fired(
+        &schedule_arg,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+}
+
+#[test]
 fn rule_value_access_in_jsx_event_handler_does_not_fire() {
     // Writing sv.value inside an onPress handler runs at event time on the JS
     // thread, which is fine -> must not fire.
@@ -293,7 +338,7 @@ fn rule_bridge_in_hot_path_fires_and_outside_does_not() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rule_missing_worklet_fires_for_named_function_and_arrow_is_clean() {
+fn rule_missing_worklet_fires_for_extracted_functions_and_inline_is_clean() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
@@ -303,6 +348,14 @@ fn rule_missing_worklet_fires_for_named_function_and_arrow_is_clean() {
 const d = useDerivedValue(compute);"#,
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_MISSING_WORKLET));
+
+    let bad_arrow = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"const compute = () => sv.value * 2;
+const d = useDerivedValue(compute);"#,
+    );
+    assert!(fired(&bad_arrow, ids::WORKLETS_THREADING_MISSING_WORKLET));
 
     // Inline callbacks -> auto-workletized by babel plugin -> do not fire.
     let clean_arrow = analyze(
@@ -339,6 +392,20 @@ const d = useDerivedValue(compute);"#,
     );
     assert!(!fired(
         &clean_worklet,
+        ids::WORKLETS_THREADING_MISSING_WORKLET
+    ));
+
+    let clean_worklet_arrow = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"const compute = () => {
+  'worklet';
+  return sv.value * 2;
+};
+const d = useDerivedValue(compute);"#,
+    );
+    assert!(!fired(
+        &clean_worklet_arrow,
         ids::WORKLETS_THREADING_MISSING_WORKLET
     ));
 }
@@ -396,6 +463,31 @@ fn rule_missing_reduced_motion_fires_and_referenced_does_not() {
 }"#,
     );
     assert!(fired(&bad, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
+
+    let animated_jsx = analyze(
+        "src/Fade.tsx",
+        "tsx",
+        r#"import Animated, { FadeIn } from "react-native-reanimated";
+function C() {
+  return <Animated.View entering={FadeIn} />;
+}"#,
+    );
+    assert!(fired(
+        &animated_jsx,
+        ids::ACCESSIBILITY_MISSING_REDUCED_MOTION
+    ));
+
+    let plain_layout_prop = analyze(
+        "src/Grid.tsx",
+        "tsx",
+        r#"function C() {
+  return <Grid layout="two-column" />;
+}"#,
+    );
+    assert!(!fired(
+        &plain_layout_prop,
+        ids::ACCESSIBILITY_MISSING_REDUCED_MOTION
+    ));
 
     let clean = analyze(
         "src/Fade.tsx",
@@ -582,6 +674,20 @@ fn babel_config_dynamic_plugins_property_is_informational() {
         "babel.config.js",
         r#"const plugins = ["react-native-worklets/plugin"];
 module.exports = { plugins };"#,
+    );
+    assert!(fired(&dynamic, ids::CONFIG_UNABLE_TO_ANALYZE));
+    assert!(!fired(
+        &dynamic,
+        ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
+    ));
+}
+
+#[test]
+fn babel_config_dynamic_presets_property_is_informational() {
+    let dynamic = analyze_babel_config(
+        "babel.config.js",
+        r#"const presets = ["babel-preset-expo"];
+module.exports = { presets };"#,
     );
     assert!(fired(&dynamic, ids::CONFIG_UNABLE_TO_ANALYZE));
     assert!(!fired(

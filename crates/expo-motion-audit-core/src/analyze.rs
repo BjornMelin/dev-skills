@@ -22,8 +22,8 @@ use std::collections::BTreeMap;
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     Argument, AssignmentTarget, CallExpression, Expression, FunctionBody,
-    ImportDeclarationSpecifier, JSXAttributeName, ObjectExpression, ObjectPropertyKind, Program,
-    PropertyKey, Statement,
+    ImportDeclarationSpecifier, JSXAttributeName, JSXElementName, JSXMemberExpressionObject,
+    ObjectExpression, ObjectPropertyKind, Program, PropertyKey, Statement,
 };
 use oxc_parser::Parser;
 use oxc_semantic::{AstNode, Semantic, SemanticBuilder};
@@ -216,6 +216,7 @@ fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
             AstKind::JSXAttribute(attribute) => {
                 if let Some(name) = jsx_attribute_name(&attribute.name)
                     && matches!(name, "entering" | "exiting" | "layout")
+                    && jsx_attribute_is_reanimated_layout_prop(node.id(), semantic, &facts)
                 {
                     facts.uses_reanimated_animation = true;
                 }
@@ -262,14 +263,31 @@ fn record_imports(import: &oxc_ast::ast::ImportDeclaration<'_>, facts: &mut File
         return;
     };
     for specifier in specifiers {
-        if let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier
-            && named.import_kind.is_value()
-        {
-            let imported = named.imported.name();
-            facts.reanimated_imports.insert(
-                named.local.name.as_str().to_string(),
-                imported.as_str().to_string(),
-            );
+        match specifier {
+            ImportDeclarationSpecifier::ImportSpecifier(named) if named.import_kind.is_value() => {
+                let imported = named.imported.name();
+                facts.reanimated_imports.insert(
+                    named.local.name.as_str().to_string(),
+                    imported.as_str().to_string(),
+                );
+            }
+            ImportDeclarationSpecifier::ImportDefaultSpecifier(default)
+                if source == REANIMATED_MODULE =>
+            {
+                facts.reanimated_imports.insert(
+                    default.local.name.as_str().to_string(),
+                    "default".to_string(),
+                );
+            }
+            ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace)
+                if source == REANIMATED_MODULE =>
+            {
+                facts.reanimated_imports.insert(
+                    namespace.local.name.as_str().to_string(),
+                    "namespace".to_string(),
+                );
+            }
+            _ => {}
         }
     }
 }
@@ -444,7 +462,7 @@ fn check_value_access_on_js<'a, F>(
     if !is_shared_value {
         return;
     }
-    if access_runs_on_ui_or_effect(semantic, node_id) {
+    if access_runs_on_ui_or_effect(semantic, node_id, member.span) {
         return;
     }
     emit(
@@ -752,6 +770,49 @@ fn jsx_attribute_name<'a>(name: &'a JSXAttributeName<'a>) -> Option<&'a str> {
     }
 }
 
+fn jsx_attribute_is_reanimated_layout_prop(
+    node_id: oxc_semantic::NodeId,
+    semantic: &Semantic<'_>,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
+            return jsx_element_name_is_reanimated_animated(&opening.name, facts);
+        }
+        current = parent_id;
+    }
+}
+
+fn jsx_element_name_is_reanimated_animated(name: &JSXElementName<'_>, facts: &FileFacts) -> bool {
+    let JSXElementName::MemberExpression(member) = name else {
+        return false;
+    };
+    jsx_member_root_name(&member.object).is_some_and(|name| {
+        matches!(
+            facts.reanimated_imports.get(name).map(String::as_str),
+            Some("default" | "namespace" | "Animated")
+        )
+    })
+}
+
+fn jsx_member_root_name<'a>(object: &'a JSXMemberExpressionObject<'a>) -> Option<&'a str> {
+    match object {
+        JSXMemberExpressionObject::IdentifierReference(identifier) => {
+            Some(identifier.name.as_str())
+        }
+        JSXMemberExpressionObject::MemberExpression(member) => jsx_member_root_name(&member.object),
+        JSXMemberExpressionObject::ThisExpression(_) => None,
+    }
+}
+
 /// Whether an assignment writes to `<sharedValue>.value`, signaling that a
 /// shared value is being driven. We accept any `something.value = with*(...)`
 /// or `something.value = <expr>` where the RHS is a `with*` factory call, which
@@ -824,24 +885,27 @@ fn identifier_resolves_to_function_body<'a>(
             Some((label, function.span, body))
         }
         AstKind::VariableDeclarator(declarator) => {
-            let Expression::FunctionExpression(function) =
-                declarator.init.as_ref()?.without_parentheses()
-            else {
-                return None;
-            };
-            let body = function.body.as_ref()?;
-            let label = function
+            let init = declarator.init.as_ref()?.without_parentheses();
+            let binding_label = declarator
                 .id
-                .as_ref()
+                .get_binding_identifier()
                 .map(|id| id.name.as_str())
-                .or_else(|| {
-                    declarator
-                        .id
-                        .get_binding_identifier()
-                        .map(|id| id.name.as_str())
-                })
                 .unwrap_or(identifier.name.as_str());
-            Some((label, function.span, body))
+            match init {
+                Expression::FunctionExpression(function) => {
+                    let body = function.body.as_ref()?;
+                    let label = function
+                        .id
+                        .as_ref()
+                        .map(|id| id.name.as_str())
+                        .unwrap_or(binding_label);
+                    Some((label, function.span, body))
+                }
+                Expression::ArrowFunctionExpression(arrow) => {
+                    Some((binding_label, arrow.span, &arrow.body))
+                }
+                _ => None,
+            }
         }
         _ => None,
     }
@@ -860,7 +924,11 @@ fn identifier_resolves_to_function_body<'a>(
 /// value of a JSX event-handler attribute. A bare expression in a JSX attribute
 /// with no intervening function (e.g. `style={{ width: sv.value }}`) is read
 /// during render and stays on the JS render path.
-fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> bool {
+fn access_runs_on_ui_or_effect(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    access_span: Span,
+) -> bool {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
@@ -868,6 +936,7 @@ fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::N
     // Whether we have climbed through a function boundary on the way up. A JSX
     // event handler only exempts the access if a function intervenes.
     let mut passed_through_function = false;
+    let mut function_ancestor_spans = Vec::new();
     loop {
         let parent_id = nodes.parent_id(current);
         if parent_id == current {
@@ -882,9 +951,11 @@ fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::N
                 {
                     return true;
                 }
+                function_ancestor_spans.push(function.span);
                 passed_through_function = true;
             }
-            AstKind::ArrowFunctionExpression(_) => {
+            AstKind::ArrowFunctionExpression(arrow) => {
+                function_ancestor_spans.push(arrow.span);
                 passed_through_function = true;
             }
             AstKind::FunctionBody(body) => {
@@ -894,7 +965,9 @@ fn access_runs_on_ui_or_effect(semantic: &Semantic<'_>, node_id: oxc_semantic::N
             }
             // A function/arrow passed as an argument to an animated hook, gesture
             // callback, event handler, or effect runs off the JS render path.
-            AstKind::CallExpression(call) if call_is_ui_or_effect_context(call) => {
+            AstKind::CallExpression(call)
+                if call_has_ui_or_effect_callback(call, access_span, &function_ancestor_spans) =>
+            {
                 return true;
             }
             // A JSX event-handler prop (`onPress={() => { ... }}`) runs at event
@@ -923,10 +996,13 @@ fn jsx_attribute_is_event_handler(attribute: &oxc_ast::ast::JSXAttribute<'_>) ->
         && chars.next().is_some_and(|c| c.is_ascii_uppercase())
 }
 
-/// Whether a call expression establishes a UI-thread or effect context for its
-/// function argument: animated hooks, gesture worklet methods, `useEffect`/
-/// `useLayoutEffect`, or an explicit `runOnUI`/`scheduleOnUI` wrapper.
-fn call_is_ui_or_effect_context(call: &CallExpression<'_>) -> bool {
+/// Whether a call expression establishes a UI-thread or effect context for the
+/// specific callback containing the shared-value access.
+fn call_has_ui_or_effect_callback(
+    call: &CallExpression<'_>,
+    access_span: Span,
+    function_spans: &[Span],
+) -> bool {
     if let Some(name) = callee_identifier(call)
         && (ANIMATED_HOOKS.contains(&name)
             || matches!(
@@ -934,9 +1010,57 @@ fn call_is_ui_or_effect_context(call: &CallExpression<'_>) -> bool {
                 "useEffect" | "useLayoutEffect" | "runOnUI" | "scheduleOnUI"
             ))
     {
-        return true;
+        let callback_indexes: &[usize] = if name == "useAnimatedReaction" {
+            &[0, 1]
+        } else {
+            &[0]
+        };
+        return callback_indexes.iter().any(|index| {
+            call_argument_has_callback_containing(call, *index, access_span, function_spans)
+        });
     }
     callee_is_gesture_worklet_method(call)
+        && call_argument_has_callback_containing(call, 0, access_span, function_spans)
+}
+
+fn call_argument_has_callback_containing(
+    call: &CallExpression<'_>,
+    index: usize,
+    access_span: Span,
+    function_spans: &[Span],
+) -> bool {
+    let Some(expression) = call.arguments.get(index).and_then(argument_expression) else {
+        return false;
+    };
+    expression_has_callback_containing(expression, access_span, function_spans)
+}
+
+fn expression_has_callback_containing(
+    expression: &Expression<'_>,
+    access_span: Span,
+    function_spans: &[Span],
+) -> bool {
+    match expression.without_parentheses() {
+        Expression::ArrowFunctionExpression(arrow) => {
+            span_contains(arrow.span, access_span)
+                && function_spans.iter().any(|span| *span == arrow.span)
+        }
+        Expression::FunctionExpression(function) => {
+            span_contains(function.span, access_span)
+                && function_spans.iter().any(|span| *span == function.span)
+        }
+        Expression::ObjectExpression(object) => object.properties.iter().any(|property| {
+            let ObjectPropertyKind::ObjectProperty(property) = property else {
+                return false;
+            };
+            expression_has_callback_containing(&property.value, access_span, function_spans)
+        }),
+        _ => false,
+    }
+}
+
+fn span_contains(outer: Span, inner: Span) -> bool {
+    outer.start <= inner.start && inner.end <= outer.end
 }
 
 /// If `node_id` is inside a gesture `onUpdate`/`onChange` callback, return its
