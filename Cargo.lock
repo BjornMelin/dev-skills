@@ -679,6 +679,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "expo-motion-audit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "expo-motion-audit-core",
+ "serde_json",
+]
+
+[[package]]
+name = "expo-motion-audit-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_semantic",
+ "oxc_span",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "fallible-iterator"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

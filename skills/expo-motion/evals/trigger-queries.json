@@ -1,0 +1,27 @@
+[
+  { "query": "swipe-to-dismiss card in my expo app — drag it and it flies off past a threshold or springs back, react native + typescript", "should_trigger": true },
+  { "query": "how do i animate a value smoothly with reanimated, like useSharedValue + withSpring, in my react native app", "should_trigger": true },
+  { "query": "build a draggable bottom sheet in expo that snaps open or closed based on how far you drag", "should_trigger": true },
+  { "query": "i want a collapsing header that shrinks and fades as you scroll down a list in react native", "should_trigger": true },
+  { "query": "animate my flatlist items in when added, out when removed, and reorder smoothly in my rn app", "should_trigger": true },
+  { "query": "my reanimated animations aren't running at all after install in my expo project, nothing moves", "should_trigger": true },
+  { "query": "make a pan/swipe gesture drive an animation with react-native-gesture-handler", "should_trigger": true },
+  { "query": "animated loading spinner with react native skia in expo", "should_trigger": true },
+  { "query": "how do i customize the screen transition / make a modal slide up between routes in expo router", "should_trigger": true },
+  { "query": "i want to animate this screen in my expo app but i'm not sure which library to use", "should_trigger": true },
+  { "query": "my react native animation is janky and seems to block the js thread, how do i get it to 60fps", "should_trigger": true },
+  { "query": "should i use scheduleOnRN or runOnJS to call a js function back from a worklet in reanimated 4", "should_trigger": true },
+
+  { "query": "add a gsap scrolltrigger animation to the hero on my next.js landing page", "should_trigger": false },
+  { "query": "animate this modal's enter/exit with framer motion in my react web app", "should_trigger": false },
+  { "query": "write a pure css @keyframes spinner for my marketing website, no javascript", "should_trigger": false },
+  { "query": "animate a view with a spring in my native swiftui ios app", "should_trigger": false },
+  { "query": "use jetpack compose AnimatedVisibility in my android kotlin app", "should_trigger": false },
+  { "query": "embed and play a lottie animation on my website using lottie-web", "should_trigger": false },
+  { "query": "rotate a 3d model continuously with react-three-fiber on my web app", "should_trigger": false },
+  { "query": "just style my react native screen with nativewind utility classes, no animation needed", "should_trigger": false },
+  { "query": "animate transitions between bar chart states with d3 in my web dashboard", "should_trigger": false },
+  { "query": "autoplay and loop a muted background mp4 video in my react native screen", "should_trigger": false },
+  { "query": "set up expo router stack navigation and routing for my app's screens", "should_trigger": false },
+  { "query": "port my flutter implicit animation to dart for my flutter app", "should_trigger": false }
+]

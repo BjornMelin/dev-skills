@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "native-three-r3f",
+  "status": "archived",
+  "archived_at": "2026-06-23T00:00:00Z",
+  "replacement": "expo-motion",
+  "source_path": "plugins/native-motion/skills/native-three-r3f",
+  "archived_path": "archive/skills/native-three-r3f",
+  "reason": "Coverage moved to a concise tier in expo-motion (skills/expo-motion/references/assets-lottie-rive-3d.md), which routes deep asset/3D work to official docs. Retained for source history.",
+  "restore": "Move back to plugins/native-motion/skills/native-three-r3f only if this asset lane needs a dedicated skill again."
+}

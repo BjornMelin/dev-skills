@@ -6,6 +6,8 @@ members = [
     "crates/codex-dev",
     "crates/codex-dev-tui",
     "crates/codex-research",
+    "crates/expo-motion-audit-core",
+    "crates/expo-motion-audit",
     "crates/gsap-audit-core",
     "crates/gsap-audit",
 ]

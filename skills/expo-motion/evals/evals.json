@@ -1,0 +1,103 @@
+{
+  "skill_name": "expo-motion",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "In my Expo (React Native) app I want a swipe-to-dismiss card: drag it horizontally, and if you throw it past a threshold it dismisses (calls onDismiss), otherwise it springs back. TypeScript.",
+      "expected_output": "A component using react-native-gesture-handler Gesture.Pan + GestureDetector driving a Reanimated shared value, springing back under threshold, calling onDismiss via scheduleOnRN from the worklet, animating transform (not layout), with a reduced-motion path and cleanup.",
+      "files": [],
+      "assertions": [
+        "Uses react-native-reanimated shared values + useAnimatedStyle (not React state per frame) and animates transform/opacity, not layout props",
+        "Uses react-native-gesture-handler Gesture.Pan() + GestureDetector for the drag",
+        "Calls the JS onDismiss from the worklet via scheduleOnRN (or notes runOnJS is deprecated), not a bare JS call inside the worklet",
+        "Springs back with withSpring when under the dismiss threshold",
+        "Provides a prefers-reduced-motion path (useReducedMotion) that still dismisses but without the throw animation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add a collapsing header to a scroll screen in my Expo app — the header should shrink/fade as the user scrolls down. RN + TypeScript.",
+      "expected_output": "Uses Reanimated useScrollOffset (current) / useAnimatedScrollHandler with an Animated.ScrollView, interpolates header translateY/opacity from scroll offset on the UI thread with Extrapolation.CLAMP, and a reduced-motion fallback.",
+      "files": [],
+      "assertions": [
+        "Drives the header from scroll offset on the UI thread (useScrollOffset or useAnimatedScrollHandler), not JS onScroll setState",
+        "Uses interpolate with Extrapolation.CLAMP on transform/opacity (not animating header height/layout)",
+        "Uses useScrollOffset (current) rather than the deprecated useScrollViewOffset, or useAnimatedScrollHandler",
+        "Mentions a reduced-motion fallback (static header) while content still scrolls"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have a FlatList in my React Native app. I want items to animate in when added, out when removed, and smoothly reorder. TypeScript.",
+      "expected_output": "Uses Reanimated layout animations: entering/exiting presets on Animated.View rows + itemLayoutAnimation={LinearTransition} on Animated.FlatList, stable keyExtractor, and .reduceMotion(ReduceMotion.System).",
+      "files": [],
+      "assertions": [
+        "Uses Reanimated layout animations (entering/exiting presets like FadeIn*/FadeOut and LinearTransition) rather than manual per-item animation",
+        "Applies itemLayoutAnimation (or layout) for reorder on the list",
+        "Notes a stable keyExtractor is required for correct enter/exit/reorder",
+        "Honors reduced motion via .reduceMotion(ReduceMotion.System) or equivalent",
+        "Does not animate layout-thrashing properties manually"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "My Reanimated animations aren't running at all in my Expo project after install. How do I set it up correctly?",
+      "expected_output": "Guidance: Reanimated 4 requires the New Architecture (newArchEnabled); install react-native-reanimated + react-native-worklets; the react-native-worklets/plugin babel plugin must be last (auto via babel-preset-expo); use expo install --check; use a development build (not Expo Go).",
+      "files": [],
+      "assertions": [
+        "States Reanimated 4 requires the New Architecture (Fabric) enabled",
+        "Says the react-native-worklets/plugin babel plugin must be listed last (and is auto-included by babel-preset-expo)",
+        "Mentions installing react-native-worklets alongside react-native-reanimated and using expo install / --check for compatible versions",
+        "Notes native modules need a development build, not Expo Go"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Build a draggable bottom sheet in Expo that snaps open or closed based on drag distance/velocity. TypeScript.",
+      "expected_output": "Gesture.Pan with a clamped translateY shared value, snapping to open/closed with withSpring using velocity, reduced-motion path, transform-based, cleanup.",
+      "files": [],
+      "assertions": [
+        "Uses Gesture.Pan + GestureDetector and a clamped translateY shared value",
+        "Snaps to the nearest snap point with withSpring (optionally using gesture velocity)",
+        "Animates transform (translateY), not layout height",
+        "Includes a reduced-motion path (snap without the spring animation)"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Create an animated loading spinner using React Native Skia in my Expo app. TypeScript.",
+      "expected_output": "A Skia Canvas with a rotating Group driven by useClock/useDerivedValue (shared values passed directly to Skia props), a reduced-motion static fallback, and an accessibility label on the opaque canvas.",
+      "files": [],
+      "assertions": [
+        "Uses @shopify/react-native-skia Canvas with shared/derived values passed directly into Skia props (useClock or useDerivedValue)",
+        "Drives the rotation on the UI thread without per-frame React state",
+        "Provides a reduced-motion fallback (static frame) since a perpetual spinner is exactly what reduced motion should suppress",
+        "Wraps the opaque canvas with an accessibility label/role"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "I'm using Expo Router. How do I customize the transition animation between screens (e.g. a modal that slides up)?",
+      "expected_output": "Configure the transition on the route via Stack/native-stack screenOptions or per-screen options (animation, presentation: 'modal'), not by reimplementing with Reanimated; reduced-motion note (animation: 'fade'/'none').",
+      "files": [],
+      "assertions": [
+        "Configures the transition via Expo Router Stack screenOptions / Stack.Screen options (animation, presentation: 'modal')",
+        "Explains navigation/react-native-screens owns the screen transition lifecycle (don't reimplement it with screen-level Reanimated)",
+        "Mentions cleaning up in-screen Reanimated animations on blur/unmount",
+        "Notes a reduced-motion option (e.g. animation: 'fade' or 'none')"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "My React Native animation is janky and seems to block the JS thread. How do I make it smooth?",
+      "expected_output": "Keep transient motion in Reanimated shared values on the UI thread (no per-frame setState), animate transform/opacity not layout props, avoid runOnJS/scheduleOnRN in high-frequency gesture callbacks, mark callbacks worklet, profile.",
+      "files": [],
+      "assertions": [
+        "Explains motion should run on the UI thread via shared values/worklets, not per-frame React setState on the JS thread",
+        "Recommends animating transform/opacity instead of layout properties (width/height/top/left)",
+        "Warns against calling back to JS (scheduleOnRN/runOnJS) inside high-frequency per-frame/gesture callbacks",
+        "Mentions the New Architecture / worklet execution or profiling (Perf monitor / Reanimated devtools)"
+      ]
+    }
+  ]
+}

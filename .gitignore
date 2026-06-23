@@ -81,6 +81,7 @@ crates/codex-dev/.pr_view_count
 
 # Skill-creator eval/benchmark workspaces (transient)
 /gsap-workspace/
+/expo-motion-workspace/
 .agents/
 skills-lock.json
 
