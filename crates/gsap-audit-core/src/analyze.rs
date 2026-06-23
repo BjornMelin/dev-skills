@@ -67,6 +67,10 @@ const DEV_ONLY_PLUGINS: &[&str] = &["GSDevTools", "MotionPathHelper"];
 /// GSAP tween factory methods that take a vars object.
 const TWEEN_METHODS: &[&str] = &["to", "from", "fromTo", "set"];
 
+/// Timeline methods that return the timeline and can appear before a tween in a
+/// fluent chain.
+const TIMELINE_CHAIN_METHODS: &[&str] = &["add", "addLabel"];
+
 /// Layout properties that force reflow when animated; transforms are preferred.
 const LAYOUT_PROPS: &[&str] = &[
     "top",
@@ -714,6 +718,13 @@ fn check_call<'a, F>(
     {
         check_scrolltrigger_config_object(object, emit);
     }
+    // ScrollTrigger.batch(targets, {...}): the second argument is a config.
+    if is_plugin_member_call(call, facts, "ScrollTrigger", "batch")
+        && let Some(config) = call.arguments.get(1).and_then(argument_expression)
+        && let Expression::ObjectExpression(object) = config.without_parentheses()
+    {
+        check_scrolltrigger_config_object(object, emit);
+    }
 
     // Rule 8: plugin used without registration.
     check_plugin_used_without_register(call, facts, emit);
@@ -1172,10 +1183,20 @@ fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts
                 || facts.timeline_handles.contains(identifier.name.as_str())
         }
         Expression::CallExpression(call) => {
-            is_gsap_member_call(call, facts, "timeline") || gsap_tween_method(call, facts).is_some()
+            is_gsap_member_call(call, facts, "timeline")
+                || gsap_tween_method(call, facts).is_some()
+                || timeline_chain_method_returns_timeline(call, facts)
         }
         _ => false,
     }
+}
+
+fn timeline_chain_method_returns_timeline(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
+    let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
+        return false;
+    };
+    TIMELINE_CHAIN_METHODS.contains(&member.property.name.as_str())
+        && expression_is_gsap_tween_owner(&member.object, facts)
 }
 
 fn expression_is_gsap_timeline_call(expression: &Expression<'_>, facts: &FileFacts) -> bool {

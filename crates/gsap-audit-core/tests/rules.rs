@@ -141,6 +141,13 @@ fn rule_scrub_with_toggleactions_conflict() {
         r#"ScrollTrigger.create({ trigger: ".x", scrub: true });"#,
     );
     assert!(!fired(&clean, ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS));
+
+    let batch = analyze(
+        "src/a.ts",
+        "ts",
+        r#"ScrollTrigger.batch(".card", { scrub: true, toggleActions: "play none none reverse" });"#,
+    );
+    assert!(fired(&batch, ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS));
 }
 
 #[test]
@@ -736,6 +743,13 @@ fn rule_markers_in_nested_scrolltrigger_fires() {
         r#"gsap.timeline({ scrollTrigger: { trigger: ".x", markers: true } });"#,
     );
     assert!(fired(&timeline, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+
+    let batch = analyze(
+        "src/a.ts",
+        "ts",
+        r#"ScrollTrigger.batch(".card", { markers: true });"#,
+    );
+    assert!(fired(&batch, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
 }
 
 #[test]
@@ -825,6 +839,23 @@ fn rule_timeline_tween_calls_are_audited() {
         r#"gsap.timeline().to(".a", { x: 100 }).to(".b", { top: 0 });"#,
     );
     assert!(fired(&fluent_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
+
+    let label_then_layout = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline().addLabel("intro").to(".box", { top: 0 });"#,
+    );
+    assert!(fired(&label_then_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
+
+    let add_then_plugin_vars = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline().add(() => {}).to(".box", { motionPath: true });"#,
+    );
+    assert!(fired(
+        &add_then_plugin_vars,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
 
     let positioned_layout = analyze(
         "src/a.ts",
