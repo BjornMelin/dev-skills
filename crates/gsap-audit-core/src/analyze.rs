@@ -41,6 +41,10 @@ const KNOWN_PLUGINS: &[&str] = &[
     "CustomEase",
     "ScrollToPlugin",
     "TextPlugin",
+    "ScrambleTextPlugin",
+    "Physics2DPlugin",
+    "PhysicsPropsPlugin",
+    "PixiPlugin",
 ];
 
 const PLUGIN_VARS: &[(&str, &str)] = &[
@@ -50,6 +54,10 @@ const PLUGIN_VARS: &[(&str, &str)] = &[
     ("text", "TextPlugin"),
     ("scrollTo", "ScrollToPlugin"),
     ("inertia", "InertiaPlugin"),
+    ("scrambleText", "ScrambleTextPlugin"),
+    ("physics2D", "Physics2DPlugin"),
+    ("physicsProps", "PhysicsPropsPlugin"),
+    ("pixi", "PixiPlugin"),
 ];
 
 /// GSAP tween factory methods that take a vars object.
@@ -1110,42 +1118,24 @@ fn expression_is_gsap_timeline_call(expression: &Expression<'_>, facts: &FileFac
 
 /// Return every vars object literal for a tween call.
 ///
-/// `to`/`from`/`set(target, vars)` carry one vars object (the last argument).
-/// `fromTo(target, fromVars, toVars)` carries two: layout-prop and config rules
-/// must scan BOTH, since either object can set offending properties.
+/// `to`/`from`/`set(target, vars[, position])` carry one vars object.
+/// `fromTo(target, fromVars, toVars[, position])` carries two: layout-prop and
+/// config rules must scan BOTH, since either object can set offending properties.
 fn tween_vars_objects<'a>(
     call: &'a CallExpression<'a>,
     method: &str,
 ) -> Vec<&'a ObjectExpression<'a>> {
-    let argument_count = call.arguments.len();
-    let mut indices: Vec<usize> = Vec::new();
-    match method {
-        // fromTo(target, fromVars, toVars): the last two arguments.
-        "fromTo" => {
-            if let Some(to_index) = argument_count.checked_sub(1) {
-                if let Some(from_index) = argument_count.checked_sub(2) {
-                    indices.push(from_index);
-                }
-                indices.push(to_index);
-            }
-        }
-        // to/from/set(target, vars): vars is the last argument.
-        _ => {
-            if let Some(index) = argument_count.checked_sub(1) {
-                indices.push(index);
-            }
-        }
-    }
-
-    indices
-        .into_iter()
-        .filter_map(|index| {
-            let argument = call.arguments.get(index)?;
+    let needed = if method == "fromTo" { 2 } else { 1 };
+    call.arguments
+        .iter()
+        .skip(1)
+        .filter_map(|argument| {
             match argument_expression(argument).map(Expression::without_parentheses) {
                 Some(Expression::ObjectExpression(object)) => Some(object.as_ref()),
                 _ => None,
             }
         })
+        .take(needed)
         .collect()
 }
 

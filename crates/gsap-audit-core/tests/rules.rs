@@ -739,6 +739,13 @@ fn rule_timeline_tween_calls_are_audited() {
     );
     assert!(fired(&fluent_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
 
+    let positioned_layout = analyze(
+        "src/a.ts",
+        "ts",
+        r#"const tl = gsap.timeline(); tl.to(".box", { top: 0 }, "<");"#,
+    );
+    assert!(fired(&positioned_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
+
     let fluent_scrolltrigger = analyze(
         "src/a.ts",
         "ts",
@@ -860,6 +867,10 @@ fn rule_plugin_vars_without_register_fire() {
         "text",
         "scrollTo",
         "inertia",
+        "scrambleText",
+        "physics2D",
+        "physicsProps",
+        "pixi",
     ] {
         let source = format!(r#"gsap.to(el, {{ {vars_key}: true }});"#);
         let bad = analyze("src/a.ts", "ts", &source);
