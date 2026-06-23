@@ -97,8 +97,8 @@ cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
 
 `gsap-audit` is the optional companion CLI for the standalone `gsap` skill. It
 statically audits GSAP usage in JS/TS/JSX/TSX with oxc and exits `2` when any
-high-severity finding is present, `0` when clean or low-only, and `1` on usage
-or IO error. See [gsap-audit reference](../reference/gsap-audit.md) for the
+medium- or high-severity finding is present, `0` when clean or low-only, and
+`1` on usage or IO error. See [gsap-audit reference](../reference/gsap-audit.md) for the
 command surface and rule categories.
 
 ## codex-dev Operating Layer

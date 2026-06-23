@@ -1093,7 +1093,9 @@ fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts
             is_gsap_identifier(identifier.name.as_str(), facts)
                 || facts.timeline_handles.contains(identifier.name.as_str())
         }
-        Expression::CallExpression(call) => is_gsap_member_call(call, facts, "timeline"),
+        Expression::CallExpression(call) => {
+            is_gsap_member_call(call, facts, "timeline") || gsap_tween_method(call, facts).is_some()
+        }
         _ => false,
     }
 }

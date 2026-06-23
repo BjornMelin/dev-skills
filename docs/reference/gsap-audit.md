@@ -155,12 +155,12 @@ total finding count plus counts grouped by severity and by category.
 `gsap-audit scan` uses exit codes as a CI-friendly contract:
 
 - `0`: clean, or only low-severity findings were reported.
-- `2`: at least one high-severity finding is present.
+- `2`: at least one medium- or high-severity finding is present.
 - `1`: a usage or IO error occurred (for example an unreadable root or invalid
   arguments).
 
-This lets a CI gate fail on high-severity GSAP anti-patterns while still
-surfacing lower-severity findings as advisory output.
+This lets a CI gate fail on actionable GSAP anti-patterns while still surfacing
+low-severity findings as advisory output.
 
 ## Validation
 

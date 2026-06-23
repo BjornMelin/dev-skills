@@ -2,7 +2,7 @@
 //!
 //! Thin clap-derive front end over `gsap-audit-core`. Exit codes:
 //! - 0: no findings, or only low-severity findings.
-//! - 2: at least one high-severity finding.
+//! - 2: at least one medium- or high-severity finding.
 //! - 1: usage or IO error.
 
 use std::collections::BTreeSet;
@@ -37,7 +37,7 @@ struct Cli {
 enum Commands {
     #[command(
         about = "Scan a directory tree for GSAP anti-patterns.",
-        long_about = "Walk the given root, parse every supported source file, and report findings. Exit code is 2 when any high-severity finding is present, otherwise 0.",
+        long_about = "Walk the given root, parse every supported source file, and report findings. Exit code is 2 when any medium- or high-severity finding is present, otherwise 0.",
         after_long_help = "Example:\n  gsap-audit scan --root . --format json --categories react,core"
     )]
     Scan {
@@ -183,9 +183,9 @@ fn run_scan(
         None => print_line(&rendered)?,
     }
 
-    // Exit-code contract: 2 if any high-severity finding, else 0.
+    // Exit-code contract: 2 if any medium- or high-severity finding, else 0.
     let code = match highest_severity(&outcome.findings) {
-        Some(Severity::High) => 2,
+        Some(Severity::High | Severity::Medium) => 2,
         _ => 0,
     };
     Ok(code)
@@ -227,6 +227,8 @@ fn print_line(text: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn verify_cli() {
@@ -250,5 +252,52 @@ mod tests {
     #[test]
     fn parse_categories_rejects_unknown() {
         assert!(parse_categories(Some("bogus")).is_err());
+    }
+
+    #[test]
+    fn scan_exits_two_for_medium_findings() {
+        let root = temp_scan_root("medium");
+        fs::write(root.join("app.ts"), "gsap.ticker.lagSmoothing(0);\n").unwrap();
+
+        let code = run_scan(
+            root.clone(),
+            OutputFormat::Json,
+            Some("performance"),
+            Some(root.join("out.json")),
+            5000,
+        )
+        .unwrap();
+
+        assert_eq!(code, 2);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn scan_exits_zero_when_clean() {
+        let root = temp_scan_root("clean");
+        fs::write(root.join("app.ts"), "const value = 1;\n").unwrap();
+
+        let code = run_scan(
+            root.clone(),
+            OutputFormat::Json,
+            None,
+            Some(root.join("out.json")),
+            5000,
+        )
+        .unwrap();
+
+        assert_eq!(code, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn temp_scan_root(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("gsap-audit-{name}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        root
     }
 }

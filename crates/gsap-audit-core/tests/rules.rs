@@ -720,6 +720,23 @@ fn rule_timeline_tween_calls_are_audited() {
     );
     assert!(fired(&chained_signature, ids::CORE_GSAP2_SIGNATURE));
 
+    let fluent_layout = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline().to(".a", { x: 100 }).to(".b", { top: 0 });"#,
+    );
+    assert!(fired(&fluent_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
+
+    let fluent_scrolltrigger = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline().to(".a", { x: 100 }).to(".b", { scrollTrigger: { markers: true } });"#,
+    );
+    assert!(fired(
+        &fluent_scrolltrigger,
+        ids::SCROLLTRIGGER_MARKERS_IN_PROD
+    ));
+
     let alias_scrolltrigger = analyze(
         "src/a.ts",
         "ts",
