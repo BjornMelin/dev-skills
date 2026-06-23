@@ -21,6 +21,8 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `crates/bun-platform/`: temporary Bun platform compatibility CLI shim over `bun-platform-core`.
 - `crates/gsap-audit-core/`: oxc-based static-analysis library powering the gsap skill's audit CLI.
 - `crates/gsap-audit/`: Rust CLI that audits GSAP usage in JS/TS/JSX/TSX.
+- `crates/expo-motion-audit-core/`: oxc-based static-analysis library powering the expo-motion skill's audit CLI.
+- `crates/expo-motion-audit/`: Rust CLI that audits Expo/React Native (Reanimated 4) motion usage in JS/TS/JSX/TSX + config.
 - `docs/`: tracked documentation portal, references, cookbooks, prompts, and runbooks.
 
 Example skill path: `skills/docker-architect/SKILL.md`.
@@ -62,7 +64,7 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Any skill: `python3 tools/skill/quick_validate.py skills/<skill-name>`
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
 - Plugin skills: `for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
-- Local plugins: `node plugins/web-motion/scripts/validate-atomic-skills.mjs`, `node plugins/native-motion/scripts/validate-atomic-skills.mjs`, and `rg --files -g '*.json' plugins | xargs -r jq empty`
+- Local plugins: `node plugins/web-motion/scripts/validate-atomic-skills.mjs` and `rg --files -g '*.json' plugins | xargs -r jq empty`
 - Python helpers: `python3 -m compileall -q skills tools subagents/codex/scripts`
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
@@ -71,6 +73,7 @@ There is no single repo-wide test harness. Treat the following as the required g
 - Research CLI: `cargo fmt --all --check`, `cargo clippy -p codex-research --all-targets -- -D warnings`, `cargo check -p codex-research`, `cargo test -p codex-research`, `cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh`, `cargo run -q -p codex-research -- manpage >/tmp/codex-research.1`
 - Development core/CLI: `cargo fmt --all --check`, `cargo clippy -p codex-dev-core --all-targets -- -D warnings`, `cargo clippy -p codex-dev --all-targets -- -D warnings`, `cargo check -p codex-dev-core`, `cargo check -p codex-dev`, `cargo test -p codex-dev-core`, `cargo test -p codex-dev`, `cargo run -q -p codex-dev -- --help`, `cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh`, `cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1`, `cargo run -q -p codex-dev -- --json policy explain --profile full_local`, `cargo run -q -p codex-dev -- --json policy docs-check`, `cargo run -q -p codex-dev -- --json local doctor`, `cargo run -q -p codex-dev -- --json local status`, `cargo run -q -p codex-dev -- --json skills inventory`, `cargo run -q -p codex-dev -- --json bootstrap status`, `cargo run -q -p codex-dev -- --json task list`, `cargo run -q -p codex-dev -- --json research import-bundle --help`, `cargo run -q -p codex-dev -- --json orchestration verify --help`, `cargo run -q -p codex-dev -- --json pr plan --repo BjornMelin/dev-skills --number 25`, `cargo run -q -p codex-dev -- --json pr agent --help`, `cargo run -q -p codex-dev -- --json pr agent-action --help`, `cargo run -q -p codex-dev -- --json pr review --help`, `cargo run -q -p codex-dev -- --json pr readiness --help`, `cargo run -q -p codex-dev -- --json review --help`, `cargo run -q -p codex-dev -- --json commit plan --help`, `cargo run -q -p codex-dev -- --json commit validate --subject "fix(codex-dev): preserve review-thread closeout evidence"`; run the task capsule, orchestration, and PR fixture smoke in `docs/runbooks/validation.md` when capsule, orchestration, policy, or PR recording behavior changes.
 - GSAP audit core/CLI: `cargo fmt --all --check`, `cargo clippy -p gsap-audit-core -p gsap-audit --all-targets -- -D warnings`, `cargo check -p gsap-audit-core -p gsap-audit`, `cargo test -p gsap-audit-core -p gsap-audit`, and a CLI smoke `cargo run -q -p gsap-audit -- doctor`.
+- Expo-motion audit core/CLI: `cargo fmt --all --check`, `cargo clippy -p expo-motion-audit-core -p expo-motion-audit --all-targets -- -D warnings`, `cargo check -p expo-motion-audit-core -p expo-motion-audit`, `cargo test -p expo-motion-audit-core -p expo-motion-audit`, and a CLI smoke `cargo run -q -p expo-motion-audit -- doctor`.
 - Local release/supply-chain: run the baseline in `docs/runbooks/local-release-supply-chain.md`, including `cargo metadata --locked --no-deps --format-version 1`, `cargo tree -d --target all`, `cargo deny check bans licenses sources`, `cargo package --list` for every workspace crate, and explicit networked advisory checks (`cargo deny check advisories`, `cargo audit`) when release evidence requires them.
 
 Machine-owned policy command smoke mirror, checked by `cargo run -q -p codex-dev -- --json policy docs-check`:
@@ -119,7 +122,7 @@ This repo may not have established git history conventions yet. Use clear, scope
 - Validation commands run (at minimum `python3 tools/skill/quick_validate.py skills/<skill-name>`)
 - If you add or rename a skill, update the catalog table in `README.md` (keep rows sorted by skill name)
 - If you add or materially change docs, update `docs/index.md`
-- If you change `codex-dev-core`, `codex-dev`, `codex-dev-tui`, `codex-research`, `bun-platform-core`, `bun-platform`, `gsap-audit-core`, or `gsap-audit`, update the CLI/TUI and crate references under `docs/reference/`
+- If you change `codex-dev-core`, `codex-dev`, `codex-dev-tui`, `codex-research`, `bun-platform-core`, `bun-platform`, `gsap-audit-core`, `gsap-audit`, `expo-motion-audit-core`, or `expo-motion-audit`, update the CLI/TUI and crate references under `docs/reference/`
 - If you built/published bundles, say where (release assets/registry)
 
 ## Security & Configuration Tips

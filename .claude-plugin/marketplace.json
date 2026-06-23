@@ -8,24 +8,6 @@
   },
   "plugins": [
     {
-      "name": "native-motion",
-      "description": "Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references.",
-      "author": {
-        "name": "Bjorn Melin",
-        "url": "https://github.com/BjornMelin"
-      },
-      "source": "./plugins/native-motion",
-      "category": "design",
-      "tags": [
-        "expo",
-        "react-native",
-        "motion",
-        "animation",
-        "design"
-      ],
-      "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/native-motion"
-    },
-    {
       "name": "web-motion",
       "description": "Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references.",
       "author": {

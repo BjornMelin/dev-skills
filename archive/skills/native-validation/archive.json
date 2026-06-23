@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "native-validation",
+  "status": "archived",
+  "archived_at": "2026-06-23T00:00:00Z",
+  "replacement": "expo-motion",
+  "source_path": "plugins/native-motion/skills/native-validation",
+  "archived_path": "archive/skills/native-validation",
+  "reason": "Consolidated (deep coverage) into the single expo-motion skill (skills/expo-motion), which owns Expo/React Native motion guidance via a lean router plus progressive-disclosure references and the expo-motion-audit CLI. Retained for source history.",
+  "restore": "Move back to plugins/native-motion/skills/native-validation only if the consolidated expo-motion skill no longer owns this domain."
+}

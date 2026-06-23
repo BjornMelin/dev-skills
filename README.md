@@ -37,6 +37,7 @@ Key docs:
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
 - [gsap-audit reference](docs/reference/gsap-audit.md)
+- [expo-motion-audit reference](docs/reference/expo-motion-audit.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -89,6 +90,8 @@ crates/
   codex-research/         # Rust CLI for evidence-first research helpers
   gsap-audit-core/        # oxc-based static-analysis engine for the gsap skill
   gsap-audit/             # Rust CLI that audits GSAP usage in JS/TS/JSX/TSX
+  expo-motion-audit-core/ # oxc-based static-analysis engine for the expo-motion skill
+  expo-motion-audit/      # Rust CLI that audits Expo/React Native motion (Reanimated) usage
 docs/
   index.md                # documentation portal
   architecture/           # system design
@@ -237,13 +240,14 @@ active catalog.
 
 ### Local Plugin Skill Bundles
 
-Install both motion plugins in Claude Code:
+Install the web-motion plugin in Claude Code:
 
 ```bash
-claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/native-motion
+claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion
 claude plugin install web-motion@bjorn-dev-skills
-claude plugin install native-motion@bjorn-dev-skills
 ```
+
+(The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)
 
 After installing inside an active Claude Code session, run `/reload-plugins`.
 See the [Claude Code motion plugin install cookbook](docs/cookbooks/claude-code-motion-plugins.md)
@@ -251,7 +255,6 @@ for local development and validation commands.
 
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
-| `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [Codex](plugins/native-motion/.codex-plugin/plugin.json), [Claude Code](plugins/native-motion/.claude-plugin/plugin.json) |
 | `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
@@ -280,6 +283,7 @@ for local development and validation commands.
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
 | `docs-align` | Post-implement docs alignment: drift detection, ADRs, specs, README, `AGENTS.md`. | [skills/docs-align/SKILL.md](skills/docs-align/SKILL.md) |
+| `expo-motion` | Master Expo/React Native motion skill for iOS/Android: Reanimated 4, worklets, gestures, layout animations, scroll, Expo Router/native-stack transitions, NativeWind boundaries, accessibility/performance, React Native Skia, and validation — with an Expo/RN recipe cookbook and the `expo-motion-audit` CLI. | [skills/expo-motion/SKILL.md](skills/expo-motion/SKILL.md) |
 | `firecrawl` | Firecrawl CLI for search, scrape, map, crawl, interact, monitor, download, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
