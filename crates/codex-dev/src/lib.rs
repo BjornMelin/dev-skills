@@ -9005,6 +9005,7 @@ fn release_gates() -> Vec<PolicyGate> {
     );
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, gsap_audit_gates());
     append_unique_gates(&mut gates, docs_gates());
     append_unique_gates(&mut gates, vec![bootstrap_pack_validate_gate()]);
     append_unique_gates(&mut gates, skills_gates());
@@ -10886,6 +10887,11 @@ enabled = false
                 "codex-research-plan-quick",
                 "codex-research-completion-zsh",
                 "codex-research-manpage",
+                "gsap-audit-clippy",
+                "gsap-audit-check",
+                "gsap-audit-test",
+                "gsap-audit-doctor",
+                "gsap-audit-completion-zsh",
                 "docs-no-todo",
                 "bootstrap-pack-validate",
                 "skills-quick-validate-all",

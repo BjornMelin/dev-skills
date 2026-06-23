@@ -113,6 +113,8 @@ struct FileFacts {
     timeline_handles: BTreeSet<String>,
     /// Local import aliases for known plugins, keyed by local binding.
     plugin_aliases: BTreeMap<String, String>,
+    /// Local import aliases for dev-only helpers, keyed by local binding.
+    dev_only_aliases: BTreeMap<String, String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -355,6 +357,7 @@ fn record_plugin_import_aliases(
         return;
     }
     let source_plugin = plugin_name_from_import_source(source);
+    let source_dev_only = dev_only_name_from_import_source(source);
     let Some(specifiers) = &import.specifiers else {
         return;
     };
@@ -366,13 +369,20 @@ fn record_plugin_import_aliases(
                 }
                 let imported = named.imported.name();
                 let imported_name = imported.as_str();
-                let Some(plugin) = plugin_name_for_known_or_default(imported_name, source_plugin)
-                else {
-                    continue;
-                };
-                facts
-                    .plugin_aliases
-                    .insert(named.local.name.as_str().to_string(), plugin.to_string());
+                let local_name = named.local.name.as_str().to_string();
+                if let Some(plugin) = plugin_name_for_known_or_default(imported_name, source_plugin)
+                {
+                    facts
+                        .plugin_aliases
+                        .insert(local_name.clone(), plugin.to_string());
+                }
+                if let Some(dev_only) =
+                    dev_only_name_for_known_or_default(imported_name, source_dev_only)
+                {
+                    facts
+                        .dev_only_aliases
+                        .insert(local_name, dev_only.to_string());
+                }
             }
             ImportDeclarationSpecifier::ImportDefaultSpecifier(default) => {
                 if let Some(plugin) = source_plugin {
@@ -380,8 +390,21 @@ fn record_plugin_import_aliases(
                         .plugin_aliases
                         .insert(default.local.name.as_str().to_string(), plugin.to_string());
                 }
+                if let Some(dev_only) = source_dev_only {
+                    facts.dev_only_aliases.insert(
+                        default.local.name.as_str().to_string(),
+                        dev_only.to_string(),
+                    );
+                }
             }
-            ImportDeclarationSpecifier::ImportNamespaceSpecifier(_) => {}
+            ImportDeclarationSpecifier::ImportNamespaceSpecifier(namespace) => {
+                if let Some(dev_only) = source_dev_only {
+                    facts.dev_only_aliases.insert(
+                        namespace.local.name.as_str().to_string(),
+                        dev_only.to_string(),
+                    );
+                }
+            }
         }
     }
 }
@@ -450,11 +473,37 @@ fn plugin_name_from_import_source(source: &str) -> Option<&str> {
     KNOWN_PLUGINS.contains(&name).then_some(name)
 }
 
+fn dev_only_name_from_import_source(source: &str) -> Option<&str> {
+    let name = source.rsplit('/').next()?;
+    DEV_ONLY_PLUGINS.contains(&name).then_some(name)
+}
+
 fn plugin_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Option<&'a str> {
     if KNOWN_PLUGINS.contains(&name) {
         Some(name)
     } else {
         facts.plugin_aliases.get(name).map(String::as_str)
+    }
+}
+
+fn dev_only_name_for_known_or_default<'a>(
+    imported_name: &'a str,
+    source_dev_only: Option<&'a str>,
+) -> Option<&'a str> {
+    if DEV_ONLY_PLUGINS.contains(&imported_name) {
+        Some(imported_name)
+    } else if imported_name == "default" {
+        source_dev_only
+    } else {
+        None
+    }
+}
+
+fn dev_only_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Option<&'a str> {
+    if DEV_ONLY_PLUGINS.contains(&name) {
+        Some(name)
+    } else {
+        facts.dev_only_aliases.get(name).map(String::as_str)
     }
 }
 
@@ -526,11 +575,12 @@ fn check_node<'a, F>(
         // Rule 2: dev-only helpers referenced in non-test source. Skip TS
         // type-only positions (e.g. `let x: GSDevTools`), which are erased at build time.
         AstKind::IdentifierReference(identifier)
-            if DEV_ONLY_PLUGINS.contains(&identifier.name.as_str())
+            if dev_only_name_for_identifier(identifier.name.as_str(), facts).is_some()
                 && !is_test_or_fixture_path(relative_path)
                 && !reference_is_ts_type_position(semantic, node.id()) =>
         {
-            let name = identifier.name.as_str();
+            let name = dev_only_name_for_identifier(identifier.name.as_str(), facts)
+                .unwrap_or_else(|| identifier.name.as_str());
             emit(
                 ids::PLUGINS_GSDEVTOOLS_IN_SOURCE,
                 Severity::Medium,
@@ -649,13 +699,12 @@ fn check_call<'a, F>(
                     "Animate transforms (x/y/scale/rotation) instead of top/left/width/height.",
                 );
             }
-            // Rules 3 & 4: markers / scrub+toggleActions only inside the GSAP
-            // config (the vars object and its nested `scrollTrigger:` object).
-            check_gsap_config_object(vars, emit);
+            // Rules 3 & 4 only apply inside nested `scrollTrigger:` configs.
+            check_nested_scrolltrigger_configs(vars, emit);
         }
     }
     if let Some(vars) = gsap_timeline_vars_object(call, facts) {
-        check_gsap_config_object(vars, emit);
+        check_nested_scrolltrigger_configs(vars, emit);
     }
 
     // ScrollTrigger.create({...}): the argument is a ScrollTrigger config.
@@ -663,7 +712,7 @@ fn check_call<'a, F>(
         && let Some(config) = call.arguments.first().and_then(argument_expression)
         && let Expression::ObjectExpression(object) = config.without_parentheses()
     {
-        check_gsap_config_object(object, emit);
+        check_scrolltrigger_config_object(object, emit);
     }
 
     // Rule 8: plugin used without registration.
@@ -944,9 +993,13 @@ fn check_file_level(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Path is under a Next.js App Router `app/` directory segment.
+/// Path is under a Next.js App Router route root: `app/` or `src/app/`.
 fn is_under_app(path: &str) -> bool {
-    path.split(['/', '\\']).any(|segment| segment == "app")
+    let segments = path
+        .split(['/', '\\'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect::<Vec<_>>();
+    segments.first() == Some(&"app") || segments.windows(2).any(|pair| pair == ["src", "app"])
 }
 
 fn is_test_or_fixture_path(path: &str) -> bool {
@@ -1155,21 +1208,17 @@ fn tween_vars_objects<'a>(
         .collect()
 }
 
-/// Run the GSAP/ScrollTrigger object-literal rules over a config object and its
-/// nested `scrollTrigger:` config object.
-///
-/// This is the single entry point that gates Rules 3 (markers) and 4 (scrub +
-/// toggleActions) to genuine GSAP context: a tween/timeline vars object, a
-/// `scrollTrigger:` value, or a `ScrollTrigger.create(...)` argument. Unrelated
-/// object literals elsewhere in the file are never scanned.
-fn check_gsap_config_object<F>(object: &ObjectExpression<'_>, emit: &mut F)
+fn check_scrolltrigger_config_object<F>(object: &ObjectExpression<'_>, emit: &mut F)
 where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     check_object_literal(object, emit);
+}
 
-    // A `scrollTrigger:` property nests a ScrollTrigger config object that also
-    // carries markers / scrub / toggleActions; scan it too.
+fn check_nested_scrolltrigger_configs<F>(object: &ObjectExpression<'_>, emit: &mut F)
+where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
     for property in &object.properties {
         let ObjectPropertyKind::ObjectProperty(property) = property else {
             continue;
@@ -1177,7 +1226,7 @@ where
         if property_key_name(&property.key) == Some("scrollTrigger")
             && let Expression::ObjectExpression(nested) = property.value.without_parentheses()
         {
-            check_object_literal(nested, emit);
+            check_scrolltrigger_config_object(nested, emit);
         }
     }
 }

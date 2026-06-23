@@ -85,6 +85,27 @@ fn rule_gsdevtools_in_source() {
         &motion_path_helper_test,
         ids::PLUGINS_GSDEVTOOLS_IN_SOURCE
     ));
+
+    let named_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { GSDevTools as DevTools } from "gsap/GSDevTools"; DevTools.create();"#,
+    );
+    assert!(fired(&named_alias, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
+
+    let default_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r##"import Helper from "gsap/MotionPathHelper"; Helper.create(".dot", { path: "#path" });"##,
+    );
+    assert!(fired(&default_alias, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
+
+    let namespace_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import * as DevTools from "gsap/GSDevTools"; DevTools.create();"#,
+    );
+    assert!(fired(&namespace_alias, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 }
 
 #[test]
@@ -405,6 +426,22 @@ export default function Page() { useGSAP(() => {}); return null; }"#,
     );
     assert!(fired(&usegsap_only, ids::REACT_GSAP_IN_SSR));
 
+    let src_app = analyze(
+        "src/app/page.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
+    );
+    assert!(fired(&src_app, ids::REACT_GSAP_IN_SSR));
+
+    let nested_app_folder = analyze(
+        "src/components/app/Widget.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export default function Widget() { gsap.to(".x", { x: 1 }); return null; }"#,
+    );
+    assert!(!fired(&nested_app_folder, ids::REACT_GSAP_IN_SSR));
+
     let type_only = analyze(
         "app/page.tsx",
         "tsx",
@@ -573,7 +610,7 @@ fn category_filtering_independent_of_rule_count() {
         "src/a.ts",
         "ts",
         r#"import { Flip } from "gsap-trial";
-gsap.to(".box", 1, { top: 0, markers: true });
+gsap.to(".box", 1, { top: 0, scrollTrigger: { markers: true } });
 gsap.ticker.lagSmoothing(0);"#,
     );
     assert!(fired(&findings, ids::CORE_GSAP_TRIAL_IMPORT));
@@ -669,6 +706,19 @@ fn rule_gsdevtools_value_use_still_fires() {
 fn rule_markers_unrelated_object_does_not_fire() {
     let unrelated = analyze("src/a.ts", "ts", r#"const opts = { markers: true };"#);
     assert!(!fired(&unrelated, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+
+    let tween_vars = analyze("src/a.ts", "ts", r#"gsap.to(el, { markers: true });"#);
+    assert!(!fired(&tween_vars, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+
+    let tween_scrub = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.to(el, { scrub: 1, toggleActions: "play none none none" });"#,
+    );
+    assert!(!fired(
+        &tween_scrub,
+        ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS
+    ));
 }
 
 #[test]
