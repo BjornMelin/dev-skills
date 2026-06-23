@@ -293,6 +293,18 @@ function C() { useGsap(() => {}); return null; }"#,
     );
     assert!(!fired(&aliased_clean, ids::REACT_USEGSAP_NOT_REGISTERED));
 
+    let configured_gsap_clean = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { gsap } from "@/lib/gsap";
+import { useGSAP } from "@gsap/react";
+function C() { useGSAP(() => gsap.to(".box", { x: 100 })); return null; }"#,
+    );
+    assert!(!fired(
+        &configured_gsap_clean,
+        ids::REACT_USEGSAP_NOT_REGISTERED
+    ));
+
     let aliased_bad = analyze(
         "src/a.tsx",
         "tsx",

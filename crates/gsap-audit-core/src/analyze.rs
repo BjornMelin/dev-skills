@@ -872,6 +872,7 @@ fn check_file_level(
 ) {
     // Rule 9: useGSAP imported but never registered with registerPlugin.
     if !facts.usegsap_bindings.is_empty()
+        && !facts.configured_gsap_imports.contains("gsap")
         && !facts
             .usegsap_bindings
             .iter()
