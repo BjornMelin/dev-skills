@@ -80,6 +80,9 @@ struct FileFacts {
     has_use_client: bool,
     /// The file uses `gsap.` member access or a bare GSAP plugin identifier.
     uses_gsap_surface: bool,
+    /// Local bindings imported from the skill's configured GSAP module pattern
+    /// (`lib/gsap`), where registration is centralized before re-export.
+    configured_gsap_imports: BTreeSet<String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -164,15 +167,18 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
     // in the file, including inside function and component bodies.
     for node in semantic.nodes() {
         match node.kind() {
-            AstKind::ImportDeclaration(import) if import.source.value.as_str() == "@gsap/react" => {
-                if let Some(specifiers) = &import.specifiers
+            AstKind::ImportDeclaration(import) => {
+                if import.source.value.as_str() == "@gsap/react"
+                    && let Some(specifiers) = &import.specifiers
                     && specifiers.iter().any(import_specifier_is_use_gsap)
                 {
                     facts.imports_usegsap = true;
                 }
+                record_configured_gsap_imports(import, &mut facts);
             }
             AstKind::IdentifierReference(identifier)
-                if KNOWN_PLUGINS.contains(&identifier.name.as_str()) =>
+                if KNOWN_PLUGINS.contains(&identifier.name.as_str())
+                    && !reference_is_ts_type_position(semantic, node.id()) =>
             {
                 facts.uses_gsap_surface = true;
             }
@@ -187,6 +193,30 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
     }
 
     facts
+}
+
+fn record_configured_gsap_imports(
+    import: &oxc_ast::ast::ImportDeclaration<'_>,
+    facts: &mut FileFacts,
+) {
+    if !import_source_is_configured_gsap_module(import.source.value.as_str()) {
+        return;
+    }
+    let Some(specifiers) = &import.specifiers else {
+        return;
+    };
+    for specifier in specifiers {
+        let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier else {
+            continue;
+        };
+        let imported = named.imported.name();
+        let imported_name = imported.as_str();
+        if imported_name == "gsap" || KNOWN_PLUGINS.contains(&imported_name) {
+            facts
+                .configured_gsap_imports
+                .insert(named.local.name.as_str().to_string());
+        }
+    }
 }
 
 /// Whether an import specifier names `useGSAP`.
@@ -225,6 +255,20 @@ fn member_object_is_gsap(member: &oxc_ast::ast::StaticMemberExpression<'_>) -> b
         member.object.without_parentheses(),
         Expression::Identifier(object) if object.name.as_str() == "gsap"
     )
+}
+
+fn import_source_is_gsap_package(source: &str) -> bool {
+    source == "gsap" || source.starts_with("gsap/")
+}
+
+fn import_source_is_gsap_trial(source: &str) -> bool {
+    source == "gsap-trial" || source.starts_with("gsap-trial/")
+}
+
+fn import_source_is_configured_gsap_module(source: &str) -> bool {
+    !import_source_is_gsap_package(source)
+        && !import_source_is_gsap_trial(source)
+        && (source == "lib/gsap" || source.ends_with("/lib/gsap") || source == "./gsap")
 }
 
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
@@ -286,7 +330,9 @@ where
 
     match node.kind() {
         // Rule 1: gsap-trial import.
-        AstKind::ImportDeclaration(import) if import.source.value.as_str() == "gsap-trial" => {
+        AstKind::ImportDeclaration(import)
+            if import_source_is_gsap_trial(import.source.value.as_str()) =>
+        {
             emit(
                 ids::CORE_GSAP_TRIAL_IMPORT,
                 Severity::High,
@@ -428,6 +474,9 @@ fn check_call<'a, F>(
             check_gsap_config_object(vars, emit);
         }
     }
+    if let Some(vars) = gsap_timeline_vars_object(call) {
+        check_gsap_config_object(vars, emit);
+    }
 
     // ScrollTrigger.create({...}): the argument is a ScrollTrigger config.
     if is_member_call(call, Some("ScrollTrigger"), "create")
@@ -468,7 +517,10 @@ where
         && let Expression::Identifier(object) = member.object.without_parentheses()
     {
         let name = object.name.as_str();
-        if KNOWN_PLUGINS.contains(&name) && !facts.registered.contains(name) {
+        if KNOWN_PLUGINS.contains(&name)
+            && !facts.registered.contains(name)
+            && !facts.configured_gsap_imports.contains(name)
+        {
             emit(
                 ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
                 Severity::High,
@@ -484,6 +536,8 @@ where
     // `scrollTrigger:` config object, even though the callee is `gsap` rather
     // than `ScrollTrigger` — e.g. gsap.to(target, { scrollTrigger: { ... } }).
     if !facts.registered.contains("ScrollTrigger")
+        && !facts.configured_gsap_imports.contains("ScrollTrigger")
+        && !facts.configured_gsap_imports.contains("gsap")
         && let Some(span) = scrolltrigger_config_span(call)
     {
         emit(
@@ -764,15 +818,7 @@ fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>) -> Option<Span> {
     {
         tween_vars_objects(call, method)
     } else if is_member_call(call, Some("gsap"), "timeline") {
-        match call
-            .arguments
-            .first()
-            .and_then(argument_expression)
-            .map(Expression::without_parentheses)
-        {
-            Some(Expression::ObjectExpression(object)) => vec![object],
-            _ => Vec::new(),
-        }
+        gsap_timeline_vars_object(call).into_iter().collect()
     } else {
         return None;
     };
@@ -786,6 +832,21 @@ fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>) -> Option<Span> {
         }
     }
     None
+}
+
+fn gsap_timeline_vars_object<'a>(call: &'a CallExpression<'a>) -> Option<&'a ObjectExpression<'a>> {
+    if !is_member_call(call, Some("gsap"), "timeline") {
+        return None;
+    }
+    match call
+        .arguments
+        .first()
+        .and_then(argument_expression)
+        .map(Expression::without_parentheses)
+    {
+        Some(Expression::ObjectExpression(object)) => Some(object),
+        _ => None,
+    }
 }
 
 /// Return every vars object literal for a tween call.
@@ -1019,19 +1080,16 @@ fn reference_is_revert_or_return(
         return true;
     }
 
-    // Climb parents looking for a `.revert()` / `.kill()` member call.
-    let mut current = node_id;
-    for _ in 0..6 {
-        let parent_id = nodes.parent_id(current);
-        if parent_id == current {
-            break;
-        }
-        if let AstKind::StaticMemberExpression(member) = nodes.kind(parent_id)
-            && matches!(member.property.name.as_str(), "revert" | "kill")
+    let member_id = nodes.parent_id(node_id);
+    if let AstKind::StaticMemberExpression(member) = nodes.kind(member_id)
+        && matches!(member.property.name.as_str(), "revert" | "kill")
+    {
+        let call_id = nodes.parent_id(member_id);
+        if let AstKind::CallExpression(call) = nodes.kind(call_id)
+            && call.callee.span() == member.span
         {
             return true;
         }
-        current = parent_id;
     }
     false
 }

@@ -29,6 +29,13 @@ fn rule_gsap_trial_import_fires_and_clean_does_not() {
     let bad = analyze("src/a.ts", "ts", r#"import { Flip } from "gsap-trial";"#);
     assert!(fired(&bad, ids::CORE_GSAP_TRIAL_IMPORT));
 
+    let bad_subpath = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger } from "gsap-trial/ScrollTrigger";"#,
+    );
+    assert!(fired(&bad_subpath, ids::CORE_GSAP_TRIAL_IMPORT));
+
     let clean = analyze("src/a.ts", "ts", r#"import { Flip } from "gsap/Flip";"#);
     assert!(!fired(&clean, ids::CORE_GSAP_TRIAL_IMPORT));
 }
@@ -198,6 +205,15 @@ export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
 export default function W() { gsap.to(".x", { x: 1 }); return null; }"#,
     );
     assert!(!fired(&outside, ids::REACT_GSAP_IN_SSR));
+
+    let type_only = analyze(
+        "app/page.tsx",
+        "tsx",
+        r#"import type { ScrollTrigger } from "gsap/ScrollTrigger";
+type Props = { trigger: ScrollTrigger };
+export default function Page(_props: Props) { return null; }"#,
+    );
+    assert!(!fired(&type_only, ids::REACT_GSAP_IN_SSR));
 }
 
 #[test]
@@ -287,6 +303,31 @@ fn rule_context_missing_revert_semantic() {
 }"#,
     );
     assert!(!fired(&clean_revert, ids::REACT_CONTEXT_MISSING_REVERT));
+
+    let property_read = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  const ctx = gsap.context(() => {});
+  console.log(ctx.revert);
+  return null;
+}"#,
+    );
+    assert!(fired(&property_read, ids::REACT_CONTEXT_MISSING_REVERT));
+
+    let argument_to_other_call = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  const ctx = gsap.context(() => {});
+  foo.revert(ctx);
+  return null;
+}"#,
+    );
+    assert!(fired(
+        &argument_to_other_call,
+        ids::REACT_CONTEXT_MISSING_REVERT
+    ));
 }
 
 #[test]
@@ -429,6 +470,13 @@ fn rule_markers_in_nested_scrolltrigger_fires() {
         r#"gsap.to(".x", { scrollTrigger: { markers: true } });"#,
     );
     assert!(fired(&bad, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+
+    let timeline = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline({ scrollTrigger: { trigger: ".x", markers: true } });"#,
+    );
+    assert!(fired(&timeline, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
 }
 
 #[test]
@@ -439,6 +487,16 @@ fn rule_scrub_toggleactions_in_scrolltrigger_create_fires() {
         r#"ScrollTrigger.create({ scrub: 1, toggleActions: "play none none none" });"#,
     );
     assert!(fired(&bad, ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS));
+
+    let timeline = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline({ scrollTrigger: { scrub: 1, toggleActions: "play none none none" } });"#,
+    );
+    assert!(fired(
+        &timeline,
+        ids::SCROLLTRIGGER_SCRUB_WITH_TOGGLEACTIONS
+    ));
 }
 
 #[test]
@@ -567,6 +625,31 @@ fn rule_scrolltrigger_config_without_register_fires() {
     // No scrollTrigger config -> does NOT fire.
     let plain = analyze("src/a.ts", "ts", r#"gsap.to(".x", { x: 100 });"#);
     assert!(!fired(&plain, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+}
+
+#[test]
+fn rule_configured_gsap_reexports_do_not_require_local_register() {
+    let configured_plugin = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { ScrollTrigger } from "@/lib/gsap";
+ScrollTrigger.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(
+        &configured_plugin,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured_gsap = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { gsap } from "@/lib/gsap";
+gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(!fired(
+        &configured_gsap,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
 }
 
 // ---------------------------------------------------------------------------
