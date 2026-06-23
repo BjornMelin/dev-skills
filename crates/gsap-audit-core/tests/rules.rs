@@ -155,6 +155,47 @@ fn rule_layout_prop_animation() {
 }
 
 #[test]
+fn rule_gsap_import_aliases_are_audited() {
+    let named_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { gsap as animate } from "gsap";
+animate.to(".box", 1, { top: 0, scrollTrigger: { markers: true }, motionPath: true });
+animate.ticker.lagSmoothing(0);"#,
+    );
+    assert!(fired(&named_alias, ids::CORE_GSAP2_SIGNATURE));
+    assert!(fired(&named_alias, ids::CORE_LAYOUT_PROP_ANIMATION));
+    assert!(fired(&named_alias, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+    assert!(fired(
+        &named_alias,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+    assert!(fired(&named_alias, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
+
+    let default_alias = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import animate from "gsap";
+const tl = animate.timeline({ scrollTrigger: { markers: true } });
+tl.to(".box", { top: 0 });"#,
+    );
+    assert!(fired(&default_alias, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
+    assert!(fired(&default_alias, ids::CORE_LAYOUT_PROP_ANIMATION));
+
+    let registered = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { gsap as animate } from "gsap";
+animate.registerPlugin(ScrollTrigger);
+animate.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(!fired(
+        &registered,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+}
+
+#[test]
 fn rule_plugin_used_without_register() {
     let bad = analyze(
         "src/a.ts",
@@ -241,6 +282,34 @@ gsap.registerPlugin(useGSAP);
 function C() { useGSAP(() => {}); return null; }"#,
     );
     assert!(!fired(&clean, ids::REACT_USEGSAP_NOT_REGISTERED));
+
+    let aliased_clean = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useGSAP as useGsap } from "@gsap/react";
+import { gsap } from "gsap";
+gsap.registerPlugin(useGsap);
+function C() { useGsap(() => {}); return null; }"#,
+    );
+    assert!(!fired(&aliased_clean, ids::REACT_USEGSAP_NOT_REGISTERED));
+
+    let aliased_bad = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useGSAP as useGsap } from "@gsap/react";
+function C() { useGsap(() => {}); return null; }"#,
+    );
+    assert!(fired(&aliased_bad, ids::REACT_USEGSAP_NOT_REGISTERED));
+
+    let type_only = analyze(
+        "app/page.tsx",
+        "tsx",
+        r#"import type { useGSAP } from "@gsap/react";
+type Hook = typeof useGSAP;
+export default function Page(_props: { hook?: Hook }) { return null; }"#,
+    );
+    assert!(!fired(&type_only, ids::REACT_USEGSAP_NOT_REGISTERED));
+    assert!(!fired(&type_only, ids::REACT_GSAP_IN_SSR));
 }
 
 #[test]
@@ -886,6 +955,19 @@ fn rule_unscoped_selector_with_dependency_array_fires() {
 }"#,
     );
     assert!(fired(&bad_timeline, ids::REACT_UNSCOPED_SELECTOR));
+
+    let aliased_hook = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useGSAP as useGsap } from "@gsap/react";
+function C() {
+  useGsap(() => {
+    gsap.to(".box", { x: 100 });
+  }, []);
+  return null;
+}"#,
+    );
+    assert!(fired(&aliased_hook, ids::REACT_UNSCOPED_SELECTOR));
 
     // gsap.context(cb, scopeRef) -> the bare ref IS a scope -> does NOT fire.
     let clean_context = analyze(

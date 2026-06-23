@@ -87,11 +87,13 @@ struct FileFacts {
     /// file: we cannot prove a plugin was *not* registered.
     registration_unknown: bool,
     /// `useGSAP` is imported from `@gsap/react`.
-    imports_usegsap: bool,
+    usegsap_bindings: BTreeSet<String>,
     /// The file has a top-of-file `"use client"` directive.
     has_use_client: bool,
-    /// The file uses `gsap.` member access or a bare GSAP plugin identifier.
+    /// The file uses GSAP member access or a bare GSAP plugin identifier.
     uses_gsap_surface: bool,
+    /// Local identifiers bound to the GSAP object.
+    gsap_bindings: BTreeSet<String>,
     /// Local bindings imported from the skill's configured GSAP module pattern
     /// (`lib/gsap`), where registration is centralized before re-export.
     configured_gsap_imports: BTreeSet<String>,
@@ -184,13 +186,8 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
     for node in semantic.nodes() {
         match node.kind() {
             AstKind::ImportDeclaration(import) => {
-                if import.source.value.as_str() == "@gsap/react"
-                    && let Some(specifiers) = &import.specifiers
-                    && specifiers.iter().any(import_specifier_is_use_gsap)
-                {
-                    facts.imports_usegsap = true;
-                    facts.uses_gsap_surface = true;
-                }
+                record_gsap_import_bindings(import, &mut facts);
+                record_usegsap_import_bindings(import, &mut facts);
                 record_plugin_import_aliases(import, &mut facts);
                 record_configured_gsap_imports(import, &mut facts);
             }
@@ -200,19 +197,19 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             {
                 facts.uses_gsap_surface = true;
             }
-            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member) => {
+            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member, &facts) => {
                 facts.uses_gsap_surface = true;
             }
             AstKind::CallExpression(call) => {
                 record_register(call, &mut facts);
-                if is_bare_call(call, "useGSAP") {
+                if is_usegsap_call(call, &facts) {
                     facts.uses_gsap_surface = true;
                 }
             }
             AstKind::VariableDeclarator(declarator) => {
                 if let Some(identifier) = declarator.id.get_binding_identifier()
                     && let Some(init) = &declarator.init
-                    && expression_is_gsap_timeline_call(init)
+                    && expression_is_gsap_timeline_call(init, &facts)
                 {
                     facts
                         .timeline_handles
@@ -230,6 +227,9 @@ fn record_configured_gsap_imports(
     import: &oxc_ast::ast::ImportDeclaration<'_>,
     facts: &mut FileFacts,
 ) {
+    if import.import_kind.is_type() {
+        return;
+    }
     if !import_source_is_configured_gsap_module(import.source.value.as_str()) {
         return;
     }
@@ -240,6 +240,9 @@ fn record_configured_gsap_imports(
         let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier else {
             continue;
         };
+        if named.import_kind.is_type() {
+            continue;
+        }
         let imported = named.imported.name();
         let imported_name = imported.as_str();
         if imported_name == "gsap" || KNOWN_PLUGINS.contains(&imported_name) {
@@ -249,6 +252,11 @@ fn record_configured_gsap_imports(
             facts
                 .configured_gsap_imports
                 .insert(imported_name.to_string());
+            if imported_name == "gsap" {
+                facts
+                    .gsap_bindings
+                    .insert(named.local.name.as_str().to_string());
+            }
             if KNOWN_PLUGINS.contains(&imported_name) {
                 facts.plugin_aliases.insert(
                     named.local.name.as_str().to_string(),
@@ -259,10 +267,66 @@ fn record_configured_gsap_imports(
     }
 }
 
+fn record_gsap_import_bindings(
+    import: &oxc_ast::ast::ImportDeclaration<'_>,
+    facts: &mut FileFacts,
+) {
+    if import.import_kind.is_type() || import.source.value.as_str() != "gsap" {
+        return;
+    }
+    let Some(specifiers) = &import.specifiers else {
+        return;
+    };
+    for specifier in specifiers {
+        match specifier {
+            ImportDeclarationSpecifier::ImportSpecifier(named)
+                if named.import_kind.is_value()
+                    && matches!(named.imported.name().as_str(), "gsap" | "default") =>
+            {
+                facts
+                    .gsap_bindings
+                    .insert(named.local.name.as_str().to_string());
+            }
+            ImportDeclarationSpecifier::ImportDefaultSpecifier(default) => {
+                facts
+                    .gsap_bindings
+                    .insert(default.local.name.as_str().to_string());
+            }
+            _ => {}
+        }
+    }
+}
+
+fn record_usegsap_import_bindings(
+    import: &oxc_ast::ast::ImportDeclaration<'_>,
+    facts: &mut FileFacts,
+) {
+    if import.import_kind.is_type() || import.source.value.as_str() != "@gsap/react" {
+        return;
+    }
+    let Some(specifiers) = &import.specifiers else {
+        return;
+    };
+    for specifier in specifiers {
+        let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier else {
+            continue;
+        };
+        if named.import_kind.is_value() && named.imported.name().as_str() == "useGSAP" {
+            facts
+                .usegsap_bindings
+                .insert(named.local.name.as_str().to_string());
+            facts.uses_gsap_surface = true;
+        }
+    }
+}
+
 fn record_plugin_import_aliases(
     import: &oxc_ast::ast::ImportDeclaration<'_>,
     facts: &mut FileFacts,
 ) {
+    if import.import_kind.is_type() {
+        return;
+    }
     let source = import.source.value.as_str();
     if !import_source_is_gsap_package(source) {
         return;
@@ -312,15 +376,6 @@ fn plugin_name_for_known_or_default<'a>(
     }
 }
 
-/// Whether an import specifier names `useGSAP`.
-fn import_specifier_is_use_gsap(specifier: &ImportDeclarationSpecifier<'_>) -> bool {
-    matches!(
-        specifier,
-        ImportDeclarationSpecifier::ImportSpecifier(named)
-            if named.imported.name().as_str() == "useGSAP"
-    )
-}
-
 /// Whether an `IdentifierReference` node sits in a TypeScript type-only
 /// position (e.g. `let x: GSDevTools`, `function f(p: GSDevTools)`), where the
 /// name is erased at build time and carries no runtime/value reference.
@@ -343,10 +398,13 @@ fn reference_is_ts_type_position(semantic: &Semantic<'_>, node_id: oxc_semantic:
 }
 
 /// Whether a static member expression's object is the `gsap` identifier.
-fn member_object_is_gsap(member: &oxc_ast::ast::StaticMemberExpression<'_>) -> bool {
+fn member_object_is_gsap(
+    member: &oxc_ast::ast::StaticMemberExpression<'_>,
+    facts: &FileFacts,
+) -> bool {
     matches!(
         member.object.without_parentheses(),
-        Expression::Identifier(object) if object.name.as_str() == "gsap"
+        Expression::Identifier(object) if is_gsap_identifier(object.name.as_str(), facts)
     )
 }
 
@@ -377,6 +435,10 @@ fn plugin_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Option
     }
 }
 
+fn is_gsap_identifier(name: &str, facts: &FileFacts) -> bool {
+    name == "gsap" || facts.gsap_bindings.contains(name)
+}
+
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
 ///
 /// Handles these argument shapes:
@@ -385,7 +447,7 @@ fn plugin_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Option
 ///   result): this sets `registration_unknown`,
 ///   which suppresses the used-without-register check for the whole file.
 fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
-    if !is_member_call(call, Some("gsap"), "registerPlugin") {
+    if !is_gsap_member_call(call, facts, "registerPlugin") {
         return;
     }
     for argument in &call.arguments {
@@ -521,7 +583,7 @@ fn check_call<'a, F>(
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     // Rule 6: lagSmoothing(0) / lagSmoothing(false).
-    if is_ticker_lag_smoothing_disabled(call) {
+    if is_ticker_lag_smoothing_disabled(call, facts) {
         emit(
             ids::PERFORMANCE_LAG_SMOOTHING_DISABLED,
             Severity::Medium,
@@ -568,7 +630,7 @@ fn check_call<'a, F>(
             check_gsap_config_object(vars, emit);
         }
     }
-    if let Some(vars) = gsap_timeline_vars_object(call) {
+    if let Some(vars) = gsap_timeline_vars_object(call, facts) {
         check_gsap_config_object(vars, emit);
     }
 
@@ -584,10 +646,10 @@ fn check_call<'a, F>(
     check_plugin_used_without_register(call, facts, emit);
 
     // Rules 11 & 12 hang off useGSAP / gsap.context calls.
-    if is_member_call(call, Some("gsap"), "context") || is_bare_call(call, "useGSAP") {
+    if is_gsap_member_call(call, facts, "context") || is_usegsap_call(call, facts) {
         check_unscoped_selectors(call, facts, emit);
     }
-    if is_member_call(call, Some("gsap"), "context") {
+    if is_gsap_member_call(call, facts, "context") {
         check_context_missing_revert(call, semantic, emit);
     }
 }
@@ -673,7 +735,7 @@ fn check_unscoped_selectors<F>(call: &CallExpression<'_>, facts: &FileFacts, emi
 where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
-    let scoped = call_has_scope(call);
+    let scoped = call_has_scope(call, facts);
     if scoped {
         return;
     }
@@ -809,7 +871,12 @@ fn check_file_level(
     findings: &mut Vec<Finding>,
 ) {
     // Rule 9: useGSAP imported but never registered with registerPlugin.
-    if facts.imports_usegsap && !facts.registered.contains("useGSAP") {
+    if !facts.usegsap_bindings.is_empty()
+        && !facts
+            .usegsap_bindings
+            .iter()
+            .any(|binding| facts.registered.contains(binding))
+    {
         let span = program.span;
         let (line, column) = line_index.line_col(span.start);
         findings.push(Finding {
@@ -828,7 +895,7 @@ fn check_file_level(
 
     // Rule 10: GSAP used in an App Router file without "use client".
     if is_under_app(relative_path)
-        && (facts.uses_gsap_surface || facts.imports_usegsap)
+        && (facts.uses_gsap_surface || !facts.usegsap_bindings.is_empty())
         && !facts.has_use_client
     {
         let span = program.span;
@@ -905,22 +972,17 @@ fn argument_is_numeric_literal(argument: &Argument<'_>) -> bool {
     )
 }
 
-/// Whether a call is `<object>.<method>(...)` where object is `expected_object`
-/// (when given) and the property name is `method`.
-fn is_member_call(call: &CallExpression<'_>, expected_object: Option<&str>, method: &str) -> bool {
+fn is_gsap_member_call(call: &CallExpression<'_>, facts: &FileFacts, method: &str) -> bool {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return false;
     };
     if member.property.name.as_str() != method {
         return false;
     }
-    match expected_object {
-        None => true,
-        Some(name) => matches!(
-            member.object.without_parentheses(),
-            Expression::Identifier(identifier) if identifier.name.as_str() == name
-        ),
-    }
+    matches!(
+        member.object.without_parentheses(),
+        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
+    )
 }
 
 fn is_plugin_member_call(
@@ -942,11 +1004,12 @@ fn is_plugin_member_call(
     )
 }
 
-/// Whether a call is a bare `name(...)` identifier call.
-fn is_bare_call(call: &CallExpression<'_>, name: &str) -> bool {
+fn is_usegsap_call(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
     matches!(
         call.callee.without_parentheses(),
-        Expression::Identifier(identifier) if identifier.name.as_str() == name
+        Expression::Identifier(identifier)
+            if identifier.name.as_str() == "useGSAP"
+                || facts.usegsap_bindings.contains(identifier.name.as_str())
     )
 }
 
@@ -971,8 +1034,8 @@ fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>, facts: &FileFacts
     let vars_objects: Vec<&'a ObjectExpression<'a>> =
         if let Some(method) = gsap_tween_method(call, facts) {
             tween_vars_objects(call, method)
-        } else if is_member_call(call, Some("gsap"), "timeline") {
-            gsap_timeline_vars_object(call).into_iter().collect()
+        } else if is_gsap_member_call(call, facts, "timeline") {
+            gsap_timeline_vars_object(call, facts).into_iter().collect()
         } else {
             return None;
         };
@@ -1006,8 +1069,11 @@ fn plugin_vars_key_span<'a>(
     None
 }
 
-fn gsap_timeline_vars_object<'a>(call: &'a CallExpression<'a>) -> Option<&'a ObjectExpression<'a>> {
-    if !is_member_call(call, Some("gsap"), "timeline") {
+fn gsap_timeline_vars_object<'a>(
+    call: &'a CallExpression<'a>,
+    facts: &FileFacts,
+) -> Option<&'a ObjectExpression<'a>> {
+    if !is_gsap_member_call(call, facts, "timeline") {
         return None;
     }
     match call
@@ -1024,18 +1090,18 @@ fn gsap_timeline_vars_object<'a>(call: &'a CallExpression<'a>) -> Option<&'a Obj
 fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts) -> bool {
     match expression.without_parentheses() {
         Expression::Identifier(identifier) => {
-            identifier.name.as_str() == "gsap"
+            is_gsap_identifier(identifier.name.as_str(), facts)
                 || facts.timeline_handles.contains(identifier.name.as_str())
         }
-        Expression::CallExpression(call) => is_member_call(call, Some("gsap"), "timeline"),
+        Expression::CallExpression(call) => is_gsap_member_call(call, facts, "timeline"),
         _ => false,
     }
 }
 
-fn expression_is_gsap_timeline_call(expression: &Expression<'_>) -> bool {
+fn expression_is_gsap_timeline_call(expression: &Expression<'_>, facts: &FileFacts) -> bool {
     matches!(
         expression.without_parentheses(),
-        Expression::CallExpression(call) if is_member_call(call, Some("gsap"), "timeline")
+        Expression::CallExpression(call) if is_gsap_member_call(call, facts, "timeline")
     )
 }
 
@@ -1123,7 +1189,7 @@ fn object_animates_layout_prop(object: &ObjectExpression<'_>) -> Option<Span> {
 }
 
 /// Whether a call is `gsap.ticker.lagSmoothing(0|false)`.
-fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>) -> bool {
+fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
     let Expression::StaticMemberExpression(outer) = call.callee.without_parentheses() else {
         return false;
     };
@@ -1139,7 +1205,7 @@ fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>) -> bool {
     }
     let is_gsap = matches!(
         inner.object.without_parentheses(),
-        Expression::Identifier(identifier) if identifier.name.as_str() == "gsap"
+        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
     );
     if !is_gsap {
         return false;
@@ -1172,7 +1238,7 @@ fn expression_is_disabled_lag_smoothing_arg(expression: &Expression<'_>) -> bool
 ///
 /// - `gsap.context(cb, scope)` -> a present second argument is the scope.
 /// - `useGSAP(cb, { scope })` -> a config object with a `scope` key.
-fn call_has_scope(call: &CallExpression<'_>) -> bool {
+fn call_has_scope(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
     let Some(second) = call.arguments.get(1).and_then(argument_expression) else {
         return false;
     };
@@ -1180,7 +1246,7 @@ fn call_has_scope(call: &CallExpression<'_>) -> bool {
     // second argument, so a non-config second argument is NOT a scope. Only
     // `gsap.context(cb, scopeRef)` passes the scope element directly as the
     // second argument.
-    let is_use_gsap = is_bare_call(call, "useGSAP");
+    let is_use_gsap = is_usegsap_call(call, facts);
     match second.without_parentheses() {
         // Config object (either call form): scoped only if it has a `scope` key.
         Expression::ObjectExpression(object) => object.properties.iter().any(|property| {
