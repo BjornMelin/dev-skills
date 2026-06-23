@@ -370,6 +370,17 @@ function C() { useGSAP(() => gsap.to(".box", { x: 100 })); return null; }"#,
         ids::REACT_USEGSAP_NOT_REGISTERED
     ));
 
+    let configured_usegsap_alias_clean = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useGSAP as useGsap } from "@/lib/gsap";
+function C() { useGsap(() => {}); return null; }"#,
+    );
+    assert!(!fired(
+        &configured_usegsap_alias_clean,
+        ids::REACT_USEGSAP_NOT_REGISTERED
+    ));
+
     let aliased_bad = analyze(
         "src/a.tsx",
         "tsx",
@@ -432,6 +443,18 @@ export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
 export default function Page() { useGSAP(() => {}); return null; }"#,
     );
     assert!(fired(&usegsap_only, ids::REACT_GSAP_IN_SSR));
+
+    let configured_usegsap_alias = analyze(
+        "app/page.tsx",
+        "tsx",
+        r#"import { useGSAP as useGsap } from "@/lib/gsap";
+export default function Page() { useGsap(() => gsap.to(".box", { x: 1 })); return null; }"#,
+    );
+    assert!(fired(&configured_usegsap_alias, ids::REACT_GSAP_IN_SSR));
+    assert!(fired(
+        &configured_usegsap_alias,
+        ids::REACT_UNSCOPED_SELECTOR
+    ));
 
     let src_app = analyze(
         "src/app/page.tsx",
@@ -503,6 +526,20 @@ fn rule_unscoped_selector_clean_with_scope() {
 }"#,
     );
     assert!(!fired(&clean, ids::REACT_UNSCOPED_SELECTOR));
+
+    let config_variable = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  const container = useRef(null);
+  const opts = { scope: container };
+  useGSAP(() => {
+    gsap.to(".box", { x: 100 });
+  }, opts);
+  return null;
+}"#,
+    );
+    assert!(!fired(&config_variable, ids::REACT_UNSCOPED_SELECTOR));
 
     // gsap.context with a scope ref argument -> does NOT fire.
     let clean_context = analyze(

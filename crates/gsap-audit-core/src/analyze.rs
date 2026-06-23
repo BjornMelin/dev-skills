@@ -104,6 +104,8 @@ struct FileFacts {
     registration_unknown: bool,
     /// `useGSAP` is imported from `@gsap/react`.
     usegsap_bindings: BTreeSet<String>,
+    /// Identifiers initialized to `useGSAP` config objects with a `scope` key.
+    scoped_usegsap_configs: BTreeSet<String>,
     /// The file has a top-of-file `"use client"` directive.
     has_use_client: bool,
     /// The file uses GSAP member access or a bare GSAP plugin identifier.
@@ -233,6 +235,15 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                         .timeline_handles
                         .insert(identifier.name.as_str().to_string());
                 }
+                if let Some(identifier) = declarator.id.get_binding_identifier()
+                    && let Some(init) = &declarator.init
+                    && let Expression::ObjectExpression(object) = init.without_parentheses()
+                    && object_has_key(object, "scope")
+                {
+                    facts
+                        .scoped_usegsap_configs
+                        .insert(identifier.name.as_str().to_string());
+                }
             }
             _ => {}
         }
@@ -262,7 +273,10 @@ fn record_configured_gsap_imports(
                 }
                 let imported = named.imported.name();
                 let imported_name = imported.as_str();
-                if imported_name == "gsap" || KNOWN_PLUGINS.contains(&imported_name) {
+                if imported_name == "gsap"
+                    || imported_name == "useGSAP"
+                    || KNOWN_PLUGINS.contains(&imported_name)
+                {
                     facts
                         .configured_gsap_imports
                         .insert(named.local.name.as_str().to_string());
@@ -272,6 +286,11 @@ fn record_configured_gsap_imports(
                     if imported_name == "gsap" {
                         facts
                             .gsap_bindings
+                            .insert(named.local.name.as_str().to_string());
+                    }
+                    if imported_name == "useGSAP" {
+                        facts
+                            .usegsap_bindings
                             .insert(named.local.name.as_str().to_string());
                     }
                     if KNOWN_PLUGINS.contains(&imported_name) {
@@ -957,6 +976,7 @@ fn check_file_level(
     // Rule 9: useGSAP imported but never registered with registerPlugin.
     if !facts.usegsap_bindings.is_empty()
         && !facts.configured_gsap_imports.contains("gsap")
+        && !facts.configured_gsap_imports.contains("useGSAP")
         && !facts
             .usegsap_bindings
             .iter()
@@ -1037,6 +1057,15 @@ fn property_key_name<'a>(key: &'a PropertyKey<'a>) -> Option<&'a str> {
         PropertyKey::StringLiteral(string) => Some(string.value.as_str()),
         _ => None,
     }
+}
+
+fn object_has_key(object: &ObjectExpression<'_>, name: &str) -> bool {
+    object.properties.iter().any(|property| {
+        matches!(
+            property,
+            ObjectPropertyKind::ObjectProperty(inner) if property_key_name(&inner.key) == Some(name)
+        )
+    })
 }
 
 /// Whether an expression is the boolean literal `true`.
@@ -1328,15 +1357,12 @@ fn call_has_scope(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
     let is_use_gsap = is_usegsap_call(call, facts);
     match second.without_parentheses() {
         // Config object (either call form): scoped only if it has a `scope` key.
-        Expression::ObjectExpression(object) => object.properties.iter().any(|property| {
-            matches!(
-                property,
-                ObjectPropertyKind::ObjectProperty(inner)
-                    if property_key_name(&inner.key) == Some("scope")
-            )
-        }),
+        Expression::ObjectExpression(object) => object_has_key(object, "scope"),
         // A dependency array (useGSAP's useEffect-style overload) is never a scope.
         Expression::ArrayExpression(_) => false,
+        Expression::Identifier(identifier) if is_use_gsap => facts
+            .scoped_usegsap_configs
+            .contains(identifier.name.as_str()),
         // gsap.context(cb, scopeRef): the bare second argument is the scope.
         // useGSAP(cb, depsVar): a non-object/non-array second argument is deps.
         _ => !is_use_gsap,
