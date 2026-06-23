@@ -1,0 +1,21 @@
+[package]
+name = "gsap-audit-core"
+version = "0.1.0"
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core static-analysis library for auditing GSAP usage in JS/TS source"
+
+[dependencies]
+anyhow = "1.0"
+oxc_allocator = "0.137.0"
+oxc_ast = "0.137.0"
+oxc_ast_visit = "0.137.0"
+oxc_parser = "0.137.0"
+oxc_semantic = "0.137.0"
+oxc_span = "0.137.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2.5"

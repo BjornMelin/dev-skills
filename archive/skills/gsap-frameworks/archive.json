@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "gsap-frameworks",
+  "status": "archived",
+  "archived_at": "2026-06-22T00:00:00Z",
+  "replacement": "gsap",
+  "source_path": "skills/gsap-frameworks",
+  "archived_path": "archive/skills/gsap-frameworks",
+  "reason": "GSAP coverage consolidated into the single 'gsap' skill (skills/gsap), which is React/Next-focused. The Vue/Svelte/Nuxt framework-lifecycle guidance in this skill was intentionally retired from the active catalog. Retained for source history and possible future reference.",
+  "restore": "Move back to plugins/web-motion/skills/gsap-frameworks only if Vue/Svelte/Nuxt GSAP lifecycle coverage is intentionally reintroduced."
+}

@@ -26,12 +26,19 @@ References:
 
 - The workspace uses Rust 2024 and resolver `3`. Resolver `3` makes dependency
   resolution aware of package `rust-version` values for Rust 2024 workspaces.
-- All Rust crates inherit `rust-version = "1.88"` from `[workspace.package]`.
-  Rust 1.85 is the first stable toolchain for Rust 2024, but the current locked
-  dependency graph contains transitive crates that require Rust 1.88, so 1.88 is
-  the repo MSRV until those dependencies are replaced or downgraded.
+- All Rust crates inherit `rust-version = "1.96"` from `[workspace.package]`.
+  Rust 1.96 is the repo MSRV so the workspace can use the current stable
+  toolchain and keep the `gsap-audit-core` oxc dependency tree on its active
+  parser and semantic-analysis line.
 - `codex-dev-core` is a library crate. Installable local binaries are
-  `codex-research`, `codex-dev`, and `codex-dev-tui`.
+  `codex-research`, `codex-dev`, and `codex-dev-tui`. `gsap-audit-core` is a
+  library crate; `gsap-audit` is an optional companion CLI for the standalone
+  `gsap` skill.
+- The `gsap-audit-core` oxc dependency tree (`oxc_allocator`, `oxc_ast`,
+  `oxc_ast_visit`, `oxc_parser`, `oxc_semantic`, and `oxc_span` at `0.137.0`,
+  plus `walkdir`) was reviewed under the `cargo deny check licenses bans sources`
+  gates. Treat new oxc or related transitive additions as supply-chain review
+  items before merge.
 - All workspace crates set `publish = false`; this repo supports local install
   handoff, not crates.io publication.
 - Path dependencies between workspace crates include package versions so
@@ -57,6 +64,8 @@ cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
 cargo package --list -p bun-platform
+cargo package --list -p gsap-audit-core
+cargo package --list -p gsap-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo run -q -p codex-dev -- --json policy manifest --profile release

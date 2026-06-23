@@ -77,6 +77,10 @@ skills/*.zip
 .firecrawl/
 skills/bun-dev/.bun-platform/
 skills/bun-dev/references/release-sync-report.json
+crates/codex-dev/.pr_view_count
+
+# Skill-creator eval/benchmark workspaces (transient)
+/gsap-workspace/
 .agents/
 skills-lock.json
 

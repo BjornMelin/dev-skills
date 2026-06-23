@@ -10,14 +10,6 @@ const pluginName = path.basename(pluginRoot);
 const tick = String.fromCharCode(96);
 
 const requiredSkills = [
-  'gsap-core',
-  'gsap-frameworks',
-  'gsap-performance',
-  'gsap-plugins',
-  'gsap-react',
-  'gsap-scrolltrigger',
-  'gsap-timeline',
-  'gsap-utils',
   'typegpu',
   'web-css-animations',
   'web-lottie',
@@ -237,9 +229,6 @@ for (const skill of requiredSkills) {
     : '';
   if (!openai.includes('default_prompt:') || !openai.includes(`$${skill}`)) {
     fail(`${skill}: agents/openai.yaml missing default_prompt with $skill reference`);
-  }
-  if (skill === 'gsap-frameworks' && !/allow_implicit_invocation:\s*false/.test(openai)) {
-    fail('gsap-frameworks must be explicit-only');
   }
 
   const ledger = existsSync(path.join(skillDir, 'references', 'source-ledger.md'))

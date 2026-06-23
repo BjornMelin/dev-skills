@@ -36,6 +36,7 @@ Key docs:
 - [codex-dev core reference](docs/reference/codex-dev-core.md)
 - [codex-dev CLI reference](docs/reference/codex-dev-cli.md)
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
+- [gsap-audit reference](docs/reference/gsap-audit.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -86,6 +87,8 @@ crates/
   codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
   codex-dev-tui/          # Optional Ratatui workbench for codex-dev capsules
   codex-research/         # Rust CLI for evidence-first research helpers
+  gsap-audit-core/        # oxc-based static-analysis engine for the gsap skill
+  gsap-audit/             # Rust CLI that audits GSAP usage in JS/TS/JSX/TSX
 docs/
   index.md                # documentation portal
   architecture/           # system design
@@ -249,7 +252,7 @@ for local development and validation commands.
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
 | `native-motion` | `native-accessibility-performance`, `native-controls-transitions`, `native-lottie`, `native-motion-core`, `native-rive`, `native-skia`, `native-styling-boundaries`, `native-three-r3f`, `native-validation` | Self-contained native motion skills for Expo and React Native with bundled Reanimated, Expo, NativeWind, Lottie, Skia, Rive, R3F, and validation references. | [Codex](plugins/native-motion/.codex-plugin/plugin.json), [Claude Code](plugins/native-motion/.claude-plugin/plugin.json) |
-| `web-motion` | `gsap-core`, `gsap-frameworks`, `gsap-performance`, `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, `gsap-utils`, `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
+| `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |
@@ -280,6 +283,7 @@ for local development and validation commands.
 | `firecrawl` | Firecrawl CLI for search, scrape, map, crawl, interact, monitor, download, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
+| `gsap` | Master GSAP skill for React/Next.js and vanilla JS: tweens, timelines, ScrollTrigger, the `useGSAP` hook, every free plugin (SplitText, MorphSVG, DrawSVG, Flip, Draggable), `gsap.utils`, performance, and reduced-motion — with a Next.js recipe cookbook and the `gsap-audit` CLI. | [skills/gsap/SKILL.md](skills/gsap/SKILL.md) |
 | `kimi-ui-agent` | Explicit-only Kimi-powered UI agent for repo profiling, adapter setup, and plan-first frontend worktree orchestration. | [skills/kimi-ui-agent/SKILL.md](skills/kimi-ui-agent/SKILL.md) |
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |
 | `new-branch` | Create a conventional, semver-friendly branch first, then plan work and the PR. | [skills/new-branch/SKILL.md](skills/new-branch/SKILL.md) |

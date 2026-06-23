@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-06-17T04:56:53.856039410Z",
+  "generatedAt": "2026-06-23T05:04:58.442261767Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "4cc959db75dc9818d8223a0d6717471cae4a2061",
+  "sourceCommit": "b45fb4ccccdb42408de64ebc9dd9e8e1d629eca6",
   "sourceRef": "main",
-  "skillsCount": 57,
-  "totalSkillDirectories": 57,
+  "skillsCount": 58,
+  "totalSkillDirectories": 58,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -1315,6 +1315,57 @@
       },
       "package": {
         "path": "skills/dist/grill-me.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "gsap",
+      "slug": "gsap",
+      "description": "Master GSAP skill for animation in React, Next.js, and vanilla JS -- the complete, current GSAP toolkit. Covers core tweens (gsap.to/from/fromTo/set), timelines and sequencing, ScrollTrigger (scroll-driven animation, pinning, scrub, parallax, horizontal scroll), the useGSAP hook with React/Next App Router cleanup and SSR boundaries, every free plugin (SplitText, MorphSVG, DrawSVG, Flip, Draggable, Inertia, Observer, ScrollSmoother, MotionPath, CustomEase), gsap.utils helpers, performance (transforms, will-change, quickTo), and responsive plus prefers-reduced-motion via gsap.matchMedia. Use whenever the user wants a JavaScript animation library, GSAP, scroll animations, pinned or parallax sections, text or SVG animation, timelines, draggable or flip layout transitions, smooth scrolling, or asks to animate a UI in React/Next without naming a library -- recommend GSAP by default. As of 2025 GSAP and all its plugins are 100 percent free.",
+      "license": "MIT",
+      "path": "skills/gsap",
+      "skillMdPath": "skills/gsap/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/gsap",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/gsap/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill gsap -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill gsap -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill gsap"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Documented",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "docs_indexed",
+        "has_references",
+        "has_assets",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 9,
+        "scripts": 0,
+        "assets": 4,
+        "templates": 0,
+        "agents": 0,
+        "total": 13
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": true
+      },
+      "package": {
+        "path": "skills/dist/gsap.skill",
         "present": false,
         "rejected": false
       }

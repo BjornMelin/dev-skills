@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "web-motion",
   "displayName": "Web Motion",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Self-contained web motion skills for production frontend apps.",
   "author": {
     "name": "Bjorn Melin",
@@ -15,7 +15,6 @@
     "web-motion",
     "react",
     "motion",
-    "gsap",
     "css",
     "waapi",
     "tailwind",

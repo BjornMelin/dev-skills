@@ -7,6 +7,7 @@ available from any directory:
 - `codex-dev`
 - `bun-platform` (temporary Bun platform compatibility shim)
 - `codex-dev-tui`
+- `gsap-audit` (optional companion CLI for the standalone `gsap` skill)
 
 This repo intentionally uses Cargo-native install/update commands. It does not
 publish crates, mutate shell startup files, or require secrets for local CLI
@@ -23,6 +24,7 @@ cargo install --path crates/codex-research --locked --force
 cargo install --path crates/codex-dev --locked --force
 cargo install --path crates/bun-platform --locked --force
 cargo install --path crates/codex-dev-tui --locked --force
+cargo install --path crates/gsap-audit --locked --force
 ```
 
 `--locked` installs from the committed `Cargo.lock`. `--force` replaces an
@@ -38,6 +40,7 @@ codex-research --help >/dev/null
 codex-dev --help >/dev/null
 bun-platform --help >/dev/null
 codex-dev-tui --help >/dev/null
+gsap-audit --help >/dev/null
 ```
 
 ## Completion And Manpage Smokes
@@ -54,6 +57,7 @@ cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p bun-platform -- completions zsh >/tmp/bun-platform.zsh
 cargo run -q -p codex-dev-tui -- completions zsh >/tmp/codex-dev-tui.zsh
+cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
 cargo run -q -p codex-research -- manpage >/tmp/codex-research.1
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 cargo run -q -p codex-dev-tui -- manpage >/tmp/codex-dev-tui.1
@@ -67,14 +71,17 @@ codex-research completions bash > ~/.local/share/dev-skills/completions/bash/cod
 codex-dev completions bash > ~/.local/share/dev-skills/completions/bash/codex-dev
 bun-platform completions bash > ~/.local/share/dev-skills/completions/bash/bun-platform
 codex-dev-tui completions bash > ~/.local/share/dev-skills/completions/bash/codex-dev-tui
+gsap-audit completions bash > ~/.local/share/dev-skills/completions/bash/gsap-audit
 codex-research completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-research
 codex-dev completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-dev
 bun-platform completions zsh > ~/.local/share/dev-skills/completions/zsh/_bun-platform
 codex-dev-tui completions zsh > ~/.local/share/dev-skills/completions/zsh/_codex-dev-tui
+gsap-audit completions zsh > ~/.local/share/dev-skills/completions/zsh/_gsap-audit
 codex-research completions fish > ~/.local/share/dev-skills/completions/fish/codex-research.fish
 codex-dev completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev.fish
 bun-platform completions fish > ~/.local/share/dev-skills/completions/fish/bun-platform.fish
 codex-dev-tui completions fish > ~/.local/share/dev-skills/completions/fish/codex-dev-tui.fish
+gsap-audit completions fish > ~/.local/share/dev-skills/completions/fish/gsap-audit.fish
 ```
 
 Generate local manpages from installed binaries:
@@ -118,6 +125,11 @@ root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
 (cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
+
+root="$repo/target/codex-dev-install-smoke/gsap-audit"
+rm -rf "$root"
+cargo install --path crates/gsap-audit --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/gsap-audit" --help >/dev/null && "$root/bin/gsap-audit" doctor >/dev/null && "$root/bin/gsap-audit" completions zsh >/dev/null)
 ```
 
 These are included in the `full_local` policy profile because they are heavier

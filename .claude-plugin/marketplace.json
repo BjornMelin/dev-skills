@@ -27,7 +27,7 @@
     },
     {
       "name": "web-motion",
-      "description": "Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references.",
+      "description": "Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references.",
       "author": {
         "name": "Bjorn Melin",
         "url": "https://github.com/BjornMelin"
@@ -37,7 +37,6 @@
       "tags": [
         "web-motion",
         "react",
-        "gsap",
         "animation",
         "frontend"
       ],

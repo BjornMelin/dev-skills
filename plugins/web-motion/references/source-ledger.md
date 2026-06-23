@@ -7,14 +7,6 @@
 
 ## Skill Baselines
 
-- gsap-core: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-core; gsap@3.15.0; greensock/GSAP@13e2b790546426a1a2e0e9b409f3f8dc6d6611f2
-- gsap-frameworks: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-frameworks; gsap@3.15.0
-- gsap-performance: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-performance; gsap@3.15.0; MDN will-change; web.dev animation performance
-- gsap-plugins: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-plugins; gsap@3.15.0
-- gsap-react: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-react; @gsap/react@2.1.2; greensock/react@b7f44ca767eb93390f965d6f19679e2b77be7966
-- gsap-scrolltrigger: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-scrolltrigger; gsap@3.15.0
-- gsap-timeline: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-timeline; gsap@3.15.0
-- gsap-utils: greensock/gsap-skills@aed9cfd3277740755f6bfc1155c7aa645403b760 skills/gsap-utils; gsap@3.15.0
 - typegpu: software-mansion-labs/skills@a56a8b600429979b071309cb890fc3b1eefe52b7 skills/typegpu; software-mansion/TypeGPU@ce5a93b59d5acd3bdb500591ca4717d98f7d0494; typegpu@0.11.8; unplugin-typegpu@0.11.5
 - web-css-animations: mdn/content@8dd50fa9cb734907685508144376dbdd28f98be6; w3c/csswg-drafts@afaf25f3c0077f181a884b064510ac9b41fa7d08; web.dev animation performance
 - web-lottie: airbnb/lottie-web@bede03d25d232826e0c9dca1733d542d8a7754fb; lottie-web@5.13.0; LottieFiles/dotlottie-web@6795b9017ef09620c51c1a86a2900e84aad7ad61; @lottiefiles/dotlottie-web@0.74.0

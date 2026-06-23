@@ -8743,6 +8743,78 @@ fn codex_research_gates() -> Vec<PolicyGate> {
     ]
 }
 
+fn gsap_audit_gates() -> Vec<PolicyGate> {
+    vec![
+        policy_gate(
+            "gsap-audit-clippy",
+            "gsap-audit Clippy",
+            [
+                "cargo",
+                "clippy",
+                "-p",
+                "gsap-audit-core",
+                "-p",
+                "gsap-audit",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            "docs/runbooks/validation.md#gsap-audit-cli",
+            ["cargo"],
+            "Failure means gsap-audit has Rust lints or warnings that must be fixed before review.",
+        ),
+        policy_gate(
+            "gsap-audit-check",
+            "gsap-audit cargo check",
+            [
+                "cargo",
+                "check",
+                "-p",
+                "gsap-audit-core",
+                "-p",
+                "gsap-audit",
+            ],
+            "docs/runbooks/validation.md#gsap-audit-cli",
+            ["cargo"],
+            "Failure means gsap-audit does not typecheck.",
+        ),
+        policy_gate(
+            "gsap-audit-test",
+            "gsap-audit tests",
+            ["cargo", "test", "-p", "gsap-audit-core", "-p", "gsap-audit"],
+            "docs/runbooks/validation.md#gsap-audit-cli",
+            ["cargo"],
+            "Failure means gsap-audit rule or CLI behavior regressed.",
+        ),
+        policy_gate(
+            "gsap-audit-doctor",
+            "gsap-audit doctor smoke",
+            ["cargo", "run", "-q", "-p", "gsap-audit", "--", "doctor"],
+            "docs/runbooks/validation.md#gsap-audit-cli",
+            ["cargo"],
+            "Failure means gsap-audit cannot emit its rule catalog.",
+        ),
+        policy_gate(
+            "gsap-audit-completion-zsh",
+            "gsap-audit zsh completion smoke",
+            [
+                "cargo",
+                "run",
+                "-q",
+                "-p",
+                "gsap-audit",
+                "--",
+                "completions",
+                "zsh",
+            ],
+            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
+            ["cargo"],
+            "Failure means gsap-audit cannot generate shell completions from its Clap contract.",
+        ),
+    ]
+}
+
 fn skills_gates() -> Vec<PolicyGate> {
     vec![
         policy_gate(
@@ -8933,6 +9005,7 @@ fn release_gates() -> Vec<PolicyGate> {
     );
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, gsap_audit_gates());
     append_unique_gates(&mut gates, docs_gates());
     append_unique_gates(&mut gates, vec![bootstrap_pack_validate_gate()]);
     append_unique_gates(&mut gates, skills_gates());
@@ -8949,6 +9022,7 @@ fn full_local_gates() -> Vec<PolicyGate> {
     );
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
+    append_unique_gates(&mut gates, gsap_audit_gates());
     append_unique_gates(&mut gates, local_cli_install_smoke_gates());
     append_unique_gates(&mut gates, bootstrap_install_gates());
     append_unique_gates(&mut gates, skills_gates());
@@ -9212,16 +9286,23 @@ fn local_cli_install_smoke_gates() -> Vec<PolicyGate> {
         local_cli_install_smoke_gate("codex-dev", "crates/codex-dev"),
         local_cli_install_smoke_gate("bun-platform", "crates/bun-platform"),
         local_cli_install_smoke_gate("codex-dev-tui", "crates/codex-dev-tui"),
+        local_cli_install_smoke_gate("gsap-audit", "crates/gsap-audit"),
     ]
 }
 
 fn local_cli_install_smoke_gate(binary: &'static str, crate_path: &'static str) -> PolicyGate {
-    let artifact_smoke = if binary == "bun-platform" {
-        format!("\"$root/bin/{binary}\" completions zsh >/dev/null")
-    } else {
-        format!(
-            "\"$root/bin/{binary}\" completions zsh >/dev/null && \"$root/bin/{binary}\" manpage >/dev/null"
-        )
+    let artifact_smoke = match binary {
+        "bun-platform" => format!("\"$root/bin/{binary}\" completions zsh >/dev/null"),
+        "gsap-audit" => {
+            format!(
+                "\"$root/bin/{binary}\" doctor >/dev/null && \"$root/bin/{binary}\" completions zsh >/dev/null"
+            )
+        }
+        _ => {
+            format!(
+                "\"$root/bin/{binary}\" completions zsh >/dev/null && \"$root/bin/{binary}\" manpage >/dev/null"
+            )
+        }
     };
     let command = format!(
         "repo=$(pwd); root=\"$repo/target/codex-dev-install-smoke/{binary}\"; rm -rf \"$root\"; cargo install --path {crate_path} --locked --offline --force --root \"$root\"; (cd /tmp && \"$root/bin/{binary}\" --help >/dev/null && {artifact_smoke})"
@@ -10806,6 +10887,11 @@ enabled = false
                 "codex-research-plan-quick",
                 "codex-research-completion-zsh",
                 "codex-research-manpage",
+                "gsap-audit-clippy",
+                "gsap-audit-check",
+                "gsap-audit-test",
+                "gsap-audit-doctor",
+                "gsap-audit-completion-zsh",
                 "docs-no-todo",
                 "bootstrap-pack-validate",
                 "skills-quick-validate-all",
@@ -10874,10 +10960,16 @@ enabled = false
                 "codex-research-plan-quick",
                 "codex-research-completion-zsh",
                 "codex-research-manpage",
+                "gsap-audit-clippy",
+                "gsap-audit-check",
+                "gsap-audit-test",
+                "gsap-audit-doctor",
+                "gsap-audit-completion-zsh",
                 "cargo-install-codex-research-smoke",
                 "cargo-install-codex-dev-smoke",
                 "cargo-install-bun-platform-smoke",
                 "cargo-install-codex-dev-tui-smoke",
+                "cargo-install-gsap-audit-smoke",
                 "codex-dev-bootstrap-status",
                 "bootstrap-pack-validate",
                 "bootstrap-pack-render-smoke",
