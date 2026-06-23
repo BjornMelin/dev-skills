@@ -328,6 +328,16 @@ fn rule_context_missing_revert_semantic() {
         &argument_to_other_call,
         ids::REACT_CONTEXT_MISSING_REVERT
     ));
+
+    let discarded = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  gsap.context(() => {});
+  return null;
+}"#,
+    );
+    assert!(fired(&discarded, ids::REACT_CONTEXT_MISSING_REVERT));
 }
 
 #[test]

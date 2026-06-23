@@ -632,8 +632,18 @@ fn check_context_missing_revert<'a, F>(
     }
 
     let Some(name) = declarator_name else {
-        // Not bound to a simple variable: do not report (could be returned
-        // directly, IIFE, etc.).
+        if call_result_is_discarded_statement(nodes, call_node_id) {
+            emit(
+                ids::REACT_CONTEXT_MISSING_REVERT,
+                Severity::High,
+                Confidence::High,
+                call.span,
+                "gsap.context() result is discarded and cannot be reverted for cleanup."
+                    .to_string(),
+                "Store the context and return `() => ctx.revert()` so animations are torn down.",
+            );
+        }
+        // Other unbound shapes may be returned directly, passed through, etc.
         return;
     };
 
@@ -1056,6 +1066,15 @@ where
         }
     }
     None
+}
+
+fn call_result_is_discarded_statement(
+    nodes: &oxc_semantic::AstNodes<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    matches!(nodes.parent_kind(node_id), AstKind::ExpressionStatement(_))
 }
 
 /// Whether the reference at `node_id` is torn down for cleanup: it is the
