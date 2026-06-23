@@ -532,3 +532,86 @@ fn rule_lag_smoothing_negative_zero_fires() {
     let bad = analyze("src/a.ts", "ts", r#"gsap.ticker.lagSmoothing(-0);"#);
     assert!(fired(&bad, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
 }
+
+// ---------------------------------------------------------------------------
+// Review fix: ScrollTrigger used via a `scrollTrigger:` tween/timeline config
+// (not only `ScrollTrigger.create`) counts as usage for missing-registration.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rule_scrolltrigger_config_without_register_fires() {
+    // gsap.to(target, { scrollTrigger: {...} }) without registering ScrollTrigger.
+    let bad = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // gsap.timeline({ scrollTrigger: {...} }) likewise.
+    let bad_tl = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline({ scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(fired(&bad_tl, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // Registered -> does NOT fire.
+    let clean = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.registerPlugin(ScrollTrigger); gsap.to(".x", { scrollTrigger: { trigger: ".x" } });"#,
+    );
+    assert!(!fired(&clean, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // No scrollTrigger config -> does NOT fire.
+    let plain = analyze("src/a.ts", "ts", r#"gsap.to(".x", { x: 100 });"#);
+    assert!(!fired(&plain, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+}
+
+// ---------------------------------------------------------------------------
+// Review fix: useGSAP(cb, []) dependency-array overload is not a scope, so an
+// unscoped selector inside it still fires.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rule_unscoped_selector_with_dependency_array_fires() {
+    // useGSAP(cb, []) -> the array is deps, not a scope -> fires.
+    let bad = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  useGSAP(() => {
+    gsap.to(".box", { x: 100 });
+  }, []);
+  return null;
+}"#,
+    );
+    assert!(fired(&bad, ids::REACT_UNSCOPED_SELECTOR));
+
+    // useGSAP(cb, { dependencies: [...] }) without a scope key -> still fires.
+    let bad_config = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  useGSAP(() => {
+    gsap.to(".box", { x: 100 });
+  }, { dependencies: [a] });
+  return null;
+}"#,
+    );
+    assert!(fired(&bad_config, ids::REACT_UNSCOPED_SELECTOR));
+
+    // gsap.context(cb, scopeRef) -> the bare ref IS a scope -> does NOT fire.
+    let clean_context = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  const ctx = gsap.context(() => {
+    gsap.to(".box", { x: 100 });
+  }, root);
+  return () => ctx.revert();
+}"#,
+    );
+    assert!(!fired(&clean_context, ids::REACT_UNSCOPED_SELECTOR));
+}

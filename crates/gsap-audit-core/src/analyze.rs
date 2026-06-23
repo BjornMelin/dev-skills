@@ -479,6 +479,23 @@ where
             );
         }
     }
+
+    // ScrollTrigger is also "used" when a gsap tween/timeline passes a
+    // `scrollTrigger:` config object, even though the callee is `gsap` rather
+    // than `ScrollTrigger` — e.g. gsap.to(target, { scrollTrigger: { ... } }).
+    if !facts.registered.contains("ScrollTrigger")
+        && let Some(span) = scrolltrigger_config_span(call)
+    {
+        emit(
+            ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
+            Severity::High,
+            Confidence::Medium,
+            span,
+            "ScrollTrigger is used (via a `scrollTrigger` config) but never passed to gsap.registerPlugin in this file."
+                .to_string(),
+            "Call gsap.registerPlugin(ScrollTrigger) once before using ScrollTrigger.",
+        );
+    }
 }
 
 /// Rule 11: useGSAP/gsap.context callback uses string-literal selectors while
@@ -739,6 +756,38 @@ fn gsap_tween_method<'a>(call: &'a CallExpression<'a>) -> Option<&'a str> {
     }
 }
 
+/// If the call uses ScrollTrigger implicitly via a `scrollTrigger:` config
+/// object — `gsap.to/from/fromTo/set(target, { scrollTrigger: {...} })` or
+/// `gsap.timeline({ scrollTrigger: {...} })` — return that property's span.
+fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>) -> Option<Span> {
+    let vars_objects: Vec<&'a ObjectExpression<'a>> = if let Some(method) = gsap_tween_method(call)
+    {
+        tween_vars_objects(call, method)
+    } else if is_member_call(call, Some("gsap"), "timeline") {
+        match call
+            .arguments
+            .first()
+            .and_then(argument_expression)
+            .map(Expression::without_parentheses)
+        {
+            Some(Expression::ObjectExpression(object)) => vec![object],
+            _ => Vec::new(),
+        }
+    } else {
+        return None;
+    };
+    for vars in vars_objects {
+        for property in &vars.properties {
+            if let ObjectPropertyKind::ObjectProperty(inner) = property
+                && property_key_name(&inner.key) == Some("scrollTrigger")
+            {
+                return Some(inner.span);
+            }
+        }
+    }
+    None
+}
+
 /// Return every vars object literal for a tween call.
 ///
 /// `to`/`from`/`set(target, vars)` carry one vars object (the last argument).
@@ -876,8 +925,13 @@ fn call_has_scope(call: &CallExpression<'_>) -> bool {
     let Some(second) = call.arguments.get(1).and_then(argument_expression) else {
         return false;
     };
+    // `useGSAP(cb, deps)` takes a dependency array (or a config object) as its
+    // second argument, so a non-config second argument is NOT a scope. Only
+    // `gsap.context(cb, scopeRef)` passes the scope element directly as the
+    // second argument.
+    let is_use_gsap = is_bare_call(call, "useGSAP");
     match second.without_parentheses() {
-        // useGSAP config object: look for a `scope` key.
+        // Config object (either call form): scoped only if it has a `scope` key.
         Expression::ObjectExpression(object) => object.properties.iter().any(|property| {
             matches!(
                 property,
@@ -885,8 +939,11 @@ fn call_has_scope(call: &CallExpression<'_>) -> bool {
                     if property_key_name(&inner.key) == Some("scope")
             )
         }),
-        // gsap.context(cb, scopeRef): any second argument counts as a scope.
-        _ => true,
+        // A dependency array (useGSAP's useEffect-style overload) is never a scope.
+        Expression::ArrayExpression(_) => false,
+        // gsap.context(cb, scopeRef): the bare second argument is the scope.
+        // useGSAP(cb, depsVar): a non-object/non-array second argument is deps.
+        _ => !is_use_gsap,
     }
 }
 
