@@ -956,6 +956,16 @@ fn rule_unscoped_selector_with_dependency_array_fires() {
     );
     assert!(fired(&bad_timeline, ids::REACT_UNSCOPED_SELECTOR));
 
+    let concise_arrow = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  useGSAP(() => gsap.to(".box", { x: 100 }));
+  return null;
+}"#,
+    );
+    assert!(fired(&concise_arrow, ids::REACT_UNSCOPED_SELECTOR));
+
     let aliased_hook = analyze(
         "src/a.tsx",
         "tsx",

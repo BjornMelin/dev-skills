@@ -1267,33 +1267,42 @@ fn call_has_scope(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
 /// Find the first string-literal selector passed to a gsap tween inside a
 /// callback expression (an arrow or function expression). Returns its span.
 fn first_string_selector_in_callback(callback: &Expression<'_>, facts: &FileFacts) -> Option<Span> {
-    let body_statements: &[Statement<'_>] = match callback.without_parentheses() {
-        Expression::ArrowFunctionExpression(arrow) => &arrow.body.statements,
-        Expression::FunctionExpression(function) => function
-            .body
-            .as_ref()
-            .map(|body| body.statements.as_slice())?,
-        _ => return None,
+    let mut found: Option<Span> = None;
+
+    let mut inspect = |expression: &Expression<'_>| {
+        if found.is_some() {
+            return;
+        }
+        if let Expression::CallExpression(call) = expression
+            && gsap_tween_method(call, facts).is_some()
+            && let Some(first) = call.arguments.first().and_then(argument_expression)
+            && let Expression::StringLiteral(string) = first.without_parentheses()
+        {
+            found = Some(string.span);
+        }
     };
 
-    let mut found: Option<Span> = None;
-    for statement in body_statements {
-        for_each_expression_in_statement(statement, &mut |expression| {
-            if found.is_some() {
-                return;
+    match callback.without_parentheses() {
+        Expression::ArrowFunctionExpression(arrow) => {
+            if let Some(expression) = arrow.get_expression() {
+                walk_expression(expression, &mut inspect);
+            } else {
+                for statement in &arrow.body.statements {
+                    for_each_expression_in_statement(statement, &mut inspect);
+                }
             }
-            if let Expression::CallExpression(call) = expression
-                && gsap_tween_method(call, facts).is_some()
-                && let Some(first) = call.arguments.first().and_then(argument_expression)
-                && let Expression::StringLiteral(string) = first.without_parentheses()
-            {
-                found = Some(string.span);
-            }
-        });
-        if found.is_some() {
-            break;
         }
+        Expression::FunctionExpression(function) => {
+            let Some(body) = &function.body else {
+                return None;
+            };
+            for statement in &body.statements {
+                for_each_expression_in_statement(statement, &mut inspect);
+            }
+        }
+        _ => return None,
     }
+
     found
 }
 
