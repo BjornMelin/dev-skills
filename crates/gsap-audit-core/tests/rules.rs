@@ -51,6 +51,20 @@ fn rule_gsdevtools_in_source() {
 
     let clean = analyze("src/a.ts", "ts", r#"const x = 1; export { x };"#);
     assert!(!fired(&clean, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
+
+    let test_file = analyze(
+        "src/a.test.ts",
+        "ts",
+        r#"import { GSDevTools } from "gsap/GSDevTools"; GSDevTools.create();"#,
+    );
+    assert!(!fired(&test_file, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
+
+    let fixture = analyze(
+        "src/fixtures/gsdevtools.ts",
+        "ts",
+        r#"import { GSDevTools } from "gsap/GSDevTools"; GSDevTools.create();"#,
+    );
+    assert!(!fired(&fixture, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 }
 
 #[test]
@@ -197,7 +211,7 @@ export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
     );
     assert!(!fired(&clean, ids::REACT_GSAP_IN_SSR));
 
-    // A file outside app/pages should not trigger SSR even without use client.
+    // A file outside app should not trigger SSR even without use client.
     let outside = analyze(
         "src/widget.tsx",
         "tsx",
@@ -205,6 +219,14 @@ export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
 export default function W() { gsap.to(".x", { x: 1 }); return null; }"#,
     );
     assert!(!fired(&outside, ids::REACT_GSAP_IN_SSR));
+
+    let pages_router = analyze(
+        "pages/index.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
+    );
+    assert!(!fired(&pages_router, ids::REACT_GSAP_IN_SSR));
 
     let type_only = analyze(
         "app/page.tsx",
@@ -547,17 +569,17 @@ fn rule_layout_prop_fromto_scans_tovars() {
 }
 
 // ---------------------------------------------------------------------------
-// Fix 5: array / spread registerPlugin handling.
+// Fix 5: registerPlugin argument handling.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rule_plugin_register_via_array_does_not_fire() {
-    let clean = analyze(
+fn rule_plugin_register_via_array_still_fires() {
+    let bad = analyze(
         "src/a.ts",
         "ts",
         r#"gsap.registerPlugin([ScrollTrigger]); ScrollTrigger.create({});"#,
     );
-    assert!(!fired(&clean, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+    assert!(fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 }
 
 #[test]

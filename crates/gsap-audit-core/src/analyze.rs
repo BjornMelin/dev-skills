@@ -67,11 +67,11 @@ const LAYOUT_PROPS: &[&str] = &[
 #[derive(Default)]
 struct FileFacts {
     /// Identifiers passed to any `gsap.registerPlugin(...)` call in the file,
-    /// including identifiers nested in an array argument.
+    /// from direct identifier arguments.
     registered: BTreeSet<String>,
     /// A `gsap.registerPlugin(...)` call passed an argument that cannot be
-    /// resolved to a plugin name statically (a spread, a call, an array spread,
-    /// etc.). When set, the used-without-register check is suppressed for the
+    /// resolved to a plugin name statically (a spread, a call, etc.). When set,
+    /// the used-without-register check is suppressed for the
     /// file: we cannot prove a plugin was *not* registered.
     registration_unknown: bool,
     /// `useGSAP` is imported from `@gsap/react`.
@@ -134,7 +134,7 @@ pub fn analyze_source(relative_path: &str, source: &str, source_type: SourceType
 
     // Node-level rules: walk every AST node once.
     for node in semantic.nodes() {
-        check_node(node, &semantic, &facts, &mut emit);
+        check_node(node, &semantic, relative_path, &facts, &mut emit);
     }
 
     // File-level rules that do not hang off a single representative node.
@@ -273,11 +273,10 @@ fn import_source_is_configured_gsap_module(source: &str) -> bool {
 
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
 ///
-/// Handles three argument shapes:
+/// Handles these argument shapes:
 /// - a bare identifier: `gsap.registerPlugin(ScrollTrigger)`,
-/// - an array of identifiers: `gsap.registerPlugin([ScrollTrigger, Flip])`,
 /// - anything that cannot be resolved statically (a spread `...plugins`, a call
-///   result, an array containing a spread): this sets `registration_unknown`,
+///   result): this sets `registration_unknown`,
 ///   which suppresses the used-without-register check for the whole file.
 fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
     if !is_member_call(call, Some("gsap"), "registerPlugin") {
@@ -295,26 +294,9 @@ fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
                     .registered
                     .insert(identifier.name.as_str().to_string());
             }
-            Expression::ArrayExpression(array) => {
-                for element in &array.elements {
-                    match element.as_expression().map(Expression::without_parentheses) {
-                        Some(Expression::Identifier(identifier)) => {
-                            facts
-                                .registered
-                                .insert(identifier.name.as_str().to_string());
-                        }
-                        // An array hole or a non-identifier element is fine to
-                        // skip; a spread element inside the array is not
-                        // statically resolvable.
-                        _ => {
-                            if element.is_elision() {
-                                continue;
-                            }
-                            facts.registration_unknown = true;
-                        }
-                    }
-                }
-            }
+            // GSAP does not flatten plugin arrays; `[ScrollTrigger]` is one
+            // invalid plugin argument, not a successful ScrollTrigger register.
+            Expression::ArrayExpression(_) => {}
             // Any other shape (call result, member access, spread) is opaque.
             _ => facts.registration_unknown = true,
         }
@@ -322,8 +304,13 @@ fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
 }
 
 /// Per-node rule dispatch.
-fn check_node<'a, F>(node: &AstNode<'a>, semantic: &Semantic<'a>, facts: &FileFacts, emit: &mut F)
-where
+fn check_node<'a, F>(
+    node: &AstNode<'a>,
+    semantic: &Semantic<'a>,
+    relative_path: &str,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     use oxc_ast::AstKind;
@@ -349,6 +336,7 @@ where
         // positions (e.g. `let x: GSDevTools`), which are erased at build time.
         AstKind::IdentifierReference(identifier)
             if identifier.name.as_str() == "GSDevTools"
+                && !is_test_or_fixture_path(relative_path)
                 && !reference_is_ts_type_position(semantic, node.id()) =>
         {
             emit(
@@ -713,8 +701,8 @@ fn check_file_level(
         });
     }
 
-    // Rule 10: GSAP used in app/ or pages/ file without "use client".
-    if is_under_app_or_pages(relative_path) && facts.uses_gsap_surface && !facts.has_use_client {
+    // Rule 10: GSAP used in an App Router file without "use client".
+    if is_under_app(relative_path) && facts.uses_gsap_surface && !facts.has_use_client {
         let span = program.span;
         let (line, column) = line_index.line_col(span.start);
         findings.push(Finding {
@@ -737,10 +725,25 @@ fn check_file_level(
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Path is under an `app/` or `pages/` directory segment.
-fn is_under_app_or_pages(path: &str) -> bool {
-    path.split(['/', '\\'])
-        .any(|segment| segment == "app" || segment == "pages")
+/// Path is under a Next.js App Router `app/` directory segment.
+fn is_under_app(path: &str) -> bool {
+    path.split(['/', '\\']).any(|segment| segment == "app")
+}
+
+fn is_test_or_fixture_path(path: &str) -> bool {
+    let mut segments = path
+        .split(['/', '\\'])
+        .filter(|segment| !segment.is_empty());
+    let Some(file_name) = segments.next_back() else {
+        return false;
+    };
+    if segments.any(|segment| matches!(segment, "__tests__" | "__fixtures__" | "fixtures")) {
+        return true;
+    }
+    file_name.contains(".test.")
+        || file_name.contains(".spec.")
+        || file_name.starts_with("test.")
+        || file_name.starts_with("spec.")
 }
 
 /// Return the static property name of an object key, if it is a plain
