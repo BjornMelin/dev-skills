@@ -39,6 +39,17 @@ const KNOWN_PLUGINS: &[&str] = &[
     "MorphSVGPlugin",
     "InertiaPlugin",
     "CustomEase",
+    "ScrollToPlugin",
+    "TextPlugin",
+];
+
+const PLUGIN_VARS: &[(&str, &str)] = &[
+    ("motionPath", "MotionPathPlugin"),
+    ("drawSVG", "DrawSVGPlugin"),
+    ("morphSVG", "MorphSVGPlugin"),
+    ("text", "TextPlugin"),
+    ("scrollTo", "ScrollToPlugin"),
+    ("inertia", "InertiaPlugin"),
 ];
 
 /// GSAP tween factory methods that take a vars object.
@@ -84,6 +95,8 @@ struct FileFacts {
     /// Local bindings imported from the skill's configured GSAP module pattern
     /// (`lib/gsap`), where registration is centralized before re-export.
     configured_gsap_imports: BTreeSet<String>,
+    /// Identifiers initialized from `gsap.timeline(...)`.
+    timeline_handles: BTreeSet<String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -174,6 +187,7 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                     && specifiers.iter().any(import_specifier_is_use_gsap)
                 {
                     facts.imports_usegsap = true;
+                    facts.uses_gsap_surface = true;
                 }
                 record_configured_gsap_imports(import, &mut facts);
             }
@@ -188,6 +202,19 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             }
             AstKind::CallExpression(call) => {
                 record_register(call, &mut facts);
+                if is_bare_call(call, "useGSAP") {
+                    facts.uses_gsap_surface = true;
+                }
+            }
+            AstKind::VariableDeclarator(declarator) => {
+                if let Some(identifier) = declarator.id.get_binding_identifier()
+                    && let Some(init) = &declarator.init
+                    && expression_is_gsap_timeline_call(init)
+                {
+                    facts
+                        .timeline_handles
+                        .insert(identifier.name.as_str().to_string());
+                }
             }
             _ => {}
         }
@@ -427,8 +454,8 @@ fn check_call<'a, F>(
         );
     }
 
-    // Tween-factory rules: gsap.to/from/fromTo/set(...).
-    if let Some(method) = gsap_tween_method(call) {
+    // Tween-factory rules: gsap.to/from/fromTo/set(...) and timeline variants.
+    if let Some(method) = gsap_tween_method(call, facts) {
         // Rule 5: GSAP-2 signature gsap.to(target, <number>, {...}).
         if matches!(method, "to" | "from" | "fromTo")
             && call.arguments.len() >= 2
@@ -480,7 +507,7 @@ fn check_call<'a, F>(
 
     // Rules 11 & 12 hang off useGSAP / gsap.context calls.
     if is_member_call(call, Some("gsap"), "context") || is_bare_call(call, "useGSAP") {
-        check_unscoped_selectors(call, emit);
+        check_unscoped_selectors(call, facts, emit);
     }
     if is_member_call(call, Some("gsap"), "context") {
         check_context_missing_revert(call, semantic, emit);
@@ -528,7 +555,7 @@ where
     if !facts.registered.contains("ScrollTrigger")
         && !facts.configured_gsap_imports.contains("ScrollTrigger")
         && !facts.configured_gsap_imports.contains("gsap")
-        && let Some(span) = scrolltrigger_config_span(call)
+        && let Some(span) = scrolltrigger_config_span(call, facts)
     {
         emit(
             ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
@@ -540,13 +567,34 @@ where
             "Call gsap.registerPlugin(ScrollTrigger) once before using ScrollTrigger.",
         );
     }
+
+    for (vars_key, plugin) in PLUGIN_VARS {
+        if facts.registered.contains(*plugin)
+            || facts.configured_gsap_imports.contains(*plugin)
+            || facts.configured_gsap_imports.contains("gsap")
+        {
+            continue;
+        }
+        if let Some(span) = plugin_vars_key_span(call, facts, vars_key) {
+            emit(
+                ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
+                Severity::High,
+                Confidence::Medium,
+                span,
+                format!(
+                    "`{vars_key}` vars use {plugin}, but `{plugin}` is never passed to gsap.registerPlugin in this file."
+                ),
+                "Call gsap.registerPlugin(<Plugin>) once before using plugin vars.",
+            );
+        }
+    }
 }
 
 /// Rule 11: useGSAP/gsap.context callback uses string-literal selectors while
 /// no scope is supplied. Uses argument structure (semantic-aware traversal of
 /// the callback body via the node walk would double-report, so we inspect the
 /// call's own arguments here).
-fn check_unscoped_selectors<F>(call: &CallExpression<'_>, emit: &mut F)
+fn check_unscoped_selectors<F>(call: &CallExpression<'_>, facts: &FileFacts, emit: &mut F)
 where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
@@ -559,7 +607,7 @@ where
     let Some(first) = call.arguments.first().and_then(argument_expression) else {
         return;
     };
-    if let Some(span) = first_string_selector_in_callback(first) {
+    if let Some(span) = first_string_selector_in_callback(first, facts) {
         emit(
             ids::REACT_UNSCOPED_SELECTOR,
             Severity::Medium,
@@ -806,19 +854,14 @@ fn is_bare_call(call: &CallExpression<'_>, name: &str) -> bool {
     )
 }
 
-/// If the call is `gsap.<method>(...)` for a tween factory, return the method.
-fn gsap_tween_method<'a>(call: &'a CallExpression<'a>) -> Option<&'a str> {
+/// If the call is a GSAP tween factory (`gsap.to`, `tl.to`,
+/// `gsap.timeline().to`, etc.), return the method.
+fn gsap_tween_method<'a>(call: &'a CallExpression<'a>, facts: &FileFacts) -> Option<&'a str> {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return None;
     };
-    let Expression::Identifier(object) = member.object.without_parentheses() else {
-        return None;
-    };
-    if object.name.as_str() != "gsap" {
-        return None;
-    }
     let method = member.property.name.as_str();
-    if TWEEN_METHODS.contains(&method) {
+    if TWEEN_METHODS.contains(&method) && expression_is_gsap_tween_owner(&member.object, facts) {
         Some(method)
     } else {
         None
@@ -828,19 +871,37 @@ fn gsap_tween_method<'a>(call: &'a CallExpression<'a>) -> Option<&'a str> {
 /// If the call uses ScrollTrigger implicitly via a `scrollTrigger:` config
 /// object — `gsap.to/from/fromTo/set(target, { scrollTrigger: {...} })` or
 /// `gsap.timeline({ scrollTrigger: {...} })` — return that property's span.
-fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>) -> Option<Span> {
-    let vars_objects: Vec<&'a ObjectExpression<'a>> = if let Some(method) = gsap_tween_method(call)
-    {
-        tween_vars_objects(call, method)
-    } else if is_member_call(call, Some("gsap"), "timeline") {
-        gsap_timeline_vars_object(call).into_iter().collect()
-    } else {
-        return None;
-    };
+fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>, facts: &FileFacts) -> Option<Span> {
+    let vars_objects: Vec<&'a ObjectExpression<'a>> =
+        if let Some(method) = gsap_tween_method(call, facts) {
+            tween_vars_objects(call, method)
+        } else if is_member_call(call, Some("gsap"), "timeline") {
+            gsap_timeline_vars_object(call).into_iter().collect()
+        } else {
+            return None;
+        };
     for vars in vars_objects {
         for property in &vars.properties {
             if let ObjectPropertyKind::ObjectProperty(inner) = property
                 && property_key_name(&inner.key) == Some("scrollTrigger")
+            {
+                return Some(inner.span);
+            }
+        }
+    }
+    None
+}
+
+fn plugin_vars_key_span<'a>(
+    call: &'a CallExpression<'a>,
+    facts: &FileFacts,
+    vars_key: &str,
+) -> Option<Span> {
+    let method = gsap_tween_method(call, facts)?;
+    for vars in tween_vars_objects(call, method) {
+        for property in &vars.properties {
+            if let ObjectPropertyKind::ObjectProperty(inner) = property
+                && property_key_name(&inner.key) == Some(vars_key)
             {
                 return Some(inner.span);
             }
@@ -862,6 +923,24 @@ fn gsap_timeline_vars_object<'a>(call: &'a CallExpression<'a>) -> Option<&'a Obj
         Some(Expression::ObjectExpression(object)) => Some(object),
         _ => None,
     }
+}
+
+fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts) -> bool {
+    match expression.without_parentheses() {
+        Expression::Identifier(identifier) => {
+            identifier.name.as_str() == "gsap"
+                || facts.timeline_handles.contains(identifier.name.as_str())
+        }
+        Expression::CallExpression(call) => is_member_call(call, Some("gsap"), "timeline"),
+        _ => false,
+    }
+}
+
+fn expression_is_gsap_timeline_call(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression.without_parentheses(),
+        Expression::CallExpression(call) if is_member_call(call, Some("gsap"), "timeline")
+    )
 }
 
 /// Return every vars object literal for a tween call.
@@ -1025,7 +1104,7 @@ fn call_has_scope(call: &CallExpression<'_>) -> bool {
 
 /// Find the first string-literal selector passed to a gsap tween inside a
 /// callback expression (an arrow or function expression). Returns its span.
-fn first_string_selector_in_callback(callback: &Expression<'_>) -> Option<Span> {
+fn first_string_selector_in_callback(callback: &Expression<'_>, facts: &FileFacts) -> Option<Span> {
     let body_statements: &[Statement<'_>] = match callback.without_parentheses() {
         Expression::ArrowFunctionExpression(arrow) => &arrow.body.statements,
         Expression::FunctionExpression(function) => function
@@ -1042,7 +1121,7 @@ fn first_string_selector_in_callback(callback: &Expression<'_>) -> Option<Span> 
                 return;
             }
             if let Expression::CallExpression(call) = expression
-                && gsap_tween_method(call).is_some()
+                && gsap_tween_method(call, facts).is_some()
                 && let Some(first) = call.arguments.first().and_then(argument_expression)
                 && let Expression::StringLiteral(string) = first.without_parentheses()
             {

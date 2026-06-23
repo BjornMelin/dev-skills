@@ -248,6 +248,14 @@ export default function Page() { gsap.to(".x", { x: 1 }); return null; }"#,
     );
     assert!(!fired(&pages_router, ids::REACT_GSAP_IN_SSR));
 
+    let usegsap_only = analyze(
+        "app/page.tsx",
+        "tsx",
+        r#"import { useGSAP } from "@gsap/react";
+export default function Page() { useGSAP(() => {}); return null; }"#,
+    );
+    assert!(fired(&usegsap_only, ids::REACT_GSAP_IN_SSR));
+
     let type_only = analyze(
         "app/page.tsx",
         "tsx",
@@ -588,6 +596,33 @@ fn rule_layout_prop_fromto_scans_tovars() {
     assert!(fired(&bad, ids::CORE_LAYOUT_PROP_ANIMATION));
 }
 
+#[test]
+fn rule_timeline_tween_calls_are_audited() {
+    let alias_layout = analyze(
+        "src/a.ts",
+        "ts",
+        r#"const tl = gsap.timeline(); tl.to(".box", { top: 0 });"#,
+    );
+    assert!(fired(&alias_layout, ids::CORE_LAYOUT_PROP_ANIMATION));
+
+    let chained_signature = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.timeline().to(".box", 1, { x: 100 });"#,
+    );
+    assert!(fired(&chained_signature, ids::CORE_GSAP2_SIGNATURE));
+
+    let alias_scrolltrigger = analyze(
+        "src/a.ts",
+        "ts",
+        r#"const tl = gsap.timeline(); tl.to(".box", { scrollTrigger: { markers: true } });"#,
+    );
+    assert!(fired(
+        &alias_scrolltrigger,
+        ids::SCROLLTRIGGER_MARKERS_IN_PROD
+    ));
+}
+
 // ---------------------------------------------------------------------------
 // Fix 5: registerPlugin argument handling.
 // ---------------------------------------------------------------------------
@@ -680,6 +715,46 @@ fn rule_scrolltrigger_config_without_register_fires() {
 }
 
 #[test]
+fn rule_plugin_vars_without_register_fire() {
+    for vars_key in [
+        "motionPath",
+        "drawSVG",
+        "morphSVG",
+        "text",
+        "scrollTo",
+        "inertia",
+    ] {
+        let source = format!(r#"gsap.to(el, {{ {vars_key}: true }});"#);
+        let bad = analyze("src/a.ts", "ts", &source);
+        assert!(
+            fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER),
+            "expected plugin-vars finding for {vars_key}, got {bad:#?}"
+        );
+    }
+
+    let registered = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.registerPlugin(MotionPathPlugin); gsap.to(el, { motionPath: true });"#,
+    );
+    assert!(!fired(
+        &registered,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+
+    let configured = analyze(
+        "src/a.ts",
+        "ts",
+        r#"import { gsap } from "@/lib/gsap";
+gsap.to(el, { motionPath: true });"#,
+    );
+    assert!(!fired(
+        &configured,
+        ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER
+    ));
+}
+
+#[test]
 fn rule_configured_gsap_reexports_do_not_require_local_register() {
     let configured_plugin = analyze(
         "src/a.ts",
@@ -748,6 +823,19 @@ fn rule_unscoped_selector_with_dependency_array_fires() {
 }"#,
     );
     assert!(fired(&bad_config, ids::REACT_UNSCOPED_SELECTOR));
+
+    let bad_timeline = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"function C() {
+  useGSAP(() => {
+    const tl = gsap.timeline();
+    tl.to(".box", { x: 100 });
+  });
+  return null;
+}"#,
+    );
+    assert!(fired(&bad_timeline, ids::REACT_UNSCOPED_SELECTOR));
 
     // gsap.context(cb, scopeRef) -> the bare ref IS a scope -> does NOT fire.
     let clean_context = analyze(
