@@ -30,6 +30,8 @@ cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
 cargo package --list -p bun-platform
+cargo package --list -p gsap-audit-core
+cargo package --list -p gsap-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 ```
@@ -79,11 +81,32 @@ binary is installed locally. The embedded default eval suite is sourced from
 routing, privacy, budgets, cited claims, report shape, and bundle closeout
 shape.
 
+## GSAP Audit CLI
+
+Run after any change under `crates/gsap-audit-core/`, `crates/gsap-audit/`, or
+root Cargo files:
+
+```bash
+cargo fmt --all --check
+cargo clippy -p gsap-audit-core -p gsap-audit --all-targets -- -D warnings
+cargo check -p gsap-audit-core -p gsap-audit
+cargo test -p gsap-audit-core -p gsap-audit
+cargo run -q -p gsap-audit -- doctor
+cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
+```
+
+`gsap-audit` is the optional companion CLI for the standalone `gsap` skill. It
+statically audits GSAP usage in JS/TS/JSX/TSX with oxc and exits `2` when any
+high-severity finding is present, `0` when clean or low-only, and `1` on usage
+or IO error. See [gsap-audit reference](../reference/gsap-audit.md) for the
+command surface and rule categories.
+
 ## codex-dev Operating Layer
 
 Run after changing `crates/codex-dev-core/`, `crates/codex-dev/`,
-`crates/bun-platform-core/`, `crates/bun-platform/`, root Cargo files, or the
-`codex-dev` architecture/spec docs:
+`crates/bun-platform-core/`, `crates/bun-platform/`, `crates/gsap-audit-core/`,
+`crates/gsap-audit/`, root Cargo files, or the `codex-dev` architecture/spec
+docs:
 
 ```bash
 cargo fmt --all --check
@@ -94,25 +117,35 @@ cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
 cargo package --list -p bun-platform
+cargo package --list -p gsap-audit-core
+cargo package --list -p gsap-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo clippy -p bun-platform-core --all-targets -- -D warnings
 cargo clippy -p bun-platform --all-targets -- -D warnings
+cargo clippy -p gsap-audit-core --all-targets -- -D warnings
+cargo clippy -p gsap-audit --all-targets -- -D warnings
 cargo check -p codex-dev-core
 cargo check -p codex-dev
 cargo check -p bun-platform-core
 cargo check -p bun-platform
+cargo check -p gsap-audit-core
+cargo check -p gsap-audit
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo test -p bun-platform-core
 cargo test -p bun-platform
+cargo test -p gsap-audit-core
+cargo test -p gsap-audit
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 cargo run -q -p bun-platform -- --help
 cargo run -q -p bun-platform -- completions zsh >/tmp/bun-platform.zsh
+cargo run -q -p gsap-audit -- doctor
+cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
@@ -398,7 +431,6 @@ claude plugin validate ./plugins/web-motion --strict
 claude plugin validate ./plugins/native-motion --strict
 node plugins/web-motion/scripts/validate-atomic-skills.mjs
 node plugins/native-motion/scripts/validate-atomic-skills.mjs
-node --check tools/skill/overhaul_motion_plugins.mjs
 rg --files -g '*.json' .claude-plugin plugins | xargs -r jq empty
 ```
 
@@ -532,13 +564,21 @@ Manual checks:
 cargo fmt --all --check
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo clippy -p gsap-audit-core --all-targets -- -D warnings
+cargo clippy -p gsap-audit --all-targets -- -D warnings
 cargo check -p codex-dev-core
 cargo check -p codex-dev
+cargo check -p gsap-audit-core
+cargo check -p gsap-audit
 cargo test -p codex-dev-core
 cargo test -p codex-dev
+cargo test -p gsap-audit-core
+cargo test -p gsap-audit
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
+cargo run -q -p gsap-audit -- doctor
+cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
 cargo run -q -p codex-dev -- --json bootstrap status
 # codex-dev:policy-manifest-all:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev

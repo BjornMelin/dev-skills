@@ -1,0 +1,27 @@
+[
+  { "query": "ok i need a gsap scrolltrigger setup where a section pins and the heading scrubs as you scroll, next 14 app router, it's in components/Pinned.tsx", "should_trigger": true },
+  { "query": "i want the cards on my landing page to fly in and stagger as you scroll down — react/ts, no idea what animation library to use", "should_trigger": true },
+  { "query": "how do i sequence a few animations one after another, like title then subtitle then the CTA button, with a slight overlap between them", "should_trigger": true },
+  { "query": "animate my hero headline so it reveals line by line on load in my next.js site", "should_trigger": true },
+  { "query": "i have two svg paths and i want one shape to morph into the other smoothly when you click it, react", "should_trigger": true },
+  { "query": "make these portfolio cards draggable with some throw/momentum after you let go", "should_trigger": true },
+  { "query": "whats the correct way to clean up gsap animations in a react component so they dont leak or double-fire on unmount/strict mode", "should_trigger": true },
+  { "query": "add smooth scrolling to my whole next app and make sure scroll-triggered reveals still work", "should_trigger": true },
+  { "query": "parallax background layers that move at different speeds as you scroll past a section", "should_trigger": true },
+  { "query": "build a magnetic hover button that follows the cursor and springs back, in react with typescript", "should_trigger": true },
+  { "query": "i want a horizontal scrolling gallery in my nextjs landing page that moves sideways while you scroll down the page", "should_trigger": true },
+  { "query": "getting 'window is not defined' and hydration mismatch errors trying to use gsap in next.js app router, how do i set it up right", "should_trigger": true },
+
+  { "query": "add a smooth hover transition to my button that fades the background color over 200ms", "should_trigger": false },
+  { "query": "animate this modal's enter and exit with framer motion's AnimatePresence", "should_trigger": false },
+  { "query": "animate a bottom sheet sliding up in my expo react native app using reanimated", "should_trigger": false },
+  { "query": "rotate my 3d model continuously in react three fiber inside useFrame", "should_trigger": false },
+  { "query": "embed this lottie json animation and play it when it scrolls into view", "should_trigger": false },
+  { "query": "use tailwind to add a pulse animation to my loading dots", "should_trigger": false },
+  { "query": "write a pure css @keyframes spinner with no javascript at all", "should_trigger": false },
+  { "query": "use the web animations api element.animate() to fade in this toast notification", "should_trigger": false },
+  { "query": "load a .riv rive file and trigger its state machine input when the user hovers", "should_trigger": false },
+  { "query": "animate transitions between bar chart states with d3 in my dashboard", "should_trigger": false },
+  { "query": "build a scroll progress bar using css scroll-driven animations with animation-timeline: scroll(), no libraries", "should_trigger": false },
+  { "query": "autoplay and loop this muted background mp4 video in my hero section", "should_trigger": false }
+]

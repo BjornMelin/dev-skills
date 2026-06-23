@@ -6,6 +6,8 @@ members = [
     "crates/codex-dev",
     "crates/codex-dev-tui",
     "crates/codex-research",
+    "crates/gsap-audit-core",
+    "crates/gsap-audit",
 ]
 resolver = "3"
 

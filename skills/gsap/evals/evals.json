@@ -1,0 +1,106 @@
+{
+  "skill_name": "gsap",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "In my Next.js App Router app I have components/Hero.tsx (a client component) with an <h1>. Animate the headline so each line wipes up into view on mount. Make sure it only targets this heading, not headings elsewhere on the page.",
+      "expected_output": "A client component using useGSAP with a scoped container ref, animating the heading lines (SplitText with type/mask lines, or per-line spans) on mount with a stagger, cleaning up automatically, and honoring prefers-reduced-motion.",
+      "files": [],
+      "assertions": [
+        "Uses the useGSAP hook from @gsap/react (not a bare useEffect) for setup and cleanup",
+        "Passes a scope (a ref to the component root) so selectors do not match elements outside the component",
+        "Keeps the file a client component ('use client') and does not run GSAP during SSR",
+        "Animates the lines with a stagger (e.g. SplitText lines or per-line wrappers) using a from/timeline reveal",
+        "Provides a prefers-reduced-motion fallback (e.g. gsap.matchMedia) that shows the text without motion"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add a pinned section to my landing page that scrubs through three cards as the user scrolls. It's React with TypeScript.",
+      "expected_output": "A client component using useGSAP that builds a timeline with a ScrollTrigger that pins the section and scrubs it to scroll, using ease none inside scrubbed tweens, with automatic cleanup and a reduced-motion path that avoids pinning.",
+      "files": [],
+      "assertions": [
+        "Registers and uses ScrollTrigger with pin: true and scrub on the trigger",
+        "Drives a timeline (or single tween) with the ScrollTrigger rather than putting scrollTrigger on nested child tweens",
+        "Uses ease: 'none' for scrubbed tweens so motion tracks scroll linearly",
+        "Wraps setup in useGSAP for cleanup, or otherwise kills the ScrollTrigger on unmount",
+        "Does not combine scrub with toggleActions",
+        "Addresses prefers-reduced-motion (e.g. no pin / static layout when reduce is set)"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build a horizontal-scrolling gallery: a wide row of panels that moves sideways while I scroll down the page. Next.js client component.",
+      "expected_output": "A client component that pins a viewport and translates the track on the x axis tied to scroll, computing the distance from scrollWidth, using a function-based end and invalidateOnRefresh, with cleanup and reduced-motion fallback.",
+      "files": [],
+      "assertions": [
+        "Pins a viewport and animates the track horizontally (x / xPercent) with scrub and ease: 'none'",
+        "Computes scroll distance from the track width (e.g. scrollWidth - innerWidth) and uses a function-based end with invalidateOnRefresh: true",
+        "Uses useGSAP with a scope for setup and automatic cleanup",
+        "Marks the component 'use client'",
+        "Provides a non-animated/normal-layout fallback for prefers-reduced-motion"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Make a magnetic button in React that smoothly follows the cursor while hovering and springs back when the pointer leaves.",
+      "expected_output": "A client component using useGSAP and contextSafe handlers; cursor tracking via gsap.quickTo (or a reused tween) for performance, an elastic/power ease return, and a reduced-motion guard.",
+      "files": [],
+      "assertions": [
+        "Uses gsap.quickTo (or a single reused tween) for the per-pointer-move update rather than creating a new gsap.to on every mousemove",
+        "Wraps event handlers in contextSafe (from useGSAP) so they are cleaned up",
+        "Animates with transform aliases (x/y) not layout properties",
+        "Resets the button on mouse leave with an ease (e.g. elastic/power)",
+        "Guards the effect for prefers-reduced-motion"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I'm getting SSR/hydration errors when I use GSAP in my Next.js App Router project. How should I set it up so it works?",
+      "expected_output": "Guidance to run GSAP client-side only: mark components 'use client', use useGSAP (SSR-safe) instead of useEffect/useLayoutEffect at top level, register plugins once at a client boundary, and never call gsap/ScrollTrigger during server render.",
+      "files": [],
+      "assertions": [
+        "Explains GSAP must run client-side only and components need 'use client'",
+        "Recommends the useGSAP hook (SSR-safe via isomorphic layout effect) rather than running GSAP during render/SSR",
+        "Shows registering plugins once (e.g. a lib/gsap.ts module) at a client boundary",
+        "Notes installing both gsap and @gsap/react"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Animate an SVG logo in React: draw the outline stroke on, then morph the shape into a different icon.",
+      "expected_output": "A client component registering DrawSVGPlugin and MorphSVGPlugin, using a timeline to draw the stroke (drawSVG) then morph (morphSVG) into a target path, with cleanup and reduced-motion fallback to the final state.",
+      "files": [],
+      "assertions": [
+        "Registers DrawSVGPlugin and MorphSVGPlugin (imported from the gsap package) before use",
+        "Uses drawSVG to reveal the stroke and morphSVG to morph between shapes, sequenced on a timeline",
+        "Notes these plugins are free (no Club GreenSock / trial / license needed)",
+        "Uses useGSAP for cleanup and renders the final state when prefers-reduced-motion is set"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Reveal a grid of cards with a stagger as they scroll into view, but I don't want a separate ScrollTrigger created for every single card.",
+      "expected_output": "Use ScrollTrigger.batch to group elements entering together and stagger them in batches, with onEnter/onLeaveBack, inside useGSAP, plus a reduced-motion fallback that shows all cards.",
+      "files": [],
+      "assertions": [
+        "Uses ScrollTrigger.batch to group the cards instead of one ScrollTrigger per card",
+        "Staggers the batched elements in onEnter and uses overwrite to avoid conflicts",
+        "Sets the initial hidden state and uses useGSAP for cleanup",
+        "Provides a prefers-reduced-motion fallback that reveals all cards without animation"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "My GSAP ScrollTrigger animations end up at the wrong scroll positions after images load and when I navigate between routes in my Next.js app. How do I fix this?",
+      "expected_output": "Call ScrollTrigger.refresh() after layout-affecting content (images/fonts/async) settles; on App Router navigation kill existing ScrollTriggers and refresh; prefer useGSAP keyed on pathname so triggers are recreated/cleaned per route.",
+      "files": [],
+      "assertions": [
+        "Recommends ScrollTrigger.refresh() after images/fonts/async content change the layout",
+        "Explains ScrollTrigger does not auto-clean on Next.js route changes and triggers must be killed/recreated on navigation",
+        "Uses useGSAP (e.g. keyed on usePathname) or an equivalent cleanup so triggers are reverted per route",
+        "Mentions function-based start/end or invalidateOnRefresh for responsive recalculation"
+      ]
+    }
+  ]
+}

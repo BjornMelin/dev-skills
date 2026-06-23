@@ -77,6 +77,9 @@ skills/*.zip
 .firecrawl/
 skills/bun-dev/.bun-platform/
 skills/bun-dev/references/release-sync-report.json
+
+# Skill-creator eval/benchmark workspaces (transient)
+/gsap-workspace/
 .agents/
 skills-lock.json
 

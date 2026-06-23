@@ -23,7 +23,16 @@ If Claude Code is already running, reload components after installation:
 ```
 
 Plugin skills are namespaced by plugin name, for example
-`/web-motion:gsap-core` and `/native-motion:native-motion-core`.
+`/web-motion:web-motion-react` and `/native-motion:native-motion-core`.
+
+> **GSAP migration (web-motion 0.2.0).** This release removed the eight
+> `gsap-*` skills (`gsap-core`, `gsap-frameworks`, `gsap-performance`,
+> `gsap-plugins`, `gsap-react`, `gsap-scrolltrigger`, `gsap-timeline`, and
+> `gsap-utils`) from the `web-motion` plugin. GSAP now lives in the standalone
+> `gsap` skill under `skills/gsap`, installed via the `skills` CLI rather than
+> this plugin marketplace. The retired plugin skill source is preserved under
+> `archive/skills/`. Install GSAP with the `skills` CLI; do not expect it from
+> `web-motion` anymore.
 
 ## Local Development
 

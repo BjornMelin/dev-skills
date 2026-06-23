@@ -56,6 +56,10 @@ out of version control.
   evidence shapes.
 - [Bun Platform Reference](reference/bun-platform.md): native `codex-dev bun`
   commands, compatibility shim, config, state, and skill integration.
+- [gsap-audit Reference](reference/gsap-audit.md): optional oxc-based companion
+  CLI for the standalone `gsap` skill that audits GSAP usage in JS/TS/JSX/TSX,
+  with scan/doctor/completions commands, rule categories, and the scan
+  exit-code contract.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning across Overview, Evidence, Subagents,
   PR, PR Agent, Validation, and Help panels.
