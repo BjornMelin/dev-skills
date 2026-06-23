@@ -134,8 +134,8 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
   without ever calling `cancelAnimation` for teardown.
 - `config`: project configuration issues — a missing or misordered
   `react-native-worklets/plugin` in `babel.config.js`, the deprecated
-  `react-native-reanimated/plugin`, and the New Architecture being disabled in
-  the app config while the project uses Reanimated 4.
+  `react-native-reanimated/plugin`, and the New Architecture being disabled
+  (or omitted before Expo SDK 53) while the project uses Reanimated 4.
 
 This doc describes rules only at the category level on purpose: the per-rule id
 set is maintained in the crate and can change between builds. Run

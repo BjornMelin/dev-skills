@@ -17,7 +17,7 @@
 //! positive/negative rate for a stable, dependency-light static check that runs
 //! without type information. Each such rule documents its specific limitation.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -103,7 +103,7 @@ const LAYOUT_PROPS: &[&str] = &[
 
 /// File-scoped facts gathered in a single pre-pass and shared by heuristic
 /// rules that need a whole-file view (imports, reduced-motion tokens, shared
-/// value bindings).
+/// value activity).
 #[derive(Default)]
 struct FileFacts {
     /// Local bindings imported from `react-native-reanimated`, keyed by local
@@ -113,8 +113,6 @@ struct FileFacts {
     has_reduced_motion_ref: bool,
     /// The file references `cancelAnimation` anywhere (token-level).
     has_cancel_animation_ref: bool,
-    /// Local binding names initialized from `useSharedValue(...)`.
-    shared_value_bindings: BTreeSet<String>,
     /// The file animates with `with*` factories or uses `entering=`/`exiting=`.
     uses_reanimated_animation: bool,
     /// A shared value is driven by a `with*` factory somewhere in the file.
@@ -215,16 +213,6 @@ fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
                     }
                 }
             }
-            AstKind::VariableDeclarator(declarator) => {
-                if let Some(identifier) = declarator.id.get_binding_identifier()
-                    && let Some(init) = &declarator.init
-                    && expression_is_call_to(init, "useSharedValue")
-                {
-                    facts
-                        .shared_value_bindings
-                        .insert(identifier.name.as_str().to_string());
-                }
-            }
             AstKind::JSXAttribute(attribute) => {
                 if let Some(name) = jsx_attribute_name(&attribute.name)
                     && matches!(name, "entering" | "exiting" | "layout")
@@ -299,11 +287,11 @@ where
         }
         // Rule 2: reassigning a useSharedValue binding directly (`sv = x`).
         AstKind::AssignmentExpression(assignment) => {
-            check_shared_value_reassign(assignment, semantic, facts, emit);
+            check_shared_value_reassign(assignment, semantic, emit);
         }
         // Rule 4: reading/writing a resolved shared value's `.value` on JS.
         AstKind::StaticMemberExpression(member) => {
-            check_value_access_on_js(member, semantic, node.id(), facts, emit);
+            check_value_access_on_js(member, semantic, node.id(), emit);
         }
         _ => {}
     }
@@ -371,7 +359,6 @@ where
 fn check_shared_value_reassign<'a, F>(
     assignment: &oxc_ast::ast::AssignmentExpression<'a>,
     semantic: &Semantic<'a>,
-    facts: &FileFacts,
     emit: &mut F,
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
@@ -379,10 +366,8 @@ fn check_shared_value_reassign<'a, F>(
     let AssignmentTarget::AssignmentTargetIdentifier(target) = &assignment.left else {
         return;
     };
-    // Fast path: the binding name was recorded as a shared value in the pre-pass.
     let name = target.name.as_str();
-    let is_shared_value = facts.shared_value_bindings.contains(name)
-        || identifier_resolves_to_shared_value(target, semantic);
+    let is_shared_value = identifier_resolves_to_shared_value(target, semantic);
     if !is_shared_value {
         return;
     }
@@ -445,7 +430,6 @@ fn check_value_access_on_js<'a, F>(
     member: &oxc_ast::ast::StaticMemberExpression<'a>,
     semantic: &Semantic<'a>,
     node_id: oxc_semantic::NodeId,
-    facts: &FileFacts,
     emit: &mut F,
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
@@ -457,8 +441,7 @@ fn check_value_access_on_js<'a, F>(
         return;
     };
     let name = object.name.as_str();
-    let is_shared_value = facts.shared_value_bindings.contains(name)
-        || identifier_resolves_to_shared_value(object, semantic);
+    let is_shared_value = identifier_resolves_to_shared_value(object, semantic);
     if !is_shared_value {
         return;
     }

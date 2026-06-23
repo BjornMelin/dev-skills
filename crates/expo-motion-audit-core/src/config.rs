@@ -139,22 +139,46 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
         // The explicit worklets plugin is absent. babel-preset-expo supplies it,
         // so only flag "missing" when the expo preset is not present.
         if !has_expo_preset {
+            if plugin_names.iter().any(Option::is_none) {
+                findings.push(unable_to_analyze(
+                    relative_path,
+                    &line_index,
+                    "babel.config plugins array contains unresolved entries; worklets plugin presence cannot be proven statically.",
+                ));
+            } else {
+                findings.push(missing_or_not_last(
+                    relative_path,
+                    &line_index,
+                    plugins.span.start,
+                    &format!(
+                        "babel.config is missing `{WORKLETS_PLUGIN}`; it is required and must be last."
+                    ),
+                ));
+            }
+        }
+    } else if !last_is_worklets {
+        let worklets_index = plugin_names
+            .iter()
+            .rposition(|name| name.as_deref() == Some(WORKLETS_PLUGIN))
+            .expect("has_worklets");
+        let has_known_plugin_after_worklets = plugin_names
+            .iter()
+            .skip(worklets_index + 1)
+            .any(Option::is_some);
+        if has_known_plugin_after_worklets {
             findings.push(missing_or_not_last(
                 relative_path,
                 &line_index,
                 plugins.span.start,
-                &format!(
-                    "babel.config is missing `{WORKLETS_PLUGIN}`; it is required and must be last."
-                ),
+                &format!("`{WORKLETS_PLUGIN}` is present but not the last plugin."),
+            ));
+        } else {
+            findings.push(unable_to_analyze(
+                relative_path,
+                &line_index,
+                "babel.config has unresolved plugin entries after the worklets plugin; last-plugin order cannot be proven statically.",
             ));
         }
-    } else if !last_is_worklets {
-        findings.push(missing_or_not_last(
-            relative_path,
-            &line_index,
-            plugins.span.start,
-            &format!("`{WORKLETS_PLUGIN}` is present but not the last plugin."),
-        ));
     }
 
     // If we could not statically resolve some entries AND the worklets plugin
@@ -178,12 +202,13 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
 /// Architecture.
 ///
 /// Emits [`ids::CONFIG_NEW_ARCH_DISABLED`] (medium) when `expo.newArchEnabled`
-/// is `false` or absent and the project uses Reanimated.
+/// is `false`, or is absent before Expo SDK 53, and the project uses Reanimated.
 #[must_use]
 pub fn analyze_app_config(
     relative_path: &str,
     source: &str,
     project_uses_reanimated: bool,
+    expo_sdk_major: Option<u64>,
 ) -> Vec<Finding> {
     let line_index = LineIndex::new(source);
     let Ok(value) = serde_json::from_str::<serde_json::Value>(source) else {
@@ -203,7 +228,8 @@ pub fn analyze_app_config(
         .and_then(|expo| expo.get("newArchEnabled"));
     let disabled = match new_arch {
         Some(serde_json::Value::Bool(true)) => false,
-        // false, null, or absent all count as "not enabled".
+        None if matches!(expo_sdk_major, Some(major) if major >= 53) => false,
+        // false, null, or absent before Expo SDK 53 all count as "not enabled".
         _ => true,
     };
     if !disabled {
@@ -218,7 +244,7 @@ pub fn analyze_app_config(
         file: relative_path.to_string(),
         line: 1,
         column: 1,
-        message: "expo.newArchEnabled is false or absent while the project uses Reanimated."
+        message: "expo.newArchEnabled is disabled or absent while the project uses Reanimated."
             .to_string(),
         suggestion:
             "Set `expo.newArchEnabled` to true; Reanimated 4 requires the New Architecture."

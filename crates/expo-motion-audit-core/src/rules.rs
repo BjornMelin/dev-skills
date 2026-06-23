@@ -111,7 +111,7 @@ pub const CATALOG: &[RuleDescriptor] = &[
         category: Category::Config,
         severity: Severity::Medium,
         confidence: Confidence::Medium,
-        summary: "app config disables/omits newArchEnabled while the project uses Reanimated 4.",
+        summary: "app config disables New Architecture, or omits it before Expo SDK 53, while the project uses Reanimated 4.",
     },
     RuleDescriptor {
         id: ids::CONFIG_UNABLE_TO_ANALYZE,

@@ -1,11 +1,13 @@
 //! Filesystem walking and per-file orchestration.
 //!
 //! The scan runs in two passes so the New-Architecture config rule can know
-//! whether the project actually uses Reanimated:
+//! whether the project actually uses Reanimated and which Expo SDK package is
+//! installed:
 //! 1. Walk every supported source file, analyze it, and record whether any file
-//!    imports `react-native-reanimated`.
+//!    imports `react-native-reanimated`. Also read `package.json` when present
+//!    to detect the Expo SDK major version.
 //! 2. Analyze the config files found during the walk, passing the
-//!    project-uses-Reanimated signal into the app-config rule.
+//!    project-uses-Reanimated and SDK signals into the app-config rule.
 //!
 //! Both static (`app.json`, `app.config.json`) and dynamic
 //! (`app.config.js`/`.ts`/`.cjs`/`.mjs`) Expo app configs are routed to the
@@ -55,6 +57,9 @@ const APP_CONFIG_NAMES: &[&str] = &[
     "app.config.cjs",
     "app.config.mjs",
 ];
+
+/// Package manifest used to infer the installed Expo SDK major version.
+const PACKAGE_JSON_NAME: &str = "package.json";
 
 /// Token used to detect whether a source file pulls in Reanimated, for the
 /// app-config New-Architecture rule.
@@ -122,6 +127,7 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     let mut outcome = ScanOutcome::default();
     let include_all = options.categories.is_empty();
     let mut project_uses_reanimated = false;
+    let mut expo_sdk_major = None;
     let mut config_files: Vec<ConfigFile> = Vec::new();
 
     let walker = WalkDir::new(root).into_iter().filter_entry(|entry| {
@@ -147,6 +153,19 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
             .file_name()
             .and_then(|name| name.to_str())
             .unwrap_or_default();
+
+        if file_name == PACKAGE_JSON_NAME {
+            if outcome.files_scanned >= options.max_files {
+                outcome.truncated = true;
+                break;
+            }
+            let Ok(source) = std::fs::read_to_string(path) else {
+                continue;
+            };
+            outcome.files_scanned += 1;
+            expo_sdk_major = expo_sdk_major.or_else(|| expo_sdk_major_from_package_json(&source));
+            continue;
+        }
 
         // Config files are collected for the second pass.
         if let Some(kind) = config_kind(file_name) {
@@ -199,9 +218,12 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     for config in config_files {
         let findings = match config.kind {
             ConfigKind::Babel => analyze_babel_config(&config.relative, &config.source),
-            ConfigKind::App => {
-                analyze_app_config(&config.relative, &config.source, project_uses_reanimated)
-            }
+            ConfigKind::App => analyze_app_config(
+                &config.relative,
+                &config.source,
+                project_uses_reanimated,
+                expo_sdk_major,
+            ),
         };
         extend_filtered(&mut outcome.findings, findings, options, include_all);
     }
@@ -247,6 +269,30 @@ fn file_extension(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|extension| extension.to_str())
         .map(|extension| extension.to_ascii_lowercase())
+}
+
+/// Infer Expo SDK major from package.json dependencies.
+fn expo_sdk_major_from_package_json(source: &str) -> Option<u64> {
+    let value = serde_json::from_str::<serde_json::Value>(source).ok()?;
+    ["dependencies", "devDependencies", "peerDependencies"]
+        .into_iter()
+        .find_map(|section| {
+            value
+                .get(section)
+                .and_then(|dependencies| dependencies.get("expo"))
+                .and_then(serde_json::Value::as_str)
+                .and_then(version_major)
+        })
+}
+
+/// Extract the first numeric major version from npm range strings like `~53.0.0`.
+fn version_major(version: &str) -> Option<u64> {
+    let start = version.find(|character: char| character.is_ascii_digit())?;
+    let digits: String = version[start..]
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect();
+    digits.parse().ok()
 }
 
 /// Render a path relative to root using forward slashes, falling back to the
