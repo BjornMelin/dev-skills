@@ -110,6 +110,16 @@ def default_checks() -> list[EvalCheck]:
             runner="all_skill_frontmatter",
         ),
         EvalCheck(
+            id="tanstack-skill-contracts",
+            name="TanStack skill contracts validate",
+            command=(
+                "python3",
+                "tools/skill/check_tanstack_skills.py",
+                "--root",
+                ".",
+            ),
+        ),
+        EvalCheck(
             id="readme-catalog-exposure",
             name="README catalog exposes every skill",
             runner="readme_catalog_exposure",
@@ -909,19 +919,19 @@ def load_quick_validator(
 
 
 def tracked_files(root: Path, prefix: str) -> set[Path]:
-    """Return tracked files below a repo prefix.
+    """Return tracked and untracked non-ignored files below a repo prefix.
 
     Args:
         root: Repository root used as the git working directory.
         prefix: Repo-relative path prefix to list.
 
     Returns:
-        A set of absolute pathlib.Path objects for tracked files under the prefix.
+        A set of absolute pathlib.Path objects for tracked and untracked non-ignored files under the prefix.
 
     Raises:
         RuntimeError: If git ls-files times out.
     """
-    command = ["git", "ls-files", "-z", "--", prefix]
+    command = ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", prefix]
     try:
         completed = subprocess.run(  # noqa: S603
             command,

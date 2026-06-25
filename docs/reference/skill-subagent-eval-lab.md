@@ -98,6 +98,7 @@ committing machine-specific paths.
 ## Built-In Checks
 
 - `all-skill-frontmatter`
+- `tanstack-skill-contracts`
 - `readme-catalog-exposure`
 - `docs-reference-exposure`
 - `skill-local-links`
@@ -113,12 +114,13 @@ committing machine-specific paths.
 The lab calls existing owners:
 
 - `tools/skill/quick_validate.py`
+- `tools/skill/check_tanstack_skills.py` for TanStack-specific stale-guidance, rule-routing, and authority-ledger contracts
 - `skills/subagent-creator/scripts/subagent_creator.py validate`
 - `skills/subspawn/scripts/subspawn_plan.py validate-roles`
 - `skills/subspawn/scripts/subspawn_plan.py plan`
 - `python3 -m compileall`
 
-Native checks enumerate every `skills/*/SKILL.md`, use tracked skill files for
+Native checks enumerate every `skills/*/SKILL.md`, use tracked and untracked non-ignored skill files for
 generated-cache and local-link checks, validate supported
 `agents/openai.yaml` shapes, and inspect local `.skill` bundles. Ignored local
 bundle artifacts are reported as warning findings so stale local build output

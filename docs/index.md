@@ -104,6 +104,7 @@ out of version control.
   reusable templates, packaged fallback copies, duplicate-role validation, and
   skill packaging rules.
 - [Skill and Subagent Eval Lab](reference/skill-subagent-eval-lab.md)
+- [TanStack Current Authority](reference/tanstack-current-authority.md)
 
 ## Cookbooks
 

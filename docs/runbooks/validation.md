@@ -446,8 +446,8 @@ The packager writes archive entries as `<skill-name>/...`, validates
 nested inside the source skill folder and skips symlinks so the bundle cannot
 package itself or out-of-tree targets. `quick_validate.py` validates only
 `SKILL.md` frontmatter. `tools/eval/skill_subagent_eval.py --json` is the
-dedicated offline validator for catalog exposure, local skill links, tracked
-generated-cache exclusion, helper syntax, `.skill` bundle shape, and
+dedicated offline validator for catalog exposure, local skill links, tracked and untracked non-ignored
+generated-cache exclusion, helper syntax, TanStack skill contracts, `.skill` bundle shape, and
 `agents/openai.yaml` metadata. Use `--strict` before publishing bundles when
 ignored local dist artifacts must also be clean.
 
