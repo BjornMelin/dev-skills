@@ -1,0 +1,6 @@
+interface:
+  display_name: "Expo Motion"
+  short_description: "Expo and React Native motion guidance"
+  default_prompt: "Use $expo-motion to build or review Expo and React Native animation, gestures, transitions, Reanimated 4, worklets, Skia, Lottie, Rive, and motion validation."
+policy:
+  allow_implicit_invocation: true

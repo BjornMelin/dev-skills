@@ -2782,11 +2782,9 @@ fn validate_skill_archive_manifest(
             format!("archive.json replacement skill '{replacement}' is not active"),
         );
     }
-    let expected_source_path = format!("skills/{directory}");
-    validate_required_archive_manifest_field(
+    validate_archive_source_path(
         &manifest.source_path,
-        "source_path",
-        &expected_source_path,
+        directory,
         repo_root,
         archive_name,
         manifest_path,
@@ -2818,6 +2816,49 @@ fn validate_skill_archive_manifest(
         manifest_path,
         issues,
     );
+}
+
+fn validate_archive_source_path(
+    value: &Option<String>,
+    directory: &str,
+    repo_root: &Path,
+    archive_name: &str,
+    manifest_path: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) {
+    match trimmed_optional(value) {
+        Some(actual) if archive_source_path_matches(actual, directory) => {}
+        Some(actual) => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            format!(
+                "archive.json source_path must be 'skills/{directory}' or 'plugins/<plugin>/skills/{directory}', found '{actual}'"
+            ),
+        ),
+        None => push_archive_issue(
+            issues,
+            SkillInventoryDiagnosticSeverity::Error,
+            "archived_skill_invalid_manifest",
+            Some(archive_name.to_string()),
+            Some(repo_relative_string(repo_root, manifest_path)),
+            "archive.json is missing source_path",
+        ),
+    }
+}
+
+fn archive_source_path_matches(actual: &str, directory: &str) -> bool {
+    if actual == format!("skills/{directory}") {
+        return true;
+    }
+    let parts = actual.split('/').collect::<Vec<_>>();
+    parts.len() == 4
+        && parts[0] == "plugins"
+        && is_valid_skill_name(parts[1])
+        && parts[2] == "skills"
+        && parts[3] == directory
 }
 
 fn validate_required_archive_manifest_field(

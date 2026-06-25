@@ -1,0 +1,6 @@
+interface:
+  display_name: "GSAP"
+  short_description: "GSAP animation guidance and audit support"
+  default_prompt: "Use $gsap to build or review GSAP animations across React, Next.js, vanilla JavaScript, ScrollTrigger, timelines, plugins, performance, and reduced-motion handling."
+policy:
+  allow_implicit_invocation: true

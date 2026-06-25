@@ -894,6 +894,103 @@ fn skills_archive_is_audited_without_active_inventory() {
 }
 
 #[test]
+fn skills_archive_accepts_plugin_source_paths() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "retired-plugin-skill",
+        "retired-plugin-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "retired-plugin-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "alpha-skill",
+            "source_path": "plugins/web-motion/skills/retired-plugin-skill",
+            "archived_path": "archive/skills/retired-plugin-skill",
+            "reason": "Merged into alpha-skill from a plugin bundle.",
+            "restore": "Move back to plugins/web-motion/skills/retired-plugin-skill only if alpha-skill no longer owns this behavior."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:07:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert_eq!(json["result"]["archive"]["total"], 1);
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .all(|issue| issue["skill"] != "retired-plugin-skill")
+    );
+}
+
+#[test]
+fn skills_archive_rejects_plugin_source_name_mismatch() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "retired-plugin-skill",
+        "retired-plugin-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "retired-plugin-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "alpha-skill",
+            "source_path": "plugins/web-motion/skills/other-skill",
+            "archived_path": "archive/skills/retired-plugin-skill",
+            "reason": "Mismatch fixture.",
+            "restore": "Fix source_path before restoring."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:08:00Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    let issues = json["result"]["issues"].as_array().expect("issues");
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "retired-plugin-skill"
+            && issue["code"] == "archived_skill_invalid_manifest"
+            && issue["message"]
+                .as_str()
+                .expect("message")
+                .contains("plugins/<plugin>/skills/retired-plugin-skill")
+    }));
+}
+
+#[test]
 fn skills_audit_reports_archive_contract_issues() {
     let temp = tempdir().expect("tempdir");
     let repo = write_skill_inventory_repo(temp.path());
