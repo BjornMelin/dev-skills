@@ -313,9 +313,6 @@ function buildRecord(path, root, existing = null) {
     ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
     ...(format === 'json' ? extractPrimaryUrls(parsed) : []),
   ]);
-  const referencedUrls = unique(
-    extractUrls(strings.join('\n')).filter((url) => !sourceUrls.includes(url)),
-  );
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
   const query = reuseExistingMetadata ? (existing?.query ?? null) : null;
   const normalizedQuery = query ? normalizeQuery(query) : null;
@@ -340,7 +337,6 @@ function buildRecord(path, root, existing = null) {
     firecrawlId,
     creditsUsed,
     sourceUrls,
-    referencedUrls,
     normalizedUrls,
     urlHashes: normalizedUrls.map((url) => sha256(url)),
     query,
@@ -377,6 +373,7 @@ function ttlMsFor(intent, commandType) {
   }
   if (key === 'search') return 6 * 60 * 60 * 1000;
   if (key === 'parse') return Number.POSITIVE_INFINITY;
+  if (key === 'monitor') return 0;
   if (['product', 'release', 'package'].includes(key)) return 24 * 60 * 60 * 1000;
   if (['docs', 'reference', 'api'].includes(key)) return 7 * 24 * 60 * 60 * 1000;
   return 24 * 60 * 60 * 1000;
@@ -459,6 +456,9 @@ function validateIndexedArtifact(record, root) {
 }
 
 function withFreshness(record, ttlMs, now) {
+  if (record.commandType === 'monitor' || record.intent === 'monitor') {
+    return { fresh: false, expiresAt: null, reason: 'monitor-historical' };
+  }
   if (record.commandType === 'parse' && record.sourceFileHash) {
     if (!record.command || !record.lookupCommand) {
       return { fresh: false, expiresAt: null, reason: 'parse-command-required' };
@@ -687,6 +687,7 @@ function selfTest() {
     const source = join(dir, 'report.pdf');
     writeFileSync(source, 'fake-pdf');
     writeFileSync(join(root, 'parse-report.md'), '# Report\n');
+    writeFileSync(join(root, 'monitor-page.json'), '{"url":"https://example.com/status"}\n');
     const unrecordedSource = join(dir, 'unrecorded.pdf');
     writeFileSync(unrecordedSource, 'source changed without a recorded hash');
     writeFileSync(join(root, 'parse-unrecorded.md'), '# Unrecorded\n');
@@ -755,6 +756,13 @@ function selfTest() {
       index,
       metadataCommand: 'firecrawl scrape "https://example.com/search?q=old"',
       intent: 'docs',
+    });
+    recordManual({
+      artifact: join(root, 'monitor-page.json'),
+      url: 'https://example.com/status',
+      index,
+      metadataCommand: 'firecrawl monitor check monitor-123 check-456',
+      intent: 'monitor',
     });
     process.chdir(oldCwd);
     const urlResult = findMatches({
@@ -843,6 +851,12 @@ function selfTest() {
       url: 'https://docs.firecrawl.dev/features/linked-only',
       intent: 'docs',
     });
+    const monitorResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/status',
+      intent: 'monitor',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -900,6 +914,13 @@ function selfTest() {
     if (linkedOnlyResult.hits.some((hit) => hit.matchType === 'url-exact' || hit.matchType === 'url-path')) {
       throw new Error('Linked result URLs must not be treated as source URL hits');
     }
+    if (
+      monitorResult.hits.length === 0
+      || monitorResult.hits[0].fresh
+      || monitorResult.hits[0].freshnessReason !== 'monitor-historical'
+    ) {
+      throw new Error('Monitor artifacts must be historical, not fresh cache hits');
+    }
     return {
       ok: true,
       records: records.length,
@@ -918,6 +939,7 @@ function selfTest() {
       queryChangedHits: queryChangedResult.hits.length,
       querylessHits: querylessResult.hits.length,
       linkedOnlyUrlHits: linkedOnlyResult.hits.length,
+      monitorFreshnessReason: monitorResult.hits[0].freshnessReason,
     };
   } finally {
     process.chdir(oldCwd);
