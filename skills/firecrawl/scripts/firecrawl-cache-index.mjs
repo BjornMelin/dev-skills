@@ -252,6 +252,10 @@ function buildRecord(path, root, existing = null) {
   const relPath = relative(process.cwd(), path).replace(/\\/g, '/');
   const rootRelPath = relative(root, path).replace(/\\/g, '/');
   const format = formatFromExtension(path);
+  const artifactSha256 = fileHash(path);
+  const reuseExistingMetadata = Boolean(
+    existing && (!existing.artifactSha256 || existing.artifactSha256 === artifactSha256),
+  );
   let parsed = null;
   let strings = [];
   let firecrawlId = null;
@@ -276,16 +280,18 @@ function buildRecord(path, root, existing = null) {
   }
 
   const sourceUrls = unique([
-    ...(existing?.sourceUrls ?? []),
+    ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
     ...extractUrls(strings.join('\n')),
   ]);
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
-  const query = existing?.query ?? null;
+  const query = reuseExistingMetadata ? (existing?.query ?? null) : null;
   const normalizedQuery = query ? normalizeQuery(query) : null;
-  const sourceFile = existing?.sourceFile ?? null;
-  const sourceFileHash = existing?.sourceFileHash ?? null;
-  const command = existing?.command ?? null;
-  const commandType = existing?.commandType ?? commandTypeFromPath(path);
+  const sourceFile = reuseExistingMetadata ? (existing?.sourceFile ?? null) : null;
+  const sourceFileHash = reuseExistingMetadata ? (existing?.sourceFileHash ?? null) : null;
+  const command = reuseExistingMetadata ? (existing?.command ?? null) : null;
+  const commandType = reuseExistingMetadata
+    ? (existing?.commandType ?? commandTypeFromPath(path))
+    : commandTypeFromPath(path);
 
   return {
     schemaVersion,
@@ -294,7 +300,7 @@ function buildRecord(path, root, existing = null) {
     rootRelativePath: rootRelPath,
     artifactMtime: stat.mtime.toISOString(),
     artifactSizeBytes: stat.size,
-    artifactSha256: fileHash(path),
+    artifactSha256,
     commandType,
     command,
     formats: [format],
@@ -309,7 +315,9 @@ function buildRecord(path, root, existing = null) {
     querySlug: normalizedQuery ? slugify(normalizedQuery) : null,
     sourceFile,
     sourceFileHash,
-    intent: existing?.intent ?? inferIntent(commandType, sourceUrls, relPath),
+    intent: reuseExistingMetadata
+      ? (existing?.intent ?? inferIntent(commandType, sourceUrls, relPath))
+      : inferIntent(commandType, sourceUrls, relPath),
     truncatedForIndex,
   };
 }
@@ -634,11 +642,21 @@ function selfTest() {
       join(root, 'stale-overwritten.md'),
       '# Original\nhttps://docs.firecrawl.dev/overwritten\n',
     );
+    writeFileSync(
+      join(root, 'rescan-reused.md'),
+      '# Old\nhttps://docs.firecrawl.dev/old-rescan\n',
+    );
     const staleRecords = scan(root, index);
     writeIndex(index, staleRecords);
     appendFileSync(index, '{not valid jsonl}\n');
     rmSync(join(root, 'stale-deleted.md'));
     writeFileSync(join(root, 'stale-overwritten.md'), '# Changed\n');
+    writeFileSync(
+      join(root, 'rescan-reused.md'),
+      '# New\nhttps://docs.firecrawl.dev/new-rescan\n',
+    );
+    const rescannedRecords = scan(root, index);
+    writeIndex(index, rescannedRecords);
     const urlResult = findMatches({
       root,
       index,
@@ -675,6 +693,18 @@ function selfTest() {
       url: 'docs.firecrawl.dev/features/parse',
       intent: 'docs',
     });
+    const oldRescanResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/old-rescan',
+      intent: 'docs',
+    });
+    const newRescanResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/new-rescan',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -694,6 +724,12 @@ function selfTest() {
     if (invalidUrlResult.hits.length !== 0) {
       throw new Error('Invalid URL lookup must not match artifact slugs');
     }
+    if (oldRescanResult.hits.length !== 0) {
+      throw new Error('Refreshed scan must not carry stale URLs from reused artifact paths');
+    }
+    if (newRescanResult.hits.length === 0 || !newRescanResult.hits[0].fresh) {
+      throw new Error('Refreshed scan did not index new reused artifact content');
+    }
     return {
       ok: true,
       records: records.length,
@@ -703,6 +739,8 @@ function selfTest() {
       deletedHits: deletedResult.hits.length,
       overwrittenHits: overwrittenResult.hits.length,
       invalidUrlHits: invalidUrlResult.hits.length,
+      oldRescanHits: oldRescanResult.hits.length,
+      newRescanHit: newRescanResult.hits[0].artifactPath,
     };
   } finally {
     process.chdir(oldCwd);
