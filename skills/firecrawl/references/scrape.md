@@ -10,10 +10,18 @@ mkdir -p .firecrawl
 FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
 node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://example.com/page" --intent docs --json
 firecrawl scrape "https://example.com/page" -o .firecrawl/example-page.md
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" record \
+  --artifact .firecrawl/example-page.md \
+  --url "https://example.com/page" \
+  --command 'firecrawl scrape "https://example.com/page" -o .firecrawl/example-page.md' \
+  --intent docs
 firecrawl scrape "https://example.com/page" --only-main-content -o .firecrawl/main.md
 firecrawl scrape "https://example.com/page" --wait-for 3000 -o .firecrawl/rendered.md
 firecrawl scrape "https://example.com/page" --format markdown,links -o .firecrawl/page.json
 ```
+
+For the alternate output paths, record the selected artifact with the matching
+scrape command so the next `find --url` can reuse the local file.
 
 Multiple URLs can be passed positionally and are scraped concurrently:
 
