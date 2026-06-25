@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "claude-core",
+  "displayName": "Claude Core",
+  "version": "0.1.0",
+  "description": "Claude-Code-native orchestration skills: subagent fan-out, custom-agent authoring, PR review-thread resolution, and complexity/perf hotspot optimization. Opus-first, Task- and Workflow-aware replacements for Codex-coupled originals.",
+  "author": {
+    "name": "Bjorn Melin",
+    "url": "https://github.com/BjornMelin"
+  },
+  "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/claude-core",
+  "repository": "https://github.com/BjornMelin/dev-skills",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "subagents",
+    "fan-out",
+    "orchestration",
+    "workflow",
+    "pr-review",
+    "performance",
+    "opus"
+  ]
+}

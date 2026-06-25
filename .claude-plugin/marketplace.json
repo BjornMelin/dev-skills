@@ -23,6 +23,23 @@
         "frontend"
       ],
       "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/web-motion"
+    },
+    {
+      "name": "claude-core",
+      "description": "Claude-Code-native orchestration skills: subagent fan-out, custom-agent authoring, PR review-thread resolution, and complexity/perf hotspot optimization.",
+      "author": {
+        "name": "Bjorn Melin",
+        "url": "https://github.com/BjornMelin"
+      },
+      "source": "./plugins/claude-core",
+      "category": "workflow",
+      "tags": [
+        "claude-code",
+        "subagents",
+        "orchestration",
+        "workflow"
+      ],
+      "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/claude-core"
     }
   ]
 }

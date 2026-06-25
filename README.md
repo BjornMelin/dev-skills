@@ -243,7 +243,7 @@ active catalog.
 Install the web-motion plugin in Claude Code:
 
 ```bash
-claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion
+claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/claude-core
 claude plugin install web-motion@bjorn-dev-skills
 ```
 
