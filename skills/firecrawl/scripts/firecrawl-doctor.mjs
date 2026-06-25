@@ -47,8 +47,13 @@ function hasGitignoreEntry() {
     .split(/\r?\n/)
     .map((line) => line.trim());
   return lines.some((line) => {
-    if (!line || line.startsWith('#')) return false;
-    return /^\/?\.firecrawl(?:\/|$)/.test(line);
+    if (!line || line.startsWith('#') || line.startsWith('!')) return false;
+    const pattern = line.replace(/\/+$/, '');
+    return (
+      pattern === '.firecrawl'
+      || pattern === '/.firecrawl'
+      || /^\/?\.firecrawl\/\*\*$/.test(line)
+    );
   });
 }
 

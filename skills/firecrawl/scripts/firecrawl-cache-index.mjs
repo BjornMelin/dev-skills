@@ -615,7 +615,7 @@ function recordManual(options) {
   const sourceFile = options.sourceFile ? resolve(options.sourceFile) : null;
   const existing = {
     command: options.metadataCommand ?? null,
-    commandType: commandTypeFromPath(artifact),
+    commandType: options.intent === 'parse' && sourceFile ? 'parse' : commandTypeFromPath(artifact),
     sourceUrls: options.url ? [options.url] : [],
     query: options.query ?? null,
     sourceFile: sourceFile ? relative(process.cwd(), sourceFile).replace(/\\/g, '/') : null,
@@ -687,6 +687,7 @@ function selfTest() {
     const source = join(dir, 'report.pdf');
     writeFileSync(source, 'fake-pdf');
     writeFileSync(join(root, 'parse-report.md'), '# Report\n');
+    writeFileSync(join(root, 'report.md'), '# Generic report\n');
     writeFileSync(join(root, 'monitor-page.json'), '{"url":"https://example.com/status"}\n');
     const unrecordedSource = join(dir, 'unrecorded.pdf');
     writeFileSync(unrecordedSource, 'source changed without a recorded hash');
@@ -714,6 +715,12 @@ function selfTest() {
       sourceFile: source,
       index,
       metadataCommand: 'firecrawl parse report.pdf',
+      intent: 'parse',
+    });
+    recordManual({
+      artifact: join(root, 'report.md'),
+      sourceFile: source,
+      index,
       intent: 'parse',
     });
     writeFileSync(
