@@ -462,9 +462,11 @@ function ttlMsFor(intent, commandType) {
 function ttlMsForRecord(options, record) {
   const explicitTtl = parseDuration(options.ttl);
   if (explicitTtl !== null) return explicitTtl;
+  const recordTtl = ttlMsFor(record.intent, record.commandType);
+  if (!options.intent) return recordTtl;
   return Math.min(
     ttlMsFor(options.intent, null),
-    ttlMsFor(record.intent, record.commandType),
+    recordTtl,
   );
 }
 
@@ -800,6 +802,7 @@ function selfTest() {
     writeFileSync(join(root, 'report.md'), '# Generic report\n');
     writeFileSync(join(root, 'monitor-page.json'), '{"url":"https://example.com/status"}\n');
     writeFileSync(join(root, 'pricing-page.md'), '# Pricing\n');
+    writeFileSync(join(root, 'docs-old-page.md'), '# Old docs\nhttps://example.com/docs-old\n');
     writeFileSync(join(root, 'docs-firecrawl-dev-features-artifact.md'), '# Artifact slug only\n');
     const unrecordedSource = join(dir, 'unrecorded.pdf');
     writeFileSync(unrecordedSource, 'source changed without a recorded hash');
@@ -906,12 +909,24 @@ function selfTest() {
       metadataCommand: 'firecrawl scrape https://example.com/pricing',
       intent: 'pricing',
     });
+    recordManual({
+      artifact: join(root, 'docs-old-page.md'),
+      url: 'https://example.com/docs-old',
+      index,
+      metadataCommand: 'firecrawl scrape https://example.com/docs-old',
+      intent: 'docs',
+    });
     const oldPricingTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const pricedRecords = loadRecords(root, index, false).map((record) =>
-      record.artifactPath?.endsWith('pricing-page.md')
-        ? { ...record, artifactMtime: oldPricingTime }
-        : record,
-    );
+    const oldDocsTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const pricedRecords = loadRecords(root, index, false).map((record) => {
+      if (record.artifactPath?.endsWith('pricing-page.md')) {
+        return { ...record, artifactMtime: oldPricingTime };
+      }
+      if (record.artifactPath?.endsWith('docs-old-page.md')) {
+        return { ...record, artifactMtime: oldDocsTime };
+      }
+      return record;
+    });
     writeIndex(index, pricedRecords);
     process.chdir(oldCwd);
     const urlResult = findMatches({
@@ -1024,6 +1039,11 @@ function selfTest() {
       url: 'https://example.com/pricing',
       intent: 'docs',
     });
+    const omittedIntentDocsResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/docs-old',
+    });
     const fuzzyQueryResult = findMatches({
       root,
       index,
@@ -1113,6 +1133,9 @@ function selfTest() {
     if (stalePricingResult.hits.length === 0 || stalePricingResult.hits[0].fresh) {
       throw new Error('Time-sensitive record intent must keep the stricter freshness window');
     }
+    if (omittedIntentDocsResult.hits.length === 0 || !omittedIntentDocsResult.hits[0].fresh) {
+      throw new Error('Lookup without intent must preserve the indexed record TTL');
+    }
     if (
       fuzzyQueryResult.hits.length === 0
       || fuzzyQueryResult.hits[0].fresh
@@ -1149,6 +1172,7 @@ function selfTest() {
       textSourceUrlHit: textSourceUrlResult.hits[0].artifactPath,
       monitorFreshnessReason: monitorResult.hits[0].freshnessReason,
       stalePricingFresh: stalePricingResult.hits[0].fresh,
+      omittedIntentDocsFresh: omittedIntentDocsResult.hits[0].fresh,
       fuzzyQueryFreshnessReason: fuzzyQueryResult.hits[0].freshnessReason,
       fuzzyArtifactFreshnessReason: fuzzyArtifactResult.hits[0].freshnessReason,
     };
