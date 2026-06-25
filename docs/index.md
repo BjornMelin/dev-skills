@@ -93,6 +93,7 @@ out of version control.
 
 - [Deep Researcher Skill](reference/deep-researcher-skill.md)
 - [Firecrawl Skill](../skills/firecrawl/SKILL.md)
+- [Expo Motion Audit Reference](reference/expo-motion-audit.md)
 - [`kimi-ui-agent`](reference/kimi-ui-agent.md)
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
