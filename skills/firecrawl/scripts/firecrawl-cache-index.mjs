@@ -131,6 +131,15 @@ function withoutQuery(normalizedUrl) {
   }
 }
 
+function hasQuery(normalizedUrl) {
+  if (!normalizedUrl) return false;
+  try {
+    return new URL(normalizedUrl).searchParams.toString() !== '';
+  } catch {
+    return false;
+  }
+}
+
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
@@ -439,7 +448,10 @@ function scoreRecord(record, options) {
     if (record.normalizedUrls?.includes(normalized)) {
       return { score: 100, matchType: 'url-exact' };
     }
-    if (record.normalizedUrls?.some((url) => withoutQuery(url) === noQuery)) {
+    if (
+      !hasQuery(normalized)
+      && record.normalizedUrls?.some((url) => !hasQuery(url) && withoutQuery(url) === noQuery)
+    ) {
       return { score: 86, matchType: 'url-path' };
     }
     if (artifactSlug.includes(slugify(normalized))) {
@@ -655,6 +667,10 @@ function selfTest() {
       join(root, 'rescan-reused.md'),
       '# New\nhttps://docs.firecrawl.dev/new-rescan\n',
     );
+    writeFileSync(
+      join(root, 'query-old.md'),
+      '# Search old\nhttps://example.com/search?q=old\n',
+    );
     const rescannedRecords = scan(root, index);
     writeIndex(index, rescannedRecords);
     const urlResult = findMatches({
@@ -705,6 +721,24 @@ function selfTest() {
       url: 'https://docs.firecrawl.dev/new-rescan',
       intent: 'docs',
     });
+    const queryExactResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/search?q=old',
+      intent: 'docs',
+    });
+    const queryChangedResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/search?q=new',
+      intent: 'docs',
+    });
+    const querylessResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/search',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -730,6 +764,15 @@ function selfTest() {
     if (newRescanResult.hits.length === 0 || !newRescanResult.hits[0].fresh) {
       throw new Error('Refreshed scan did not index new reused artifact content');
     }
+    if (queryExactResult.hits.length === 0 || queryExactResult.hits[0].matchType !== 'url-exact') {
+      throw new Error('Query-bearing URL lookup did not find an exact hit');
+    }
+    if (queryChangedResult.hits.length !== 0) {
+      throw new Error('Different query parameters must not match by URL path');
+    }
+    if (querylessResult.hits.length !== 0) {
+      throw new Error('Queryless URL lookup must not match query-bearing cached URLs by path');
+    }
     return {
       ok: true,
       records: records.length,
@@ -741,6 +784,9 @@ function selfTest() {
       invalidUrlHits: invalidUrlResult.hits.length,
       oldRescanHits: oldRescanResult.hits.length,
       newRescanHit: newRescanResult.hits[0].artifactPath,
+      queryExactHit: queryExactResult.hits[0].artifactPath,
+      queryChangedHits: queryChangedResult.hits.length,
+      querylessHits: querylessResult.hits.length,
     };
   } finally {
     process.chdir(oldCwd);

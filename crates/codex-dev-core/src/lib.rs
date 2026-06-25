@@ -2444,10 +2444,11 @@ pub fn skills_audit(args: SkillAuditArgs) -> Result<SkillsAuditReport> {
         &inventory.repo_root.join("docs/index.md"),
         &mut archive_catalog_diagnostics,
     )?;
-    let active_skill_names = active_skill_names(&inventory.skills);
+    let active_skill_entrypoints =
+        active_skill_entrypoints(&inventory.repo_root, &inventory.skills)?;
     let archive = audit_skill_archive(
         &inventory.repo_root,
-        &active_skill_names,
+        &active_skill_entrypoints,
         &readme,
         &docs_index,
         &mut issues,
@@ -2482,20 +2483,116 @@ pub fn skills_audit(args: SkillAuditArgs) -> Result<SkillsAuditReport> {
     })
 }
 
-fn active_skill_names(skills: &[SkillInventoryEntry]) -> BTreeSet<String> {
-    let mut names = BTreeSet::new();
+fn active_skill_entrypoints(
+    repo_root: &Path,
+    skills: &[SkillInventoryEntry],
+) -> Result<BTreeMap<String, String>> {
+    let mut entrypoints = BTreeMap::new();
     for skill in skills {
-        names.insert(skill.directory.clone());
+        entrypoints.insert(skill.directory.clone(), skill.skill_md.clone());
         if let Some(name) = &skill.name {
-            names.insert(name.clone());
+            entrypoints.insert(name.clone(), skill.skill_md.clone());
         }
     }
-    names
+    collect_plugin_skill_entrypoints(repo_root, &mut entrypoints)?;
+    Ok(entrypoints)
+}
+
+fn collect_plugin_skill_entrypoints(
+    repo_root: &Path,
+    entrypoints: &mut BTreeMap<String, String>,
+) -> Result<()> {
+    let plugins_root = repo_root.join("plugins");
+    let metadata = match fs::symlink_metadata(&plugins_root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error).with_context(|| {
+                format!("failed to inspect plugins root {}", plugins_root.display())
+            });
+        }
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Ok(());
+    }
+    for plugin_entry in fs::read_dir(&plugins_root)
+        .with_context(|| format!("failed to read plugins root {}", plugins_root.display()))?
+    {
+        let plugin_entry = plugin_entry
+            .with_context(|| format!("failed to read entry in {}", plugins_root.display()))?;
+        let plugin_path = plugin_entry.path();
+        let plugin_metadata = fs::symlink_metadata(&plugin_path)
+            .with_context(|| format!("failed to inspect plugin {}", plugin_path.display()))?;
+        if plugin_metadata.file_type().is_symlink() || !plugin_metadata.is_dir() {
+            continue;
+        }
+        let skills_root = plugin_path.join("skills");
+        let skills_metadata = match fs::symlink_metadata(&skills_root) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!(
+                        "failed to inspect plugin skills root {}",
+                        skills_root.display()
+                    )
+                });
+            }
+        };
+        if skills_metadata.file_type().is_symlink() || !skills_metadata.is_dir() {
+            continue;
+        }
+        for skill_entry in fs::read_dir(&skills_root).with_context(|| {
+            format!(
+                "failed to read plugin skills root {}",
+                skills_root.display()
+            )
+        })? {
+            let skill_entry = skill_entry
+                .with_context(|| format!("failed to read entry in {}", skills_root.display()))?;
+            let skill_path = skill_entry.path();
+            let skill_metadata = fs::symlink_metadata(&skill_path).with_context(|| {
+                format!("failed to inspect plugin skill {}", skill_path.display())
+            })?;
+            if skill_metadata.file_type().is_symlink() || !skill_metadata.is_dir() {
+                continue;
+            }
+            let skill_md = skill_path.join("SKILL.md");
+            let skill_md_metadata = match fs::symlink_metadata(&skill_md) {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!(
+                            "failed to inspect plugin skill entrypoint {}",
+                            skill_md.display()
+                        )
+                    });
+                }
+            };
+            if skill_md_metadata.file_type().is_symlink() || !skill_md_metadata.is_file() {
+                continue;
+            }
+            let directory = skill_entry.file_name().to_string_lossy().to_string();
+            let rel_path = repo_relative_string(repo_root, &skill_md);
+            entrypoints
+                .entry(directory)
+                .or_insert_with(|| rel_path.clone());
+            if let Some(name) =
+                read_optional_regular_text(&skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES)?
+                    .and_then(|text| parse_skill_frontmatter(&text.text).ok())
+                    .and_then(|frontmatter| frontmatter.name)
+            {
+                entrypoints.entry(name).or_insert_with(|| rel_path.clone());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn audit_skill_archive(
     repo_root: &Path,
-    active_skill_names: &BTreeSet<String>,
+    active_skill_entrypoints: &BTreeMap<String, String>,
     readme: &CatalogInputText,
     docs_index: &CatalogInputText,
     issues: &mut Vec<SkillAuditIssue>,
@@ -2604,7 +2701,7 @@ fn audit_skill_archive(
                 &archive_name,
                 &manifest,
                 &manifest_path,
-                active_skill_names,
+                active_skill_entrypoints,
                 issues,
             );
         }
@@ -2670,7 +2767,7 @@ fn validate_skill_archive_manifest(
     archive_name: &str,
     manifest: &SkillArchiveManifest,
     manifest_path: &Path,
-    active_skill_names: &BTreeSet<String>,
+    active_skill_entrypoints: &BTreeMap<String, String>,
     issues: &mut Vec<SkillAuditIssue>,
 ) {
     let manifest_rel = repo_relative_string(repo_root, manifest_path);
@@ -2760,18 +2857,18 @@ fn validate_skill_archive_manifest(
             "archive.json is missing archived_at",
         ),
     }
-    if active_skill_names.contains(archive_name) {
+    if let Some(active_path) = active_skill_entrypoints.get(archive_name) {
         push_archive_issue(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_still_active",
             Some(archive_name.to_string()),
-            Some(format!("skills/{archive_name}/SKILL.md")),
-            "archived skill name is also present in the active skills root",
+            Some(active_path.clone()),
+            "archived skill name is also present in an active skill entrypoint",
         );
     }
     if let Some(replacement) = trimmed_optional(&manifest.replacement)
-        && !active_skill_names.contains(replacement)
+        && !active_skill_entrypoints.contains_key(replacement)
     {
         push_archive_issue(
             issues,
@@ -7565,6 +7662,72 @@ mod tests {
 
         assert_eq!(files, 1);
         assert!(!capped);
+    }
+
+    #[test]
+    fn skills_audit_flags_archived_plugin_skill_still_active() {
+        let temp = tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        fs::create_dir_all(&repo).expect("repo dir");
+        fs::create_dir_all(repo.join("docs/runbooks")).expect("runbooks dir");
+        fs::write(repo.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
+        fs::write(repo.join("docs/runbooks/validation.md"), "# Validation\n")
+            .expect("validation runbook");
+        fs::create_dir_all(repo.join("skills")).expect("skills dir");
+        fs::create_dir_all(repo.join("plugins/web-motion/skills/plugin-skill"))
+            .expect("plugin skill dir");
+        fs::create_dir_all(repo.join("archive/skills/plugin-skill")).expect("archive skill dir");
+        fs::write(
+            repo.join("plugins/web-motion/skills/plugin-skill/SKILL.md"),
+            r#"---
+name: plugin-skill
+description: Active plugin skill.
+---
+
+# Plugin Skill
+"#,
+        )
+        .expect("plugin skill");
+        fs::write(
+            repo.join("archive/skills/plugin-skill/SKILL.md"),
+            r#"---
+name: plugin-skill
+description: Archived plugin skill.
+---
+
+# Plugin Skill
+"#,
+        )
+        .expect("archived skill");
+        fs::write(
+            repo.join("archive/skills/plugin-skill/archive.json"),
+            r#"{
+  "schema": "skill_archive.v1",
+  "name": "plugin-skill",
+  "status": "archived",
+  "archived_at": "2026-06-24T00:00:00Z",
+  "source_path": "plugins/web-motion/skills/plugin-skill",
+  "archived_path": "archive/skills/plugin-skill",
+  "reason": "fixture",
+  "restore": "fixture"
+}
+"#,
+        )
+        .expect("archive manifest");
+
+        let audit = skills_audit(SkillAuditArgs {
+            repo_root: Some(repo),
+            skills_root: None,
+            checked_at: None,
+            max_skill_md_lines: 200,
+        })
+        .expect("skills audit");
+
+        assert!(audit.issues.iter().any(|issue| {
+            issue.code == "archived_skill_still_active"
+                && issue.skill.as_deref() == Some("plugin-skill")
+                && issue.path.as_deref() == Some("plugins/web-motion/skills/plugin-skill/SKILL.md")
+        }));
     }
 
     #[test]
