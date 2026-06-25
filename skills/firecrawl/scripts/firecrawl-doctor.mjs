@@ -52,7 +52,7 @@ function hasGitignoreEntry() {
     return (
       pattern === '.firecrawl'
       || pattern === '/.firecrawl'
-      || /^\/?\.firecrawl\/\*\*$/.test(line)
+      || /^\/?\.firecrawl\/\*\*$/.test(pattern)
     );
   });
 }

@@ -25,6 +25,27 @@ const trackingParams = new Set([
   'mc_cid',
   'mc_eid',
 ]);
+const sensitiveQueryParams = new Set([
+  'access_token',
+  'api_key',
+  'apikey',
+  'auth',
+  'authorization',
+  'client_secret',
+  'code',
+  'id_token',
+  'jwt',
+  'key',
+  'password',
+  'refresh_token',
+  'secret',
+  'session',
+  'session_id',
+  'sessionid',
+  'sig',
+  'signature',
+  'token',
+]);
 
 function usage() {
   return `Usage:
@@ -97,14 +118,26 @@ function normalizeQuery(value) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+function shouldDropQueryParam(key) {
+  const normalized = key.toLowerCase();
+  return (
+    normalized.startsWith('utm_')
+    || trackingParams.has(normalized)
+    || sensitiveQueryParams.has(normalized)
+    || /(^|[-_])(token|secret|password|passwd|signature|session|jwt|credential|api[-_]?key)([-_]|$)/.test(normalized)
+  );
+}
+
 function normalizeUrl(value) {
   try {
     const url = new URL(String(value).trim());
     url.protocol = url.protocol.toLowerCase();
     url.hostname = url.hostname.toLowerCase();
+    url.username = '';
+    url.password = '';
     url.hash = '';
     for (const key of [...url.searchParams.keys()]) {
-      if (key.toLowerCase().startsWith('utm_') || trackingParams.has(key.toLowerCase())) {
+      if (shouldDropQueryParam(key)) {
         url.searchParams.delete(key);
       }
     }
@@ -188,6 +221,17 @@ function hasQuery(normalizedUrl) {
   } catch {
     return false;
   }
+}
+
+function sanitizeSourceUrl(value, options = {}) {
+  const normalized = normalizeUrl(value);
+  if (!normalized) return null;
+  if (options.excludeQuery && hasQuery(normalized)) return null;
+  return normalized;
+}
+
+function sanitizeSourceUrls(values, options = {}) {
+  return unique(values.map((value) => sanitizeSourceUrl(value, options)));
 }
 
 function unique(values) {
@@ -343,10 +387,13 @@ function buildRecord(path, root, existing = null) {
     : commandTypeFromPath(path);
   const textSourceUrls = format === 'json'
     ? []
-    : unique(strings.flatMap((value) => extractUrls(value)));
+    : sanitizeSourceUrls(
+        strings.flatMap((value) => extractUrls(value)),
+        { excludeQuery: true },
+      );
   const sourceUrls = unique([
-    ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
-    ...(format === 'json' ? extractPrimaryUrls(parsed, commandType) : []),
+    ...(reuseExistingMetadata ? sanitizeSourceUrls(existing?.sourceUrls ?? []) : []),
+    ...(format === 'json' ? sanitizeSourceUrls(extractPrimaryUrls(parsed, commandType)) : []),
     ...textSourceUrls,
   ]);
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
@@ -733,7 +780,7 @@ function selfTest() {
           {
             markdown: 'Crawl page docs',
             metadata: {
-              sourceURL: 'https://docs.firecrawl.dev/features/crawl-page?utm_source=test',
+              sourceURL: 'https://docs.firecrawl.dev/features/crawl-page?utm_source=test&access_token=secret-token',
             },
           },
         ],
@@ -745,7 +792,7 @@ function selfTest() {
     );
     writeFileSync(
       join(root, 'scrape-text-source-url.md'),
-      '# Text source\nhttps://docs.firecrawl.dev/features/text-source\n',
+      '# Text source\nhttps://docs.firecrawl.dev/features/text-source?access_token=secret-token&utm_source=test\n',
     );
     const source = join(dir, 'report.pdf');
     writeFileSync(source, 'fake-pdf');
@@ -760,6 +807,15 @@ function selfTest() {
     process.chdir(dir);
     const index = join(root, 'index.jsonl');
     const records = scan(root, index);
+    const indexedUrlMetadata = JSON.stringify(
+      records.map((record) => ({
+        sourceUrls: record.sourceUrls,
+        normalizedUrls: record.normalizedUrls,
+      })),
+    );
+    if (indexedUrlMetadata.includes('secret-token') || indexedUrlMetadata.includes('access_token')) {
+      throw new Error('Indexed URL metadata must not persist sensitive query values');
+    }
     writeIndex(index, records);
     appendFileSync(index, '{not valid jsonl}\n');
     recordManual({
