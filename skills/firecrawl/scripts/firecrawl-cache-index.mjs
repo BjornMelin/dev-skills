@@ -124,6 +124,23 @@ function normalizeUrl(value) {
   }
 }
 
+function extractPrimaryUrls(parsed) {
+  if (!parsed || typeof parsed !== 'object') return [];
+  const candidates = [
+    parsed.url,
+    parsed.sourceUrl,
+    parsed.metadata?.sourceURL,
+    parsed.metadata?.sourceUrl,
+    parsed.metadata?.url,
+    parsed.data?.url,
+    parsed.data?.sourceUrl,
+    parsed.data?.metadata?.sourceURL,
+    parsed.data?.metadata?.sourceUrl,
+    parsed.data?.metadata?.url,
+  ];
+  return unique(candidates.filter((value) => typeof value === 'string'));
+}
+
 function withoutQuery(normalizedUrl) {
   if (!normalizedUrl) return null;
   try {
@@ -294,8 +311,11 @@ function buildRecord(path, root, existing = null) {
 
   const sourceUrls = unique([
     ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
-    ...extractUrls(strings.join('\n')),
+    ...(format === 'json' ? extractPrimaryUrls(parsed) : []),
   ]);
+  const referencedUrls = unique(
+    extractUrls(strings.join('\n')).filter((url) => !sourceUrls.includes(url)),
+  );
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
   const query = reuseExistingMetadata ? (existing?.query ?? null) : null;
   const normalizedQuery = query ? normalizeQuery(query) : null;
@@ -320,6 +340,7 @@ function buildRecord(path, root, existing = null) {
     firecrawlId,
     creditsUsed,
     sourceUrls,
+    referencedUrls,
     normalizedUrls,
     urlHashes: normalizedUrls.map((url) => sha256(url)),
     query,
@@ -415,7 +436,7 @@ function loadRecords(root, indexPath, refreshIndex) {
 }
 
 function normalizeCommand(value) {
-  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
 }
 
 function validateIndexedArtifact(record, root) {
@@ -438,6 +459,11 @@ function validateIndexedArtifact(record, root) {
 }
 
 function withFreshness(record, ttlMs, now) {
+  if (record.commandType === 'parse' && record.sourceFileHash) {
+    if (!record.command || !record.lookupCommand) {
+      return { fresh: false, expiresAt: null, reason: 'parse-command-required' };
+    }
+  }
   if (record.sourceFileHash && record.lookupSourceFileHash) {
     if (record.sourceFileHash !== record.lookupSourceFileHash) {
       return { fresh: false, expiresAt: null, reason: 'source-file-hash-changed' };
@@ -645,6 +671,11 @@ function selfTest() {
               url: 'https://docs.firecrawl.dev/features/parse?utm_source=test',
               markdown: 'Parse docs',
             },
+            {
+              title: 'Linked only',
+              url: 'https://docs.firecrawl.dev/features/linked-only',
+              markdown: 'Linked result only',
+            },
           ],
         },
       }),
@@ -664,6 +695,13 @@ function selfTest() {
     const records = scan(root, index);
     writeIndex(index, records);
     appendFileSync(index, '{not valid jsonl}\n');
+    recordManual({
+      artifact: join(root, 'scrape-firecrawl-parse.md'),
+      url: 'https://docs.firecrawl.dev/features/parse',
+      index,
+      metadataCommand: 'firecrawl scrape https://docs.firecrawl.dev/features/parse',
+      intent: 'docs',
+    });
     const malformedJsonlResult = findMatches({
       root,
       index,
@@ -704,6 +742,20 @@ function selfTest() {
     );
     const rescannedRecords = scan(root, index);
     writeIndex(index, rescannedRecords);
+    recordManual({
+      artifact: join(root, 'rescan-reused.md'),
+      url: 'https://docs.firecrawl.dev/new-rescan',
+      index,
+      metadataCommand: 'firecrawl scrape https://docs.firecrawl.dev/new-rescan',
+      intent: 'docs',
+    });
+    recordManual({
+      artifact: join(root, 'query-old.md'),
+      url: 'https://example.com/search?q=old',
+      index,
+      metadataCommand: 'firecrawl scrape "https://example.com/search?q=old"',
+      intent: 'docs',
+    });
     process.chdir(oldCwd);
     const urlResult = findMatches({
       root,
@@ -785,6 +837,12 @@ function selfTest() {
       url: 'https://example.com/search',
       intent: 'docs',
     });
+    const linkedOnlyResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/features/linked-only',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -839,6 +897,9 @@ function selfTest() {
     if (querylessResult.hits.length !== 0) {
       throw new Error('Queryless URL lookup must not match query-bearing cached URLs by path');
     }
+    if (linkedOnlyResult.hits.some((hit) => hit.matchType === 'url-exact' || hit.matchType === 'url-path')) {
+      throw new Error('Linked result URLs must not be treated as source URL hits');
+    }
     return {
       ok: true,
       records: records.length,
@@ -856,6 +917,7 @@ function selfTest() {
       queryExactHit: queryExactResult.hits[0].artifactPath,
       queryChangedHits: queryChangedResult.hits.length,
       querylessHits: querylessResult.hits.length,
+      linkedOnlyUrlHits: linkedOnlyResult.hits.length,
     };
   } finally {
     process.chdir(oldCwd);

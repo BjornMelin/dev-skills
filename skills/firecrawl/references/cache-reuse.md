@@ -23,7 +23,7 @@ FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
 node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" scan --root .firecrawl --out .firecrawl/index.jsonl
 node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://docs.example.com/page" --intent docs --json
 node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --query "firecrawl parse docs" --intent search --json
-node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --file "./report.pdf" --intent parse --json
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --file "./report.pdf" --command 'firecrawl parse ./report.pdf -o .firecrawl/parse-report.md' --intent parse --json
 ```
 
 When a new artifact needs explicit source metadata, append a record:
@@ -44,6 +44,7 @@ FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
 node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" record \
   --artifact .firecrawl/parse-report.md \
   --source-file ./report.pdf \
+  --command 'firecrawl parse ./report.pdf -o .firecrawl/parse-report.md' \
   --intent parse
 ```
 
@@ -57,7 +58,7 @@ Use these defaults unless the user gives a stricter freshness requirement:
 | `search` result sets | 6 hours |
 | `product`, `release`, `package` | 24 hours |
 | `docs`, `reference`, `api` | 7 days |
-| `parse` | Until the source file hash changes |
+| `parse` | Until the source file hash or parse command changes |
 | `monitor` output | Historical evidence only |
 
 For user wording such as "today", "latest", "current", "breaking", "price",
@@ -71,7 +72,8 @@ for fresh data, refresh even if the local cache is fresh.
   source discovery itself matters.
 - Crawl/download stale hit: map or scrape the needed pages before repeating the
   whole crawl/download.
-- Parse stale hit: rerun only when the source file hash changed.
+- Parse stale hit: rerun when the source file hash changed or the previous
+  artifact was recorded without matching `--command` metadata.
 - Monitor hit: use only as historical context; call monitor APIs or scrape fresh
   for current claims.
 

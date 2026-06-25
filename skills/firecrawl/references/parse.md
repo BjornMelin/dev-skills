@@ -11,12 +11,12 @@ Do not use this command for generic local source-code reads or repo editing.
 ```bash
 mkdir -p .firecrawl
 FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
-node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --file "./report.pdf" --intent parse --json
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --file "./report.pdf" --command 'firecrawl parse "./report.pdf" -o .firecrawl/report.md' --intent parse --json
 firecrawl parse "./report.pdf" -o .firecrawl/report.md
 firecrawl parse "./report.pdf" -S -o .firecrawl/report-summary.md
 firecrawl parse "./report.pdf" -Q "What are the main conclusions?" -o .firecrawl/report-qa.md
 firecrawl parse "./report.pdf" -f markdown,links --json --pretty -o .firecrawl/report.json
-node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" record --artifact .firecrawl/report.md --source-file ./report.pdf --intent parse
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" record --artifact .firecrawl/report.md --source-file ./report.pdf --command 'firecrawl parse "./report.pdf" -o .firecrawl/report.md' --intent parse
 ```
 
 ## Key Flags
@@ -45,6 +45,8 @@ Inspect parsed files incrementally because documents can be large.
 
 ## Reuse
 
-Parsed local documents are reusable until the source file hash changes. After a
-parse, record the source file with `firecrawl-cache-index.mjs record` so future
-`find --file` checks can skip duplicate uploads.
+Parsed local documents are reusable when the source file hash and parse command
+metadata match. After a parse, record the source file and exact command with
+`firecrawl-cache-index.mjs record` so future `find --file --command ...` checks
+can skip duplicate uploads without reusing a summary or targeted query for a
+different parse request.
