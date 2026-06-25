@@ -225,7 +225,7 @@ def scan_text(path: Path, root: Path, text: str) -> list[Finding]:
         if not stripped or stripped.startswith(("//", "#", "*")):
             continue
         indent = len(line) - len(line.lstrip(" "))
-        loop_stack = [(level, lno) for level, lno in loop_stack if level < indent + 4]
+        loop_stack = [(level, lno) for level, lno in loop_stack if level < indent]
 
         if LOOP_RE.search(stripped):
             if loop_stack:
