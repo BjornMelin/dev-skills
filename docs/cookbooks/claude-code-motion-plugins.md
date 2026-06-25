@@ -15,10 +15,10 @@ Codex manifest under `.codex-plugin/`.
 ## Install
 
 Add the marketplace from GitHub with sparse checkout so Claude Code fetches only
-the marketplace catalog and the web-motion plugin directory:
+the marketplace catalog and plugin directories:
 
 ```bash
-claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion
+claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/claude-core
 claude plugin install web-motion@bjorn-dev-skills
 ```
 
