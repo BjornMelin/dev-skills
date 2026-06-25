@@ -7,11 +7,21 @@ JavaScript-rendered pages.
 
 ```bash
 mkdir -p .firecrawl
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://example.com/page" --intent docs --json
 firecrawl scrape "https://example.com/page" -o .firecrawl/example-page.md
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" record \
+  --artifact .firecrawl/example-page.md \
+  --url "https://example.com/page" \
+  --command 'firecrawl scrape "https://example.com/page" -o .firecrawl/example-page.md' \
+  --intent docs
 firecrawl scrape "https://example.com/page" --only-main-content -o .firecrawl/main.md
 firecrawl scrape "https://example.com/page" --wait-for 3000 -o .firecrawl/rendered.md
 firecrawl scrape "https://example.com/page" --format markdown,links -o .firecrawl/page.json
 ```
+
+For the alternate output paths, record the selected artifact with the matching
+scrape command so the next `find --url` can reuse the local file.
 
 Multiple URLs can be passed positionally and are scraped concurrently:
 
@@ -30,9 +40,24 @@ firecrawl scrape "https://example.com" "https://example.com/blog"
 - `--schema` / `--schema-file`: structured extraction from a page.
 - `--actions` / `--actions-file`: run scrape-time action arrays.
 - `--profile <name>` and `--no-save-changes`: persistent browser state.
-- `--lockdown`: lockdown mode.
+- `--lockdown`: Firecrawl server-cache-only mode for compliance/replay.
+- `--redact-pii`: redact personally identifiable information from output.
 - `--proxy <proxy>`: proxy mode such as `auto` or `basic`.
 - `--max-age`, `--country`, `--languages`: cache and locale controls.
+
+## Cache Controls
+
+Check local `.firecrawl` artifacts before scraping. If a paid refresh is needed,
+use `--max-age <milliseconds>` to let Firecrawl reuse its server cache within
+the acceptable freshness window:
+
+```bash
+firecrawl scrape "https://docs.example.com/page" --max-age 604800000 -o .firecrawl/scrape-docs-page.md
+firecrawl scrape "https://example.com/pricing" --max-age 3600000 -o .firecrawl/scrape-example-pricing.md
+```
+
+Firecrawl server cache hits still bill credits. Use `--lockdown` only when the
+user wants cache-only behavior and accepts cache misses or stale server data.
 
 ## Output Shape
 

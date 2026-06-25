@@ -1,13 +1,15 @@
 # X Download
 
 Use `firecrawl x download` to save a site as nested local files under
-`.firecrawl/`. In released 1.18.x it aliases the expanded
+`.firecrawl/`. In released 1.19.x it aliases the expanded
 `firecrawl experimental download` form. The command maps first, then scrapes
 pages.
 
 ## Quick Start
 
 ```bash
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://docs.example.com" --intent docs --json
 firecrawl x download "https://docs.example.com" --format markdown,links --screenshot --limit 20 -y
 firecrawl x download "https://docs.example.com" \
   --include-paths "/features,/sdks" \
@@ -42,5 +44,8 @@ Add `json` only when downstream tooling expects per-page structured files.
 - `--screenshot`, `--full-page-screenshot`: visual capture.
 - `--wait-for`, `--max-age`, `--country`, `--languages`, `--lockdown`: scrape
   options.
+
+If a prior offline copy is stale, inspect and scrape only the needed pages
+before repeating a full download.
 
 Do not use top-level `firecrawl download` unless `firecrawl --help` shows it.

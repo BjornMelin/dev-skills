@@ -4,6 +4,19 @@ Use these when the inline `SKILL.md` recipes are too small. Keep outputs under
 `.firecrawl/`, inspect incrementally, quote URLs and paths, and leave a small
 evidence file for claims the final answer depends on.
 
+## Local Reuse Check
+
+Run the bundled cache helper before paid commands when prior `.firecrawl`
+artifacts may answer the task:
+
+```bash
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://docs.example.com/page" --intent docs --json
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --query "official react useTransition docs" --intent search --json
+```
+
+Reuse fresh exact hits. Use stale hits to target the smallest refresh.
+
 ## Search, Scrape, Feedback
 
 Use when no URL is known and you need result content.
@@ -231,7 +244,7 @@ firecrawl parse "./financials.xlsx" \
 
 ## X Download
 
-Use for an offline local site copy. In released 1.18.x the command lives under
+Use for an offline local site copy. In released 1.19.x the command lives under
 `x`; the expanded `experimental download` spelling is an alias.
 
 ```bash

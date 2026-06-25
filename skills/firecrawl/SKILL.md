@@ -1,11 +1,9 @@
 ---
 name: firecrawl
 description: |
-  Use this skill for Firecrawl CLI web work: web search, URL scraping, site mapping, crawling, structured extraction, page interaction, monitoring changes, offline site download via x download, and parsing local documents such as PDF, DOCX, XLSX, HTML, DOC, ODT, or RTF. Trigger for requests to search the web, look up current info, fetch/read/scrape a URL, extract website data, crawl docs, click/fill/login/paginate a page, monitor page changes, save a site offline, or parse a document. Do not trigger for generic local file reads/edits, git/deploy/code tasks, or Firecrawl app integration work.
+  Use this skill for Firecrawl CLI web-data work: web search, URL scraping, site mapping, crawling, structured extraction, page interaction, monitoring changes, Firecrawl-native public research, feedback/doctor troubleshooting, offline site download via x download, local .firecrawl artifact reuse, and parsing local documents such as PDF, DOCX, XLSX, HTML, DOC, ODT, or RTF. Trigger for requests to search the web, look up current info, fetch/read/scrape a URL, extract website data, crawl docs, click/fill/login/paginate a page, monitor page changes, save a site offline, parse a document, or avoid duplicate Firecrawl credits. Do not trigger for generic local file reads/edits, git/deploy/code tasks, or Firecrawl app integration work.
 license: ISC
-allowed-tools:
-  - Bash(firecrawl *)
-  - Bash(bunx firecrawl *)
+allowed-tools: Bash(firecrawl *) Bash(bunx --bun firecrawl-cli@latest *) Bash(node *firecrawl-*.mjs *)
 ---
 
 # Firecrawl CLI
@@ -16,22 +14,26 @@ download, and local document parsing.
 
 Use the installed CLI as command truth. Run `firecrawl --help` or
 `firecrawl <command> --help` before relying on version-sensitive flags. This
-skill is written for released `firecrawl-cli` 1.18.x behavior; do not teach or
+skill is written for released `firecrawl-cli` 1.19.x behavior; do not teach or
 use unreleased GitHub-main flags unless local help confirms them.
 
-Do not run `firecrawl init`, `firecrawl setup skills`, or any Firecrawl
-skill-install command from this skill. Those commands are user-manual only in
-this environment so custom skills are not overwritten.
+Do not run `firecrawl init`, `firecrawl setup skills`, `firecrawl setup mcp`,
+`firecrawl launch`, or `firecrawl make default` from this skill unless the user
+explicitly asks for Firecrawl workstation maintenance. Those commands can
+modify installed skills, MCP config, or native web-provider defaults.
 
 ## First Checks
 
 1. Check setup with `firecrawl --status`.
 2. If a command or flag matters, confirm it with `firecrawl <command> --help`.
-3. Write large outputs to `.firecrawl/` with `-o`; do not stream large page
+3. Before paid Firecrawl commands, check `.firecrawl/` for reusable artifacts
+   with `scripts/firecrawl-cache-index.mjs`; see
+   [references/cache-reuse.md](references/cache-reuse.md).
+4. Write large outputs to `.firecrawl/` with `-o`; do not stream large page
    content into the agent context.
-4. Quote URLs and paths. Shells treat `?`, `&`, spaces, and brackets specially.
-5. Use deterministic artifact names so follow-up commands can find evidence.
-6. Do not send private, confidential, repo-proprietary, or secret-bearing
+5. Quote URLs and paths. Shells treat `?`, `&`, spaces, and brackets specially.
+6. Use deterministic artifact names so follow-up commands can find evidence.
+7. Do not send private, confidential, repo-proprietary, or secret-bearing
    material to Firecrawl unless the user explicitly permits external
    processing.
 
@@ -55,14 +57,22 @@ full decision tree. Default order:
    pagination, session state, or browser actions.
 8. `parse` for local documents, not URLs.
 9. `x download` when the user wants a local offline site copy.
+10. `research` only for Firecrawl-native public arXiv or GitHub-history
+    research, and verify important claims against the underlying source.
+11. `doctor` and `feedback` for diagnostics and concise upstream quality
+    feedback.
 
 ## Scope And Cost Defaults
 
 - Use `--limit` on `search`, `map`, `crawl`, `agent`, and `x download`.
+- Reuse fresh local `.firecrawl` artifacts before spending credits.
 - Prefer `map --search` plus targeted `scrape` before broad crawls.
 - Keep `crawl` scoped with `--include-paths`, `--exclude-paths`, `--max-depth`,
   and `--wait`.
 - Use `agent --max-credits` and a schema for complex structured extraction.
+- Use `--redact-pii` for contact pages, PDFs, user-generated pages, lead
+  research, or anything likely to enter logs, shared artifacts, or vector
+  stores.
 - Do not crawl whole domains, allow external links, or allow subdomains unless
   the user explicitly needs that breadth.
 
@@ -71,6 +81,16 @@ full decision tree. Default order:
 Prefer these short chains before opening a detailed reference. Read
 [references/recipes.md](references/recipes.md) for schema, monitor JSON, jq,
 output-shape probes, profile, feedback, and download variants.
+
+Search local cache before fetching a known URL:
+
+```bash
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find \
+  --url "https://example.com/page" \
+  --intent docs \
+  --json
+```
 
 Search with page content, inspect, then send feedback:
 
@@ -134,6 +154,7 @@ Create `.firecrawl/` first and use names that encode command plus subject:
 .firecrawl/monitor-<name>.json
 .firecrawl/parse-<document>.md
 .firecrawl/schema-<purpose>.json
+.firecrawl/index.jsonl
 ```
 
 ## Evidence Closeout
@@ -156,6 +177,8 @@ evidence materially supports the claim.
 
 - Auth/401: run `firecrawl --status`; see `references/install-auth.md`.
 - Credits/402 or rate limit: reduce `--limit`, narrow scope, or stop and report.
+- Failed run/job: use `firecrawl doctor --json` or
+  `firecrawl doctor <job-id> --query "why did this run fail?"`.
 - Timeout: add `--timeout`, reduce scope, or use `--wait-for` for rendering.
 - Blocked or JS-heavy page: retry `scrape` with `--wait-for`; escalate to
   `interact` only after a successful scrape.
@@ -171,6 +194,7 @@ evidence materially supports the claim.
 ## Reference Loading
 
 - Rich command chains: [references/recipes.md](references/recipes.md)
+- Local cache/reuse: [references/cache-reuse.md](references/cache-reuse.md)
 - Reusable schemas: [references/schemas.md](references/schemas.md)
 - Search/discovery first: [references/search.md](references/search.md)
 - Known URL extraction: [references/scrape.md](references/scrape.md)
@@ -181,6 +205,8 @@ evidence materially supports the claim.
 - Local document parsing: [references/parse.md](references/parse.md)
 - Recurring change tracking: [references/monitor.md](references/monitor.md)
 - Offline site copy: [references/download.md](references/download.md)
+- Firecrawl-native public paper/GitHub research:
+  [references/research.md](references/research.md)
 - Local maintenance/drift: [references/maintenance.md](references/maintenance.md)
 
 For Firecrawl SDK/API integration into an application, adding

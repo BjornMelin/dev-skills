@@ -39,7 +39,27 @@
     {
       "id": "search-scrape-no-duplicate",
       "prompt": "Find current official docs for Firecrawl parse and read the pages.",
-      "expected_output": "Uses firecrawl search --scrape with --json and a .firecrawl/search-*-scraped.json artifact, then inspects embedded content before any separate scrape."
+      "expected_output": "Checks .firecrawl cache/index first, uses firecrawl search --scrape with --json and a .firecrawl/search-*-scraped.json artifact if needed, then inspects embedded content before any separate scrape."
+    },
+    {
+      "id": "fresh-local-cache-known-url",
+      "prompt": "Read https://docs.example.com/auth and summarize the setup steps; .firecrawl already contains a fresh scrape artifact for that URL.",
+      "expected_output": "Uses firecrawl-cache-index find --url before scraping, reuses the fresh local artifact, inspects it incrementally, and does not spend Firecrawl credits."
+    },
+    {
+      "id": "stale-cache-targeted-refresh",
+      "prompt": "Get the latest pricing from https://example.com/pricing; .firecrawl contains a stale pricing scrape.",
+      "expected_output": "Uses the stale local hit only to target a narrow refresh, then runs a single known-URL scrape with an intent-appropriate --max-age rather than repeating search or crawl."
+    },
+    {
+      "id": "parse-hash-reuse",
+      "prompt": "Parse ./sample.pdf again and summarize the same pricing clause; .firecrawl has a recorded parse artifact with the same source-file hash.",
+      "expected_output": "Uses firecrawl-cache-index find --file, reuses the matching parse artifact, and avoids uploading the unchanged document again."
+    },
+    {
+      "id": "monitor-validation-no-create",
+      "prompt": "Validate that the Firecrawl monitor guidance still matches the CLI.",
+      "expected_output": "Uses help/doctor-style checks and does not create, run, update, or delete a real monitor during validation."
     },
     {
       "id": "agent-schema-credit-cap",

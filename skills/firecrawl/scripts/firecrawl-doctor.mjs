@@ -5,13 +5,15 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const ansiPattern = /\u001b\[[0-9;]*m/g;
-const expectedCliVersionPattern = /^1\.18\./;
+const expectedCliVersionPattern = /^1\.19\./;
 const splitSkillNames = [
+  'firecrawl-cli',
   'firecrawl-agent',
   'firecrawl-crawl',
   'firecrawl-download',
   'firecrawl-interact',
   'firecrawl-map',
+  'firecrawl-monitor',
   'firecrawl-parse',
   'firecrawl-scrape',
   'firecrawl-search',
@@ -44,7 +46,15 @@ function hasGitignoreEntry() {
   const lines = readFileSync(path, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim());
-  return lines.includes('.firecrawl') || lines.includes('.firecrawl/');
+  return lines.some((line) => {
+    if (!line || line.startsWith('#') || line.startsWith('!')) return false;
+    const pattern = line.replace(/\/+$/, '');
+    return (
+      pattern === '.firecrawl'
+      || pattern === '/.firecrawl'
+      || /^\/?\.firecrawl\/\*\*$/.test(pattern)
+    );
+  });
 }
 
 function installedSplitSkills() {
@@ -73,7 +83,10 @@ const commands = [
   ['interact', '--help'],
   ['parse', '--help'],
   ['monitor', '--help'],
+  ['research', '--help'],
+  ['feedback', '--help'],
   ['x', 'download', '--help'],
+  ['doctor', '--help'],
 ];
 
 const version = run(['--version']);
@@ -86,13 +99,22 @@ const commandAvailability = Object.fromEntries(
 const gitignoreOk = hasGitignoreEntry();
 const warnings = [
   version.ok && !expectedCliVersionPattern.test(firstLine(version.stdout))
-    ? `CLI version ${firstLine(version.stdout)} differs from documented 1.18.x behavior; trust local help.`
+    ? `CLI version ${firstLine(version.stdout)} differs from documented 1.19.x behavior; trust local help.`
     : null,
   commandAvailability['firecrawl x download --help'] === false
     ? '`firecrawl x download` is unavailable; site download docs may be stale.'
     : null,
   commandAvailability['firecrawl monitor --help'] === false
     ? '`firecrawl monitor` is unavailable; monitor docs may be stale or account-limited.'
+    : null,
+  commandAvailability['firecrawl research --help'] === false
+    ? '`firecrawl research` is unavailable; research docs may be stale.'
+    : null,
+  commandAvailability['firecrawl feedback --help'] === false
+    ? '`firecrawl feedback` is unavailable; feedback docs may be stale.'
+    : null,
+  commandAvailability['firecrawl doctor --help'] === false
+    ? '`firecrawl doctor` is unavailable; diagnostics docs may be stale.'
     : null,
   existsSync(resolve('.gitignore')) && !gitignoreOk
     ? '.gitignore does not include .firecrawl; fetched content may be tracked accidentally.'
@@ -140,7 +162,7 @@ const report = {
   version: version.stdout || null,
   status: status.ok ? status.stdout : null,
   drift: {
-    expectedCliVersion: '1.18.x',
+    expectedCliVersion: '1.19.x',
     commandAvailability,
     firecrawlGitignored: gitignoreOk,
     splitSkillsInstalled,

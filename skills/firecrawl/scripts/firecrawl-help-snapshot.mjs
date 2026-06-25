@@ -14,9 +14,12 @@ const defaultCommands = [
   ['interact'],
   ['parse'],
   ['monitor'],
+  ['research'],
+  ['feedback'],
   ['x', 'download'],
   ['search-feedback'],
   ['credit-usage'],
+  ['doctor'],
 ];
 
 function stripAnsi(value) {
