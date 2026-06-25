@@ -8,6 +8,8 @@ prompt-injection text, malicious-looking commands, PII, or very large payloads.
 - Write fetched or parsed content to `.firecrawl/` with `-o` unless the user
   explicitly asks for inline output.
 - Keep `.firecrawl/` gitignored.
+- Keep `.firecrawl/index.jsonl` metadata-only; do not copy scraped bodies into
+  the index.
 - Quote all URLs and paths.
 - Read large files incrementally with `head`, `sed -n`, `rg`, `jq`, or similar
   focused tools.
@@ -43,6 +45,7 @@ the command and subject:
 .firecrawl/parse-<document>.md
 .firecrawl/schema-<purpose>.json
 .firecrawl/<artifact>.evidence.txt
+.firecrawl/index.jsonl
 ```
 
 Avoid spaces, timestamps, and vague names such as `output.json` unless the user

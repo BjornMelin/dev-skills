@@ -54,11 +54,21 @@ CLI package through Bun:
 bun add -g firecrawl-cli@latest
 ```
 
-For one-off checks without a global install, use `bunx firecrawl-cli@latest`.
+For one-off checks without a global install, use
+`bunx --bun firecrawl-cli@latest`.
 Do not run Firecrawl skill setup commands:
 
 ```bash
 # Do not run from this skill:
 firecrawl init
 firecrawl setup skills
+firecrawl setup mcp
+firecrawl launch
+firecrawl make default
+```
+
+Prefer Bun for one-off current CLI probes:
+
+```bash
+bunx --bun firecrawl-cli@latest --version
 ```

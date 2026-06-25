@@ -43,6 +43,18 @@
       "should_trigger": true
     },
     {
+      "query": "Check the .firecrawl cache before scraping this docs page again.",
+      "should_trigger": true
+    },
+    {
+      "query": "Reuse any existing Firecrawl scrape for this URL so we do not burn duplicate credits.",
+      "should_trigger": true
+    },
+    {
+      "query": "Use Firecrawl research to find relevant arXiv papers and GitHub issues.",
+      "should_trigger": true
+    },
+    {
       "query": "Crawl the whole domain with subdomains and external links.",
       "should_trigger": true
     },

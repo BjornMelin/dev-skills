@@ -7,9 +7,12 @@ Prefer monitors when the user wants alerts, ongoing checks, or future diffs.
 
 ```bash
 firecrawl monitor create --name "Blog" --schedule "every 30 minutes" \
-  --scrape-urls https://example.com/blog --email alerts@example.com
+  --page https://example.com/blog \
+  --goal "Alert only for new product or release announcements" \
+  --email alerts@example.com
 
 firecrawl monitor list --limit 20
+firecrawl monitor get <monitorId>
 firecrawl monitor run <monitorId>
 firecrawl monitor checks <monitorId> --limit 10
 firecrawl monitor check <monitorId> <checkId> --page-status changed
@@ -25,17 +28,21 @@ cat monitor.json | firecrawl monitor create
 firecrawl monitor update <monitorId> monitor.json
 ```
 
-## Released 1.18.x Subcommands
+## Released 1.19.x Subcommands
 
 `create`, `list`, `get`, `update`, `delete`, `run`, `checks`, `check`.
 
 ## Gotchas
 
-- In released 1.18.0 help, single-page shorthand flags such as `--page` and
-  `--goal` are not present. Do not use them unless local help confirms them.
+- Use `--page` for one URL, `--scrape-urls` for multiple page URLs, and
+  `--crawl-url` for a recurring crawl target.
+- Always write a short `--goal` for AI change judging unless the user wants raw
+  diffs only.
 - Use `--state` for active/paused updates.
 - Use `--page-status` for filtering check page results.
 - Monitoring may be unavailable for zero-data-retention teams.
+- Monitor-triggered scrapes can use `scrapeOptions.maxAge` in JSON payloads, but
+  recurring monitors are for future change tracking, not local cache reuse.
 
 ## JSON Change Tracking
 

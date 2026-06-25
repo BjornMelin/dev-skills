@@ -7,6 +7,8 @@ Scope crawls tightly because credits are consumed per page.
 
 ```bash
 mkdir -p .firecrawl
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://docs.example.com" --intent docs --json
 firecrawl crawl "https://docs.example.com" --include-paths /docs --limit 50 --wait --pretty -o .firecrawl/crawl-docs.json
 firecrawl crawl "https://docs.example.com" --max-depth 3 --wait --progress --pretty -o .firecrawl/crawl-depth3.json
 ```
@@ -31,6 +33,16 @@ firecrawl crawl <job-id> --cancel
   crawled page.
 - `--webhook <url-or-json>`: webhook config.
 
+Use `--scrape-options-file` to pass `maxAge` for page-level server-cache reuse
+inside a crawl:
+
+```json
+{
+  "formats": ["markdown"],
+  "maxAge": 604800000
+}
+```
+
 ## Output Shape
 
 Completed crawl output is JSON when saved with `--pretty` or JSON-oriented
@@ -50,4 +62,5 @@ and wait or fetch results according to local help.
 ## Scope Rule
 
 Prefer `map --search` plus targeted scrapes when the user needs specific pages.
-Use crawl when breadth is the requirement.
+Use crawl when breadth is the requirement. If a previous crawl is stale, reuse
+its URLs to target `scrape` before repeating the whole crawl.

@@ -2,6 +2,20 @@
 
 Use this decision tree before reading a command-specific reference.
 
+## Reuse First
+
+Before paid commands, check local `.firecrawl/` artifacts:
+
+```bash
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --url "https://example.com/page" --intent docs --json
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --query "query text" --intent search --json
+```
+
+Reuse fresh exact hits. Use stale hits to target the smallest refresh. Read
+[cache-reuse.md](cache-reuse.md) for TTLs, parse file hashes, and `--max-age`
+defaults.
+
 ## Route By User Intent
 
 | User intent | Default command | Load |
@@ -15,6 +29,9 @@ Use this decision tree before reading a command-specific reference.
 | Click, fill, login, paginate, or inspect a live session | `scrape` then `interact` | `references/interact.md` |
 | Parse a local PDF/Office/HTML document | `parse` | `references/parse.md` |
 | Save a local offline site copy | `x download` | `references/download.md` |
+| Research arXiv papers or GitHub issue/PR history through Firecrawl | `research` | `references/research.md` |
+| Diagnose CLI/account/job failure | `doctor` | `references/maintenance.md` |
+| Send endpoint quality feedback | `feedback` or `search-feedback` | `references/search.md` |
 
 ## Escalation
 
@@ -38,12 +55,16 @@ Use this decision tree before reading a command-specific reference.
 
 ## Gotchas
 
-- `firecrawl x download` is the preferred released 1.18.x site-download path.
+- `firecrawl x download` is the preferred released 1.19.x site-download path.
   It aliases the expanded `firecrawl experimental download` form. Do not use
   top-level `firecrawl download` unless `firecrawl --help` shows it.
 - `parse` is for local documents, not URLs.
 - `search --scrape` already fetches result page content.
 - `interact` needs a prior scrape ID, either implicit from the last scrape or
   explicit with `--scrape-id`.
-- `firecrawl init` and `firecrawl setup skills` can modify installed skills in
-  this environment. Do not run them from this skill.
+- `firecrawl init`, `firecrawl setup skills`, `firecrawl setup mcp`,
+  `firecrawl launch`, and `firecrawl make default` can modify workstation
+  config or installed skills. Do not run them from this skill unless the user
+  explicitly asks for Firecrawl maintenance.
+- `firecrawl make default` can change native web-provider defaults; use
+  `firecrawl make default --undo` only as an intentional maintenance action.

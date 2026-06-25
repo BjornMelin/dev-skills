@@ -6,6 +6,8 @@ Use `firecrawl search` when the user does not already have the exact URL.
 
 ```bash
 mkdir -p .firecrawl
+FIRECRAWL_SKILL_DIR="${FIRECRAWL_SKILL_DIR:-$HOME/.agents/skills/firecrawl}"
+node "$FIRECRAWL_SKILL_DIR/scripts/firecrawl-cache-index.mjs" find --query "query" --intent search --json
 firecrawl search "query" --json -o .firecrawl/search-query.json
 firecrawl search "query" --scrape --json -o .firecrawl/search-query-scraped.json
 firecrawl search "query" --sources news --tbs qdr:d --json -o .firecrawl/news.json
@@ -26,7 +28,7 @@ firecrawl search "query" --sources news --tbs qdr:d --json -o .firecrawl/news.js
 ## Output Shape
 
 With `--json`, inspect root keys first because source-specific arrays vary by
-query options. Released 1.18.x search responses commonly include a search
+query options. Released 1.19.x search responses commonly include a search
 `.id` and source arrays under `.data`.
 
 ```bash
@@ -40,6 +42,13 @@ jq -r '.. | objects | .markdown? // empty' .firecrawl/search-query-scraped.json 
 
 `search --scrape` already fetches full result content. Do not re-scrape those
 URLs unless the embedded scraped content is incomplete for the task.
+
+## Reuse
+
+Search results are usually fresh for 6 hours. Use a 1-hour window when the
+query says "latest", "today", "current", "news", "pricing", "status", or
+"changelog". If a stale search artifact contains the right URLs, scrape those
+known URLs before repeating search.
 
 ## Feedback
 
@@ -58,3 +67,9 @@ firecrawl search-feedback "$SEARCH_ID" \
 
 Use `good`, `partial`, or `bad` based on actual usefulness. Make
 `--missing-content` specific, one topic per entry.
+
+For non-search endpoint jobs, use generic feedback:
+
+```bash
+firecrawl feedback scrape "$SCRAPE_ID" --rating partial --issues missing_content --note "Main pricing table was absent" --silent &
+```
