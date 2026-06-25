@@ -379,6 +379,15 @@ function ttlMsFor(intent, commandType) {
   return 24 * 60 * 60 * 1000;
 }
 
+function ttlMsForRecord(options, record) {
+  const explicitTtl = parseDuration(options.ttl);
+  if (explicitTtl !== null) return explicitTtl;
+  return Math.min(
+    ttlMsFor(options.intent, null),
+    ttlMsFor(record.intent, record.commandType),
+  );
+}
+
 function parseDuration(value) {
   if (!value) return null;
   const match = String(value).trim().match(/^(\d+(?:\.\d+)?)(ms|s|m|h|d|w)$/);
@@ -562,15 +571,18 @@ function findMatches(options) {
     if (!match) continue;
     const artifactValidation = validateIndexedArtifact(record, root);
     if (!artifactValidation.ok) continue;
-    const recordTtl = parseDuration(options.ttl) ?? ttlMsFor(options.intent ?? record.intent, record.commandType);
+    const recordTtl = ttlMsForRecord(options, record);
     const enriched = {
       ...record,
       lookupSourceFileHash,
       lookupCommand: lookupOptions.lookupCommand,
     };
-    const freshness = fileOnlyLookup && match.matchType !== 'file-hash'
-      ? { fresh: false, expiresAt: null, reason: 'source-file-hash-required' }
-      : withFreshness(enriched, recordTtl, now);
+    let freshness = withFreshness(enriched, recordTtl, now);
+    if (fileOnlyLookup && match.matchType !== 'file-hash') {
+      freshness = { fresh: false, expiresAt: null, reason: 'source-file-hash-required' };
+    } else if (['artifact-slug', 'query-slug', 'url-path', 'file-slug'].includes(match.matchType)) {
+      freshness = { ...freshness, fresh: false, reason: 'fuzzy-match-refresh-required' };
+    }
     const ageMs = now - new Date(record.artifactMtime).getTime();
     hits.push({
       artifactPath: record.artifactPath,
@@ -689,6 +701,8 @@ function selfTest() {
     writeFileSync(join(root, 'parse-report.md'), '# Report\n');
     writeFileSync(join(root, 'report.md'), '# Generic report\n');
     writeFileSync(join(root, 'monitor-page.json'), '{"url":"https://example.com/status"}\n');
+    writeFileSync(join(root, 'pricing-page.md'), '# Pricing\n');
+    writeFileSync(join(root, 'docs-firecrawl-dev-features-artifact.md'), '# Artifact slug only\n');
     const unrecordedSource = join(dir, 'unrecorded.pdf');
     writeFileSync(unrecordedSource, 'source changed without a recorded hash');
     writeFileSync(join(root, 'parse-unrecorded.md'), '# Unrecorded\n');
@@ -703,6 +717,13 @@ function selfTest() {
       index,
       metadataCommand: 'firecrawl scrape https://docs.firecrawl.dev/features/parse',
       intent: 'docs',
+    });
+    recordManual({
+      artifact: join(root, 'search-firecrawl-parse.json'),
+      query: 'firecrawl parse docs',
+      index,
+      metadataCommand: 'firecrawl search "firecrawl parse docs"',
+      intent: 'search',
     });
     const malformedJsonlResult = findMatches({
       root,
@@ -771,6 +792,20 @@ function selfTest() {
       metadataCommand: 'firecrawl monitor check monitor-123 check-456',
       intent: 'monitor',
     });
+    recordManual({
+      artifact: join(root, 'pricing-page.md'),
+      url: 'https://example.com/pricing',
+      index,
+      metadataCommand: 'firecrawl scrape https://example.com/pricing',
+      intent: 'pricing',
+    });
+    const oldPricingTime = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const pricedRecords = loadRecords(root, index, false).map((record) =>
+      record.artifactPath?.endsWith('pricing-page.md')
+        ? { ...record, artifactMtime: oldPricingTime }
+        : record,
+    );
+    writeIndex(index, pricedRecords);
     process.chdir(oldCwd);
     const urlResult = findMatches({
       root,
@@ -864,6 +899,24 @@ function selfTest() {
       url: 'https://example.com/status',
       intent: 'monitor',
     });
+    const stalePricingResult = findMatches({
+      root,
+      index,
+      url: 'https://example.com/pricing',
+      intent: 'docs',
+    });
+    const fuzzyQueryResult = findMatches({
+      root,
+      index,
+      query: 'firecrawl parse docs latest release',
+      intent: 'search',
+    });
+    const fuzzyArtifactResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/features/artifact',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -928,6 +981,23 @@ function selfTest() {
     ) {
       throw new Error('Monitor artifacts must be historical, not fresh cache hits');
     }
+    if (stalePricingResult.hits.length === 0 || stalePricingResult.hits[0].fresh) {
+      throw new Error('Time-sensitive record intent must keep the stricter freshness window');
+    }
+    if (
+      fuzzyQueryResult.hits.length === 0
+      || fuzzyQueryResult.hits[0].fresh
+      || fuzzyQueryResult.hits[0].freshnessReason !== 'fuzzy-match-refresh-required'
+    ) {
+      throw new Error('Fuzzy query matches must not be treated as fresh');
+    }
+    if (
+      fuzzyArtifactResult.hits.length === 0
+      || fuzzyArtifactResult.hits[0].fresh
+      || fuzzyArtifactResult.hits[0].freshnessReason !== 'fuzzy-match-refresh-required'
+    ) {
+      throw new Error('Fuzzy artifact matches must not be treated as fresh');
+    }
     return {
       ok: true,
       records: records.length,
@@ -947,6 +1017,9 @@ function selfTest() {
       querylessHits: querylessResult.hits.length,
       linkedOnlyUrlHits: linkedOnlyResult.hits.length,
       monitorFreshnessReason: monitorResult.hits[0].freshnessReason,
+      stalePricingFresh: stalePricingResult.hits[0].fresh,
+      fuzzyQueryFreshnessReason: fuzzyQueryResult.hits[0].freshnessReason,
+      fuzzyArtifactFreshnessReason: fuzzyArtifactResult.hits[0].freshnessReason,
     };
   } finally {
     process.chdir(oldCwd);
