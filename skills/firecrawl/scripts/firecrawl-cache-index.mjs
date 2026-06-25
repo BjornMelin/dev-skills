@@ -341,9 +341,13 @@ function buildRecord(path, root, existing = null) {
   const commandType = reuseExistingMetadata
     ? (existing?.commandType ?? commandTypeFromPath(path))
     : commandTypeFromPath(path);
+  const textSourceUrls = format === 'json'
+    ? []
+    : unique(strings.flatMap((value) => extractUrls(value)));
   const sourceUrls = unique([
     ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
     ...(format === 'json' ? extractPrimaryUrls(parsed, commandType) : []),
+    ...textSourceUrls,
   ]);
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
   const query = reuseExistingMetadata ? (existing?.query ?? null) : null;
@@ -739,6 +743,10 @@ function selfTest() {
       join(root, 'scrape-firecrawl-parse.md'),
       '# Parse\nhttps://docs.firecrawl.dev/features/parse\n',
     );
+    writeFileSync(
+      join(root, 'scrape-text-source-url.md'),
+      '# Text source\nhttps://docs.firecrawl.dev/features/text-source\n',
+    );
     const source = join(dir, 'report.pdf');
     writeFileSync(source, 'fake-pdf');
     writeFileSync(join(root, 'parse-report.md'), '# Report\n');
@@ -942,6 +950,12 @@ function selfTest() {
       url: 'https://docs.firecrawl.dev/features/crawl-page',
       intent: 'docs',
     });
+    const textSourceUrlResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/features/text-source',
+      intent: 'docs',
+    });
     const monitorResult = findMatches({
       root,
       index,
@@ -1027,6 +1041,13 @@ function selfTest() {
       throw new Error('Nested crawl page source URLs must be indexed as exact hits');
     }
     if (
+      textSourceUrlResult.hits.length === 0
+      || textSourceUrlResult.hits[0].matchType !== 'url-exact'
+      || !textSourceUrlResult.hits[0].fresh
+    ) {
+      throw new Error('Text artifact URLs must be indexed as fresh exact hits');
+    }
+    if (
       monitorResult.hits.length === 0
       || monitorResult.hits[0].fresh
       || monitorResult.hits[0].freshnessReason !== 'monitor-historical'
@@ -1069,6 +1090,7 @@ function selfTest() {
       querylessHits: querylessResult.hits.length,
       linkedOnlyUrlHits: linkedOnlyResult.hits.length,
       nestedCrawlHit: nestedCrawlResult.hits[0].artifactPath,
+      textSourceUrlHit: textSourceUrlResult.hits[0].artifactPath,
       monitorFreshnessReason: monitorResult.hits[0].freshnessReason,
       stalePricingFresh: stalePricingResult.hits[0].fresh,
       fuzzyQueryFreshnessReason: fuzzyQueryResult.hits[0].freshnessReason,
