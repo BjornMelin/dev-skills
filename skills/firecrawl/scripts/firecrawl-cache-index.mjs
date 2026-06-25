@@ -124,7 +124,35 @@ function normalizeUrl(value) {
   }
 }
 
-function extractPrimaryUrls(parsed) {
+function collectNestedPageSourceUrls(value, output = [], seen = new Set(), limit = 1000) {
+  if (output.length >= limit || !value || typeof value !== 'object') return output;
+  if (seen.has(value)) return output;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    for (const item of value) collectNestedPageSourceUrls(item, output, seen, limit);
+    return output;
+  }
+
+  if (typeof value.sourceURL === 'string') output.push(value.sourceURL);
+  if (typeof value.sourceUrl === 'string') output.push(value.sourceUrl);
+  if (value.metadata && typeof value.metadata === 'object') {
+    if (typeof value.metadata.sourceURL === 'string') output.push(value.metadata.sourceURL);
+    if (typeof value.metadata.sourceUrl === 'string') output.push(value.metadata.sourceUrl);
+    if (typeof value.metadata.url === 'string') output.push(value.metadata.url);
+  }
+
+  const looksLikePage =
+    typeof value.markdown === 'string'
+    || typeof value.html === 'string'
+    || typeof value.rawHtml === 'string'
+    || typeof value.screenshot === 'string';
+  if (looksLikePage && typeof value.url === 'string') output.push(value.url);
+
+  for (const item of Object.values(value)) collectNestedPageSourceUrls(item, output, seen, limit);
+  return output;
+}
+
+function extractPrimaryUrls(parsed, commandType = null) {
   if (!parsed || typeof parsed !== 'object') return [];
   const candidates = [
     parsed.url,
@@ -137,6 +165,7 @@ function extractPrimaryUrls(parsed) {
     parsed.data?.metadata?.sourceURL,
     parsed.data?.metadata?.sourceUrl,
     parsed.data?.metadata?.url,
+    ...(commandType === 'crawl' ? collectNestedPageSourceUrls(parsed) : []),
   ];
   return unique(candidates.filter((value) => typeof value === 'string'));
 }
@@ -309,9 +338,12 @@ function buildRecord(path, root, existing = null) {
     }
   }
 
+  const commandType = reuseExistingMetadata
+    ? (existing?.commandType ?? commandTypeFromPath(path))
+    : commandTypeFromPath(path);
   const sourceUrls = unique([
     ...(reuseExistingMetadata ? (existing?.sourceUrls ?? []) : []),
-    ...(format === 'json' ? extractPrimaryUrls(parsed) : []),
+    ...(format === 'json' ? extractPrimaryUrls(parsed, commandType) : []),
   ]);
   const normalizedUrls = unique(sourceUrls.map(normalizeUrl));
   const query = reuseExistingMetadata ? (existing?.query ?? null) : null;
@@ -319,9 +351,6 @@ function buildRecord(path, root, existing = null) {
   const sourceFile = reuseExistingMetadata ? (existing?.sourceFile ?? null) : null;
   const sourceFileHash = reuseExistingMetadata ? (existing?.sourceFileHash ?? null) : null;
   const command = reuseExistingMetadata ? (existing?.command ?? null) : null;
-  const commandType = reuseExistingMetadata
-    ? (existing?.commandType ?? commandTypeFromPath(path))
-    : commandTypeFromPath(path);
 
   return {
     schemaVersion,
@@ -693,6 +722,20 @@ function selfTest() {
       }),
     );
     writeFileSync(
+      join(root, 'crawl-firecrawl-docs.json'),
+      JSON.stringify({
+        success: true,
+        data: [
+          {
+            markdown: 'Crawl page docs',
+            metadata: {
+              sourceURL: 'https://docs.firecrawl.dev/features/crawl-page?utm_source=test',
+            },
+          },
+        ],
+      }),
+    );
+    writeFileSync(
       join(root, 'scrape-firecrawl-parse.md'),
       '# Parse\nhttps://docs.firecrawl.dev/features/parse\n',
     );
@@ -893,6 +936,12 @@ function selfTest() {
       url: 'https://docs.firecrawl.dev/features/linked-only',
       intent: 'docs',
     });
+    const nestedCrawlResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/features/crawl-page',
+      intent: 'docs',
+    });
     const monitorResult = findMatches({
       root,
       index,
@@ -974,6 +1023,9 @@ function selfTest() {
     if (linkedOnlyResult.hits.some((hit) => hit.matchType === 'url-exact' || hit.matchType === 'url-path')) {
       throw new Error('Linked result URLs must not be treated as source URL hits');
     }
+    if (nestedCrawlResult.hits.length === 0 || nestedCrawlResult.hits[0].matchType !== 'url-exact') {
+      throw new Error('Nested crawl page source URLs must be indexed as exact hits');
+    }
     if (
       monitorResult.hits.length === 0
       || monitorResult.hits[0].fresh
@@ -1016,6 +1068,7 @@ function selfTest() {
       queryChangedHits: queryChangedResult.hits.length,
       querylessHits: querylessResult.hits.length,
       linkedOnlyUrlHits: linkedOnlyResult.hits.length,
+      nestedCrawlHit: nestedCrawlResult.hits[0].artifactPath,
       monitorFreshnessReason: monitorResult.hits[0].freshnessReason,
       stalePricingFresh: stalePricingResult.hits[0].fresh,
       fuzzyQueryFreshnessReason: fuzzyQueryResult.hits[0].freshnessReason,
