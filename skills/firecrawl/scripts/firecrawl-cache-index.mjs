@@ -426,6 +426,7 @@ function scoreRecord(record, options) {
   const artifactSlug = slugify(record.artifactPath);
   if (options.url) {
     const normalized = normalizeUrl(options.url);
+    if (!normalized) return null;
     const noQuery = withoutQuery(normalized);
     if (record.normalizedUrls?.includes(normalized)) {
       return { score: 100, matchType: 'url-exact' };
@@ -668,6 +669,12 @@ function selfTest() {
       url: 'https://docs.firecrawl.dev/overwritten',
       intent: 'docs',
     });
+    const invalidUrlResult = findMatches({
+      root,
+      index,
+      url: 'docs.firecrawl.dev/features/parse',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -684,6 +691,9 @@ function selfTest() {
     if (overwrittenResult.hits.length !== 0) {
       throw new Error('Overwritten indexed artifact must not be returned');
     }
+    if (invalidUrlResult.hits.length !== 0) {
+      throw new Error('Invalid URL lookup must not match artifact slugs');
+    }
     return {
       ok: true,
       records: records.length,
@@ -692,6 +702,7 @@ function selfTest() {
       staleSlugHit: staleSlugHit.artifactPath,
       deletedHits: deletedResult.hits.length,
       overwrittenHits: overwrittenResult.hits.length,
+      invalidUrlHits: invalidUrlResult.hits.length,
     };
   } finally {
     process.chdir(oldCwd);
