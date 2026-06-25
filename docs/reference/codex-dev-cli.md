@@ -446,7 +446,8 @@ skills that still exist under `skills/`, missing active replacements, name
 mismatches, invalid source/archive paths, missing archive reasons, missing
 restore guidance, and active-catalog references. Archive `source_path` accepts
 either `skills/<skill>` or plugin-origin paths shaped as
-`plugins/<plugin>/skills/<skill>`. `--max-skill-md-lines` defaults to `500`.
+`plugins/<plugin>/skills/<skill>`, where `<plugin>` must use the same
+hyphen-case skill-name syntax. `--max-skill-md-lines` defaults to `500`.
 
 The archive summary is reported at `result.archive` with schema
 `skill_archive.v1`, root, total archived skill count, and manifest-derived skill

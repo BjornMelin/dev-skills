@@ -51,7 +51,11 @@ function parseArgs(argv) {
       if (value === undefined || value.startsWith('--')) {
         throw new Error(`Missing value for ${arg}`);
       }
-      options[key] = value;
+      if (key === 'command') {
+        options.metadataCommand = value;
+      } else {
+        options[key] = value;
+      }
       index += 1;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
@@ -410,8 +414,16 @@ function loadRecords(root, indexPath, refreshIndex) {
   return records;
 }
 
-function validateIndexedArtifact(record) {
-  const artifactPath = record.artifactPath ? resolve(record.artifactPath) : null;
+function normalizeCommand(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function validateIndexedArtifact(record, root) {
+  const artifactPath = record.rootRelativePath
+    ? resolve(root, record.rootRelativePath)
+    : record.artifactPath
+      ? resolve(record.artifactPath)
+      : null;
   if (!artifactPath || !existsSync(artifactPath)) {
     return { ok: false, reason: 'artifact-missing' };
   }
@@ -427,8 +439,18 @@ function validateIndexedArtifact(record) {
 
 function withFreshness(record, ttlMs, now) {
   if (record.sourceFileHash && record.lookupSourceFileHash) {
-    // Parse records with matching source hashes are valid until the input changes.
-    return { fresh: record.sourceFileHash === record.lookupSourceFileHash, expiresAt: null };
+    if (record.sourceFileHash !== record.lookupSourceFileHash) {
+      return { fresh: false, expiresAt: null, reason: 'source-file-hash-changed' };
+    }
+    if (record.command || record.lookupCommand) {
+      if (!record.command || !record.lookupCommand) {
+        return { fresh: false, expiresAt: null, reason: 'parse-command-required' };
+      }
+      if (normalizeCommand(record.command) !== normalizeCommand(record.lookupCommand)) {
+        return { fresh: false, expiresAt: null, reason: 'parse-command-changed' };
+      }
+    }
+    return { fresh: true, expiresAt: null };
   }
   if (ttlMs === Number.POSITIVE_INFINITY) return { fresh: true, expiresAt: null };
   const mtime = new Date(record.artifactMtime).getTime();
@@ -505,18 +527,20 @@ function findMatches(options) {
     resolvedLookupFile,
     lookupSourceFileHash,
     lookupFileSlug,
+    lookupCommand: options.metadataCommand ?? null,
   };
 
   const hits = [];
   for (const record of records) {
     const match = scoreRecord(record, lookupOptions);
     if (!match) continue;
-    const artifactValidation = validateIndexedArtifact(record);
+    const artifactValidation = validateIndexedArtifact(record, root);
     if (!artifactValidation.ok) continue;
     const recordTtl = parseDuration(options.ttl) ?? ttlMsFor(options.intent ?? record.intent, record.commandType);
     const enriched = {
       ...record,
       lookupSourceFileHash,
+      lookupCommand: lookupOptions.lookupCommand,
     };
     const freshness = fileOnlyLookup && match.matchType !== 'file-hash'
       ? { fresh: false, expiresAt: null, reason: 'source-file-hash-required' }
@@ -564,7 +588,7 @@ function recordManual(options) {
   const indexPath = resolve(options.index ?? '.firecrawl/index.jsonl');
   const sourceFile = options.sourceFile ? resolve(options.sourceFile) : null;
   const existing = {
-    command: options.command ?? null,
+    command: options.metadataCommand ?? null,
     commandType: commandTypeFromPath(artifact),
     sourceUrls: options.url ? [options.url] : [],
     query: options.query ?? null,
@@ -640,10 +664,17 @@ function selfTest() {
     const records = scan(root, index);
     writeIndex(index, records);
     appendFileSync(index, '{not valid jsonl}\n');
+    const malformedJsonlResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/features/parse',
+      intent: 'docs',
+    });
     recordManual({
       artifact: join(root, 'parse-report.md'),
       sourceFile: source,
       index,
+      metadataCommand: 'firecrawl parse report.pdf',
       intent: 'parse',
     });
     writeFileSync(
@@ -673,6 +704,7 @@ function selfTest() {
     );
     const rescannedRecords = scan(root, index);
     writeIndex(index, rescannedRecords);
+    process.chdir(oldCwd);
     const urlResult = findMatches({
       root,
       index,
@@ -684,6 +716,20 @@ function selfTest() {
       index,
       file: source,
       intent: 'parse',
+      metadataCommand: 'firecrawl parse report.pdf',
+    });
+    const fileMissingCommandResult = findMatches({
+      root,
+      index,
+      file: source,
+      intent: 'parse',
+    });
+    const fileDifferentCommandResult = findMatches({
+      root,
+      index,
+      file: source,
+      intent: 'parse',
+      metadataCommand: 'firecrawl parse report.pdf -Q summary',
     });
     const slugResult = findMatches({
       root,
@@ -742,8 +788,28 @@ function selfTest() {
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
+    if (malformedJsonlResult.hits.length === 0 || !malformedJsonlResult.hits[0].fresh) {
+      throw new Error('Malformed JSONL index lookup did not find a fresh hit');
+    }
     if (fileResult.hits.length === 0 || fileResult.hits[0].matchType !== 'file-hash') {
       throw new Error('File lookup did not find a hash hit');
+    }
+    if (!fileResult.hits[0].fresh) {
+      throw new Error('File lookup with matching parse command did not produce a fresh hit');
+    }
+    if (
+      fileMissingCommandResult.hits.length === 0
+      || fileMissingCommandResult.hits[0].fresh
+      || fileMissingCommandResult.hits[0].freshnessReason !== 'parse-command-required'
+    ) {
+      throw new Error('File lookup without required parse command must not be fresh');
+    }
+    if (
+      fileDifferentCommandResult.hits.length === 0
+      || fileDifferentCommandResult.hits[0].fresh
+      || fileDifferentCommandResult.hits[0].freshnessReason !== 'parse-command-changed'
+    ) {
+      throw new Error('File lookup with a different parse command must not be fresh');
     }
     const staleSlugHit = slugResult.hits.find((hit) => hit.matchType === 'file-slug');
     if (!staleSlugHit || staleSlugHit.fresh) {
@@ -777,7 +843,10 @@ function selfTest() {
       ok: true,
       records: records.length,
       urlHit: urlResult.hits[0].artifactPath,
+      malformedJsonlHit: malformedJsonlResult.hits[0].artifactPath,
       fileHit: fileResult.hits[0].artifactPath,
+      fileMissingCommandFreshnessReason: fileMissingCommandResult.hits[0].freshnessReason,
+      fileDifferentCommandFreshnessReason: fileDifferentCommandResult.hits[0].freshnessReason,
       staleSlugHit: staleSlugHit.artifactPath,
       deletedHits: deletedResult.hits.length,
       overwrittenHits: overwrittenResult.hits.length,

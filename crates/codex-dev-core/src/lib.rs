@@ -2576,12 +2576,13 @@ fn collect_plugin_skill_entrypoints(
             let directory = skill_entry.file_name().to_string_lossy().to_string();
             let rel_path = repo_relative_string(repo_root, &skill_md);
             entrypoints
-                .entry(directory)
+                .entry(directory.clone())
                 .or_insert_with(|| rel_path.clone());
             if let Some(name) =
                 read_optional_regular_text(&skill_md, SKILL_INVENTORY_MAX_TEXT_BYTES)?
                     .and_then(|text| parse_skill_frontmatter(&text.text).ok())
                     .and_then(|frontmatter| frontmatter.name)
+                    .filter(|name| is_valid_skill_name(name) && name == &directory)
             {
                 entrypoints.entry(name).or_insert_with(|| rel_path.clone());
             }
