@@ -5,9 +5,9 @@ Use this reference when updating the skill or checking CLI drift.
 ## Local Diagnostics
 
 ```bash
-node scripts/firecrawl-doctor.mjs --json
-node scripts/firecrawl-help-snapshot.mjs --output /tmp/firecrawl-help.json --markdown /tmp/firecrawl-help.md
-node scripts/firecrawl-cache-index.mjs self-test
+node skills/firecrawl/scripts/firecrawl-doctor.mjs --json
+node skills/firecrawl/scripts/firecrawl-help-snapshot.mjs --output /tmp/firecrawl-help.json --markdown /tmp/firecrawl-help.md
+node skills/firecrawl/scripts/firecrawl-cache-index.mjs self-test
 ```
 
 These scripts are non-interactive. They do not run Firecrawl setup or install

@@ -384,9 +384,28 @@ function loadRecords(root, indexPath, refreshIndex) {
   const records = [];
   for (const line of readFileSync(indexPath, 'utf8').split(/\r?\n/)) {
     if (!line.trim()) continue;
-    records.push(JSON.parse(line));
+    try {
+      records.push(JSON.parse(line));
+    } catch {
+      // Ignore malformed lines; callers can refresh-index to rebuild.
+    }
   }
   return records;
+}
+
+function validateIndexedArtifact(record) {
+  const artifactPath = record.artifactPath ? resolve(record.artifactPath) : null;
+  if (!artifactPath || !existsSync(artifactPath)) {
+    return { ok: false, reason: 'artifact-missing' };
+  }
+  const stat = statSync(artifactPath);
+  if (typeof record.artifactSizeBytes === 'number' && record.artifactSizeBytes !== stat.size) {
+    return { ok: false, reason: 'artifact-size-changed' };
+  }
+  if (record.artifactSha256 && record.artifactSha256 !== fileHash(artifactPath)) {
+    return { ok: false, reason: 'artifact-hash-changed' };
+  }
+  return { ok: true, reason: null };
 }
 
 function withFreshness(record, ttlMs, now) {
@@ -471,6 +490,8 @@ function findMatches(options) {
   for (const record of records) {
     const match = scoreRecord(record, lookupOptions);
     if (!match) continue;
+    const artifactValidation = validateIndexedArtifact(record);
+    if (!artifactValidation.ok) continue;
     const recordTtl = parseDuration(options.ttl) ?? ttlMsFor(options.intent ?? record.intent, record.commandType);
     const enriched = {
       ...record,
@@ -597,12 +618,26 @@ function selfTest() {
     const index = join(root, 'index.jsonl');
     const records = scan(root, index);
     writeIndex(index, records);
+    appendFileSync(index, '{not valid jsonl}\n');
     recordManual({
       artifact: join(root, 'parse-report.md'),
       sourceFile: source,
       index,
       intent: 'parse',
     });
+    writeFileSync(
+      join(root, 'stale-deleted.md'),
+      '# Deleted\nhttps://docs.firecrawl.dev/deleted\n',
+    );
+    writeFileSync(
+      join(root, 'stale-overwritten.md'),
+      '# Original\nhttps://docs.firecrawl.dev/overwritten\n',
+    );
+    const staleRecords = scan(root, index);
+    writeIndex(index, staleRecords);
+    appendFileSync(index, '{not valid jsonl}\n');
+    rmSync(join(root, 'stale-deleted.md'));
+    writeFileSync(join(root, 'stale-overwritten.md'), '# Changed\n');
     const urlResult = findMatches({
       root,
       index,
@@ -621,6 +656,18 @@ function selfTest() {
       file: unrecordedSource,
       intent: 'parse',
     });
+    const deletedResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/deleted',
+      intent: 'docs',
+    });
+    const overwrittenResult = findMatches({
+      root,
+      index,
+      url: 'https://docs.firecrawl.dev/overwritten',
+      intent: 'docs',
+    });
     if (urlResult.hits.length === 0 || !urlResult.hits[0].fresh) {
       throw new Error('URL lookup did not find a fresh hit');
     }
@@ -631,12 +678,20 @@ function selfTest() {
     if (!staleSlugHit || staleSlugHit.fresh) {
       throw new Error('Unrecorded parse artifact must not be treated as fresh');
     }
+    if (deletedResult.hits.length !== 0) {
+      throw new Error('Deleted indexed artifact must not be returned');
+    }
+    if (overwrittenResult.hits.length !== 0) {
+      throw new Error('Overwritten indexed artifact must not be returned');
+    }
     return {
       ok: true,
       records: records.length,
       urlHit: urlResult.hits[0].artifactPath,
       fileHit: fileResult.hits[0].artifactPath,
       staleSlugHit: staleSlugHit.artifactPath,
+      deletedHits: deletedResult.hits.length,
+      overwrittenHits: overwrittenResult.hits.length,
     };
   } finally {
     process.chdir(oldCwd);
