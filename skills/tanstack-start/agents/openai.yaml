@@ -1,0 +1,6 @@
+interface:
+  display_name: "TanStack Start"
+  short_description: "Modern TanStack Start full-stack guidance"
+  default_prompt: "Use $tanstack-start to plan or review TanStack Start server functions, middleware, server routes, auth boundaries, SSR, and deployment patterns."
+policy:
+  allow_implicit_invocation: true

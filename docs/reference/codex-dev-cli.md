@@ -332,7 +332,7 @@ Compact shape:
 `sourceCommit` defaults to `git rev-parse HEAD`. Pass it explicitly when
 generating deterministic fixtures or when a workflow needs to pin links to a
 known commit or release branch. In Git checkouts, the value must resolve to a
-commit before catalog generation continues.
+commit before catalog generation continues. New skill paths must be committed before the catalog can include them.
 
 `sourceRef` defaults to `sourceCommit`. Use `--source-ref main` for tracked PR
 artifacts that should link to the published branch after merge; the command

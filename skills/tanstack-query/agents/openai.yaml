@@ -1,0 +1,6 @@
+interface:
+  display_name: "TanStack Query"
+  short_description: "React Query v5 server-state guidance"
+  default_prompt: "Use $tanstack-query to design or review TanStack Query v5 keys, queryOptions, caching, mutations, invalidation, SSR hydration, and error handling."
+policy:
+  allow_implicit_invocation: true

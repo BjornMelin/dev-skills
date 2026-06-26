@@ -313,6 +313,10 @@ for local development and validation commands.
 | `subagent-creator` | Create, validate, install, diff, sync, and smoke-test Codex custom subagent TOML role packs. | [skills/subagent-creator/SKILL.md](skills/subagent-creator/SKILL.md) |
 | `subspawn` | Bounded Codex subagent delegation with strict wait and evidence-first synthesis. | [skills/subspawn/SKILL.md](skills/subspawn/SKILL.md) |
 | `supabase-ts` | Supabase with Next/React/TS: SSR auth, RLS, storage, realtime, Edge Functions, pgvector, deploy. | [skills/supabase-ts/SKILL.md](skills/supabase-ts/SKILL.md) |
+| `tanstack-integration` | Start + Router + Query integration: SSR query setup, loader prefetch, cache ownership, auth/data boundaries. | [skills/tanstack-integration/SKILL.md](skills/tanstack-integration/SKILL.md) |
+| `tanstack-query` | TanStack Query v5: queryOptions, keys, cache defaults, mutations, invalidation, SSR hydration, errors. | [skills/tanstack-query/SKILL.md](skills/tanstack-query/SKILL.md) |
+| `tanstack-router` | TanStack Router: file routes, typed context, search params, loaders, navigation, code splitting, errors. | [skills/tanstack-router/SKILL.md](skills/tanstack-router/SKILL.md) |
+| `tanstack-start` | TanStack Start: server functions, middleware, server routes, auth boundaries, SSR, deployment. | [skills/tanstack-start/SKILL.md](skills/tanstack-start/SKILL.md) |
 | `taste-metaskill` | Route frontend UI work to focused visual-taste references (premium, distinct, anti-generic). | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
 | `technical-writing` | Internal engineering docs: PRDs, specs, architecture, runbooks, migrations, and maintainer guides. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |

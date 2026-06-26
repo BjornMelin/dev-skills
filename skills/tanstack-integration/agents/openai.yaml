@@ -1,0 +1,6 @@
+interface:
+  display_name: "TanStack Integration"
+  short_description: "Start + Router + Query integration patterns"
+  default_prompt: "Use $tanstack-integration to wire or review TanStack Start, Router, and Query together with SSR, loader prefetching, cache ownership, and auth/data-boundary cautions."
+policy:
+  allow_implicit_invocation: true
