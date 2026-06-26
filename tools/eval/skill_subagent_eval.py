@@ -926,12 +926,22 @@ def tracked_files(root: Path, prefix: str) -> set[Path]:
         prefix: Repo-relative path prefix to list.
 
     Returns:
-        A set of absolute pathlib.Path objects for tracked and untracked non-ignored files under the prefix.
+        A set of absolute pathlib.Path objects for tracked and untracked
+        non-ignored files under the prefix.
 
     Raises:
         RuntimeError: If git ls-files times out.
     """
-    command = ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", prefix]
+    command = [
+        "git",
+        "ls-files",
+        "-z",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "--",
+        prefix,
+    ]
     try:
         completed = subprocess.run(  # noqa: S603
             command,
