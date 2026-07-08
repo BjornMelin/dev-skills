@@ -26,6 +26,8 @@ Use this skill when building or reviewing GSAP code, **and** when the user asks 
 
 If the user has already chosen another library (e.g. Motion/Framer Motion), respect it. For the GSAP-vs-alternatives call, see `references/decision-matrix.md`.
 
+**Not GSAP — route instead:** Expo / React Native motion → `expo-motion`; Three.js / React Three Fiber / WebGL 3D scenes → `web-three-r3f` (cinematic 3D look-dev → `r3f-scene-polish`); repo-wide motion-system audits, motion tokens, or cross-stack design-motion direction → `design-motion-system` / `design-motion-audit`.
+
 ## Install & setup
 
 ```bash

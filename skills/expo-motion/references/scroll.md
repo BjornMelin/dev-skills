@@ -152,6 +152,57 @@ out of range. Keep input ranges in strictly increasing order. See
 [Reanimated core](./reanimated-core.md) for `interpolate`/`interpolateColor`
 details.
 
+## Sensor-driven (device tilt) parallax
+
+Parallax doesn't have to come from scroll. `useAnimatedSensor` exposes the
+device's motion sensors as a shared value on the UI thread, so tilting the phone
+can drive depth in a hero or card stack ("gyro parallax") without crossing to JS.
+Use `SensorType.ROTATION` (fused orientation, radians) and read `pitch`/`roll`
+inside the worklet:
+
+```tsx
+import Animated, {
+  Extrapolation,
+  SensorType,
+  interpolate,
+  useAnimatedSensor,
+  useAnimatedStyle,
+  useReducedMotion,
+} from 'react-native-reanimated';
+
+const MAX_SHIFT = 12; // px of travel at full tilt — keep it small
+
+export function TiltParallaxLayer() {
+  const tilt = useAnimatedSensor(SensorType.ROTATION, { interval: 'auto' });
+  const reduced = useReducedMotion();
+
+  const style = useAnimatedStyle(() => {
+    // Sensor parallax is decorative + vestibular — disable it under reduced motion.
+    if (reduced) return { transform: [{ translateX: 0 }, { translateY: 0 }] };
+    const { pitch, roll } = tilt.sensor.value; // radians
+    return {
+      transform: [
+        { translateX: interpolate(roll, [-0.4, 0.4], [-MAX_SHIFT, MAX_SHIFT], Extrapolation.CLAMP) },
+        { translateY: interpolate(pitch, [-0.4, 0.4], [-MAX_SHIFT, MAX_SHIFT], Extrapolation.CLAMP) },
+      ],
+    };
+  });
+
+  return <Animated.View style={style}>{/* background layer */}</Animated.View>;
+}
+```
+
+- Read `tilt.sensor.value` **only inside the worklet**, like any shared value.
+- Move background and foreground layers by *different* `MAX_SHIFT` amounts for
+  depth; `Extrapolation.CLAMP` every range so extreme tilt can't slide a layer
+  off-screen.
+- The sensor samples continuously — call `tilt.unregister()` on blur/unmount to
+  stop draining the battery when the effect isn't visible, and check
+  `tilt.isAvailable` before relying on it.
+- `SensorType` options: `ACCELEROMETER`, `GYROSCOPE`, `GRAVITY`,
+  `MAGNETIC_FIELD`, `ROTATION`. `ROTATION` (fused) is the stable choice for tilt;
+  raw `GYROSCOPE`/`ACCELEROMETER` need smoothing.
+
 ## Reduced motion
 
 Parallax and large collapsing translations are exactly the kind of motion that
@@ -159,6 +210,9 @@ can trigger discomfort. When the OS reduced-motion setting is on:
 
 - Drop or heavily damp parallax offsets (track scroll 1:1 instead of at a
   fraction), and avoid over-scale stretch effects.
+- **Disable sensor/tilt parallax entirely** (return the identity transform, as in
+  the recipe above) — device-motion parallax is a common nausea trigger and
+  carries no functional meaning to lose.
 - Keep functional behavior (the header can still collapse) but remove decorative
   travel and bounce.
 - Read the preference with `useReducedMotion()` and branch your interpolation
