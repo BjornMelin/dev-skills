@@ -1,0 +1,33 @@
+{
+  "skill": "r3f-scene-polish",
+  "checked_at": "2026-07-08",
+  "copy_policy": "Derived notes from official docs/package sources for cinematic R3F look-dev. Version pins in art-direction.md were live-verified on the checked_at date; verify installed package versions before applying API examples.",
+  "upstream_sources": [
+    { "label": "@react-three/postprocessing docs", "url": "https://react-postprocessing.docs.pmnd.rs/" },
+    { "label": "pmndrs postprocessing (core) — ToneMappingMode / effects", "url": "https://pmndrs.github.io/postprocessing/public/docs/" },
+    { "label": "@react-three/drei docs (Environment, ContactShadows, AccumulativeShadows, MeshTransmissionMaterial, Stage)", "url": "https://drei.docs.pmnd.rs/" },
+    { "label": "React Three Fiber Canvas API (ACESFilmic default, flat prop)", "url": "https://r3f.docs.pmnd.rs/api/canvas" },
+    { "label": "React Three Fiber v9 migration guide (React 19, ThreeElements, async gl / WebGPU)", "url": "https://r3f.docs.pmnd.rs/tutorials/v9-migration-guide" },
+    { "label": "three.js WebGLRenderer.toneMapping + r152 color-management migration", "url": "https://threejs.org/docs/#api/en/renderers/WebGLRenderer.toneMapping" },
+    { "label": "N8AO (ambient occlusion, SSAO successor)", "url": "https://github.com/N8python/n8ao" },
+    { "label": "Agent Skills specification and best practices" }
+  ],
+  "verified_versions": {
+    "three": "0.185.1",
+    "@react-three/fiber": "9.6.1",
+    "@react-three/drei": "10.7.7",
+    "@react-three/postprocessing": "3.0.4",
+    "postprocessing": "6.39.2 (peer three >=0.168 <0.186)"
+  },
+  "tailored_reference_files": [
+    { "file": "references/art-direction.md", "title": "Cinematic R3F look-dev (postprocessing, lighting, tone mapping, materials, camera)", "sources": [
+      "https://react-postprocessing.docs.pmnd.rs/",
+      "https://drei.docs.pmnd.rs/",
+      "https://threejs.org/docs/#api/en/renderers/WebGLRenderer.toneMapping",
+      "https://r3f.docs.pmnd.rs/tutorials/v9-migration-guide"
+    ] },
+    { "file": "references/motion-vocabulary.md", "title": "Named motion & camera vocabulary", "sources": [] },
+    { "file": "references/performance-accessibility.md", "title": "Performance budget + reduced-motion gates", "sources": [] }
+  ],
+  "local_files": ["SKILL.md", "evals/evals.json", "evals/trigger-queries.json", "agents/openai.yaml"]
+}

@@ -1,0 +1,15 @@
+{
+  "skill": "design-motion-audit",
+  "checked_at": "2026-07-08",
+  "copy_policy": "Audit/diagnosis skill authored against the Agent Skills specification and general motion-quality heuristics. Findings are leads — verify each against real code before reporting, and route implementation fixes to the skill that owns the stack.",
+  "upstream_sources": [
+    { "label": "Agent Skills specification and best practices." },
+    { "label": "Cross-stack motion-quality heuristics (tokenization, R3F frame-loop safety, Reanimated UI-thread safety, reduced-motion coverage, frame budget)." }
+  ],
+  "tailored_reference_files": [
+    { "file": "references/quality-gates.md", "title": "Creative / implementation / visual quality gates + checklist", "sources": [] },
+    { "file": "references/performance-accessibility.md", "title": "Performance budget + reduced-motion gates", "sources": [] },
+    { "file": "references/motion-vocabulary.md", "title": "Named motion vocabulary for coverage checks", "sources": [] }
+  ],
+  "local_files": ["SKILL.md", "scripts/audit_motion_system.py", "scripts/detect_motion_stack.py", "evals/evals.json", "evals/trigger-queries.json", "agents/openai.yaml"]
+}

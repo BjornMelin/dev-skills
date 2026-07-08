@@ -243,11 +243,13 @@ active catalog.
 Install the web-motion plugin in Claude Code:
 
 ```bash
-claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/claude-core
+claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/claude-core plugins/design-motion
 claude plugin install web-motion@bjorn-dev-skills
 ```
 
 (The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)
+
+The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus six specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`).
 
 After installing inside an active Claude Code session, run `/reload-plugins`.
 See the [Claude Code motion plugin install cookbook](docs/cookbooks/claude-code-motion-plugins.md)
@@ -256,6 +258,7 @@ for local development and validation commands.
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
 | `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
+| `design-motion` | `design-motion-system`, `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit, cinematic R3F look-dev, six specialist motion subagents, and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |
@@ -279,6 +282,8 @@ for local development and validation commands.
 | `convex-feature-spec` | Convex-first feature specs: model, API, rollout, verification (not implementation audits). | [skills/convex-feature-spec/SKILL.md](skills/convex-feature-spec/SKILL.md) |
 | `dash-audit` | Audit Dash apps: callbacks, state, layout, accessibility, Dash-specific UX. | [skills/dash-audit/SKILL.md](skills/dash-audit/SKILL.md) |
 | `deep-researcher` | Deep cited research across Codex web, Context7 API, GitHub, source, rendered pages, Firecrawl, and evidence ledgers. | [skills/deep-researcher/SKILL.md](skills/deep-researcher/SKILL.md) |
+| `design-motion-audit` | Audit a repo, route, screen, or 3D scene for motion quality — token consistency, R3F/Reanimated polish, performance, reduced-motion, and accessibility — returning a prioritized punch list. | [skills/design-motion-audit/SKILL.md](skills/design-motion-audit/SKILL.md) |
+| `design-motion-system` | Cross-stack motion & design-system director: turns vague premium/cinematic requests into a named vocabulary, design tokens, and a routed plan across web 3D and native; routes single-stack work to the owning skill. | [skills/design-motion-system/SKILL.md](skills/design-motion-system/SKILL.md) |
 | `dmc-best-practices` | DMC + Dash best practices: architecture, callbacks, styling, performance, theming. | [skills/dmc-best-practices/SKILL.md](skills/dmc-best-practices/SKILL.md) |
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
@@ -295,6 +300,7 @@ for local development and validation commands.
 | `opensrc` | Canonical source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
+| `r3f-scene-polish` | Cinematic look-dev for an existing three.js / React Three Fiber scene: postprocessing, HDRI/PBR lighting, shadows, tone mapping, and camera choreography (scene setup & lifecycle route to `web-three-r3f`). | [skills/r3f-scene-polish/SKILL.md](skills/r3f-scene-polish/SKILL.md) |
 | `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
 | `repo-modernizer` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernizer/SKILL.md](skills/repo-modernizer/SKILL.md) |

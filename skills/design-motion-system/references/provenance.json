@@ -1,0 +1,15 @@
+{
+  "skill": "design-motion-system",
+  "checked_at": "2026-07-08",
+  "copy_policy": "Director/orchestration skill authored against the Agent Skills specification and general cross-stack motion-design principles. Stack-specific API truth lives in the skills this one routes to (expo-motion, web-three-r3f, r3f-scene-polish, gsap) — verify installed package versions there before implementing.",
+  "upstream_sources": [
+    { "label": "Agent Skills specification and best practices (SKILL.md frontmatter, references, progressive disclosure)." },
+    { "label": "Claude Code skills, subagents, and dynamic-workflow (ultracode) documentation for routing and orchestration." }
+  ],
+  "tailored_reference_files": [
+    { "file": "references/motion-vocabulary.md", "title": "Named cross-stack motion & choreography vocabulary", "sources": [] },
+    { "file": "references/design-system-tokens.md", "title": "Cross-stack motion token architecture", "sources": [] },
+    { "file": "references/routing-workflows.md", "title": "Routing criteria + dynamic-workflow stage template", "sources": [] }
+  ],
+  "local_files": ["SKILL.md", "scripts/detect_motion_stack.py", "scripts/audit_motion_system.py", "scripts/scaffold_motion_tokens.py", "evals/evals.json", "evals/trigger-queries.json", "agents/openai.yaml"]
+}

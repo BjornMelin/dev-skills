@@ -1,0 +1,6 @@
+interface:
+  display_name: "Design Motion Audit"
+  short_description: "Audit UI motion and 3D polish quality"
+  default_prompt: "Use $design-motion-audit to audit a repo, route, screen, component, or 3D scene for motion quality, design-token consistency, performance risk, reduced-motion coverage, accessibility, and missing hallmark-motion opportunities, returning a prioritized punch list."
+policy:
+  allow_implicit_invocation: true

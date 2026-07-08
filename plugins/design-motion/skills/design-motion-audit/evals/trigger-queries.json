@@ -1,0 +1,25 @@
+[
+  { "query": "audit the motion on our /pricing route and tell me where it feels cheap, in priority order", "should_trigger": true },
+  { "query": "review this screen's animations and give me a punch list of what to fix", "should_trigger": true },
+  { "query": "verify our app respects prefers-reduced-motion everywhere — find what ignores it", "should_trigger": true },
+  { "query": "check my react three fiber scene for performance risks before we ship", "should_trigger": true },
+  { "query": "critique whether our onboarding actually feels premium or generic", "should_trigger": true },
+  { "query": "find the gaps in our motion — hardcoded durations, missing tokens, weak choreography", "should_trigger": true },
+  { "query": "assess if our animation quality is awwwards-level or falls short", "should_trigger": true },
+  { "query": "look over our reanimated gestures and flag anything janky or non-interruptible", "should_trigger": true },
+  { "query": "do a motion-quality review across the whole repo and rank the issues", "should_trigger": true },
+  { "query": "are there setState calls in useFrame or per-frame allocations in this r3f scene?", "should_trigger": true },
+  { "query": "check that every camera move and parallax has a reduced-motion fallback", "should_trigger": true },
+  { "query": "review our design tokens for motion consistency and flag hardcoded easings", "should_trigger": true },
+
+  { "query": "build a swipe-to-dismiss card in my expo app", "should_trigger": false },
+  { "query": "add cinematic bloom and depth of field to my already-working r3f hero", "should_trigger": false },
+  { "query": "set up a react three fiber canvas and load my gltf model", "should_trigger": false },
+  { "query": "design a cross-stack motion-token system for our web and native apps", "should_trigger": false },
+  { "query": "add a gsap scrolltrigger pin to my landing page hero", "should_trigger": false },
+  { "query": "animate a collapsing header in my react native scroll screen", "should_trigger": false },
+  { "query": "implement a signature motion language across our whole product", "should_trigger": false },
+  { "query": "make this three.js scene look cinematic with agx tonemapping and hdri", "should_trigger": false },
+  { "query": "write a css keyframes spinner for my website", "should_trigger": false },
+  { "query": "create a draggable bottom sheet that snaps with reanimated", "should_trigger": false }
+]
