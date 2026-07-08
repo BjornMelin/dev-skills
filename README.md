@@ -249,7 +249,12 @@ claude plugin install web-motion@bjorn-dev-skills
 
 (The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)
 
-The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus six specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`).
+The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus six specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`). To use the six subagents **without** the plugin, install them into your Claude Code agents directory:
+
+```bash
+python3 plugins/design-motion/scripts/install_agents.py --target global   # ~/.claude/agents
+python3 plugins/design-motion/scripts/install_agents.py --target project  # ./.claude/agents
+```
 
 After installing inside an active Claude Code session, run `/reload-plugins`.
 See the [Claude Code motion plugin install cookbook](docs/cookbooks/claude-code-motion-plugins.md)
