@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Scaffold reusable motion token files for web and native stacks."""
+
 import argparse
 import json
 from pathlib import Path
@@ -94,12 +96,13 @@ export const reanimatedMotion = {
 
 
 def has_native_deps(root: Path):
+    """Return whether package.json declares native motion dependencies."""
     path = root / "package.json"
     if not path.exists():
         return False
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return False
     deps = {}
     deps.update(data.get("dependencies", {}) or {})
@@ -108,26 +111,38 @@ def has_native_deps(root: Path):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Scaffold motion token files. Dry run by default.")
+    """Run the motion-token scaffold CLI."""
+    ap = argparse.ArgumentParser(
+        description="Scaffold motion token files. Dry run by default."
+    )
     ap.add_argument("root", nargs="?", default=".")
     ap.add_argument("--dir", default="src/design-system/motion")
-    ap.add_argument("--stack", choices=["auto", "web", "native", "both"], default="auto")
+    ap.add_argument(
+        "--stack",
+        choices=["auto", "web", "native", "both"],
+        default="auto",
+    )
     ap.add_argument("--write", action="store_true")
     args = ap.parse_args()
     root = Path(args.root).resolve()
     if not root.is_dir():
         ap.error(f"not a directory: {root}")
     out = (root / args.dir).resolve()
-    # Output-path guard: keep writes inside the project root (no absolute --dir, no '..' escape).
+    # Output-path guard: keep writes inside the project root.
     try:
         out.relative_to(root)
     except ValueError:
-        ap.error("--dir must stay inside the project root (no absolute paths or '..' escapes)")
+        ap.error(
+            "--dir must stay inside the project root "
+            "(no absolute paths or '..' escapes)"
+        )
     files = {
         out / "motion.ts": TS_CONTENT,
         out / "motion.css": CSS_CONTENT,
     }
-    if args.stack in {"native", "both"} or (args.stack == "auto" and has_native_deps(root)):
+    if args.stack in {"native", "both"} or (
+        args.stack == "auto" and has_native_deps(root)
+    ):
         files[out / "reanimated-motion.ts"] = REA_CONTENT
     for path, content in files.items():
         print(str(path))
