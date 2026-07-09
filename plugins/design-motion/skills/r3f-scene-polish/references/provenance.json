@@ -29,5 +29,5 @@
     { "file": "references/motion-vocabulary.md", "title": "Named motion & camera vocabulary", "sources": [] },
     { "file": "references/performance-accessibility.md", "title": "Performance budget + reduced-motion gates", "sources": [] }
   ],
-  "local_files": ["SKILL.md", "evals/evals.json", "evals/trigger-queries.json", "agents/openai.yaml"]
+  "local_files": ["SKILL.md", "scripts/audit.mjs", "evals/evals.json", "evals/trigger-queries.json", "agents/openai.yaml"]
 }

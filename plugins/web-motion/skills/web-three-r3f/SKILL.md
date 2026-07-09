@@ -89,6 +89,11 @@ changing behavior or reporting it as valid.
 ## Closeout
 
 Before finalizing, run the repo's focused validation command, this skill's audit
-CLI when relevant, and any browser/device/manual proof required by the changed
-surface. Report commands run, findings fixed, findings skipped with reasons,
-and residual risk.
+CLI when relevant, and browser proof for the changed surface. **Browser proof
+(optional tools — degrade and state what stays unverified if absent):** drive the
+running scene with the `playwright-cli` skill — `eval` a `<canvas>` readback to
+prove non-blank pixels, `resize` for responsive behavior, exercise interaction, and
+`screenshot`/`video` the result; capture `console`/`requests` for asset or WebGL
+errors. For a fuller motion frame-budget / reduced-motion pass, use the
+`design-motion-audit` skill's runtime-verification reference. Report commands run,
+findings fixed, findings skipped with reasons, and residual risk.

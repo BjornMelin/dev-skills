@@ -1,6 +1,6 @@
 ---
 name: reanimated-ios-motion-engineer
-description: Use for Expo iOS, React Native Reanimated, Gesture Handler, shared values, worklets, withSpring, withTiming, layout transitions, bottom sheets, cards, tabs, carousels, scroll headers, and native touch physics.
+description: Use for Expo (iOS and Android), React Native Reanimated, Gesture Handler, shared values, worklets, withSpring, withTiming, layout transitions, bottom sheets, cards, tabs, carousels, scroll headers, and native touch physics.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: inherit
 effort: xhigh

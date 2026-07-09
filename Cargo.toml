@@ -10,6 +10,8 @@ members = [
     "crates/expo-motion-audit",
     "crates/gsap-audit-core",
     "crates/gsap-audit",
+    "crates/motion-token-audit-core",
+    "crates/motion-token-audit",
 ]
 resolver = "3"
 

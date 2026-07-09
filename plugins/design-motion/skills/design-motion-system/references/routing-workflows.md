@@ -6,8 +6,13 @@
 - R3F, three.js, Drei, GLB, WebGL: `r3f-scene-architect`.
 - Expo, iOS, Reanimated, gestures: `reanimated-ios-motion-engineer`.
 - Tokens, constants, CSS variables, Tailwind: `motion-token-systems-integrator`.
-- Performance, FPS, reduced motion, accessibility: `motion-performance-auditor`.
-- Final acceptance criteria: `motion-qa-reviewer`.
+- Static performance risk, FPS heuristics, reduced-motion coverage (code-level): `motion-performance-auditor`.
+- Prove it renders / real-browser FPS & frame budget / runtime reduced-motion: `motion-runtime-verifier`.
+- Final acceptance criteria and launch gate: `motion-qa-reviewer`.
+
+The performance pipeline is deliberately staged: `motion-performance-auditor` finds
+risk in the code, `motion-runtime-verifier` proves behavior in a running app, and
+`motion-qa-reviewer` gives the pass / pass-with-risks / block verdict.
 
 ## Use normal skill execution when
 

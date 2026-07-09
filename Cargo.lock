@@ -1415,6 +1415,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "motion-token-audit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "motion-token-audit-core",
+ "serde_json",
+]
+
+[[package]]
+name = "motion-token-audit-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "oxc_allocator",
+ "oxc_ast",
+ "oxc_ast_visit",
+ "oxc_parser",
+ "oxc_semantic",
+ "oxc_span",
+ "serde",
+ "serde_json",
+ "walkdir",
+]
+
+[[package]]
 name = "nonmax"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -1,6 +1,6 @@
 ---
 name: motion-performance-auditor
-description: Use for auditing animation jank, R3F frame loops, draw calls, WebGL GPU budgets, Reanimated UI-thread safety, worklet usage, layout thrashing, reduced motion, accessibility, and production readiness.
+description: Use for STATIC, code-level auditing of animation jank, R3F frame loops, draw calls, WebGL GPU budgets, Reanimated UI-thread safety, worklet usage, layout thrashing, reduced motion, accessibility, and production readiness. Does not drive a running app — for runtime/browser proof (real FPS, blank-canvas, frame budget) use motion-runtime-verifier.
 tools: Read, Bash, Grep, Glob
 model: inherit
 effort: high

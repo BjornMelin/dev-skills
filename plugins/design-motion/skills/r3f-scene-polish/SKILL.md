@@ -60,3 +60,19 @@ If the scene doesn't render yet, start in `web-three-r3f`, then return here.
 
 Return complete code changes or a complete look-dev plan, depending on the
 request.
+
+## Optional power tool: art-direction audit
+
+This skill ships `scripts/audit.mjs`, a static auditor for R3F/three.js
+**art-direction** quality — tone mapping (double-tonemap, legacy API), color
+management (deprecated `outputEncoding`/`sRGBEncoding`), lighting (unlit scenes),
+postprocessing quality (missing quality ladder, legacy `SSAO`, WebGPU mismatch), and
+material color-space. This is the visual layer `web-three-r3f`'s lifecycle audit does
+**not** cover; run both. Optional — findings are leads.
+
+```bash
+node scripts/audit.mjs doctor                    # list every rule
+node scripts/audit.mjs scan --root . --format json
+```
+
+Verify each finding against the repo's installed package versions before changing behavior.
