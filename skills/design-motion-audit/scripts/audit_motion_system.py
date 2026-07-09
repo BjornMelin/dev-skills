@@ -22,6 +22,8 @@ IGNORE = {
     "vendor",
     ".venv",
     "__pycache__",
+    "Pods",
+    ".gradle",
 }
 DURATION_RE = re.compile(r"(?<![\w-])(?:\d+ms|\d+(?:\.\d+)?s)(?![\w-])")
 EASING_RE = re.compile(
