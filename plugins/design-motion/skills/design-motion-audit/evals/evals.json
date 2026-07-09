@@ -1,0 +1,58 @@
+{
+  "skill_name": "design-motion-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Audit the motion on our /pricing route — I want to know where it feels cheap and what to fix, in priority order.",
+      "expected_output": "A prioritized punch list (most-severe first) with exact files, severity, reasoning, and concrete fixes across the audit dimensions (token consistency, physicality, performance, reduced-motion, accessibility, hallmark gaps); it diagnoses and routes implementation to the owning skill rather than rewriting the code itself.",
+      "files": [],
+      "assertions": [
+        "Returns a prioritized punch list (most-severe first) with file references, severity, and concrete fixes",
+        "Checks design-token consistency (hardcoded durations/easings vs tokenized values, intent naming)",
+        "Flags missing reduced-motion branches for camera moves, parallax, loops, and bounce",
+        "Identifies missing hallmark-motion opportunities (or explicitly notes there are none) rather than only listing defects",
+        "Routes the actual implementation fixes to the owning skill (design-motion-system / expo-motion / web-three-r3f / r3f-scene-polish / gsap) rather than building them itself",
+        "Treats any static-analyzer output as leads to verify against the real code, not final findings"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Verify our app respects prefers-reduced-motion everywhere — find every animation that ignores it.",
+      "expected_output": "Reviews each motion source (camera moves, parallax, idle loops, bounce, entrances) for a reduced-motion branch that preserves functional feedback, lists offenders by file and severity, and notes that state must stay clear when large motion is removed — across both web and native surfaces.",
+      "files": [],
+      "assertions": [
+        "Enumerates motion sources (camera travel, parallax, idle loops, bounce, entrances) and checks each for a reduced-motion branch",
+        "Confirms the reduced-motion path preserves functional feedback / keeps state clear rather than only disabling animation",
+        "Reports offenders as a punch list with file references and severity",
+        "Covers both web (prefers-reduced-motion) and native (useReducedMotion / ReduceMotion.System) surfaces",
+        "Diagnoses only and routes the fixes to the owning per-stack skill instead of implementing them"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Review my React Three Fiber scene for performance risks before we ship — draw calls, frame loop, that kind of thing.",
+      "expected_output": "Flags setState in useFrame, per-frame allocations, missing delta-time, disposal gaps, and DPR/shadow/postprocessing budget with file references and severity as a punch list; diagnoses only and routes correctness fixes to web-three-r3f and look-dev fixes to r3f-scene-polish.",
+      "files": [],
+      "assertions": [
+        "Flags setState-in-useFrame, per-frame allocations, and missing delta-time normalization in the frame loop",
+        "Checks disposal, DPR, shadow, and postprocessing budget for frame-rate / draw-call risk",
+        "Returns findings as a prioritized punch list with file references and severity",
+        "Routes correctness/setup fixes to web-three-r3f and cinematic look-dev fixes to r3f-scene-polish rather than implementing them",
+        "Verifies analyzer leads against the actual code before reporting"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Does our onboarding flow actually feel premium, or generic? Critique it and tell me where a signature motion would help.",
+      "expected_output": "Judges the surface against motion quality gates, calls out where motion feels generic/templated, identifies specific missing hallmark-motion opportunities, assesses interaction physicality, and returns a prioritized list — without building the animations.",
+      "files": [],
+      "assertions": [
+        "Judges the surface against motion quality gates and calls out where it feels generic / templated",
+        "Identifies specific missing hallmark-motion opportunities where a signature interaction would add value",
+        "Assesses interaction physicality (velocity-aware release, interruptibility, cancellation-safety)",
+        "Returns a prioritized punch list rather than implementing the animations",
+        "Routes any build work to design-motion-system or the owning per-stack skill"
+      ]
+    }
+  ]
+}

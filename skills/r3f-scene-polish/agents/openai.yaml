@@ -1,0 +1,6 @@
+interface:
+  display_name: "R3F Scene Polish"
+  short_description: "Cinematic look-dev for working R3F scenes"
+  default_prompt: "Use $r3f-scene-polish to art-direct an already-working three.js / React Three Fiber scene to cinematic quality — postprocessing, HDRI/PBR lighting, contact and accumulative shadows, transmission materials, tone mapping, and camera choreography."
+policy:
+  allow_implicit_invocation: true

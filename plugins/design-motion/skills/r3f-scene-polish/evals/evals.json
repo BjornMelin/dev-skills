@@ -1,0 +1,57 @@
+{
+  "skill_name": "r3f-scene-polish",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "My R3F product hero already renders fine but looks plain. Add cinematic postprocessing — bloom, some depth of field, ambient occlusion. TypeScript.",
+      "expected_output": "An EffectComposer stack in intentional child order (N8AO, DepthOfField, Bloom with mipmapBlur, ToneMapping AgX, SMAA/Vignette) with a HalfFloatType HDR buffer, expensive effects (N8AO, DoF) gated behind a device/DPR quality tier, and a reduced-motion / low-power lighter branch.",
+      "files": [],
+      "assertions": [
+        "Uses <EffectComposer> from @react-three/postprocessing with effects ordered intentionally in child order",
+        "Uses N8AO for ambient occlusion and prefers it over legacy SSAO (which needs enableNormalPass)",
+        "Sets Bloom with mipmapBlur + luminanceThreshold and frameBufferType={THREE.HalfFloatType} for a correct HDR bloom/tonemap buffer",
+        "Gates expensive effects (N8AO, DepthOfField) behind a device/DPR quality tier with a lighter reduced-motion / low-power branch",
+        "Assumes web-three-r3f correctness rules (no setState in useFrame) rather than re-deriving Canvas setup"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Grade and light this R3F scene properly — I want accurate color, AgX tone mapping, and image-based lighting from an HDRI. It currently looks washed out.",
+      "expected_output": "HDRI via drei Environment for image-based lighting, tone mapping set to AgX (via ToneMappingMode.AGX in postprocessing or THREE.AgXToneMapping on the renderer, but not both), correct color management (SRGBColorSpace on albedo, data maps left linear), and intentional key/fill/rim lighting.",
+      "files": [],
+      "assertions": [
+        "Uses drei <Environment> (preset or .hdr files) for HDRI image-based lighting",
+        "Sets AgX tone mapping via ToneMappingMode.AGX (postprocessing) or THREE.AgXToneMapping (renderer) and warns against double-tonemapping",
+        "Handles color management: SRGBColorSpace on color/albedo textures, data maps (normal/roughness/metalness) left linear",
+        "Adds intentional key/fill/rim lighting instead of relying on a single flat light",
+        "Notes the three < 0.186 pin for @react-three/postprocessing and verifies APIs against the installed versions"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "The scene renders but looks flat and toy-like. Art-direct it to feel premium — grounding, materials, the works.",
+      "expected_output": "Grounds the subject with drei ContactShadows or AccumulativeShadows + RandomizedLight, uses PBR material values and MeshTransmissionMaterial for glass (sharing one FBO), adds selective bloom via emissive with toneMapped={false}, HDRI, and tone mapping, and choreographs subtle camera / Float with a reduced-motion branch.",
+      "files": [],
+      "assertions": [
+        "Grounds the subject with drei <ContactShadows> or <AccumulativeShadows> + <RandomizedLight> rather than an ungrounded floating object",
+        "Uses PBR material values / HDRI over fake tricks, and MeshTransmissionMaterial for glass (sharing one FBO across transmissive objects)",
+        "Adds selective bloom cheaply via emissive lifted out of the 0–1 range with toneMapped={false}",
+        "Choreographs camera / idle Float with intent and includes a reduced-motion / low-power alternative",
+        "Diagnoses look-dev only; if the scene had not rendered it would route setup to web-three-r3f"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Add a real glass material to the bottle in my working three.js scene and give the camera a slow cinematic move on load. R3F + TypeScript.",
+      "expected_output": "MeshTransmissionMaterial (transmission/thickness/roughness/chromaticAberration, sharing one FBO), a choreographed camera move via drei CameraControls or refs with easing (dolly/truck, not a large spin), delta-time in useFrame, and a reduced-motion branch that cuts camera travel while keeping the graded still.",
+      "files": [],
+      "assertions": [
+        "Uses MeshTransmissionMaterial with transmission/thickness/roughness (and shares one FBO for multiple glass objects)",
+        "Choreographs the camera with intent (dolly/truck/orbit + easing) via CameraControls or refs, not a large disorienting spin",
+        "Animates the hot path cheaply with refs + delta-time in useFrame (no per-frame setState)",
+        "Provides a reduced-motion branch that cuts camera travel / idle Float while keeping the lit, graded still",
+        "Keeps text/UI legible through bloom and depth-of-field"
+      ]
+    }
+  ]
+}

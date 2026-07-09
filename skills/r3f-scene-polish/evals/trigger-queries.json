@@ -1,0 +1,25 @@
+[
+  { "query": "my r3f product hero renders fine but looks plain — add cinematic bloom and depth of field", "should_trigger": true },
+  { "query": "grade and tonemap this three.js scene with agx and hdri lighting, it looks washed out", "should_trigger": true },
+  { "query": "the scene renders but looks flat and toy-like, art-direct it to feel premium", "should_trigger": true },
+  { "query": "add a real glass material to the bottle and give the camera a slow cinematic move on load", "should_trigger": true },
+  { "query": "ground my floating model with contact shadows and add studio hdri lighting", "should_trigger": true },
+  { "query": "make my working drei scene look hyperrealistic — postprocessing, pbr, the works", "should_trigger": true },
+  { "query": "add n8ao ambient occlusion and selective bloom to my react three fiber hero", "should_trigger": true },
+  { "query": "my three.js scene looks flat, help me light it for form with key/fill/rim and an environment", "should_trigger": true },
+  { "query": "choreograph a cinematic camera dolly on my already-working r3f scene", "should_trigger": true },
+  { "query": "set up a postprocessing quality ladder with agx tonemapping for my webgl hero", "should_trigger": true },
+  { "query": "make the glass on my product look real with transmission and refraction in r3f", "should_trigger": true },
+  { "query": "polish the look of my working three.js hero — shadows, tone mapping, and bloom", "should_trigger": true },
+
+  { "query": "my r3f canvas is blank and won't render, help me get the scene showing", "should_trigger": false },
+  { "query": "load a gltf model into my react three fiber canvas", "should_trigger": false },
+  { "query": "set up the Canvas lifecycle and fix a resize/ssr bug in my r3f app", "should_trigger": false },
+  { "query": "animate a bottom sheet in my expo app with reanimated", "should_trigger": false },
+  { "query": "add a gsap scrolltrigger animation to my landing page hero", "should_trigger": false },
+  { "query": "audit my three.js scene for performance risk and reduced-motion gaps", "should_trigger": false },
+  { "query": "dispose of my geometries and textures properly to fix a memory leak in r3f", "should_trigger": false },
+  { "query": "direct a cross-stack motion system for our web and native app", "should_trigger": false },
+  { "query": "why is my useFrame setState causing the whole page to re-render", "should_trigger": false },
+  { "query": "animate a css hover tilt on my product card, no 3d", "should_trigger": false }
+]

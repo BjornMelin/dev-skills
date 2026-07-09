@@ -40,6 +40,25 @@
         "workflow"
       ],
       "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/claude-core"
+    },
+    {
+      "name": "design-motion",
+      "description": "Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit skill, cinematic R3F look-dev, six specialist motion subagents, and a director output style.",
+      "author": {
+        "name": "Bjorn Melin",
+        "url": "https://github.com/BjornMelin"
+      },
+      "source": "./plugins/design-motion",
+      "category": "design",
+      "tags": [
+        "design-motion",
+        "motion",
+        "three",
+        "react-three-fiber",
+        "reanimated",
+        "orchestration"
+      ],
+      "homepage": "https://github.com/BjornMelin/dev-skills/tree/main/plugins/design-motion"
     }
   ]
 }

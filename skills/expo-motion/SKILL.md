@@ -21,6 +21,8 @@ Use this when building or reviewing motion in an Expo/RN app, **and** when the u
 
 **Risk level: LOW** — animation libraries with a minimal security surface. If the user already chose a tool, respect it.
 
+**Not this skill — route instead:** Web 3D / Three.js / React Three Fiber (incl. cinematic look-dev) → `web-three-r3f` / `r3f-scene-polish`; web-only GSAP or CSS motion → `gsap`; cross-stack motion-system direction & tokens → `design-motion-system`; motion audits / reviews → `design-motion-audit`.
+
 ## Install & setup
 
 ```bash
@@ -111,7 +113,7 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 | `references/worklets-threading.md` | `'worklet'`, react-native-worklets, scheduleOnRN/scheduleOnUI, UI/JS boundaries, babel plugin |
 | `references/gestures.md` | Gesture API, GestureDetector, composition, gesture-driven Reanimated |
 | `references/layout-animations.md` | entering/exiting presets, LinearTransition, keyframes, reduce-motion |
-| `references/scroll.md` | useAnimatedScrollHandler, collapsing/parallax headers, FlatList |
+| `references/scroll.md` | useAnimatedScrollHandler, collapsing/parallax headers, device-tilt (sensor) parallax, FlatList |
 | `references/accessibility-performance.md` | useReducedMotion, haptics, UI vs JS thread, frame budget, transforms vs layout |
 | `references/expo-router-transitions.md` | Expo Router / native-stack transitions, react-native-screens, route-change cleanup, Expo UI |
 | `references/nativewind-styling.md` | NativeWind motion utilities, static class safety, NativeWind vs Reanimated ownership |

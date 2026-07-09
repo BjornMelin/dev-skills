@@ -226,10 +226,10 @@ See [Validation](./validation.md) for the full device-proof and command checklis
 ## Motion sickness
 
 Large, sustained, or automatic movement can trigger vestibular discomfort even in
-users who have not enabled reduced motion. Big parallax, full-screen zoom or
-rotation, auto-playing carousels, and shared-element transitions across large
-distances deserve stricter scrutiny and stronger device proof than a small
-opacity or scale affordance. Prefer shorter travel distances, give users control
+users who have not enabled reduced motion. Big parallax, device-tilt (sensor)
+parallax, full-screen zoom or rotation, auto-playing carousels, and shared-element
+transitions across large distances deserve stricter scrutiny and stronger device
+proof than a small opacity or scale affordance. Prefer shorter travel distances, give users control
 over auto-advancing motion, and always provide a reduced-motion path for these
 heavy effects. When in doubt, the small affordance is the safer default. See
 [Recipes](./recipes.md) for patterns that stay within comfortable limits.

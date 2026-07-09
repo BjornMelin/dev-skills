@@ -28,8 +28,12 @@ target repo's installed package versions before editing.
 ## Decision Boundaries
 
 - Use typegpu for typed WebGPU pipelines.
-- Use native-three-r3f for Expo/React Native.
+- Use expo-motion for Expo / React Native (Three.js / R3F on native).
 - Use CSS 3D transforms only for simple DOM transforms.
+- For cinematic look-dev / art-direction of an already-working scene
+  (postprocessing, HDRI, tone mapping, lighting, camera choreography), route to
+  r3f-scene-polish. This skill owns Canvas/createRoot lifecycle, loaders,
+  disposal, SSR/client boundaries, and DPR.
 
 ## Workflow
 

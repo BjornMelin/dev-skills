@@ -36,7 +36,7 @@ Three.js, React Three Fiber, Drei, Canvas/createRoot lifecycle, loaders, GLTF, u
 ### Decision Boundaries
 
 - Use typegpu for typed WebGPU pipelines.
-- Use native-three-r3f for Expo/React Native.
+- Use expo-motion for Expo / React Native (Three.js / R3F on native).
 - Use CSS 3D transforms only for simple DOM transforms.
 
 ### Workflow Details
