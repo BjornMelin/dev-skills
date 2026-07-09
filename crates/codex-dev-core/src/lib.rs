@@ -4102,7 +4102,11 @@ fn count_regular_files_bounded(
         let metadata = fs::symlink_metadata(entry.path())
             .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
         let file_type = metadata.file_type();
-        if is_generated_resource_entry(&entry.path(), &file_type) {
+        // Skip symlinks and generated/build entries *before* consuming the
+        // entry budget so they never count toward the cap (a symlinked
+        // `node_modules`/`target` would otherwise burn a budget slot on the way
+        // to being skipped).
+        if file_type.is_symlink() || is_generated_resource_entry(&entry.path(), &file_type) {
             continue;
         }
         if *remaining == 0 {
@@ -4110,9 +4114,6 @@ fn count_regular_files_bounded(
             break;
         }
         *remaining = remaining.saturating_sub(1);
-        if file_type.is_symlink() {
-            continue;
-        }
         if file_type.is_dir() {
             let (nested_count, nested_capped) =
                 count_regular_files_bounded(&entry.path(), depth + 1, remaining)?;
@@ -4130,19 +4131,22 @@ fn count_regular_files_bounded(
 /// are excluded from resource counts so the catalog is deterministic regardless
 /// of local build state (e.g. a Rust `target/` or a `node_modules/` left behind
 /// by a script's own tooling).
+///
+/// Deliberately conservative: only names that are unambiguously tool-generated
+/// (dependency trees, caches, dot-prefixed build dirs) are listed. Generic
+/// English words like `dist`, `build`, or `out` are *not* excluded — a skill can
+/// legitimately ship a tracked resource directory with those names, and their
+/// build-output form is `.gitignore`d anyway, so it never reaches a clean CI
+/// checkout.
 const GENERATED_RESOURCE_DIRS: &[&str] = &[
     "__pycache__",
     "node_modules",
     "target",
-    "dist",
-    "build",
-    "out",
     ".next",
     ".turbo",
     ".venv",
     ".cache",
     ".git",
-    "coverage",
 ];
 
 fn is_generated_resource_entry(path: &Path, file_type: &fs::FileType) -> bool {
@@ -7705,12 +7709,17 @@ mod tests {
             b"module.exports = 1",
         )
         .expect("dependency file");
+        // A generic name like `dist` is NOT excluded — a skill may legitimately
+        // ship a tracked resource directory with that name, so its files count.
+        fs::create_dir_all(root.join("dist")).expect("dist dir");
+        fs::write(root.join("dist").join("template.css"), b".x{}").expect("tracked resource");
         fs::write(root.join("audit.mjs"), b"export default 1").expect("live script");
         fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
 
         let (files, capped) = count_regular_files(&root).expect("count resources");
 
-        assert_eq!(files, 2);
+        // audit.mjs + tool.py + dist/template.css = 3; target/ and node_modules/ excluded.
+        assert_eq!(files, 3);
         assert!(!capped);
     }
 

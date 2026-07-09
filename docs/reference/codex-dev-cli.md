@@ -294,11 +294,13 @@ expose local absolute paths.
 
 **Resource counts read the working tree, so regenerate from a clean checkout.**
 The `resources` counts (references/scripts/etc.) walk each skill's directories on
-disk. Build-artifact and dependency directories are ignored automatically
-(`target/`, `node_modules/`, `dist/`, `build/`, `out/`, `.next/`, `.turbo/`,
-`.venv/`, `.cache/`, `.git/`, `coverage/`, `__pycache__/`, and `*.pyc/*.pyo`), but
-`.gitignore`d generated files and empty local directories can still skew counts
-versus a fresh checkout. CI regenerates the catalog from the pushed commit and
+disk. Unambiguous build-artifact and dependency directories are ignored
+automatically (`target/`, `node_modules/`, `.next/`, `.turbo/`, `.venv/`,
+`.cache/`, `.git/`, `__pycache__/`, and `*.pyc/*.pyo`). Generic names such as
+`dist/`, `build/`, or `out/` are intentionally *not* excluded — a skill may ship
+a tracked resource directory with those names — so their build-output form must
+stay `.gitignore`d. `.gitignore`d generated files and empty local directories can
+still skew counts versus a fresh checkout. CI regenerates the catalog from the pushed commit and
 diffs it, so a locally polluted artifact fails the "Verify catalog artifact" gate.
 When regenerating for commit, run against a clean tree — either `git stash`/clean
 the worktree first, or point `--repo-root` at a detached worktree:
