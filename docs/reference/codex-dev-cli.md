@@ -274,7 +274,9 @@ humans can request a status-oriented readiness summary.
 
 ## skills catalog
 
-Emit the public Agent Skills Lab catalog artifact consumed by `bjornmelin.io`:
+Emit the public Agent Skills Lab catalog artifact consumed by `bjornmelin.io`.
+For how this artifact is verified and propagated to the live site, see the
+[Agent Skills Lab catalog pipeline](agent-skills-catalog-pipeline.md).
 
 ```bash
 cargo run -q -p codex-dev -- --json skills catalog \
