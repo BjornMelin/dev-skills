@@ -4102,7 +4102,11 @@ fn count_regular_files_bounded(
         let metadata = fs::symlink_metadata(entry.path())
             .with_context(|| format!("failed to stat resource entry {}", entry.path().display()))?;
         let file_type = metadata.file_type();
-        if is_generated_resource_entry(&entry.path(), &file_type) {
+        // Skip symlinks and generated/build entries *before* consuming the
+        // entry budget so they never count toward the cap (a symlinked
+        // `node_modules`/`target` would otherwise burn a budget slot on the way
+        // to being skipped).
+        if file_type.is_symlink() || is_generated_resource_entry(&entry.path(), &file_type) {
             continue;
         }
         if *remaining == 0 {
@@ -4110,9 +4114,6 @@ fn count_regular_files_bounded(
             break;
         }
         *remaining = remaining.saturating_sub(1);
-        if file_type.is_symlink() {
-            continue;
-        }
         if file_type.is_dir() {
             let (nested_count, nested_capped) =
                 count_regular_files_bounded(&entry.path(), depth + 1, remaining)?;
@@ -4125,11 +4126,34 @@ fn count_regular_files_bounded(
     Ok((count, capped))
 }
 
+/// Build-artifact and dependency directories that may appear inside a skill's
+/// resource tree in a dirty working tree but are never tracked resources. They
+/// are excluded from resource counts so the catalog is deterministic regardless
+/// of local build state (e.g. a Rust `target/` or a `node_modules/` left behind
+/// by a script's own tooling).
+///
+/// Deliberately conservative: only names that are unambiguously tool-generated
+/// (dependency trees, caches, dot-prefixed build dirs) are listed. Generic
+/// English words like `dist`, `build`, or `out` are *not* excluded — a skill can
+/// legitimately ship a tracked resource directory with those names, and their
+/// build-output form is `.gitignore`d anyway, so it never reaches a clean CI
+/// checkout.
+const GENERATED_RESOURCE_DIRS: &[&str] = &[
+    "__pycache__",
+    "node_modules",
+    "target",
+    ".next",
+    ".turbo",
+    ".venv",
+    ".cache",
+    ".git",
+];
+
 fn is_generated_resource_entry(path: &Path, file_type: &fs::FileType) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    (file_type.is_dir() && name == "__pycache__")
+    (file_type.is_dir() && GENERATED_RESOURCE_DIRS.contains(&name))
         || (file_type.is_file() && (name.ends_with(".pyc") || name.ends_with(".pyo")))
 }
 
@@ -7661,6 +7685,69 @@ mod tests {
 
         let (files, capped) = count_regular_files(&root).expect("count resources");
 
+        assert_eq!(files, 1);
+        assert!(!capped);
+    }
+
+    #[test]
+    fn skills_inventory_resource_walk_ignores_build_artifact_dirs() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("scripts");
+        fs::create_dir_all(&root).expect("scripts dir");
+        // A dirty working tree can leave a script's own build output behind
+        // (e.g. a Rust `target/` or an npm `node_modules/`). These are never
+        // tracked resources and must not inflate the deterministic count.
+        fs::create_dir_all(root.join("target").join("debug").join("deps")).expect("target dir");
+        fs::write(
+            root.join("target").join("debug").join("deps").join("bin"),
+            b"binary",
+        )
+        .expect("target artifact");
+        fs::create_dir_all(root.join("node_modules").join("left-pad")).expect("node_modules dir");
+        fs::write(
+            root.join("node_modules").join("left-pad").join("index.js"),
+            b"module.exports = 1",
+        )
+        .expect("dependency file");
+        // A generic name like `dist` is NOT excluded — a skill may legitimately
+        // ship a tracked resource directory with that name, so its files count.
+        fs::create_dir_all(root.join("dist")).expect("dist dir");
+        fs::write(root.join("dist").join("template.css"), b".x{}").expect("tracked resource");
+        fs::write(root.join("audit.mjs"), b"export default 1").expect("live script");
+        fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        // audit.mjs + tool.py + dist/template.css = 3; target/ and node_modules/ excluded.
+        assert_eq!(files, 3);
+        assert!(!capped);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn skills_inventory_resource_walk_ignores_symlinked_generated_dirs() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempdir().expect("tempdir");
+        // A populated directory the symlinks point at — its files must NOT be
+        // counted (the walk never follows symlinks) and it must NOT be recursed.
+        let external = temp.path().join("external_deps");
+        fs::create_dir_all(&external).expect("external dir");
+        for index in 0..5 {
+            fs::write(external.join(format!("dep-{index}.js")), b"x").expect("dep file");
+        }
+
+        let root = temp.path().join("scripts");
+        fs::create_dir_all(&root).expect("scripts dir");
+        // Symlinked build/dependency dirs are skipped as symlinks before the
+        // entry-cap budget is consumed, so they neither count nor recurse.
+        symlink(&external, root.join("node_modules")).expect("node_modules symlink");
+        symlink(&external, root.join("target")).expect("target symlink");
+        fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        // Only tool.py counts; the 5 files behind the symlinks are never reached.
         assert_eq!(files, 1);
         assert!(!capped);
     }
