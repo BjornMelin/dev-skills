@@ -449,7 +449,10 @@ package itself or out-of-tree targets. `quick_validate.py` validates only
 dedicated offline validator for catalog exposure, local skill links, tracked and untracked non-ignored
 generated-cache exclusion, helper syntax, TanStack skill contracts, `.skill` bundle shape, and
 `agents/openai.yaml` metadata. Use `--strict` before publishing bundles when
-ignored local dist artifacts must also be clean.
+ignored local dist artifacts must also be clean. For how the generated
+`catalog/agent-skills-lab.json` is verified in CI and propagated to
+`bjornmelin.io/agent-skills`, see the
+[Agent Skills Lab catalog pipeline](../reference/agent-skills-catalog-pipeline.md).
 
 ## Python Helpers
 

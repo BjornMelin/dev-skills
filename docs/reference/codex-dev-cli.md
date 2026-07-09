@@ -274,7 +274,9 @@ humans can request a status-oriented readiness summary.
 
 ## skills catalog
 
-Emit the public Agent Skills Lab catalog artifact consumed by `bjornmelin.io`:
+Emit the public Agent Skills Lab catalog artifact consumed by `bjornmelin.io`.
+For how this artifact is verified and propagated to the live site, see the
+[Agent Skills Lab catalog pipeline](agent-skills-catalog-pipeline.md).
 
 ```bash
 cargo run -q -p codex-dev -- --json skills catalog \
@@ -296,7 +298,7 @@ expose local absolute paths.
 The `resources` counts (references/scripts/etc.) walk each skill's directories on
 disk. Unambiguous build-artifact and dependency directories are ignored
 automatically (`target/`, `node_modules/`, `.next/`, `.turbo/`, `.venv/`,
-`.cache/`, `.git/`, `__pycache__/`, and `*.pyc/*.pyo`). Generic names such as
+`.cache/`, `.git/`, `__pycache__/`, and `*.pyc`/`*.pyo`). Generic names such as
 `dist/`, `build/`, or `out/` are intentionally *not* excluded — a skill may ship
 a tracked resource directory with those names — so their build-output form must
 stay `.gitignore`d. `.gitignore`d generated files and empty local directories can

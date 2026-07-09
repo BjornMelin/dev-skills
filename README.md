@@ -239,7 +239,9 @@ artifact is generated with
 `codex-dev --json skills catalog --out catalog/agent-skills-lab.json`. Retired
 skills belong in `archive/skills/` with an `archive.json` manifest and must not
 remain linked from this active catalog. The table below remains the human-facing
-active catalog.
+active catalog. For how the generated artifact reaches the public Agent Skills
+Lab at `bjornmelin.io/agent-skills`, see the
+[Agent Skills Lab catalog pipeline](docs/reference/agent-skills-catalog-pipeline.md).
 
 ### Local Plugin Skill Bundles
 

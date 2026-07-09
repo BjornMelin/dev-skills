@@ -51,6 +51,11 @@ out of version control.
   inventory reports, public Agent Skills Lab catalog generation, Bun platform
   workflows, PR evidence capture, and apply-gated PR actions and closeout
   readiness reports.
+- [Agent Skills Lab Catalog Pipeline](reference/agent-skills-catalog-pipeline.md):
+  end-to-end, cross-repo flow that carries a skill change from this repo to the
+  public catalog at `bjornmelin.io/agent-skills` — generation, the verify +
+  `repository_dispatch` step, the platform sync PR, deploy, and the ops runbook
+  (force a resync, debug a failed verify, rotate the dispatch token).
 - [codex-dev Core Reference](reference/codex-dev-core.md): shared Rust
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.
