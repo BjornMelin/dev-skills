@@ -96,6 +96,6 @@ behavior · manual verification steps · remaining risks.
 - `references/motion-vocabulary.md` — named motion & choreography vocabulary.
 - `references/design-system-tokens.md` — cross-stack token architecture.
 - `references/routing-workflows.md` — routing criteria + dynamic-workflow stages.
-- `scripts/detect_motion_stack.py . --pretty` — inventory stack and motion files.
-- `scripts/audit_motion_system.py . --pretty` — static motion-quality audit (see also the `design-motion-audit` skill).
-- `scripts/scaffold_motion_tokens.py . --stack auto --write` — scaffold starter token files (review output first; writes only with `--write`).
+- `scripts/detect_motion_stack.py <project-root> --pretty` — inventory stack and motion files.
+- `scripts/audit_motion_system.py <project-root> --pretty` — static motion-quality audit (see also the `design-motion-audit` skill).
+- `scripts/scaffold_motion_tokens.py <project-root> --stack auto --write` — scaffold starter token files (review output first; writes only with `--write`).

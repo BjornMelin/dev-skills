@@ -11,8 +11,8 @@ IGNORE = {
 }
 DURATION_RE = re.compile(r"(?<![\w-])(?:\d+ms|\d+(?:\.\d+)?s)(?![\w-])")
 EASING_RE = re.compile(r"cubic-bezier\([^)]+\)|ease-in-out|ease-out|ease-in|linear")
-R3F_STATE_RE = re.compile(r"useFrame\s*\([^)]*=>[\s\S]{0,500}?set[A-Z]")
-REA_STATE_RE = re.compile(r"on(Update|Change|Active)\s*\([^)]*=>[\s\S]{0,400}?set[A-Z]")
+R3F_STATE_RE = re.compile(r"useFrame\s*\([^)]*\)\s*=>[\s\S]{0,500}?set[A-Z]")
+REA_STATE_RE = re.compile(r"on(Update|Change|Active)\s*\([^)]*\)\s*=>[\s\S]{0,400}?set[A-Z]")
 
 
 def iter_files(root: Path, limit: int):
@@ -41,8 +41,11 @@ def audit_file(root: Path, p: Path):
         findings.append({"severity": "low", "type": "hardcoded-easing", "detail": sorted(set(easings))[:12]})
     if "useFrame" in text and R3F_STATE_RE.search(text):
         findings.append({"severity": "high", "type": "r3f-setstate-in-useframe", "detail": "Possible React state update inside useFrame."})
-    if "useFrame" in text and "delta" not in text[: max(text.find("useFrame") + 2000, 2000)]:
+    idx = text.find("useFrame")
+    if idx != -1 and "delta" not in text[idx:idx + 2000]:
         findings.append({"severity": "medium", "type": "r3f-missing-delta", "detail": "useFrame appears without delta-time normalization nearby."})
+    if ("react-native-reanimated" in text or "useAnimated" in text or "Gesture." in text) and REA_STATE_RE.search(text):
+        findings.append({"severity": "medium", "type": "reanimated-setstate-in-callback", "detail": "React state update inside a Reanimated/gesture callback (use a shared value)."})
     if "react-native-reanimated" in text and "useSharedValue" not in text and ("withSpring" in text or "withTiming" in text):
         findings.append({"severity": "medium", "type": "reanimated-no-shared-value", "detail": "Reanimated animation helper used without obvious shared value."})
     if "react-native-gesture-handler" in text and "velocity" not in text:

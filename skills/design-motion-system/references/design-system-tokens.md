@@ -83,7 +83,8 @@ export const motion = {
   --motion-glow-active: 0.4;
 }
 
-/* Reduced-motion tokens collapse travel/loops while preserving state changes. */
+/* Reduced motion: zero decorative parallax here; loop/travel/duration collapse
+   lives in the `reducedMotion` token group in the TypeScript const above. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-parallax-subtle: 0;

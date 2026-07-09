@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 from pathlib import Path
 
 PACKAGE_KEYS = {
@@ -14,6 +15,7 @@ PACKAGE_KEYS = {
     "gesture_handler": ["react-native-gesture-handler"],
     "skia": ["@shopify/react-native-skia"],
     "framer_motion": ["framer-motion", "motion"],
+    "gsap": ["gsap", "@gsap/react"],
 }
 
 EXTS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".css", ".scss", ".glsl", ".wgsl"}
@@ -25,11 +27,12 @@ KEYWORDS = {
     "reanimated_files": ["react-native-reanimated", "useSharedValue", "useAnimatedStyle", "withSpring", "withTiming", "withDecay"],
     "gesture_files": ["react-native-gesture-handler", "GestureDetector", "Gesture.Pan", "Gesture.Tap"],
     "motion_token_files": ["reducedMotion", "prefers-reduced-motion", "useReducedMotion", "--motion-duration", "--motion-ease", "motion.duration", "motion.easing", "motion.spring"],
+    "gsap_files": ["gsap.to", "gsap.from", "ScrollTrigger", "useGSAP", "from 'gsap'", 'from "gsap"'],
 }
 
 IGNORE_DIRS = {
-    "node_modules", ".git", "dist", "build", ".next", ".expo", "ios/Pods",
-    "android/.gradle", "coverage", "target", "out", ".turbo", ".cache",
+    "node_modules", ".git", "dist", "build", ".next", ".expo", "Pods",
+    ".gradle", "coverage", "target", "out", ".turbo", ".cache",
     "vendor", ".venv", "__pycache__",
 }
 
@@ -50,19 +53,17 @@ def read_package(root: Path):
 
 def iter_files(root: Path, limit: int):
     count = 0
-    for p in root.rglob("*"):
-        if count >= limit:
-            break
-        if not p.is_file():
-            continue
-        rel = p.relative_to(root)
-        parts = set(rel.parts)
-        if parts & IGNORE_DIRS:
-            continue
-        if p.suffix not in EXTS and p.suffix not in {".json", ".glb", ".gltf", ".hdr", ".ktx2"}:
-            continue
-        count += 1
-        yield p
+    allow = EXTS | {".json", ".glb", ".gltf", ".hdr", ".ktx2", ".png", ".jpg", ".jpeg", ".webp", ".avif"}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in IGNORE_DIRS]
+        for name in filenames:
+            if count >= limit:
+                return
+            p = Path(dirpath) / name
+            if p.suffix not in allow:
+                continue
+            count += 1
+            yield p
 
 
 def scan(root: Path, limit: int):

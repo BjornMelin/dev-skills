@@ -10,6 +10,7 @@
         "Returns a prioritized punch list (most-severe first) with file references, severity, and concrete fixes",
         "Checks design-token consistency (hardcoded durations/easings vs tokenized values, intent naming)",
         "Flags missing reduced-motion branches for camera moves, parallax, loops, and bounce",
+        "Identifies missing hallmark-motion opportunities (or explicitly notes there are none) rather than only listing defects",
         "Routes the actual implementation fixes to the owning skill (design-motion-system / expo-motion / web-three-r3f / r3f-scene-polish / gsap) rather than building them itself",
         "Treats any static-analyzer output as leads to verify against the real code, not final findings"
       ]

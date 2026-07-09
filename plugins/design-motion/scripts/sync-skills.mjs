@@ -45,10 +45,12 @@ for (const skill of SKILLS) {
   for (const rel of wantRel) {
     const from = join(src, rel);
     const to = join(dst, rel);
-    const same = existsSync(to) && readFileSync(to).equals(readFileSync(from));
+    const toExists = existsSync(to);
+    const same = toExists && statSync(to).isFile() && readFileSync(to).equals(readFileSync(from));
     if (check) {
       if (!same) { console.error(`DRIFT: ${skill}/${rel}`); drift++; }
     } else if (!same) {
+      if (toExists && !statSync(to).isFile()) rmSync(to, { recursive: true, force: true });
       mkdirSync(dirname(to), { recursive: true });
       copyFileSync(from, to);
     }

@@ -101,7 +101,7 @@ Use these terms in prompts, component names, variants, code comments, and accept
 - Idle animation: subtle motion while waiting for interaction.
 - Float: gentle up-and-down movement.
 - Pulse: repeating opacity, scale, glow, or emissive change.
-- Orbit: continuous circular motion.
+- Orbital loop: continuous circular motion.
 - Marquee: content scrolls continuously.
 - Alternate or yoyo: loop reverses every iteration.
 - Breathing material: roughness, glow, opacity, or shader intensity changes slowly.

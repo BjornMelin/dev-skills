@@ -245,6 +245,8 @@ Install the web-motion plugin in Claude Code:
 ```bash
 claude plugin marketplace add BjornMelin/dev-skills --sparse .claude-plugin plugins/web-motion plugins/claude-core plugins/design-motion
 claude plugin install web-motion@bjorn-dev-skills
+claude plugin install claude-core@bjorn-dev-skills
+claude plugin install design-motion@bjorn-dev-skills
 ```
 
 (The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)

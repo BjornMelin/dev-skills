@@ -18,8 +18,8 @@ system/token work, `expo-motion`, `web-three-r3f`, `r3f-scene-polish`, or `gsap`
    verify each against the real code before reporting):
 
    ```bash
-   python3 scripts/detect_motion_stack.py . --pretty   # what stacks/files exist
-   python3 scripts/audit_motion_system.py . --pretty    # heuristic motion-quality scan
+   python3 scripts/detect_motion_stack.py <project-root> --pretty   # what stacks/files exist
+   python3 scripts/audit_motion_system.py <project-root> --pretty    # heuristic motion-quality scan
    ```
 
 2. Read the flagged files and judge against the dimensions below.

@@ -10,7 +10,7 @@
     { "label": "React Three Fiber v9 migration guide (React 19, ThreeElements, async gl / WebGPU)", "url": "https://r3f.docs.pmnd.rs/tutorials/v9-migration-guide" },
     { "label": "three.js WebGLRenderer.toneMapping + r152 color-management migration", "url": "https://threejs.org/docs/#api/en/renderers/WebGLRenderer.toneMapping" },
     { "label": "N8AO (ambient occlusion, SSAO successor)", "url": "https://github.com/N8python/n8ao" },
-    { "label": "Agent Skills specification and best practices" }
+    { "label": "Agent Skills specification and best practices", "url": "https://agentskills.io/specification" }
   ],
   "verified_versions": {
     "three": "0.185.1",
