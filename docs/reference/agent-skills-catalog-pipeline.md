@@ -54,7 +54,7 @@ for flags and the output shape.
 > walk each skill's directories **on disk**, so a dirty working tree can skew
 > them. Unambiguous build/dependency dirs are ignored automatically
 > (`target/`, `node_modules/`, `.next/`, `.turbo/`, `.venv/`, `.cache/`,
-> `.git/`, `__pycache__/`, `*.pyc/*.pyo`), but `.gitignore`d generated files and
+> `.git/`, `__pycache__/`, `*.pyc`/`*.pyo`), but `.gitignore`d generated files and
 > empty local directories can still differ from a fresh checkout. Before
 > committing a regenerated catalog, run against a clean tree — `git stash` the
 > worktree, or point `--repo-root` at a detached worktree
@@ -100,8 +100,10 @@ cannot reach another repo).
   (paste the token at the prompt so it never lands in shell history).
 - **If it is absent** the dispatch step logs
   `Skipping dispatch because PLATFORM_REPOSITORY_DISPATCH_TOKEN is not configured.`
-  and **exits 0** — the run is green but the platform is never notified. Use the
-  [manual resync](#force-a-resync) fallback in that case.
+  and **exits 0** — the run is green but the platform is never notified.
+  Re-running this workflow will keep skipping until the token is set; to sync
+  in the meantime, drive the platform directly (the second command under
+  [Force a resync](#force-a-resync), which needs no dispatch token).
 
 ## Stage 3 — Sync (platform)
 
@@ -129,14 +131,17 @@ the committed `agent-skills.generated.json` via `src/data/agent-skills.ts`.
 
 ### Force a resync
 
-When the token is missing, or you want to backfill without a new dev-skills
-commit, trigger either end manually:
+To backfill without a new dev-skills commit, trigger either end manually:
 
 ```bash
-# Re-run verify + dispatch from dev-skills main (fires repository_dispatch):
+# Re-run verify + dispatch from dev-skills main. Fires repository_dispatch ONLY
+# if PLATFORM_REPOSITORY_DISPATCH_TOKEN is configured — otherwise it just skips
+# (green but no-op), so this is not the fix for the missing-token case:
 gh workflow run agent-skills-catalog-dispatch.yml -R BjornMelin/dev-skills
 
-# Or drive the platform directly (workflow_dispatch allows a branch or SHA):
+# Drive the platform directly. Needs NO dispatch token (the sync uses the
+# platform's own token to read the public catalog), so this is the correct
+# path when the token is missing:
 gh workflow run agent-skills-catalog-sync.yml -R BjornMelin/bjornmelin-platform-io \
   -f source_sha="$(git -C /path/to/dev-skills rev-parse origin/main)"
 ```
