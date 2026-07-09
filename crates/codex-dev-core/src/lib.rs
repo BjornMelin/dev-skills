@@ -4125,11 +4125,31 @@ fn count_regular_files_bounded(
     Ok((count, capped))
 }
 
+/// Build-artifact and dependency directories that may appear inside a skill's
+/// resource tree in a dirty working tree but are never tracked resources. They
+/// are excluded from resource counts so the catalog is deterministic regardless
+/// of local build state (e.g. a Rust `target/` or a `node_modules/` left behind
+/// by a script's own tooling).
+const GENERATED_RESOURCE_DIRS: &[&str] = &[
+    "__pycache__",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    ".turbo",
+    ".venv",
+    ".cache",
+    ".git",
+    "coverage",
+];
+
 fn is_generated_resource_entry(path: &Path, file_type: &fs::FileType) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    (file_type.is_dir() && name == "__pycache__")
+    (file_type.is_dir() && GENERATED_RESOURCE_DIRS.contains(&name))
         || (file_type.is_file() && (name.ends_with(".pyc") || name.ends_with(".pyo")))
 }
 
@@ -7662,6 +7682,35 @@ mod tests {
         let (files, capped) = count_regular_files(&root).expect("count resources");
 
         assert_eq!(files, 1);
+        assert!(!capped);
+    }
+
+    #[test]
+    fn skills_inventory_resource_walk_ignores_build_artifact_dirs() {
+        let temp = tempdir().expect("tempdir");
+        let root = temp.path().join("scripts");
+        fs::create_dir_all(&root).expect("scripts dir");
+        // A dirty working tree can leave a script's own build output behind
+        // (e.g. a Rust `target/` or an npm `node_modules/`). These are never
+        // tracked resources and must not inflate the deterministic count.
+        fs::create_dir_all(root.join("target").join("debug").join("deps")).expect("target dir");
+        fs::write(
+            root.join("target").join("debug").join("deps").join("bin"),
+            b"binary",
+        )
+        .expect("target artifact");
+        fs::create_dir_all(root.join("node_modules").join("left-pad")).expect("node_modules dir");
+        fs::write(
+            root.join("node_modules").join("left-pad").join("index.js"),
+            b"module.exports = 1",
+        )
+        .expect("dependency file");
+        fs::write(root.join("audit.mjs"), b"export default 1").expect("live script");
+        fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        assert_eq!(files, 2);
         assert!(!capped);
     }
 

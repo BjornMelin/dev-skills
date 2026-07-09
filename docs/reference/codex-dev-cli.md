@@ -292,6 +292,18 @@ into positive readiness labels for the portfolio marketplace. It does not
 package skills, call skills.sh, run network checks, mutate portfolio files, or
 expose local absolute paths.
 
+**Resource counts read the working tree, so regenerate from a clean checkout.**
+The `resources` counts (references/scripts/etc.) walk each skill's directories on
+disk. Build-artifact and dependency directories are ignored automatically
+(`target/`, `node_modules/`, `dist/`, `build/`, `out/`, `.next/`, `.turbo/`,
+`.venv/`, `.cache/`, `.git/`, `coverage/`, `__pycache__/`, and `*.pyc/*.pyo`), but
+`.gitignore`d generated files and empty local directories can still skew counts
+versus a fresh checkout. CI regenerates the catalog from the pushed commit and
+diffs it, so a locally polluted artifact fails the "Verify catalog artifact" gate.
+When regenerating for commit, run against a clean tree — either `git stash`/clean
+the worktree first, or point `--repo-root` at a detached worktree:
+`git worktree add --detach /tmp/ds-clean HEAD`.
+
 Fixture-friendly options:
 
 ```bash
