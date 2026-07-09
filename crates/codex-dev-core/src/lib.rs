@@ -7723,6 +7723,35 @@ mod tests {
         assert!(!capped);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn skills_inventory_resource_walk_ignores_symlinked_generated_dirs() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempdir().expect("tempdir");
+        // A populated directory the symlinks point at — its files must NOT be
+        // counted (the walk never follows symlinks) and it must NOT be recursed.
+        let external = temp.path().join("external_deps");
+        fs::create_dir_all(&external).expect("external dir");
+        for index in 0..5 {
+            fs::write(external.join(format!("dep-{index}.js")), b"x").expect("dep file");
+        }
+
+        let root = temp.path().join("scripts");
+        fs::create_dir_all(&root).expect("scripts dir");
+        // Symlinked build/dependency dirs are skipped as symlinks before the
+        // entry-cap budget is consumed, so they neither count nor recurse.
+        symlink(&external, root.join("node_modules")).expect("node_modules symlink");
+        symlink(&external, root.join("target")).expect("target symlink");
+        fs::write(root.join("tool.py"), b"print('ok')").expect("live script");
+
+        let (files, capped) = count_regular_files(&root).expect("count resources");
+
+        // Only tool.py counts; the 5 files behind the symlinks are never reached.
+        assert_eq!(files, 1);
+        assert!(!capped);
+    }
+
     #[test]
     fn skills_audit_flags_archived_plugin_skill_still_active() {
         let temp = tempdir().expect("tempdir");
