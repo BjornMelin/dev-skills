@@ -38,6 +38,7 @@ Key docs:
 - [codex-dev TUI reference](docs/reference/codex-dev-tui.md)
 - [gsap-audit reference](docs/reference/gsap-audit.md)
 - [expo-motion-audit reference](docs/reference/expo-motion-audit.md)
+- [motion-token-audit reference](docs/reference/motion-token-audit.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -92,6 +93,8 @@ crates/
   gsap-audit/             # Rust CLI that audits GSAP usage in JS/TS/JSX/TSX
   expo-motion-audit-core/ # oxc-based static-analysis engine for the expo-motion skill
   expo-motion-audit/      # Rust CLI that audits Expo/React Native motion (Reanimated) usage
+  motion-token-audit-core/ # oxc-based engine for cross-stack motion-token drift/orphan analysis
+  motion-token-audit/     # Rust CLI that audits motion-token consistency across CSS/R3F/Reanimated/GSAP
 docs/
   index.md                # documentation portal
   architecture/           # system design
@@ -251,7 +254,7 @@ claude plugin install design-motion@bjorn-dev-skills
 
 (The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)
 
-The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus six specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`). To use the six subagents **without** the plugin, install them into your Claude Code agents directory:
+The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus seven specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`). To use the seven subagents **without** the plugin, install them into your Claude Code agents directory:
 
 ```bash
 python3 plugins/design-motion/scripts/install_agents.py --target global   # ~/.claude/agents
@@ -265,7 +268,7 @@ for local development and validation commands.
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
 | `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
-| `design-motion` | `design-motion-system`, `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit, cinematic R3F look-dev, six specialist motion subagents, and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json) |
+| `design-motion` | `design-motion-system`, `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit, cinematic R3F look-dev, seven specialist motion subagents (including a runtime-proof verifier), and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |

@@ -1,7 +1,7 @@
 {
   "name": "design-motion",
   "version": "0.1.0",
-  "description": "Cross-stack motion & design-system direction with a router skill, motion-quality audit, cinematic R3F look-dev, six specialist subagents, and a director output style.",
+  "description": "Cross-stack motion & design-system direction with a router skill, motion-quality audit, cinematic R3F look-dev, seven specialist subagents (including a runtime-proof verifier), and a director output style.",
   "author": {
     "name": "Bjorn Melin",
     "url": "https://github.com/BjornMelin"
@@ -23,7 +23,7 @@
   "interface": {
     "displayName": "Design Motion",
     "shortDescription": "Direct and audit cross-stack motion & design systems.",
-    "longDescription": "A motion director for repos that mix web 3D and native motion: the design-motion-system router turns vague premium/cinematic requests into a named vocabulary, design tokens, and a routed plan; design-motion-audit returns a prioritized motion-quality punch list; r3f-scene-polish does cinematic R3F look-dev. Ships six specialist subagents and a director output style. Routes single-stack implementation to expo-motion, web-three-r3f, and gsap.",
+    "longDescription": "A motion director for repos that mix web 3D and native motion: the design-motion-system router turns vague premium/cinematic requests into a named vocabulary, design tokens, and a routed plan; design-motion-audit returns a prioritized motion-quality punch list; r3f-scene-polish does cinematic R3F look-dev. Ships seven specialist subagents (including a runtime-proof verifier) and a director output style. Routes single-stack implementation to expo-motion, web-three-r3f, and gsap.",
     "developerName": "Bjorn Melin",
     "category": "Design",
     "capabilities": [

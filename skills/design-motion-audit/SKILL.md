@@ -41,5 +41,9 @@ system/token work, `expo-motion`, `web-three-r3f`, `r3f-scene-polish`, or `gsap`
 7. **Accessibility & readability** — text legibility during motion.
 8. **Missing hallmark opportunities** — where a signature motion would add value.
 
-Score against `references/quality-gates.md`. For deep implementation fixes, hand
-each finding to the skill that owns its stack.
+Score against `references/quality-gates.md`, and shape the output with
+`references/report-template.md`. For any change with a visible motion surface, add
+**runtime proof** (`references/runtime-verification.md`) — static findings alone do
+not prove a scene renders or holds its frame budget; the `motion-runtime-verifier`
+subagent (design-motion plugin) drives that when the browser tools are available.
+For deep implementation fixes, hand each finding to the skill that owns its stack.

@@ -43,7 +43,7 @@
     },
     {
       "name": "design-motion",
-      "description": "Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit skill, cinematic R3F look-dev, six specialist motion subagents, and a director output style.",
+      "description": "Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit skill, cinematic R3F look-dev, seven specialist motion subagents (including a runtime-proof verifier), and a director output style.",
       "author": {
         "name": "Bjorn Melin",
         "url": "https://github.com/BjornMelin"

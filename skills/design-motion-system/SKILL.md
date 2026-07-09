@@ -69,8 +69,10 @@ small slice when cost or risk is high.
 If the `design-motion` plugin is installed, that fan-out can use its specialist
 subagents (`motion-design-director`, `r3f-scene-architect`,
 `reanimated-ios-motion-engineer`, `motion-token-systems-integrator`,
-`motion-performance-auditor`, `motion-qa-reviewer`); otherwise use generic
-fan-out. See `references/routing-workflows.md` for the full stage template.
+`motion-performance-auditor`, `motion-runtime-verifier`, `motion-qa-reviewer`);
+otherwise use generic fan-out. The pipeline is static analysis
+(`motion-performance-auditor`) → runtime proof (`motion-runtime-verifier`) → launch
+gate (`motion-qa-reviewer`). See `references/routing-workflows.md` for the full stage template.
 
 ## Output shape
 
@@ -99,3 +101,21 @@ behavior · manual verification steps · remaining risks.
 - `scripts/detect_motion_stack.py <project-root> --pretty` — inventory stack and motion files.
 - `scripts/audit_motion_system.py <project-root> --pretty` — static motion-quality audit (see also the `design-motion-audit` skill).
 - `scripts/scaffold_motion_tokens.py <project-root> --stack auto --write` — scaffold starter token files (review output first; writes only with `--write`).
+
+## Optional power tool: `motion-token-audit` CLI
+
+This repo ships a Rust CLI, `motion-token-audit`, that statically audits motion-token
+consistency **across stacks** (CSS, Reanimated, GSAP, Motion-React) against a token
+SSOT — flagging **drift** (a hardcoded value that equals a token but bypasses it) and
+**orphan** (a value with no matching token), plus per-stack tokenization coverage. No
+other tool checks this. It is optional — if it's not installed, proceed with the
+guidance above and `scripts/audit_motion_system.py`.
+
+```bash
+# Install once (from this repo): cargo install --path crates/motion-token-audit --locked --force
+motion-token-audit scan --root . --format json
+motion-token-audit scan --root . --categories tokens-reanimated,tokens-css
+motion-token-audit doctor   # list every rule
+```
+
+Treat findings as leads — verify each against the current code before changing behavior.
