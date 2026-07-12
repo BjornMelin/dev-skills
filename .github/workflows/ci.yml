@@ -71,7 +71,7 @@ jobs:
               python3 tools/skill/quick_validate.py "$skill"
             fi
           done
-          rg --files -g '*.json' .claude-plugin plugins | xargs -r jq empty
+          find .claude-plugin plugins -type f -name '*.json' -exec jq empty {} +
       - name: Verify generated plugin mirrors
         run: |
           set -euo pipefail

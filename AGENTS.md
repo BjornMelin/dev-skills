@@ -67,7 +67,7 @@ following as the required focused gates based on touched files:
 - Any skill: `python3 tools/skill/quick_validate.py skills/<skill-name>`
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
 - Plugin skills: `for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
-- Local plugins: `node plugins/web-motion/scripts/validate-atomic-skills.mjs` and `rg --files -g '*.json' plugins | xargs -r jq empty`
+- Local plugins: `node plugins/web-motion/scripts/validate-atomic-skills.mjs` and `find .claude-plugin plugins -type f -name '*.json' -exec jq empty {} +`
 - Python helpers: `python3 -m compileall -q skills tools subagents/codex/scripts`
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
