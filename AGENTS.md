@@ -59,7 +59,10 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 
 ## Testing Guidelines
 
-There is no single repo-wide test harness. Treat the following as the required gates based on touched files:
+The PR baseline lives in `.github/workflows/ci.yml` and is documented in
+`docs/runbooks/validation.md#pull-request-ci-baseline`. Install
+`requirements-ci.txt` before reproducing its Python-backed gates. Treat the
+following as the required focused gates based on touched files:
 
 - Any skill: `python3 tools/skill/quick_validate.py skills/<skill-name>`
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`

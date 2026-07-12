@@ -65,6 +65,8 @@ out of version control.
   CLI for the standalone `gsap` skill that audits GSAP usage in JS/TS/JSX/TSX,
   with scan/doctor/completions commands, rule categories, and the scan
   exit-code contract.
+- [motion-token-audit Reference](reference/motion-token-audit.md): cross-stack
+  motion-token drift and orphan analysis across CSS, R3F, Reanimated, and GSAP.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning across Overview, Evidence, Subagents,
   PR, PR Agent, Validation, and Help panels.

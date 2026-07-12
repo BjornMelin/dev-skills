@@ -1,6 +1,6 @@
 # dev-skills
 
-[![AgentSkills](https://img.shields.io/badge/AgentSkills-specification-24292f?style=flat-square)](https://agentskills.io/specification) [![skills.sh](https://img.shields.io/badge/registry-skills.sh-24292f?style=flat-square)](https://skills.sh/) [![Python](https://img.shields.io/badge/tooling-Python%203-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![Rust](https://img.shields.io/badge/tooling-Rust-000000?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![CI](https://github.com/BjornMelin/dev-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/BjornMelin/dev-skills/actions/workflows/ci.yml) [![AgentSkills](https://img.shields.io/badge/AgentSkills-specification-24292f?style=flat-square)](https://agentskills.io/specification) [![skills.sh](https://img.shields.io/badge/registry-skills.sh-24292f?style=flat-square)](https://skills.sh/) [![Python](https://img.shields.io/badge/tooling-Python%203-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/) [![Rust](https://img.shields.io/badge/tooling-Rust-000000?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 
 A versioned collection of reusable **Agent Skills** (per the AgentSkills specification) that I use to make coding agents more reliable, consistent, and fast.
 
@@ -236,7 +236,8 @@ Active skills are stored in `skills/`. The canonical entrypoint for each active
 skill is its `SKILL.md`. Machine-readable inventory for automation is available
 through `codex-dev --json skills inventory`; the public Agent Skills Lab
 artifact is generated with
-`codex-dev --json skills catalog --out catalog/agent-skills-lab.json`. Retired
+`codex-dev --json skills catalog --source-ref main --out
+catalog/agent-skills-lab.json`. Retired
 skills belong in `archive/skills/` with an `archive.json` manifest and must not
 remain linked from this active catalog. The table below remains the human-facing
 active catalog. For how the generated artifact reaches the public Agent Skills
@@ -354,6 +355,13 @@ Common approaches:
 
 This repo includes lightweight validation and packaging helpers under `tools/skill/`.
 
+Install the pinned Python validation dependency before running the complete
+skill and documentation gates:
+
+```bash
+python3 -m pip install -r requirements-ci.txt
+```
+
 Validate a skill directory:
 
 ```bash
@@ -374,6 +382,11 @@ cargo build -p codex-dev-core
 cargo build -p codex-dev-tui
 cargo build -p codex-research
 ```
+
+Pull requests run the complete Rust workspace, catalog, skill, plugin,
+generated-mirror, Bun, and documentation baseline in
+[CI](.github/workflows/ci.yml). The copy-ready local commands remain in the
+[Validation runbook](docs/runbooks/validation.md).
 
 Use [docs/runbooks/validation.md](docs/runbooks/validation.md) for the
 canonical validation matrix and
