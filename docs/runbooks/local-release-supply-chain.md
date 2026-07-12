@@ -30,10 +30,10 @@ References:
   Rust 1.96 is the repo MSRV so the workspace can use the current stable
   toolchain and keep the `gsap-audit-core` oxc dependency tree on its active
   parser and semantic-analysis line.
-- `codex-dev-core` is a library crate. Installable local binaries are
-  `codex-research`, `codex-dev`, and `codex-dev-tui`. `gsap-audit-core` is a
-  library crate; `gsap-audit` is an optional companion CLI for the standalone
-  `gsap` skill.
+- `codex-dev-core`, `bun-platform-core`, and the audit-core packages are library
+  crates. Installable local binaries are `codex-research`, `codex-dev`,
+  `codex-dev-tui`, `expo-motion-audit`, `gsap-audit`, and
+  `motion-token-audit`.
 - The `gsap-audit-core` oxc dependency tree (`oxc_allocator`, `oxc_ast`,
   `oxc_ast_visit`, `oxc_parser`, `oxc_semantic`, and `oxc_span` at `0.137.0`,
   plus `walkdir`) was reviewed under the `cargo deny check licenses bans sources`
@@ -41,9 +41,9 @@ References:
   items before merge.
 - All workspace crates set `publish = false`; this repo supports local install
   handoff, not crates.io publication.
-- Path dependencies between workspace crates include package versions so
-  `cargo package --list` and cargo-deny wildcard checks exercise publish-like
-  metadata without actually publishing anything.
+- Workspace path dependencies are local-only while every crate remains
+  unpublished. Registry-ready dependency metadata is intentionally deferred to
+  the distribution-escalation gate.
 - Distribution escalation is gate-driven. A future issue must use
   [`distribution_surface_gate.v1`](../reference/distribution-surface-gates.md)
   before changing `publish`, adding release signing, adopting `cargo-vet`, or
@@ -63,9 +63,12 @@ cargo audit
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
-cargo package --list -p bun-platform
+cargo package --list -p expo-motion-audit-core
+cargo package --list -p expo-motion-audit
 cargo package --list -p gsap-audit-core
 cargo package --list -p gsap-audit
+cargo package --list -p motion-token-audit-core
+cargo package --list -p motion-token-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo run -q -p codex-dev -- --json policy manifest --profile release
@@ -77,9 +80,10 @@ git diff --check
 
 `cargo deny check advisories` and `cargo audit` fetch the RustSec advisory
 database unless their local databases are already fresh. Treat those as explicit
-networked release evidence. The built-in `codex-dev` policy profiles keep their
-required gates local and non-secret by default, so automated local runs do not
-silently depend on external network state.
+networked release evidence. Built-in policy profiles keep supply-chain gates
+local and all gates non-secret. The `skills`, `release`, and `full_local`
+profiles separately declare the locked Kimi dependency install as a network
+gate, so it runs only with explicit `--allow-network`.
 
 When cargo-deny is available but network access is not, run:
 
@@ -93,9 +97,11 @@ The second command requires a previously cached advisory database.
 ## Package Dry Runs
 
 The package gates use `cargo package --list` instead of `cargo publish` or
-`cargo package` archive creation. This catches missing package metadata,
-invalid path dependency metadata, and unexpected file inclusion without creating
-archives or pushing to a registry.
+`cargo package` archive creation. This enumerates each would-be package file set
+for inspection without creating archives or pushing to a registry. Detecting an
+unexpected inclusion requires comparing that output with the intended file set;
+the command does not assemble a package or validate registry-ready dependency
+metadata.
 
 On a dirty working tree, add `--allow-dirty` for a pre-commit package preview.
 Final release evidence should run without `--allow-dirty` after the release
@@ -103,8 +109,9 @@ branch is committed so Cargo proves the packaged contents match versioned files.
 
 Before any real registry publication, run a dedicated release PR that clears the
 [`crates_io_publish`](../reference/distribution-surface-gates.md#crates_io_publish)
-gate, adds registry-specific package metadata, confirms archive contents, and
-documents the publishing account, token handling, SemVer owner, and rollback
+gate, adds version requirements for path dependencies and other registry-specific
+metadata, assembles and verifies every package archive, confirms archive contents,
+and documents the publishing account, token handling, SemVer owner, and rollback
 plan. This repo currently supports local installation handoff, not crates.io
 publication.
 
@@ -161,6 +168,9 @@ git pull --ff-only
 cargo install --path crates/codex-research --locked --force
 cargo install --path crates/codex-dev --locked --force
 cargo install --path crates/codex-dev-tui --locked --force
+cargo install --path crates/expo-motion-audit --locked --force
+cargo install --path crates/gsap-audit --locked --force
+cargo install --path crates/motion-token-audit --locked --force
 ```
 
 Use [Global CLI Workflow](global-cli-workflow.md) for completion generation,
@@ -174,6 +184,9 @@ codex-research --json doctor
 codex-research --json eval
 codex-dev --help
 codex-dev-tui --help
+expo-motion-audit doctor
+gsap-audit doctor
+motion-token-audit doctor
 ```
 
 If you need to verify behavior before installing, use

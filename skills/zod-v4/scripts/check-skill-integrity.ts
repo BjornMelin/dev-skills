@@ -3,7 +3,7 @@
  * Check that SKILL.md <-> rules <-> references <-> scripts/templates stay in sync.
  *
  * Usage:
- *   bun ~/.codex/skills/zod-v4/scripts/check-skill-integrity.ts
+ *   bun ~/.agents/skills/zod-v4/scripts/check-skill-integrity.ts
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";

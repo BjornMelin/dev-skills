@@ -18,11 +18,12 @@ This repository is a catalog of **Agent Skills** (per the AgentSkills specificat
 - `crates/codex-dev-tui/`: optional Ratatui workbench for local `codex-dev` task capsules.
 - `crates/codex-research/`: Rust CLI for evidence-first research helpers.
 - `crates/bun-platform-core/`: shared Bun audit, safe-fix, validation, and reference-sync library.
-- `crates/bun-platform/`: temporary Bun platform compatibility CLI shim over `bun-platform-core`.
 - `crates/gsap-audit-core/`: oxc-based static-analysis library powering the gsap skill's audit CLI.
 - `crates/gsap-audit/`: Rust CLI that audits GSAP usage in JS/TS/JSX/TSX.
 - `crates/expo-motion-audit-core/`: oxc-based static-analysis library powering the expo-motion skill's audit CLI.
 - `crates/expo-motion-audit/`: Rust CLI that audits Expo/React Native (Reanimated 4) motion usage in JS/TS/JSX/TSX + config.
+- `crates/motion-token-audit-core/`: oxc-based engine for cross-stack motion-token drift and orphan analysis.
+- `crates/motion-token-audit/`: Rust CLI that audits motion-token consistency across CSS, R3F, Reanimated, and GSAP.
 - `docs/`: tracked documentation portal, references, cookbooks, prompts, and runbooks.
 
 Example skill path: `skills/docker-architect/SKILL.md`.
@@ -127,7 +128,7 @@ This repo may not have established git history conventions yet. Use clear, scope
 - Validation commands run (at minimum `python3 tools/skill/quick_validate.py skills/<skill-name>`)
 - If you add or rename a skill, update the catalog table in `README.md` (keep rows sorted by skill name)
 - If you add or materially change docs, update `docs/index.md`
-- If you change `codex-dev-core`, `codex-dev`, `codex-dev-tui`, `codex-research`, `bun-platform-core`, `bun-platform`, `gsap-audit-core`, `gsap-audit`, `expo-motion-audit-core`, or `expo-motion-audit`, update the CLI/TUI and crate references under `docs/reference/`
+- If you change `codex-dev-core`, `codex-dev`, `codex-dev-tui`, `codex-research`, `bun-platform-core`, `gsap-audit-core`, `gsap-audit`, `expo-motion-audit-core`, `expo-motion-audit`, `motion-token-audit-core`, or `motion-token-audit`, update the CLI/TUI and crate references under `docs/reference/`
 - If you built/published bundles, say where (release assets/registry)
 
 ## Security & Configuration Tips

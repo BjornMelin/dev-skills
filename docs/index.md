@@ -60,7 +60,10 @@ out of version control.
   contract/read-model crate for capsule files, schema validation, and PR/policy
   evidence shapes.
 - [Bun Platform Reference](reference/bun-platform.md): native `codex-dev bun`
-  commands, compatibility shim, config, state, and skill integration.
+  commands, config, state, and skill integration.
+- [expo-motion-audit Reference](reference/expo-motion-audit.md): Expo and React
+  Native motion auditing for Reanimated worklets, reduced motion, gestures,
+  lists, layout transitions, and configuration.
 - [gsap-audit Reference](reference/gsap-audit.md): optional oxc-based companion
   CLI for the standalone `gsap` skill that audits GSAP usage in JS/TS/JSX/TSX,
   with scan/doctor/completions commands, rule categories, and the scan

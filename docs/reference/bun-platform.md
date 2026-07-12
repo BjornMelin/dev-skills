@@ -1,71 +1,61 @@
-# Bun Platform Reference
+# Bun platform reference
 
 The Bun platform tooling from `~/repos/cli/skill-tools` now lives in this
-repository. The canonical command surface is the native `codex-dev bun` group.
-The standalone `bun-platform` binary remains a temporary compatibility shim;
-new automation should not depend on it.
-Deleting the legacy repository is explicitly gated by
-<https://github.com/BjornMelin/dev-skills/issues/105>.
+repository. Use the native `codex-dev bun` group for audits, fixes, validation,
+reference sync, and diagnostics. Deleting the legacy repository remains gated
+by [issue #105](https://github.com/BjornMelin/dev-skills/issues/105).
+Previously installed `bun-platform` executables are unsupported workstation
+residue; removing them remains an explicit local-deletion approval step.
 
 ## Crates
 
 - `crates/bun-platform-core`: shared Bun audit, safe-fix, validation, reference
-  sync, state-path, and rule/skill integrity logic.
-- `crates/bun-platform`: temporary compatibility binary over
-  `bun-platform-core`.
-- `crates/codex-dev`: canonical native command surface.
+  sync, state-path, and skill-integrity logic.
+- `crates/codex-dev`: canonical command surface.
 
-## Compatibility binary JSON contract
+## JSON contract
 
-`bun-platform` JSON output is command-specific and is emitted with
-`--format json`:
+Place the global `--json` flag before `bun`. Native results use a versioned
+result schema inside the standard `codex-dev.output.v1` envelope:
 
 ```json
-[
-  {
-    "rule_id": "pm-no-mixed-lockfiles",
-    "severity": "error",
-    "file": "package-lock.json"
+{
+  "schema": "codex-dev.output.v1",
+  "ok": true,
+  "command": "bun audit",
+  "result": {
+    "schema": "codex-dev.bun-audit.v1",
+    "finding_count": 0,
+    "findings": []
   }
-]
+}
 ```
 
-Safe-fix planning and apply reports emit `PlannedFix` records. Each record
-includes `before` and `after` content when a package.json rewrite is planned or
-applied; there is no `--full-content` flag.
+Safe-fix reports include hashes and diffs by default. Pass `--full-content` to
+include complete before-and-after content.
 
 ## Commands
 
-```bash
-bun-platform audit --root . --format json
-bun-platform list-rules
-bun-platform explain pm-no-mixed-lockfiles
-bun-platform plan-fixes --root . --format json
-bun-platform apply-safe-fixes --root . --format json
-bun-platform validate --root . --fail-on warn
-bun-platform benchmark --root . --format json
-bun-platform release-sync --status --format json
-bun-platform release-sync --dry-run --format json
-bun-platform release-sync
-bun-platform doctor --format json
-```
-
-Common text-mode examples:
+Use these commands from an installed `codex-dev` binary:
 
 ```bash
-bun-platform audit --root .
-bun-platform plan-fixes --root .
-bun-platform apply-safe-fixes --root .
-bun-platform validate --root . --fail-on warn
+codex-dev --json bun audit --root .
+codex-dev --json bun rules list
+codex-dev --json bun rules show pm-no-mixed-lockfiles
+codex-dev --json bun fixes plan --root .
+codex-dev --json bun fixes apply --root .
+codex-dev --json bun validate plan --root .
+codex-dev --json bun validate run --root . --fail-on warn
+codex-dev --json bun benchmark --root .
+codex-dev --json bun references status
+codex-dev --json bun references plan
+codex-dev --json bun references sync
+codex-dev --json bun doctor
 ```
 
-Use the `codex-dev bun` command group in skills, docs, and new scripts. Keep the
-`bun-platform` command only where an existing caller still requires the
-temporary compatibility binary.
+## State and config
 
-## State And Config
-
-Repository config is still `bun-platform.config.json`. Supported keys:
+Repository config remains `bun-platform.config.json`. Supported keys:
 
 - `disabledRules`
 - `severityOverrides`
@@ -84,31 +74,32 @@ External paths use the dev-skills namespace:
 - state: `${XDG_STATE_HOME:-~/.local/state}/dev-skills/bun-platform`
 - cache: `${XDG_CACHE_HOME:-~/.cache}/dev-skills/bun-platform`
 
-Audit cache writes are disabled by default. Use `--write-cache` only when a
-caller explicitly wants reusable scan-cache entries. Safe fixes always write
-rollback artifacts under external state before mutating files.
+Audit cache writes are disabled by default. Pass `--write-cache` when you need
+reusable scan-cache entries. Safe fixes write rollback artifacts under external
+state before changing files.
+Benchmark runs always suppress cache writes, even when configuration requests
+them, so measured timings exclude persistent-cache side effects. The benchmark
+command intentionally does not accept `--write-cache`.
 
-## Skill Integration
+## Skill integration
 
-`skills/bun-dev` is the source of vendor reference snapshots and rule snapshots
-used by the platform. `skills/bun-audit` is a router/front-end over the Bun
-audit workflow rather than the owner of those snapshots.
+`skills/bun-dev` owns vendor references and rule snapshots. `skills/bun-audit`
+routes audit work to the native command surface.
 
-Reference sync defaults to the installed global agent skill root
-`~/.agents/skills/bun-dev/references/...` unless an explicit `--skill-root` is
-passed. Running inside this repository does not automatically target the tracked
-`skills/bun-dev`; callers that need repo-local snapshots must pass
-`--skill-root skills/bun-dev`.
+Inside this repository, reference commands discover the tracked
+`skills/bun-dev` directory. Outside the repository, they use
+`BUN_PLATFORM_SKILL_ROOT` or `~/.agents/skills/bun-dev`. Pass `--skill-root` to
+override discovery.
 
-## Task Capsule Import
+## Task capsule import
 
-External JSON reports can be recorded as capsule evidence:
+Record a Bun audit report as task-capsule evidence:
 
 ```bash
-codex-dev --json evidence append \
-  --capsule .codex/tasks/<task> \
-  --kind output \
-  --summary "Record bun-platform audit output" \
-  --tool bun-platform \
-  --artifact /tmp/bun-audit.json
+codex-dev --json bun audit --root . > /tmp/bun-audit.json
+codex-dev --json tool import \
+  --capsule .codex/tasks/task_id \
+  --tool codex-dev-bun \
+  --report /tmp/bun-audit.json \
+  --kind output
 ```

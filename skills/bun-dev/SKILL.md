@@ -140,15 +140,6 @@ Migration + troubleshooting:
 - `codex-dev bun doctor`: inspect paths, version pin, and integrity.
 - `codex-dev tool import`: import an external JSON report into a task capsule.
 
-Compatibility shim:
-
-```bash
-bun-platform audit --root .
-```
-
-Prefer `codex-dev bun ...` for new automation. Keep `bun-platform` only for one
-release while old command references are retired.
-
 ## Platform State
 
 - Config file: `bun-platform.config.json`

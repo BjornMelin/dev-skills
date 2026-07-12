@@ -23,6 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
+          fetch-depth: 2
           persist-credentials: false
       - name: Install Rust toolchain
         run: rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
@@ -39,6 +40,8 @@ jobs:
         run: cargo run -q -p codex-dev -- --json bun doctor
       - name: Verify Agent Skills Lab catalog
         run: bash tools/skill/check_catalog.sh "$GITHUB_SHA"
+      - name: Test catalog checker isolation
+        run: bash tools/skill/test_check_catalog.sh
 
   skills-and-docs:
     name: Skills, plugins, and docs

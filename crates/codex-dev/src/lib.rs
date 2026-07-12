@@ -8225,23 +8225,6 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "Failure means Bun platform core has Rust lints or warnings that must be fixed before review.",
         ),
         policy_gate(
-            "bun-platform-clippy",
-            "bun-platform Clippy",
-            [
-                "cargo",
-                "clippy",
-                "-p",
-                "bun-platform",
-                "--all-targets",
-                "--",
-                "-D",
-                "warnings",
-            ],
-            "docs/runbooks/validation.md#codex-dev-operating-layer",
-            ["cargo"],
-            "Failure means the temporary Bun platform shim has Rust lints or warnings that must be fixed before review.",
-        ),
-        policy_gate(
             "codex-dev-core-check",
             "codex-dev-core cargo check",
             ["cargo", "check", "-p", "codex-dev-core"],
@@ -8266,14 +8249,6 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "Failure means Bun platform core does not typecheck.",
         ),
         policy_gate(
-            "bun-platform-check",
-            "bun-platform cargo check",
-            ["cargo", "check", "-p", "bun-platform"],
-            "docs/runbooks/validation.md#codex-dev-operating-layer",
-            ["cargo"],
-            "Failure means the temporary Bun platform shim does not typecheck.",
-        ),
-        policy_gate(
             "codex-dev-core-test",
             "codex-dev-core tests",
             ["cargo", "test", "-p", "codex-dev-core"],
@@ -8296,14 +8271,6 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "docs/runbooks/validation.md#codex-dev-operating-layer",
             ["cargo"],
             "Failure means Bun platform audit, fix, reference, or fixture behavior regressed.",
-        ),
-        policy_gate(
-            "bun-platform-test",
-            "bun-platform tests",
-            ["cargo", "test", "-p", "bun-platform"],
-            "docs/runbooks/validation.md#codex-dev-operating-layer",
-            ["cargo"],
-            "Failure means the temporary Bun platform CLI contract regressed.",
         ),
         policy_gate(
             "codex-dev-help",
@@ -8337,31 +8304,6 @@ fn codex_dev_gates() -> Vec<PolicyGate> {
             "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
             ["cargo"],
             "Failure means codex-dev cannot generate a manpage from its Clap contract.",
-        ),
-        policy_gate(
-            "bun-platform-help",
-            "bun-platform help smoke",
-            ["cargo", "run", "-q", "-p", "bun-platform", "--", "--help"],
-            "docs/runbooks/validation.md#codex-dev-operating-layer",
-            ["cargo"],
-            "Failure means the temporary Bun platform shim cannot render its top-level Clap contract.",
-        ),
-        policy_gate(
-            "bun-platform-completion-zsh",
-            "bun-platform zsh completion smoke",
-            [
-                "cargo",
-                "run",
-                "-q",
-                "-p",
-                "bun-platform",
-                "--",
-                "completions",
-                "zsh",
-            ],
-            "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
-            ["cargo"],
-            "Failure means bun-platform cannot generate shell completions from its Clap contract.",
         ),
         policy_gate(
             "codex-dev-policy-manifest",
@@ -8744,75 +8686,112 @@ fn codex_research_gates() -> Vec<PolicyGate> {
 }
 
 fn gsap_audit_gates() -> Vec<PolicyGate> {
+    static_audit_gates(
+        "gsap-audit",
+        "gsap-audit-core",
+        "docs/runbooks/validation.md#gsap-audit-cli",
+    )
+}
+
+fn expo_motion_audit_gates() -> Vec<PolicyGate> {
+    static_audit_gates(
+        "expo-motion-audit",
+        "expo-motion-audit-core",
+        "docs/reference/expo-motion-audit.md#validation",
+    )
+}
+
+fn motion_token_audit_gates() -> Vec<PolicyGate> {
+    static_audit_gates(
+        "motion-token-audit",
+        "motion-token-audit-core",
+        "docs/reference/motion-token-audit.md#validation",
+    )
+}
+
+fn static_audit_gates(binary: &str, core: &str, validation_source: &str) -> Vec<PolicyGate> {
+    let gate = |suffix: &str,
+                label: &str,
+                command: Vec<String>,
+                source: &str,
+                failure_interpretation: String| PolicyGate {
+        id: format!("{binary}-{suffix}"),
+        name: format!("{binary} {label}"),
+        command,
+        source: source.to_string(),
+        working_directory: ".".to_string(),
+        required_tools: vec!["cargo".to_string()],
+        required: true,
+        network: false,
+        secrets: false,
+        failure_interpretation,
+    };
+
     vec![
-        policy_gate(
-            "gsap-audit-clippy",
-            "gsap-audit Clippy",
-            [
+        gate(
+            "clippy",
+            "Clippy",
+            policy_command([
                 "cargo",
                 "clippy",
                 "-p",
-                "gsap-audit-core",
+                core,
                 "-p",
-                "gsap-audit",
+                binary,
                 "--all-targets",
                 "--",
                 "-D",
                 "warnings",
-            ],
-            "docs/runbooks/validation.md#gsap-audit-cli",
-            ["cargo"],
-            "Failure means gsap-audit has Rust lints or warnings that must be fixed before review.",
+            ]),
+            validation_source,
+            format!(
+                "Failure means {binary} has Rust lints or warnings that must be fixed before review."
+            ),
         ),
-        policy_gate(
-            "gsap-audit-check",
-            "gsap-audit cargo check",
-            [
-                "cargo",
-                "check",
-                "-p",
-                "gsap-audit-core",
-                "-p",
-                "gsap-audit",
-            ],
-            "docs/runbooks/validation.md#gsap-audit-cli",
-            ["cargo"],
-            "Failure means gsap-audit does not typecheck.",
+        gate(
+            "check",
+            "cargo check",
+            policy_command(["cargo", "check", "-p", core, "-p", binary]),
+            validation_source,
+            format!("Failure means {binary} does not typecheck."),
         ),
-        policy_gate(
-            "gsap-audit-test",
-            "gsap-audit tests",
-            ["cargo", "test", "-p", "gsap-audit-core", "-p", "gsap-audit"],
-            "docs/runbooks/validation.md#gsap-audit-cli",
-            ["cargo"],
-            "Failure means gsap-audit rule or CLI behavior regressed.",
+        gate(
+            "test",
+            "tests",
+            policy_command(["cargo", "test", "-p", core, "-p", binary]),
+            validation_source,
+            format!("Failure means {binary} rule or CLI behavior regressed."),
         ),
-        policy_gate(
-            "gsap-audit-doctor",
-            "gsap-audit doctor smoke",
-            ["cargo", "run", "-q", "-p", "gsap-audit", "--", "doctor"],
-            "docs/runbooks/validation.md#gsap-audit-cli",
-            ["cargo"],
-            "Failure means gsap-audit cannot emit its rule catalog.",
+        gate(
+            "doctor",
+            "doctor smoke",
+            policy_command(["cargo", "run", "-q", "-p", binary, "--", "doctor"]),
+            validation_source,
+            format!("Failure means {binary} cannot emit its rule catalog."),
         ),
-        policy_gate(
-            "gsap-audit-completion-zsh",
-            "gsap-audit zsh completion smoke",
-            [
+        gate(
+            "completion-zsh",
+            "zsh completion smoke",
+            policy_command([
                 "cargo",
                 "run",
                 "-q",
                 "-p",
-                "gsap-audit",
+                binary,
                 "--",
                 "completions",
                 "zsh",
-            ],
+            ]),
             "docs/runbooks/global-cli-workflow.md#completion-and-manpage-smokes",
-            ["cargo"],
-            "Failure means gsap-audit cannot generate shell completions from its Clap contract.",
+            format!(
+                "Failure means {binary} cannot generate shell completions from its Clap contract."
+            ),
         ),
     ]
+}
+
+fn policy_command<const N: usize>(parts: [&str; N]) -> Vec<String> {
+    parts.into_iter().map(str::to_string).collect()
 }
 
 fn skills_gates() -> Vec<PolicyGate> {
@@ -8823,11 +8802,140 @@ fn skills_gates() -> Vec<PolicyGate> {
             [
                 "bash",
                 "-lc",
-                "for d in skills/*; do [ -f \"$d/SKILL.md\" ] && python3 tools/skill/quick_validate.py \"$d\"; done",
+                "set -euo pipefail; for d in skills/*; do [ -f \"$d/SKILL.md\" ] && python3 tools/skill/quick_validate.py \"$d\"; done",
             ],
             "docs/runbooks/validation.md#skills",
             ["bash", "python3"],
             "Failure means at least one skill is not AgentSkills-spec compliant.",
+        ),
+        policy_gate(
+            "plugin-skills-quick-validate-all",
+            "validate all plugin skill metadata",
+            [
+                "bash",
+                "-lc",
+                "set -euo pipefail; for d in plugins/*/skills/*; do [ -f \"$d/SKILL.md\" ] && python3 tools/skill/quick_validate.py \"$d\"; done",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["bash", "python3"],
+            "Failure means at least one plugin-contained skill is not AgentSkills-spec compliant.",
+        ),
+        policy_gate(
+            "plugin-manifests-json",
+            "validate plugin JSON manifests",
+            [
+                "find",
+                ".claude-plugin",
+                "plugins",
+                "-type",
+                "f",
+                "-name",
+                "*.json",
+                "-exec",
+                "jq",
+                "empty",
+                "{}",
+                "+",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["find", "jq"],
+            "Failure means a tracked plugin or marketplace JSON manifest is invalid.",
+        ),
+        policy_gate(
+            "web-motion-atomic-skills",
+            "validate web-motion atomic skills",
+            [
+                "node",
+                "plugins/web-motion/scripts/validate-atomic-skills.mjs",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["node"],
+            "Failure means the web-motion plugin skill contracts or generated assets drifted.",
+        ),
+        policy_gate(
+            "design-motion-mirror-check",
+            "validate design-motion skill mirror",
+            [
+                "node",
+                "plugins/design-motion/scripts/sync-skills.mjs",
+                "--check",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["node"],
+            "Failure means the design-motion plugin mirror drifted from canonical skills.",
+        ),
+        policy_gate(
+            "design-motion-system-tests",
+            "design-motion system tests",
+            [
+                "python3",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "skills/design-motion-system/scripts/tests",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["python3"],
+            "Failure means design-motion token scaffolding or audit behavior regressed.",
+        ),
+        policy_gate(
+            "r3f-scene-polish-doctor",
+            "R3F scene-polish doctor",
+            [
+                "node",
+                "skills/r3f-scene-polish/scripts/audit.mjs",
+                "doctor",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["node"],
+            "Failure means the R3F scene-polish audit CLI cannot load its rule catalog.",
+        ),
+        kimi_ui_agent_install_gate(),
+        policy_gate(
+            "kimi-ui-agent-typecheck",
+            "Kimi UI agent typecheck",
+            ["bun", "run", "--cwd", "skills/kimi-ui-agent", "typecheck"],
+            "docs/runbooks/validation.md#skills",
+            ["bun"],
+            "Failure means the Kimi UI agent TypeScript does not typecheck.",
+        ),
+        policy_gate(
+            "kimi-ui-agent-test",
+            "Kimi UI agent tests",
+            ["bun", "test", "--cwd", "skills/kimi-ui-agent"],
+            "docs/runbooks/validation.md#skills",
+            ["bun"],
+            "Failure means the Kimi UI agent behavior regressed.",
+        ),
+        policy_gate(
+            "kimi-ui-agent-doctor",
+            "Kimi UI agent doctor",
+            [
+                "bun",
+                "skills/kimi-ui-agent/scripts/kimi-ui-agent.ts",
+                "doctor",
+                "--json",
+            ],
+            "docs/runbooks/validation.md#skills",
+            ["bun"],
+            "Failure means the Kimi UI agent cannot emit its local readiness report.",
+        ),
+        policy_gate(
+            "agent-skills-catalog-check",
+            "verify Agent Skills Lab catalog",
+            ["bash", "tools/skill/check_catalog.sh"],
+            "docs/runbooks/validation.md#pull-request-ci-baseline",
+            ["bash", "cargo", "diff", "git", "jq", "mktemp"],
+            "Failure means the tracked Agent Skills Lab catalog drifted from the current skill inventory.",
+        ),
+        policy_gate(
+            "agent-skills-catalog-checker-test",
+            "test Agent Skills Lab catalog checker isolation",
+            ["bash", "tools/skill/test_check_catalog.sh"],
+            "docs/runbooks/validation.md#pull-request-ci-baseline",
+            ["bash", "cargo", "diff", "git", "jq", "mktemp"],
+            "Failure means catalog validation missed non-ignored files or leaked a temporary worktree.",
         ),
         policy_gate(
             "python-helpers-compile",
@@ -8897,7 +9005,12 @@ fn skills_gates() -> Vec<PolicyGate> {
         policy_gate(
             "skill-subagent-eval",
             "skill and subagent eval smoke",
-            ["python3", "tools/eval/skill_subagent_eval.py", "--json"],
+            [
+                "python3",
+                "tools/eval/skill_subagent_eval.py",
+                "--json",
+                "--strict",
+            ],
             "docs/runbooks/validation.md#subagent-templates",
             ["python3"],
             "Failure means the local skill/subagent evaluation smoke regressed.",
@@ -9006,6 +9119,8 @@ fn release_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
     append_unique_gates(&mut gates, gsap_audit_gates());
+    append_unique_gates(&mut gates, expo_motion_audit_gates());
+    append_unique_gates(&mut gates, motion_token_audit_gates());
     append_unique_gates(&mut gates, docs_gates());
     append_unique_gates(&mut gates, vec![bootstrap_pack_validate_gate()]);
     append_unique_gates(&mut gates, skills_gates());
@@ -9023,6 +9138,8 @@ fn full_local_gates() -> Vec<PolicyGate> {
     append_unique_gates(&mut gates, codex_dev_tui_gates());
     append_unique_gates(&mut gates, codex_research_gates());
     append_unique_gates(&mut gates, gsap_audit_gates());
+    append_unique_gates(&mut gates, expo_motion_audit_gates());
+    append_unique_gates(&mut gates, motion_token_audit_gates());
     append_unique_gates(&mut gates, local_cli_install_smoke_gates());
     append_unique_gates(&mut gates, bootstrap_install_gates());
     append_unique_gates(&mut gates, skills_gates());
@@ -9040,6 +9157,27 @@ fn append_unique_gates(target: &mut Vec<PolicyGate>, gates: Vec<PolicyGate>) {
         if seen.insert(gate.id.clone()) {
             target.push(gate);
         }
+    }
+}
+
+fn kimi_ui_agent_install_gate() -> PolicyGate {
+    PolicyGate {
+        id: "kimi-ui-agent-install".to_string(),
+        name: "Kimi UI agent dependency install".to_string(),
+        command: policy_command([
+            "bun",
+            "install",
+            "--cwd",
+            "skills/kimi-ui-agent",
+            "--frozen-lockfile",
+        ]),
+        source: "docs/runbooks/validation.md#skills".to_string(),
+        working_directory: ".".to_string(),
+        required_tools: vec!["bun".to_string()],
+        required: true,
+        network: true,
+        secrets: false,
+        failure_interpretation: "Failure means the locked Kimi UI agent dependency graph cannot be installed reproducibly.".to_string(),
     }
 }
 
@@ -9197,7 +9335,7 @@ fn policy_profile_gate_slug(profile: PolicyProfile) -> &'static str {
 }
 
 fn supply_chain_gates() -> Vec<PolicyGate> {
-    vec![
+    let mut gates = vec![
         policy_gate(
             "cargo-metadata-locked",
             "locked Cargo metadata smoke",
@@ -9229,71 +9367,58 @@ fn supply_chain_gates() -> Vec<PolicyGate> {
             ["cargo", "cargo-deny"],
             "Failure means the configured license, dependency ban, or source allowlist policy rejected the workspace.",
         ),
-        policy_gate(
-            "cargo-package-codex-dev-core-list",
-            "codex-dev-core package file list",
-            ["cargo", "package", "--list", "-p", "codex-dev-core"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means codex-dev-core is missing package metadata or would package unexpected invalid content.",
+    ];
+    gates.extend(
+        [
+            "codex-dev-core",
+            "codex-dev",
+            "bun-platform-core",
+            "codex-dev-tui",
+            "codex-research",
+            "gsap-audit-core",
+            "gsap-audit",
+            "expo-motion-audit-core",
+            "expo-motion-audit",
+            "motion-token-audit-core",
+            "motion-token-audit",
+        ]
+        .into_iter()
+        .map(cargo_package_list_gate),
+    );
+    gates
+}
+
+fn cargo_package_list_gate(package: &str) -> PolicyGate {
+    PolicyGate {
+        id: format!("cargo-package-{package}-list"),
+        name: format!("{package} package file list"),
+        command: policy_command(["cargo", "package", "--list", "-p", package]),
+        source: "docs/runbooks/local-release-supply-chain.md#package-dry-runs".to_string(),
+        working_directory: ".".to_string(),
+        required_tools: vec!["cargo".to_string()],
+        required: true,
+        network: false,
+        secrets: false,
+        failure_interpretation: format!(
+            "Failure means Cargo could not enumerate the would-be package file set for {package}."
         ),
-        policy_gate(
-            "cargo-package-codex-dev-list",
-            "codex-dev package file list",
-            ["cargo", "package", "--list", "-p", "codex-dev"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means codex-dev is missing package metadata or would package unexpected invalid content.",
-        ),
-        policy_gate(
-            "cargo-package-bun-platform-core-list",
-            "bun-platform-core package file list",
-            ["cargo", "package", "--list", "-p", "bun-platform-core"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means bun-platform-core is missing package metadata or would package unexpected invalid content.",
-        ),
-        policy_gate(
-            "cargo-package-bun-platform-list",
-            "bun-platform package file list",
-            ["cargo", "package", "--list", "-p", "bun-platform"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means bun-platform is missing package metadata or would package unexpected invalid content.",
-        ),
-        policy_gate(
-            "cargo-package-codex-dev-tui-list",
-            "codex-dev-tui package file list",
-            ["cargo", "package", "--list", "-p", "codex-dev-tui"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means codex-dev-tui is missing package metadata or would package unexpected invalid content.",
-        ),
-        policy_gate(
-            "cargo-package-codex-research-list",
-            "codex-research package file list",
-            ["cargo", "package", "--list", "-p", "codex-research"],
-            "docs/runbooks/local-release-supply-chain.md#package-dry-runs",
-            ["cargo"],
-            "Failure means codex-research is missing package metadata or would package unexpected invalid content.",
-        ),
-    ]
+    }
 }
 
 fn local_cli_install_smoke_gates() -> Vec<PolicyGate> {
     vec![
         local_cli_install_smoke_gate("codex-research", "crates/codex-research"),
         local_cli_install_smoke_gate("codex-dev", "crates/codex-dev"),
-        local_cli_install_smoke_gate("bun-platform", "crates/bun-platform"),
         local_cli_install_smoke_gate("codex-dev-tui", "crates/codex-dev-tui"),
         local_cli_install_smoke_gate("gsap-audit", "crates/gsap-audit"),
+        local_cli_install_smoke_gate("expo-motion-audit", "crates/expo-motion-audit"),
+        local_cli_install_smoke_gate("motion-token-audit", "crates/motion-token-audit"),
     ]
 }
 
 fn local_cli_install_smoke_gate(binary: &'static str, crate_path: &'static str) -> PolicyGate {
     let artifact_smoke = match binary {
-        "bun-platform" => format!("\"$root/bin/{binary}\" completions zsh >/dev/null"),
-        "gsap-audit" => {
+        "gsap-audit" | "expo-motion-audit" | "motion-token-audit" => {
             format!(
                 "\"$root/bin/{binary}\" doctor >/dev/null && \"$root/bin/{binary}\" completions zsh >/dev/null"
             )
@@ -10704,7 +10829,7 @@ enabled = false
     }
 
     #[test]
-    fn policy_manifest_profiles_are_explicit_local_gates() {
+    fn policy_manifest_profiles_declare_network_and_secret_requirements() {
         for profile in all_policy_profiles() {
             let manifest = policy_manifest(profile, "2026-05-09T05:00:00Z".parse().unwrap());
 
@@ -10733,11 +10858,16 @@ enabled = false
                     "{profile} gate {} has no failure_interpretation",
                     gate.id
                 );
-                assert!(
-                    !gate.network && !gate.secrets,
-                    "{profile} gate {} unexpectedly requires network or secrets",
+                let expected_network = matches!(
+                    profile,
+                    PolicyProfile::Skills | PolicyProfile::Release | PolicyProfile::FullLocal
+                ) && gate.id == "kimi-ui-agent-install";
+                assert_eq!(
+                    gate.network, expected_network,
+                    "{profile} gate {} has incorrect network metadata",
                     gate.id
                 );
+                assert!(!gate.secrets, "{profile} gate {} requires secrets", gate.id);
             }
         }
     }
@@ -10751,20 +10881,15 @@ enabled = false
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
                 "bun-platform-core-clippy",
-                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
                 "bun-platform-core-check",
-                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "bun-platform-core-test",
-                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
-                "bun-platform-help",
-                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
@@ -10810,6 +10935,18 @@ enabled = false
             PolicyProfile::Skills,
             &[
                 "skills-quick-validate-all",
+                "plugin-skills-quick-validate-all",
+                "plugin-manifests-json",
+                "web-motion-atomic-skills",
+                "design-motion-mirror-check",
+                "design-motion-system-tests",
+                "r3f-scene-polish-doctor",
+                "kimi-ui-agent-install",
+                "kimi-ui-agent-typecheck",
+                "kimi-ui-agent-test",
+                "kimi-ui-agent-doctor",
+                "agent-skills-catalog-check",
+                "agent-skills-catalog-checker-test",
                 "python-helpers-compile",
                 "subagent-templates-validate",
                 "subspawn-roles-validate",
@@ -10845,20 +10982,15 @@ enabled = false
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
                 "bun-platform-core-clippy",
-                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
                 "bun-platform-core-check",
-                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "bun-platform-core-test",
-                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
-                "bun-platform-help",
-                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
@@ -10892,9 +11024,31 @@ enabled = false
                 "gsap-audit-test",
                 "gsap-audit-doctor",
                 "gsap-audit-completion-zsh",
+                "expo-motion-audit-clippy",
+                "expo-motion-audit-check",
+                "expo-motion-audit-test",
+                "expo-motion-audit-doctor",
+                "expo-motion-audit-completion-zsh",
+                "motion-token-audit-clippy",
+                "motion-token-audit-check",
+                "motion-token-audit-test",
+                "motion-token-audit-doctor",
+                "motion-token-audit-completion-zsh",
                 "docs-no-todo",
                 "bootstrap-pack-validate",
                 "skills-quick-validate-all",
+                "plugin-skills-quick-validate-all",
+                "plugin-manifests-json",
+                "web-motion-atomic-skills",
+                "design-motion-mirror-check",
+                "design-motion-system-tests",
+                "r3f-scene-polish-doctor",
+                "kimi-ui-agent-install",
+                "kimi-ui-agent-typecheck",
+                "kimi-ui-agent-test",
+                "kimi-ui-agent-doctor",
+                "agent-skills-catalog-check",
+                "agent-skills-catalog-checker-test",
                 "python-helpers-compile",
                 "subagent-templates-validate",
                 "subspawn-roles-validate",
@@ -10906,9 +11060,14 @@ enabled = false
                 "cargo-package-codex-dev-core-list",
                 "cargo-package-codex-dev-list",
                 "cargo-package-bun-platform-core-list",
-                "cargo-package-bun-platform-list",
                 "cargo-package-codex-dev-tui-list",
                 "cargo-package-codex-research-list",
+                "cargo-package-gsap-audit-core-list",
+                "cargo-package-gsap-audit-list",
+                "cargo-package-expo-motion-audit-core-list",
+                "cargo-package-expo-motion-audit-list",
+                "cargo-package-motion-token-audit-core-list",
+                "cargo-package-motion-token-audit-list",
             ],
         );
         assert_profile_ids(
@@ -10918,20 +11077,15 @@ enabled = false
                 "codex-dev-core-clippy",
                 "codex-dev-clippy",
                 "bun-platform-core-clippy",
-                "bun-platform-clippy",
                 "codex-dev-core-check",
                 "codex-dev-check",
                 "bun-platform-core-check",
-                "bun-platform-check",
                 "codex-dev-core-test",
                 "codex-dev-test",
                 "bun-platform-core-test",
-                "bun-platform-test",
                 "codex-dev-help",
                 "codex-dev-completion-zsh",
                 "codex-dev-manpage",
-                "bun-platform-help",
-                "bun-platform-completion-zsh",
                 "codex-dev-policy-manifest",
                 "codex-dev-policy-explain",
                 "codex-dev-policy-docs-check",
@@ -10965,11 +11119,22 @@ enabled = false
                 "gsap-audit-test",
                 "gsap-audit-doctor",
                 "gsap-audit-completion-zsh",
+                "expo-motion-audit-clippy",
+                "expo-motion-audit-check",
+                "expo-motion-audit-test",
+                "expo-motion-audit-doctor",
+                "expo-motion-audit-completion-zsh",
+                "motion-token-audit-clippy",
+                "motion-token-audit-check",
+                "motion-token-audit-test",
+                "motion-token-audit-doctor",
+                "motion-token-audit-completion-zsh",
                 "cargo-install-codex-research-smoke",
                 "cargo-install-codex-dev-smoke",
-                "cargo-install-bun-platform-smoke",
                 "cargo-install-codex-dev-tui-smoke",
                 "cargo-install-gsap-audit-smoke",
+                "cargo-install-expo-motion-audit-smoke",
+                "cargo-install-motion-token-audit-smoke",
                 "codex-dev-bootstrap-status",
                 "bootstrap-pack-validate",
                 "bootstrap-pack-render-smoke",
@@ -10978,6 +11143,18 @@ enabled = false
                 "codex-subagents-validate-sources",
                 "bootstrap-local-overlays-ignored",
                 "skills-quick-validate-all",
+                "plugin-skills-quick-validate-all",
+                "plugin-manifests-json",
+                "web-motion-atomic-skills",
+                "design-motion-mirror-check",
+                "design-motion-system-tests",
+                "r3f-scene-polish-doctor",
+                "kimi-ui-agent-install",
+                "kimi-ui-agent-typecheck",
+                "kimi-ui-agent-test",
+                "kimi-ui-agent-doctor",
+                "agent-skills-catalog-check",
+                "agent-skills-catalog-checker-test",
                 "python-helpers-compile",
                 "subagent-templates-validate",
                 "subspawn-roles-validate",
@@ -10990,9 +11167,14 @@ enabled = false
                 "cargo-package-codex-dev-core-list",
                 "cargo-package-codex-dev-list",
                 "cargo-package-bun-platform-core-list",
-                "cargo-package-bun-platform-list",
                 "cargo-package-codex-dev-tui-list",
                 "cargo-package-codex-research-list",
+                "cargo-package-gsap-audit-core-list",
+                "cargo-package-gsap-audit-list",
+                "cargo-package-expo-motion-audit-core-list",
+                "cargo-package-expo-motion-audit-list",
+                "cargo-package-motion-token-audit-core-list",
+                "cargo-package-motion-token-audit-list",
             ],
         );
     }

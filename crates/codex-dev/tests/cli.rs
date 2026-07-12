@@ -117,6 +117,143 @@ fn codex_dev_generates_manpage() {
         .stdout(predicates::str::contains("codex\\-dev\\-capsule"));
 }
 
+fn bun_fixture(name: &str) -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../bun-platform-core/fixtures")
+        .join(name)
+}
+
+fn run_codex_dev_json(args: &[&str]) -> Value {
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(args)
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    serde_json::from_slice(&output).expect("codex-dev json")
+}
+
+#[test]
+fn bun_audit_emits_the_native_finding_contract() {
+    let root = bun_fixture("github-actions");
+    let json = run_codex_dev_json(&[
+        "--json",
+        "bun",
+        "audit",
+        "--root",
+        root.to_str().expect("utf8 fixture path"),
+    ]);
+
+    assert_eq!(json["schema"], "codex-dev.output.v1");
+    assert_eq!(json["command"], "bun audit");
+    assert_eq!(json["result"]["schema"], "codex-dev.bun-audit.v1");
+    let findings = json["result"]["findings"]
+        .as_array()
+        .expect("audit findings");
+    let finding = findings
+        .iter()
+        .find(|finding| finding["rule_id"] == "scripts-no-npm-in-bun-repos")
+        .expect("GitHub Actions package-manager finding");
+    for key in [
+        "rule_id",
+        "category",
+        "severity",
+        "confidence",
+        "file",
+        "line",
+        "column",
+        "message",
+        "suppression_key",
+    ] {
+        assert!(finding.get(key).is_some(), "missing key `{key}`");
+    }
+}
+
+#[test]
+fn bun_benchmark_emits_the_native_timing_contract() {
+    let root = tempdir().expect("benchmark root");
+    std::fs::write(
+        root.path().join("package.json"),
+        r#"{"name":"benchmark-fixture","private":true,"packageManager":"bun@1.3.14"}"#,
+    )
+    .expect("write benchmark package.json");
+    std::fs::write(
+        root.path().join("bun-platform.config.json"),
+        r#"{"writeCache":true}"#,
+    )
+    .expect("write benchmark config");
+    let xdg_root = tempdir().expect("xdg root");
+    let help = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["bun", "benchmark", "--help"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    assert!(
+        !String::from_utf8(help)
+            .expect("utf8 benchmark help")
+            .contains("--write-cache"),
+        "benchmark help must not advertise cache writes"
+    );
+    let rejected_cache_flag = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args(["bun", "benchmark", "--write-cache"])
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    assert!(
+        String::from_utf8(rejected_cache_flag)
+            .expect("utf8 benchmark error")
+            .contains("unexpected argument '--write-cache'"),
+        "benchmark must reject cache-write requests"
+    );
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .env("XDG_CACHE_HOME", xdg_root.path().join("cache"))
+        .env("XDG_CONFIG_HOME", xdg_root.path().join("config"))
+        .env("XDG_STATE_HOME", xdg_root.path().join("state"))
+        .args([
+            "--json",
+            "bun",
+            "benchmark",
+            "--root",
+            root.path().to_str().expect("utf8 fixture path"),
+            "--iterations",
+            "1",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("codex-dev json");
+    let result = &json["result"];
+
+    assert_eq!(json["schema"], "codex-dev.output.v1");
+    assert_eq!(json["command"], "bun benchmark");
+    assert_eq!(result["schema"], "codex-dev.bun-benchmark.v1");
+    assert_eq!(result["iterations"].as_u64(), Some(1));
+    assert_eq!(result["audit_ms"].as_array().map(Vec::len), Some(1));
+    assert_eq!(result["plan_fix_ms"].as_array().map(Vec::len), Some(1));
+    for key in ["min_ms", "median_ms", "max_ms", "mean_ms"] {
+        assert!(result["summary"]["audit"][key].is_number());
+        assert!(result["summary"]["plan_fixes"][key].is_number());
+    }
+    assert!(
+        !xdg_root
+            .path()
+            .join("cache/dev-skills/bun-platform")
+            .exists(),
+        "benchmark must not write scan-cache state"
+    );
+}
+
 #[test]
 fn bun_validate_plan_rejects_malformed_package_json() {
     let temp = tempdir().expect("tempdir");

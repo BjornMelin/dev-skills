@@ -196,9 +196,8 @@ standard `codex-dev.output.v1` envelope. Audit cache writes are disabled by
 default; pass `--write-cache` only when reusable cache entries are desired.
 Safe fixes emit hashes and diffs by default, with complete before/after content
 available behind `--full-content`.
-
-`bun-platform` remains as a temporary compatibility binary. New automation
-should use `codex-dev bun ...`.
+`bun benchmark` always suppresses cache writes so its timings exclude
+persistent-cache side effects.
 
 ## tool import
 
@@ -207,7 +206,7 @@ Import an external JSON report as task-capsule evidence:
 ```bash
 cargo run -q -p codex-dev -- --json tool import \
   --capsule .codex/tasks/<task> \
-  --tool bun-platform \
+  --tool codex-dev-bun \
   --report /tmp/bun-audit.json \
   --kind output
 ```
@@ -1013,8 +1012,10 @@ The default profile is `codex_dev`. Supported profiles are:
 The manifest is versioned as `codex-dev.policy-gates.v1` and ties each gate to
 its tracked runbook source. Each gate records the command, working directory,
 required tools, required/network/secrets flags, and failure interpretation.
-Built-in profiles are local by default and do not require secrets or network
-access; networked advisory checks stay explicit in the release runbook.
+Built-in profiles do not require secrets. The `skills`, `release`, and
+`full_local` profiles declare the locked `kimi-ui-agent` dependency install as
+their sole network gate; networked advisory checks stay explicit in the release
+runbook.
 Aggregated profiles keep their inherited gates and add profile-specific
 `policy explain` smokes where inheritance would otherwise only exercise
 `codex_dev`.
@@ -1080,7 +1081,8 @@ Executed required-gate failures set `ok: false` and exit nonzero. Use
 `--keep-going` to continue after a failed required gate. Gates marked as
 network-using are skipped unless `--allow-network` is passed. Gates marked as
 secret-using are skipped unless `--allow-secrets` is passed. The built-in local
-profiles currently have no network or secret gates.
+profiles have no secret gates. Fresh-clone execution of `skills`, `release`, or
+`full_local` requires `--allow-network` for the locked Kimi dependency install.
 
 Execution discovers the repository root from the current directory or capsule
 path before running repo-native commands. Pass `--repo-root <path>` for

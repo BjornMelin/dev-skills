@@ -85,6 +85,7 @@ plugins/
       <skill-name>/
         SKILL.md          # plugin-scoped skill entrypoint
 crates/
+  bun-platform-core/      # Shared native Bun audit, fix, validation, and reference engine
   codex-dev-core/         # Shared task capsule contracts and read-model helpers
   codex-dev/              # Rust CLI for local task capsules, policy gates, and development evidence
   codex-dev-tui/          # Optional Ratatui workbench for codex-dev capsules
