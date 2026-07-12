@@ -29,15 +29,9 @@ import sys
 from pathlib import Path
 
 
-def find_docs_directory() -> Path | None:
-    """Find DMC skill references directory.
-
-    Searches in known locations for the skill references.
-
-    Returns:
-        Path to references directory if found, None otherwise
-    """
-    possible_paths = [
+def _docs_directory_candidates() -> list[Path]:
+    """Return the ordered DMC reference directory candidates."""
+    return [
         # The script's own skill bundle is authoritative in repo and installed copies.
         Path(__file__).resolve().parent.parent / "references",
         # Fallbacks for manually copied launchers.
@@ -46,7 +40,16 @@ def find_docs_directory() -> Path | None:
         Path.cwd() / "references",
     ]
 
-    for path in possible_paths:
+
+def find_docs_directory() -> Path | None:
+    """Find DMC skill references directory.
+
+    Searches in known locations for the skill references.
+
+    Returns:
+        Path to references directory if found, None otherwise
+    """
+    for path in _docs_directory_candidates():
         if path.exists() and path.is_dir():
             return path
 
@@ -230,11 +233,12 @@ Examples:
     docs_dir = args.docs_dir or find_docs_directory()
 
     if not docs_dir:
+        searched_paths = "\n".join(
+            f"  - {path}" for path in _docs_directory_candidates()
+        )
         print(
             "Warning: Could not find skill references directory.\n"
-            "Searched in:\n"
-            "  - ~/.agents/skills/dmc-py/references\n"
-            "  - ~/.claude/skills/dmc-py/references\n\n"
+            f"Searched in:\n{searched_paths}\n\n"
             "Use --docs-dir to specify a custom path, or --online for web docs.",
             file=sys.stderr,
         )
