@@ -23,7 +23,7 @@ references.
 ## Operating Rules
 
 - Treat `bun-dev` as the source of truth for rules and reference snapshots.
-- Prefer `codex-dev bun ...` over the temporary `bun-platform` compatibility shim.
+- Use `codex-dev bun ...`; it is the sole supported Bun audit and remediation CLI.
 - Do not run `fixes apply`, `validate run`, or `references sync` in parallel
   against the same repo or skill root.
 - Audit cache writes are opt-in with `--write-cache`.

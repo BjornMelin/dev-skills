@@ -3,12 +3,44 @@ set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 catalog_path="$repo_root/catalog/agent-skills-lab.json"
-source_commit="${1:-$(git -C "$repo_root" rev-parse HEAD)}"
-scan_root="${2:-$repo_root}"
+source_commit="$(git -C "$repo_root" rev-parse --verify "${1:-HEAD}^{commit}")"
+scan_root="${2:-}"
 generated_path="$(mktemp)"
 tracked_normalized_path="$(mktemp)"
 generated_normalized_path="$(mktemp)"
-trap 'rm -f "$generated_path" "$tracked_normalized_path" "$generated_normalized_path"' EXIT
+temporary_worktree_parent=""
+
+cleanup() {
+  local status=$?
+  rm -f "$generated_path" "$tracked_normalized_path" "$generated_normalized_path"
+  if [[ -n "$temporary_worktree_parent" ]]; then
+    git -C "$repo_root" worktree remove --force "$scan_root" >/dev/null 2>&1 || true
+    rmdir "$temporary_worktree_parent" >/dev/null 2>&1 || true
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+if [[ -z "$scan_root" ]]; then
+  head_commit="$(git -C "$repo_root" rev-parse --verify 'HEAD^{commit}')"
+  if [[ "$source_commit" != "$head_commit" ]]; then
+    echo "implicit catalog scan requires source_commit to match HEAD; pass an explicit scan root for another commit" >&2
+    exit 2
+  fi
+  temporary_worktree_parent="$(mktemp -d)"
+  scan_root="$temporary_worktree_parent/repo"
+  git -C "$repo_root" worktree add --detach "$scan_root" "$source_commit" >/dev/null
+  if ! git -C "$repo_root" diff --quiet "$source_commit" --; then
+    git -C "$repo_root" diff --binary "$source_commit" -- |
+      git -C "$scan_root" apply --whitespace=nowarn
+  fi
+  while IFS= read -r -d '' relative_path; do
+    source_path="$repo_root/$relative_path"
+    destination_path="$scan_root/$relative_path"
+    mkdir -p "$(dirname "$destination_path")"
+    cp -pP "$source_path" "$destination_path"
+  done < <(git -C "$repo_root" ls-files --others --exclude-standard -z)
+fi
 
 jq -e '
   .schemaVersion == "agent_skills_lab_catalog.v1"

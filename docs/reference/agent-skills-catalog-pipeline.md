@@ -53,15 +53,14 @@ See [codex-dev CLI Reference › skills catalog](codex-dev-cli.md#skills-catalog
 for flags and the output shape.
 
 > **Regenerate from a clean tree.** Resource counts (references/scripts/etc.)
-> walk each skill's directories **on disk**, so a dirty working tree can skew
-> them. Unambiguous build/dependency dirs are ignored automatically
-> (`target/`, `node_modules/`, `.next/`, `.turbo/`, `.venv/`, `.cache/`,
-> `.git/`, `__pycache__/`, `*.pyc`/`*.pyo`), but `.gitignore`d generated files and
-> empty local directories can still differ from a fresh checkout. Before
-> committing a regenerated catalog, run against a clean tree — `git stash` the
-> worktree, or point `--repo-root` at a detached worktree
-> (`git worktree add --detach /tmp/ds-clean HEAD`). CI regenerates from the
-> pushed commit and diffs (Stage 2), so a locally polluted artifact fails.
+> walk each skill's directories **on disk**, so ignored generated files and
+> empty local directories can skew them. The shared checker creates a detached
+> worktree from the requested source commit and overlays tracked working-tree
+> changes plus non-ignored untracked files by default. Ignored files and empty
+> untracked directories never enter that scan. Implicit scans require the source
+> commit to resolve to `HEAD`, so current content cannot be labeled with an older
+> SHA. Pass a scan root as the second positional argument for fixture, historical,
+> or other explicit filesystem validation.
 
 ## Stage 2 — Verify + dispatch (dev-skills)
 
@@ -71,11 +70,11 @@ when any catalog-affecting path changes (the workflow file, `catalog/`,
 `skills/**`, `tools/skill/**`) and via manual `workflow_dispatch`.
 
 1. **Verify catalog artifact**: calls the same
-   `tools/skill/check_catalog.sh` used by PR CI. It regenerates from the
-   checked-out commit with `--source-commit ${GITHUB_SHA}` and
-   `--source-ref main`, normalizes both the committed and freshly-generated
-   copies (replacing the tracked SHA and the workflow SHA with
-   `<sourceCommit>`, and reusing the committed `generatedAt`), then `diff`s them.
+   `tools/skill/check_catalog.sh` used by PR CI. It creates a detached worktree
+   at `${GITHUB_SHA}`, regenerates with `--source-ref main`, normalizes both the
+   committed and freshly-generated copies (replacing the tracked SHA and the
+   workflow SHA with `<sourceCommit>`, and reusing the committed `generatedAt`),
+   then `diff`s them.
    A mismatch means the committed `catalog/agent-skills-lab.json` is stale or was
    generated from a polluted tree — the job **fails here** and nothing is
    dispatched. (See [Operations](#operations) to debug this.)

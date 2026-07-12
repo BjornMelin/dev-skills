@@ -38,11 +38,11 @@ def find_docs_directory() -> Path | None:
         Path to references directory if found, None otherwise
     """
     possible_paths = [
-        # Primary locations for the skill
-        Path.home() / ".codex" / "skills" / "dmc-py" / "references",
+        # The script's own skill bundle is authoritative in repo and installed copies.
+        Path(__file__).resolve().parent.parent / "references",
+        # Fallbacks for manually copied launchers.
+        Path.home() / ".agents" / "skills" / "dmc-py" / "references",
         Path.home() / ".claude" / "skills" / "dmc-py" / "references",
-        # Fallback to current directory structure
-        Path(__file__).parent.parent / "references",
         Path.cwd() / "references",
     ]
 
@@ -233,7 +233,7 @@ Examples:
         print(
             "Warning: Could not find skill references directory.\n"
             "Searched in:\n"
-            "  - ~/.codex/skills/dmc-py/references\n"
+            "  - ~/.agents/skills/dmc-py/references\n"
             "  - ~/.claude/skills/dmc-py/references\n\n"
             "Use --docs-dir to specify a custom path, or --online for web docs.",
             file=sys.stderr,

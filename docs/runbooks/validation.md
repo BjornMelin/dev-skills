@@ -17,11 +17,15 @@ Unmarked prose and workflow notes are human-owned documentation.
 
 ## Pull-request CI baseline
 
-The continuous integration (CI) workflow in `.github/workflows/ci.yml` runs two parallel, credential-free jobs on every pull request and push to `main`:
+The continuous integration (CI) workflow in `.github/workflows/ci.yml` runs two
+parallel, credential-free jobs on every pull request and push to `main`:
 
 - `Rust workspace and catalog` runs workspace formatting, Clippy, tests,
   policy-doc and native Bun smokes, then regenerates and diffs the public
-  catalog through `tools/skill/check_catalog.sh`.
+  catalog through `tools/skill/check_catalog.sh`, which isolates the scan in a
+  detached worktree so ignored local artifacts cannot affect the result. Its
+  regression harness proves non-ignored untracked files fail validation and
+  temporary worktrees are cleaned after success and failure.
 - `Skills, plugins, and docs` runs the strict offline eval, plugin and generated
   mirror validation, design-motion tooling, bootstrap validation, the
   `kimi-ui-agent` clean install/typecheck/tests/doctor, and documentation links.
@@ -46,9 +50,12 @@ cargo audit
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
-cargo package --list -p bun-platform
+cargo package --list -p expo-motion-audit-core
+cargo package --list -p expo-motion-audit
 cargo package --list -p gsap-audit-core
 cargo package --list -p gsap-audit
+cargo package --list -p motion-token-audit-core
+cargo package --list -p motion-token-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 ```
@@ -121,9 +128,8 @@ command surface and rule categories.
 ## codex-dev Operating Layer
 
 Run after changing `crates/codex-dev-core/`, `crates/codex-dev/`,
-`crates/bun-platform-core/`, `crates/bun-platform/`, `crates/gsap-audit-core/`,
-`crates/gsap-audit/`, root Cargo files, or the `codex-dev` architecture/spec
-docs:
+`crates/bun-platform-core/`, any audit crate, root Cargo files, or the
+`codex-dev` architecture and specification docs:
 
 ```bash
 cargo fmt --all --check
@@ -133,36 +139,44 @@ cargo deny check bans licenses sources
 cargo package --list -p codex-dev-core
 cargo package --list -p codex-dev
 cargo package --list -p bun-platform-core
-cargo package --list -p bun-platform
+cargo package --list -p expo-motion-audit-core
+cargo package --list -p expo-motion-audit
 cargo package --list -p gsap-audit-core
 cargo package --list -p gsap-audit
+cargo package --list -p motion-token-audit-core
+cargo package --list -p motion-token-audit
 cargo package --list -p codex-dev-tui
 cargo package --list -p codex-research
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
 cargo clippy -p bun-platform-core --all-targets -- -D warnings
-cargo clippy -p bun-platform --all-targets -- -D warnings
+cargo clippy -p expo-motion-audit-core -p expo-motion-audit --all-targets -- -D warnings
 cargo clippy -p gsap-audit-core --all-targets -- -D warnings
 cargo clippy -p gsap-audit --all-targets -- -D warnings
+cargo clippy -p motion-token-audit-core -p motion-token-audit --all-targets -- -D warnings
 cargo check -p codex-dev-core
 cargo check -p codex-dev
 cargo check -p bun-platform-core
-cargo check -p bun-platform
+cargo check -p expo-motion-audit-core -p expo-motion-audit
 cargo check -p gsap-audit-core
 cargo check -p gsap-audit
+cargo check -p motion-token-audit-core -p motion-token-audit
 cargo test -p codex-dev-core
 cargo test -p codex-dev
 cargo test -p bun-platform-core
-cargo test -p bun-platform
+cargo test -p expo-motion-audit-core -p expo-motion-audit
 cargo test -p gsap-audit-core
 cargo test -p gsap-audit
+cargo test -p motion-token-audit-core -p motion-token-audit
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
-cargo run -q -p bun-platform -- --help
-cargo run -q -p bun-platform -- completions zsh >/tmp/bun-platform.zsh
+cargo run -q -p expo-motion-audit -- doctor
+cargo run -q -p expo-motion-audit -- completions zsh >/tmp/expo-motion-audit.zsh
 cargo run -q -p gsap-audit -- doctor
 cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
+cargo run -q -p motion-token-audit -- doctor
+cargo run -q -p motion-token-audit -- completions zsh >/tmp/motion-token-audit.zsh
 # codex-dev:policy-manifest-smoke:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev
 cargo run -q -p codex-dev -- --json policy explain --profile codex_dev
@@ -328,6 +342,9 @@ documentation.
 cargo run -q -p codex-research -- completions zsh >/tmp/codex-research.zsh
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev-tui -- completions zsh >/tmp/codex-dev-tui.zsh
+cargo run -q -p expo-motion-audit -- completions zsh >/tmp/expo-motion-audit.zsh
+cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
+cargo run -q -p motion-token-audit -- completions zsh >/tmp/motion-token-audit.zsh
 cargo run -q -p codex-research -- manpage >/tmp/codex-research.1
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
 cargo run -q -p codex-dev-tui -- manpage >/tmp/codex-dev-tui.1
@@ -344,6 +361,18 @@ root="$repo/target/codex-dev-install-smoke/codex-dev-tui"
 rm -rf "$root"
 cargo install --path crates/codex-dev-tui --locked --offline --force --root "$root"
 (cd /tmp && "$root/bin/codex-dev-tui" --help >/dev/null && "$root/bin/codex-dev-tui" completions zsh >/dev/null && "$root/bin/codex-dev-tui" manpage >/dev/null)
+root="$repo/target/codex-dev-install-smoke/expo-motion-audit"
+rm -rf "$root"
+cargo install --path crates/expo-motion-audit --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/expo-motion-audit" --help >/dev/null && "$root/bin/expo-motion-audit" doctor >/dev/null && "$root/bin/expo-motion-audit" completions zsh >/dev/null)
+root="$repo/target/codex-dev-install-smoke/gsap-audit"
+rm -rf "$root"
+cargo install --path crates/gsap-audit --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/gsap-audit" --help >/dev/null && "$root/bin/gsap-audit" doctor >/dev/null && "$root/bin/gsap-audit" completions zsh >/dev/null)
+root="$repo/target/codex-dev-install-smoke/motion-token-audit"
+rm -rf "$root"
+cargo install --path crates/motion-token-audit --locked --offline --force --root "$root"
+(cd /tmp && "$root/bin/motion-token-audit" --help >/dev/null && "$root/bin/motion-token-audit" doctor >/dev/null && "$root/bin/motion-token-audit" completions zsh >/dev/null)
 ```
 
 Optional live PR-agent smoke, for branches with a GitHub PR and valid `gh`
@@ -408,6 +437,9 @@ tools, network/secrets expectation, and failure interpretation. Built-in
 profiles are local and do not require provider credentials; live provider checks
 stay explicit in their owning runbooks. Executed gates marked `network` require
 `--allow-network`; executed gates marked `secrets` require `--allow-secrets`.
+The `skills`, `release`, and `full_local` profiles declare the locked
+`kimi-ui-agent` dependency install as their sole network gate so a fresh clone
+can run its required typecheck, tests, and doctor deterministically.
 Use `cargo run -q -p codex-dev -- --json policy explain --profile <profile>` to
 inspect gate purpose, expected artifacts, missing local prerequisites, and docs
 mirror status without executing any gate. Aggregated `release` and `full_local`
@@ -582,21 +614,31 @@ Manual checks:
 cargo fmt --all --check
 cargo clippy -p codex-dev-core --all-targets -- -D warnings
 cargo clippy -p codex-dev --all-targets -- -D warnings
+cargo clippy -p expo-motion-audit-core -p expo-motion-audit --all-targets -- -D warnings
 cargo clippy -p gsap-audit-core --all-targets -- -D warnings
 cargo clippy -p gsap-audit --all-targets -- -D warnings
+cargo clippy -p motion-token-audit-core -p motion-token-audit --all-targets -- -D warnings
 cargo check -p codex-dev-core
 cargo check -p codex-dev
+cargo check -p expo-motion-audit-core -p expo-motion-audit
 cargo check -p gsap-audit-core
 cargo check -p gsap-audit
+cargo check -p motion-token-audit-core -p motion-token-audit
 cargo test -p codex-dev-core
 cargo test -p codex-dev
+cargo test -p expo-motion-audit-core -p expo-motion-audit
 cargo test -p gsap-audit-core
 cargo test -p gsap-audit
+cargo test -p motion-token-audit-core -p motion-token-audit
 cargo run -q -p codex-dev -- --help
 cargo run -q -p codex-dev -- completions zsh >/tmp/codex-dev.zsh
 cargo run -q -p codex-dev -- manpage >/tmp/codex-dev.1
+cargo run -q -p expo-motion-audit -- doctor
+cargo run -q -p expo-motion-audit -- completions zsh >/tmp/expo-motion-audit.zsh
 cargo run -q -p gsap-audit -- doctor
 cargo run -q -p gsap-audit -- completions zsh >/tmp/gsap-audit.zsh
+cargo run -q -p motion-token-audit -- doctor
+cargo run -q -p motion-token-audit -- completions zsh >/tmp/motion-token-audit.zsh
 cargo run -q -p codex-dev -- --json bootstrap status
 # codex-dev:policy-manifest-all:start
 cargo run -q -p codex-dev -- --json policy manifest --profile codex_dev

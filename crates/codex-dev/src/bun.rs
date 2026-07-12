@@ -122,7 +122,7 @@ pub(crate) struct BunRuleShowArgs {
 }
 
 #[derive(Args, Debug, Default)]
-pub(crate) struct BunScopeArgs {
+pub(crate) struct BunScanScopeArgs {
     #[arg(long, value_name = "PATH", help = "Repository root to inspect")]
     root: Option<PathBuf>,
     #[arg(long, value_name = "PATH", help = "Path to bun-platform.config.json")]
@@ -139,6 +139,12 @@ pub(crate) struct BunScopeArgs {
     max_files: Option<usize>,
     #[arg(long = "max-bytes", value_name = "N")]
     max_bytes: Option<u64>,
+}
+
+#[derive(Args, Debug, Default)]
+pub(crate) struct BunScopeArgs {
+    #[command(flatten)]
+    scan: BunScanScopeArgs,
     #[arg(
         long = "write-cache",
         help = "Write scan-cache entries under the dev-skills Bun platform cache"
@@ -182,7 +188,7 @@ pub(crate) struct BunDoctorArgs {
 #[derive(Args, Debug)]
 pub(crate) struct BunBenchmarkArgs {
     #[command(flatten)]
-    scope: BunScopeArgs,
+    scope: BunScanScopeArgs,
     #[arg(long, default_value_t = 3, value_name = "N")]
     iterations: u32,
 }
@@ -281,7 +287,7 @@ pub(crate) fn handle_tool_command(command: ToolCommand) -> Result<CommandOutput>
 }
 
 fn bun_audit(args: BunAuditArgs) -> Result<CommandOutput> {
-    let (root, config) = build_bun_config(&args.scope)?;
+    let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let findings = run_audit(&root, &config, &paths)?;
     let failed = args
@@ -335,7 +341,7 @@ fn bun_rules_show(args: BunRuleShowArgs) -> Result<CommandOutput> {
 }
 
 fn bun_fixes(args: BunFixesArgs, apply: bool) -> Result<CommandOutput> {
-    let (root, config) = build_bun_config(&args.scope)?;
+    let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let fixes = if apply {
         apply_safe_fixes(&root, &config, &paths)?
@@ -367,7 +373,7 @@ fn bun_fixes(args: BunFixesArgs, apply: bool) -> Result<CommandOutput> {
 }
 
 fn bun_validate_plan(scope: BunScopeArgs) -> Result<CommandOutput> {
-    let (root, config) = build_bun_config(&scope)?;
+    let (root, config) = build_bun_config(&scope.scan, scope.write_cache)?;
     let commands = validation_commands(&root, &config)?;
     Ok(CommandOutput {
         ok: true,
@@ -383,7 +389,7 @@ fn bun_validate_plan(scope: BunScopeArgs) -> Result<CommandOutput> {
 }
 
 fn bun_validate_run(args: BunValidateRunArgs) -> Result<CommandOutput> {
-    let (root, config) = build_bun_config(&args.scope)?;
+    let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let findings = run_audit(&root, &config, &paths)?;
     let fail_on = map_bun_severity(args.fail_on);
@@ -527,7 +533,8 @@ fn bun_doctor(args: BunDoctorArgs) -> Result<CommandOutput> {
 }
 
 fn bun_benchmark(args: BunBenchmarkArgs) -> Result<CommandOutput> {
-    let (root, config) = build_bun_config(&args.scope)?;
+    let (root, mut config) = build_bun_config(&args.scope, false)?;
+    config.write_cache = false;
     let paths = PlatformPaths::discover()?;
     let iterations = args.iterations.max(1);
     let mut audit_ms = Vec::new();
@@ -630,7 +637,7 @@ fn tool_import(args: ToolImportArgs) -> Result<CommandOutput> {
     })
 }
 
-fn build_bun_config(scope: &BunScopeArgs) -> Result<(PathBuf, AuditConfig)> {
+fn build_bun_config(scope: &BunScanScopeArgs, write_cache: bool) -> Result<(PathBuf, AuditConfig)> {
     let root = resolve_root(scope.root.clone())?;
     let overrides = CliOverrides {
         baseline_path: scope.baseline.clone(),
@@ -639,7 +646,7 @@ fn build_bun_config(scope: &BunScopeArgs) -> Result<(PathBuf, AuditConfig)> {
         adapters: scope.adapters.clone(),
         max_files: scope.max_files,
         max_bytes: scope.max_bytes,
-        write_cache: scope.write_cache,
+        write_cache,
     };
     let config = load_audit_config(&root, scope.config.as_deref(), &overrides)?;
     Ok((root, config))
