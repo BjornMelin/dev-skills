@@ -1,9 +1,9 @@
 # Bun Platform Reference
 
 The Bun platform tooling from `~/repos/cli/skill-tools` now lives in this
-repository. The current command surface is the standalone `bun-platform` binary;
-`codex-dev` integration records evidence and policy state but does not yet expose
-a native `codex-dev bun` command group.
+repository. The canonical command surface is the native `codex-dev bun` group.
+The standalone `bun-platform` binary remains a temporary compatibility shim;
+new automation should not depend on it.
 Deleting the legacy repository is explicitly gated by
 <https://github.com/BjornMelin/dev-skills/issues/105>.
 
@@ -11,11 +11,11 @@ Deleting the legacy repository is explicitly gated by
 
 - `crates/bun-platform-core`: shared Bun audit, safe-fix, validation, reference
   sync, state-path, and rule/skill integrity logic.
-- `crates/bun-platform`: compatibility binary that calls
+- `crates/bun-platform`: temporary compatibility binary over
   `bun-platform-core`.
-- `crates/codex-dev`: native command surface for future automation.
+- `crates/codex-dev`: canonical native command surface.
 
-## JSON Contract
+## Compatibility binary JSON contract
 
 `bun-platform` JSON output is command-specific and is emitted with
 `--format json`:
@@ -59,8 +59,9 @@ bun-platform apply-safe-fixes --root .
 bun-platform validate --root . --fail-on warn
 ```
 
-Use `bun-platform ...` in skills, docs, and future scripts until a native
-`codex-dev bun` command group is implemented.
+Use the `codex-dev bun` command group in skills, docs, and new scripts. Keep the
+`bun-platform` command only where an existing caller still requires the
+temporary compatibility binary.
 
 ## State And Config
 

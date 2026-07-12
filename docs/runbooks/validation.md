@@ -15,6 +15,23 @@ cargo run -q -p codex-dev -- --json policy docs-check
 
 Unmarked prose and workflow notes are human-owned documentation.
 
+## Pull-request CI baseline
+
+The continuous integration (CI) workflow in `.github/workflows/ci.yml` runs two parallel, credential-free jobs on every pull request and push to `main`:
+
+- `Rust workspace and catalog` runs workspace formatting, Clippy, tests,
+  policy-doc and native Bun smokes, then regenerates and diffs the public
+  catalog through `tools/skill/check_catalog.sh`.
+- `Skills, plugins, and docs` runs the strict offline eval, plugin and generated
+  mirror validation, design-motion tooling, bootstrap validation, the
+  `kimi-ui-agent` clean install/typecheck/tests/doctor, and documentation links.
+
+Install the one pinned Python dependency before reproducing the second job:
+
+```bash
+python3 -m pip install -r requirements-ci.txt
+```
+
 ## Local Release Supply Chain
 
 Use [Local Release and Supply Chain](local-release-supply-chain.md) before
@@ -429,7 +446,7 @@ for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quic
 claude plugin validate . --strict
 claude plugin validate ./plugins/web-motion --strict
 node plugins/web-motion/scripts/validate-atomic-skills.mjs
-rg --files -g '*.json' .claude-plugin plugins | xargs -r jq empty
+find .claude-plugin plugins -type f -name '*.json' -exec jq empty {} +
 ```
 
 Package changed skills:
