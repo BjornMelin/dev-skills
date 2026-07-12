@@ -44,7 +44,9 @@ The public artifact `catalog/agent-skills-lab.json`
 (schema `agent_skills_lab_catalog.v1`) is produced by the `codex-dev` CLI:
 
 ```bash
-cargo run -q -p codex-dev -- --json skills catalog --out catalog/agent-skills-lab.json
+cargo run -q -p codex-dev -- --json skills catalog \
+  --source-ref main \
+  --out catalog/agent-skills-lab.json
 ```
 
 See [codex-dev CLI Reference › skills catalog](codex-dev-cli.md#skills-catalog)
@@ -68,9 +70,11 @@ when any catalog-affecting path changes (the workflow file, `catalog/`,
 `crates/codex-dev-core/**`, `crates/codex-dev/**`, `docs/**`, `README.md`,
 `skills/**`, `tools/skill/**`) and via manual `workflow_dispatch`.
 
-1. **Verify catalog artifact** — regenerates the catalog from the checked-out
-   commit with `--source-commit ${GITHUB_SHA}`, normalizes both the committed and
-   freshly-generated copies (replacing the tracked SHA and the workflow SHA with
+1. **Verify catalog artifact**: calls the same
+   `tools/skill/check_catalog.sh` used by PR CI. It regenerates from the
+   checked-out commit with `--source-commit ${GITHUB_SHA}` and
+   `--source-ref main`, normalizes both the committed and freshly-generated
+   copies (replacing the tracked SHA and the workflow SHA with
    `<sourceCommit>`, and reusing the committed `generatedAt`), then `diff`s them.
    A mismatch means the committed `catalog/agent-skills-lab.json` is stale or was
    generated from a polluted tree — the job **fails here** and nothing is
