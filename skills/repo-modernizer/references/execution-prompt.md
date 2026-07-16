@@ -36,7 +36,6 @@ Conditional skill and tool routing:
   delete custom repo code via newer native capabilities, also use:
   - `$opensrc`
   - `opensrc path`
-  - `/home/bjorn/.codex/skill-support/bin/deps-workbench upgrade-prep`
 - For GitHub release/changelog dependency intelligence, use this skill's
   bundled `scripts/gh_deps_intel.py` lane and `references/gh-deps-workflow.md`
   instead of invoking a separate dependency-intel skill.
@@ -113,17 +112,13 @@ Dependency audit requirements:
    - `bun pm ls`
    - `bun pm why`
    - plus package-manager-native equivalents for the repo
-4. For major or ambiguous npm/Bun package upgrades, run the fast prep layer before source-level analysis:
-   - `deps-workbench upgrade-prep --cwd <repo-root> --package <pkg> --out <tmp.json>`
-   - `deps-workbench report --input <tmp.json> --format md`
-   - then use `$opensrc` for current-versus-target source comparison
-5. For GitHub release and changelog evidence across JS/TS or Python dependency
+4. For GitHub release and changelog evidence across JS/TS or Python dependency
    sets, run:
    - `python3 "$skill_dir/scripts/gh_deps_intel.py" full --repo . --out reports --mode safe`
    - `python3 "$skill_dir/scripts/gh_deps_intel.py" package --repo . --out reports --mode safe --dependency <name>`
    Use the generated Markdown plus JSON as supporting evidence, not as a
    replacement for repo-native verification.
-6. Produce a dependency matrix covering:
+5. Produce a dependency matrix covering:
    - package
    - current version
    - latest version

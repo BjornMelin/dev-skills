@@ -465,13 +465,8 @@ def source_map_url_maps(seed: dict[str, Any]) -> dict[str, dict[str, str]]:
 
 def collector_adapters() -> dict[str, dict[str, Any]]:
     """Report optional collector backends available in the environment."""
-    deps_workbench_root = Path.home() / ".codex" / "deps-workbench"
     return {
         "bundled_source_map": {"status": "ok", "path": str(bundled_source_map_path(__file__))},
-        "deps_workbench": {
-            "status": "available" if deps_workbench_root.exists() else "missing",
-            "path": str(deps_workbench_root),
-        },
         "ctx7": {"status": "available" if tool_available("ctx7") else "missing"},
         "github": {"status": "available" if tool_available("gh") else "missing"},
         "opensrc": {"status": "available" if tool_available("opensrc") else "missing"},
