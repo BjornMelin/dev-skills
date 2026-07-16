@@ -182,5 +182,3 @@ Mark anything that could not be confirmed as `UNVERIFIED`.
 - Use opensrc for code, not as a substitute for official migration docs.
 - If latest is risky or unstable, compare current against the exact intended
   target version instead of defaulting to latest.
-- Do not over-automate the final migration decision. The helper is for prep, not
-  for replacing source interpretation, API review, or hard-cut reasoning.
