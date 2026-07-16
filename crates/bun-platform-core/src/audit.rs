@@ -84,7 +84,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
     let mut findings = Vec::new();
     let package_json_path = root.join("package.json");
     let package_json = snapshot.read_json::<PackageJson>(&package_json_path)?;
-    let tsconfig = snapshot.read_json::<TsConfig>(&root.join("tsconfig.json"))?;
+    let tsconfig = snapshot.read_jsonc::<TsConfig>(&root.join("tsconfig.json"))?;
     let bunfig = snapshot.read_text(&root.join("bunfig.toml"))?;
     let gitignore = snapshot.read_text(&root.join(".gitignore"))?;
 
@@ -487,6 +487,25 @@ impl<'a> RepoSnapshot<'a> {
         Ok(Some(serde_json::from_str::<T>(&text).with_context(
             || format!("failed to parse {}", path.display()),
         )?))
+    }
+
+    fn read_jsonc<T: DeserializeOwned>(&self, path: &Path) -> Result<Option<T>> {
+        let Some(text) = self.read_text(path)? else {
+            return Ok(None);
+        };
+        let options = jsonc_parser::ParseOptions {
+            allow_comments: true,
+            allow_loose_object_property_names: false,
+            allow_trailing_commas: true,
+            allow_missing_commas: false,
+            allow_single_quoted_strings: false,
+            allow_hexadecimal_numbers: false,
+            allow_unary_plus_numbers: false,
+        };
+        Ok(Some(
+            jsonc_parser::parse_to_serde_value::<T>(&text, &options)
+                .with_context(|| format!("failed to parse {}", path.display()))?,
+        ))
     }
 
     fn walk_files(&self) -> Result<Vec<PathBuf>> {

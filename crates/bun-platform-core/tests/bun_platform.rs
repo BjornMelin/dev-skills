@@ -144,6 +144,49 @@ fn plans_and_applies_safe_package_json_fixes() {
 }
 
 #[test]
+fn parses_jsonc_tsconfig_without_rewriting_it() {
+    let _env = TestEnv::new("jsonc-tsconfig");
+    let root = copy_fixture("jsonc-tsconfig");
+    let tsconfig_path = root.join("tsconfig.json");
+    let before = fs::read_to_string(&tsconfig_path).expect("tsconfig before audit");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+
+    let findings = run_audit(&root, &config, &paths).expect("audit JSONC tsconfig");
+
+    assert!(
+        findings
+            .iter()
+            .all(|finding| !finding.rule_id.starts_with("tsconfig-"))
+    );
+    assert_eq!(
+        fs::read_to_string(tsconfig_path).expect("tsconfig after audit"),
+        before
+    );
+}
+
+#[test]
+fn rejects_invalid_jsonc_tsconfig_with_location() {
+    let _env = TestEnv::new("invalid-jsonc-tsconfig");
+    let root = copy_fixture("jsonc-tsconfig");
+    let tsconfig_path = root.join("tsconfig.json");
+    fs::write(
+        &tsconfig_path,
+        "{\n  \"compilerOptions\": {\n    target: \"ESNext\"\n  }\n}\n",
+    )
+    .expect("write invalid tsconfig");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+
+    let error = run_audit(&root, &config, &paths).expect_err("invalid JSONC must fail");
+    let message = format!("{error:#}");
+
+    assert!(message.contains(&format!("failed to parse {}", tsconfig_path.display())));
+    assert!(message.contains("Expected string for object property"));
+    assert!(message.contains("line 3 column 5"));
+}
+
+#[test]
 fn normalizes_next_scripts_when_vercel_bun_runtime_is_enabled() {
     let _env = TestEnv::new("vercel-next");
     let root = copy_fixture("vercel-next");

@@ -1,0 +1,15 @@
+{
+  // TypeScript accepts line comments in tsconfig.json.
+  "compilerOptions": {
+    /* Bun's resolver follows package exports and imports. */
+    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "module": "Preserve",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "types": [
+      "bun-types",
+    ],
+  },
+}

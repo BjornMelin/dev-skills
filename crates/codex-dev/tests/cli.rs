@@ -172,6 +172,36 @@ fn bun_audit_emits_the_native_finding_contract() {
 }
 
 #[test]
+fn bun_jsonc_tsconfig_entry_points_succeed() {
+    let root = bun_fixture("jsonc-tsconfig");
+    let root = root.to_str().expect("utf8 fixture path");
+
+    let audit = run_codex_dev_json(&["--json", "bun", "audit", "--root", root]);
+    assert_eq!(audit["command"], "bun audit");
+    assert!(
+        audit["result"]["findings"]
+            .as_array()
+            .expect("audit findings")
+            .iter()
+            .all(|finding| !finding["rule_id"]
+                .as_str()
+                .unwrap_or_default()
+                .starts_with("tsconfig-"))
+    );
+
+    let fixes = run_codex_dev_json(&["--json", "bun", "fixes", "plan", "--root", root]);
+    assert_eq!(fixes["command"], "bun fixes plan");
+    assert_eq!(fixes["result"]["fix_count"], 0);
+
+    let validation = run_codex_dev_json(&["--json", "bun", "validate", "plan", "--root", root]);
+    assert_eq!(validation["command"], "bun validate plan");
+    assert_eq!(
+        validation["result"]["commands"],
+        json!(["bun run typecheck"])
+    );
+}
+
+#[test]
 fn bun_benchmark_emits_the_native_timing_contract() {
     let root = tempdir().expect("benchmark root");
     std::fs::write(
