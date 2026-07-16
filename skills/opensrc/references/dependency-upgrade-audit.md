@@ -18,18 +18,6 @@ native package capabilities should replace repo-owned code.
 
 ## Workflow
 
-If `/home/bjorn/.codex/skill-support/bin/deps-workbench` exists and the package
-is in the Bun/npm lane, start with:
-
-```bash
-tmp_json="$(mktemp)"
-deps-workbench upgrade-prep --cwd <repo-root> --package <pkg> --out "$tmp_json"
-deps-workbench report --input "$tmp_json" --format md
-```
-
-Use that output as the fast inventory layer, then continue with the deeper
-source, docs, and migration reasoning below.
-
 ### 1. Establish Current Repo State
 
 1. Read the repo's manifests and lockfiles.
@@ -194,5 +182,3 @@ Mark anything that could not be confirmed as `UNVERIFIED`.
 - Use opensrc for code, not as a substitute for official migration docs.
 - If latest is risky or unstable, compare current against the exact intended
   target version instead of defaulting to latest.
-- Do not over-automate the final migration decision. The helper is for prep, not
-  for replacing source interpretation, API review, or hard-cut reasoning.

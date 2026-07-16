@@ -60,15 +60,7 @@ or implementation details matter.
 
 ## Upgrade Audits
 
-For npm/Bun dependency upgrades, if this helper exists, use it as the fast
-inventory layer before deeper source reasoning:
-
-```bash
-deps-workbench upgrade-prep --cwd <repo-root> --package <pkg> --out <tmp.json>
-deps-workbench report --input <tmp.json> --format md
-```
-
-Then compare current and target with official docs plus pinned source paths.
+Compare current and target with official docs plus pinned source paths.
 Prefer package-native capabilities, delete obsolete wrappers/shims/adapters, and
 avoid dual-shape compatibility unless a real boundary requires it.
 

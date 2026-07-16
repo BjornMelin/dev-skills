@@ -30,8 +30,6 @@ the authoritative lockfile.
    - `bun pm ls`
    - `bun pm why`
    - `bun pm pkg`
-   - `/home/bjorn/.codex/skill-support/bin/deps-workbench inventory`
-   - `/home/bjorn/.codex/skill-support/bin/deps-workbench upgrade-prep`
 3. Bun-native dependency mutation:
    - `bun install`
    - `bun add`
@@ -45,8 +43,6 @@ the authoritative lockfile.
 - Use Bun docs as the primary source for package-manager behavior, not npm docs.
 - If runtime execution or test behavior changes after upgrades, verify whether
   the issue is Bun-runtime specific versus generic JS ecosystem breakage.
-- Use `deps-workbench upgrade-prep` to gather Bun outdated, audit, why, usage,
-  and opensrc-path context quickly before invoking deeper source analysis.
 
 ## Cleanup Bias
 
