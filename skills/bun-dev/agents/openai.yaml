@@ -1,4 +1,4 @@
 interface:
   display_name: "Bun Dev"
   short_description: "Bun operating model + native dev-skills audit/remediation platform"
-  default_prompt: "Use bun-dev for Bun-first operating-model guidance, reference sync, and shared repo auditing. Prefer codex-dev bun for audit, rules, fixes, validate, benchmark, and references workflows. Route focused scan/remediation work to bun-audit when appropriate, but keep bun-dev as the source of truth for rules and references."
+  default_prompt: "Use bun-dev for Bun-first operating-model guidance, knowledge, rules, reference sync, and repo auditing. Prefer codex-dev bun for audit, rules, fixes, validate, benchmark, and references workflows. bun-dev is the single Bun skill and the source of truth for rules and references."

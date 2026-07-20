@@ -1,14 +1,12 @@
 # Bun CLI Cheatsheet (Bun-First Repos)
 
-This is a quick reference for day-to-day Bun development. Prefer `rules/` for “what to do” and “what not to do”.
+This is a quick reference for day-to-day Bun development. Prefer `rules/` for "what to do"
+and "what not to do".
 
 ## Install / Upgrade Bun
 
 ```bash
-# Upgrade Bun in-place
-bun upgrade
-
-# Check version
+bun upgrade         # upgrade Bun in-place
 bun --version
 ```
 
@@ -26,57 +24,42 @@ bun create vite my-app
 ## Package Management
 
 ```bash
-# Install deps from package.json
-bun install
+bun install                      # install deps from package.json (writes bun.lock)
+bun ci                           # deterministic CI install (frozen lockfile)
+bun install --linker=isolated    # strict, pnpm-style isolation (monorepos)
 
-# Deterministic install (CI)
-bun install --frozen-lockfile
-
-# Add / remove
 bun add <pkg>
 bun add -d <pkg>
 bun remove <pkg>
 
-# Update / outdated
 bun update
 bun update <pkg>
 bun outdated
 
-# Tool runner (npx equivalent)
-bunx <bin> [...args]
+bun audit                        # dependency security advisories
+bunx <bin> [...args]             # npx equivalent
 ```
 
 ## Run Code
 
 ```bash
-# Run a package.json script
-bun run dev
+bun run dev                      # run a package.json script
+bun run src/index.ts             # run a TS/JS entrypoint directly
 
-# Run an entrypoint directly (TS/JS)
-bun run src/index.ts
-
-# Watch / hot reload
 bun --watch run src/server.ts
 bun --hot run src/server.ts
 
-# Explicit env file
 bun --env-file=.env.production run src/server.ts
 ```
 
 ## Monorepos (Workspaces)
 
 ```bash
-# Run in all workspace packages
-bun run --workspaces test
+bun run --workspaces test        # run in all workspace packages
+bun run --filter "packages/*" build
 
-# Filter packages
-bun run --filter \"packages/*\" build
-
-# Parallel / sequential
 bun run --parallel --workspaces lint typecheck
 bun run --sequential --workspaces build
-
-# Keep going if one fails
 bun run --parallel --no-exit-on-error --workspaces test
 ```
 
@@ -86,7 +69,13 @@ bun run --parallel --no-exit-on-error --workspaces test
 bun test
 bun test --watch
 bun test --coverage
-bun test --grep \"pattern\"
+bun test -t "pattern"            # filter by test name (--test-name-pattern)
+
+# Scale (Bun 1.3.x)
+bun test --isolate
+bun test --parallel
+bun test --shard=3/4
+bun test --changed
 ```
 
 ## Bundling / Build
@@ -100,12 +89,12 @@ bun build ./src/cli.ts --compile --outfile mycli
 
 ## Vercel Bun Runtime (Functions)
 
-Enable Bun runtime:
+Enable the Bun runtime (Beta):
 
 ```json
 {
-  \"$schema\": \"https://openapi.vercel.sh/vercel.json\",
-  \"bunVersion\": \"1.x\"
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "bunVersion": "1.x"
 }
 ```
 
@@ -119,14 +108,13 @@ export default {
 };
 ```
 
-Next.js with Bun runtime (notably ISR):
+Next.js with the Bun runtime (notably ISR):
 
 ```json
 {
-  \"scripts\": {
-    \"dev\": \"bun run --bun next dev\",
-    \"build\": \"bun run --bun next build\"
+  "scripts": {
+    "dev": "bun run --bun next dev",
+    "build": "bun run --bun next build"
   }
 }
 ```
-

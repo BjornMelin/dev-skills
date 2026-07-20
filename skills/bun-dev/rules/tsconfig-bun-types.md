@@ -2,28 +2,45 @@
 
 ## Why
 
-Without Bun’s type definitions, TypeScript won’t understand Bun globals (like `Bun`) and Bun-specific modules (`bun:*`), causing false errors and poor editor support.
+Without Bun's type definitions, TypeScript doesn't understand Bun globals (like `Bun`)
+or Bun-specific modules (`bun:*`), causing false errors like "Cannot find name 'Bun'"
+and poor editor support.
 
 ## Do
 
-- Install `@types/bun` as a dev dependency.
-- Add `"types": ["bun-types"]` to `compilerOptions` when you need Bun globals in TS.
+- Install `@types/bun` as a dev dependency. This is the actual requirement: it provides
+  the `Bun` global and `bun:*` module types.
+- Leave `compilerOptions.types` **unset** for most projects. TypeScript then auto-includes
+  every `@types/*` package (including `@types/bun`), so Bun globals plus DOM/Node ambient
+  types all resolve.
+- Only scope `compilerOptions.types` when you deliberately restrict ambient types, and
+  then keep Bun's types in the list.
+- Restart the TS server after changing types.
 
 ## Don't
 
-- Don’t rely on implicit global types being present.
+- Don't paper over missing types with `any`.
+- Don't scope `compilerOptions.types` to a list that omits Bun's types (it silently drops
+  the `Bun` global).
 
 ## Examples
+
+Install (the important step):
 
 ```bash
 bun add -d @types/bun
 ```
 
+Scoped types (only if you must restrict) - keep Bun in the list:
+
 ```json
 {
   "compilerOptions": {
-    "types": ["bun-types"]
+    "types": ["bun"]
   }
 }
 ```
 
+> Audit note: `bun audit` emits an Info nudge only when `compilerOptions.types` is scoped
+> to a non-empty array that omits Bun's types. An unset `types` array (or one that
+> includes `"bun"` / `"bun-types"`) resolves Bun globals and is not flagged.
