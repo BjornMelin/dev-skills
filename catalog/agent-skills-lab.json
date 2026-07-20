@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-12T01:10:43Z",
+  "generatedAt": "2026-07-20T21:53:51Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "98abc273835fafe07e4a7dfbcda75b56dd770347",
+  "sourceCommit": "c141a6dd9b1a4f9682e2a368e1072c52c74a6687",
   "sourceRef": "main",
-  "skillsCount": 66,
-  "totalSkillDirectories": 66,
+  "skillsCount": 65,
+  "totalSkillDirectories": 65,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -350,56 +350,9 @@
       }
     },
     {
-      "name": "bun-audit",
-      "slug": "bun-audit",
-      "description": "Shared Bun audit/remediation router. Use when auditing a repo for Bun-first correctness, explaining findings, listing rules, planning safe fixes, applying low-risk remediations, or validating Bun-related changes.",
-      "path": "skills/bun-audit",
-      "skillMdPath": "skills/bun-audit/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/bun-audit",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/bun-audit/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill bun-audit -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill bun-audit -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill bun-audit"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_agents"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_references",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 0,
-        "scripts": 0,
-        "assets": 0,
-        "templates": 0,
-        "agents": 1,
-        "total": 1
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/bun-audit.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
       "name": "bun-dev",
       "slug": "bun-dev",
-      "description": "Definitive, rule-first Bun development/build/runtime guidance plus native dev-skills automation. Use when adopting Bun, migrating from Node.js, auditing or fixing Bun package-management posture, optimizing scripts/monorepos, configuring Bun + TypeScript, using bun test/build, or deploying Bun workloads/Vercel Functions with Bun runtime.",
+      "description": "Definitive Bun development, build, and runtime skill: package manager and lockfiles, Node-to-Bun migration, monorepo scripts and workspaces, bun test and bun build, TypeScript config, Bun-native APIs (Bun.serve, Bun.file, Bun.$ shell, bun:sqlite), and Vercel Bun-runtime Functions, plus an optional native audit/fix/validate engine (codex-dev bun). Use when adopting or migrating to Bun, choosing Bun vs Node as runtime or package manager, auditing or fixing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml or tsconfig for Bun, running or scaling bun test, bundling or compiling with bun build, or deploying Bun Functions on Vercel.",
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {

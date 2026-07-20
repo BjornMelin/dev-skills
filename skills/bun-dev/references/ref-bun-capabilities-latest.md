@@ -1,7 +1,23 @@
-# Bun v1.3.13 Capability Map
+# Bun v1.3.14 Capability Map
 
-Verified against Bun `v1.3.13` CLI help, official docs, Bun blog release notes,
-Context7 `/oven-sh/bun`, and GitHub release metadata.
+Verified against Bun `v1.3.14` CLI help, official docs, Bun blog release notes,
+Context7 `/oven-sh/bun`, and GitHub release metadata. The v1.3.13 feature set below
+carries forward.
+
+## New / important in v1.3.14
+
+- **Global Virtual Store**: `install.globalStore = true` in `bunfig.toml` (isolated
+  linker) materializes packages once and symlinks projects in - large warm-install
+  speedup. Route to `pm-linker-and-streaming-install`, `tooling-bunfig`.
+- **`Bun.Image`**: built-in image processing (sharp-style pipeline), zero native
+  installs. No dedicated rule; see `bun.com/docs/llms.txt`.
+- **HTTP/3 (QUIC) in `Bun.serve`** (`http3: true`, experimental). Route to
+  `perf-prefer-bun-native-apis`.
+- **Experimental HTTP/2 / HTTP/3 `fetch()` clients** (`protocol: "http2" | "http3"`). No
+  dedicated rule yet; see `bun.com/docs/llms.txt`.
+- **`--no-orphans`** (`[run] noOrphans`), **`process.execve()`**, **`Bun.Terminal` on
+  Windows**, rewritten `fs.watch()` backend, native `using` / `await using` when
+  targeting Bun, SQLite 3.53.0, FreeBSD/Android builds.
 
 ## New / important in v1.3.13
 
@@ -93,8 +109,7 @@ Use when:
 
 Route to:
 
-- `runtime-webview-automation`
-- `perf-prefer-bun-native-apis`
+- no dedicated rule yet; see `bun.com/docs/llms.txt` for `Bun.WebView`
 
 ### Markdown in terminal
 
@@ -104,8 +119,7 @@ Route to:
 
 Route to:
 
-- `runtime-markdown-entrypoints`
-- `perf-prefer-bun-native-apis`
+- no dedicated rule yet; see `bun.com/docs/llms.txt` for markdown entrypoints
 
 ### Cron split is now first-class
 
@@ -121,7 +135,7 @@ Route to:
 
 Route to:
 
-- `runtime-cron-in-process-vs-os`
+- no dedicated rule yet; see `bun.com/docs/llms.txt` for `Bun.cron`
 
 ### JS engine / language surface
 
@@ -172,17 +186,22 @@ Use when:
 
 ## Skill impact
 
-Need direct rule coverage:
+Covered by rules:
 
-- Bun runtime vs. Node runtime choice
-- Bun-native APIs
-- `Bun.WebView`
-- `Bun.cron` overload split
-- Markdown terminal entrypoints
-- standalone HTML
-- workspace script orchestration
+- Bun runtime vs. Node runtime choice (`runtime-bun-vs-node-choose`)
+- Bun-native APIs (`perf-prefer-bun-native-apis`)
+- standalone HTML (`build-bun-compile-browser`)
+- workspace script orchestration (`scripts-bun-run-parallel-sequential`,
+  `scripts-bun-filter-and-workspaces`)
 - `bun test` isolation, parallelism, changed-file selection, and sharding
-- isolated linker and streaming install behavior
+  (`test-bun-test-runner`)
+- isolated linker and streaming install behavior (`pm-linker-and-streaming-install`)
+
+Known gaps (no dedicated rule yet; see `bun.com/docs/llms.txt`):
+
+- `Bun.WebView` browser automation
+- `Bun.cron` in-process vs OS overload split
+- Markdown terminal entrypoints (`bun ./file.md`, `Bun.markdown.ansi()`)
 
 Docs-only, no dedicated rule needed:
 

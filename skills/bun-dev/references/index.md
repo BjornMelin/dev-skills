@@ -1,11 +1,11 @@
 # References Index
 
-Prefer rules for decisions and references for exact commands or API details.
+Prefer rules for decisions, references for exact commands and API detail.
 
 Verified version pin:
 
-- Bun CLI `1.3.13`
-- Bun release `v1.3.13`
+- Bun CLI `1.3.14`
+- Bun release `v1.3.14`
 
 Refresh vendor-backed refs:
 
@@ -17,15 +17,15 @@ codex-dev --json bun references sync
 
 ## Bun
 
-- Latest Bun release notes:
+- Bun release notes snapshot:
   - `ref-bun-release-notes-latest.md`
-- Bun capabilities snapshot:
+- Bun capability map:
   - `ref-bun-capabilities-latest.md`
-- Bun CLI + workflow cheatsheet:
+- Bun CLI reference:
   - `ref-bun-cli-cheatsheet.md`
-- Bun built-in APIs cheatsheet:
+- Bun runtime APIs reference:
   - `ref-bun-builtins-cheatsheet.md`
-- Bun package-manager fallback notes:
+- Package-manager fallback lanes:
   - `ref-bun-package-manager-fallbacks.md`
 
 ## Vercel
@@ -36,7 +36,8 @@ codex-dev --json bun references sync
 ## Fast Lookup
 
 ```bash
-rg -n "--parallel|--sequential" skills/bun-dev/references/ref-bun-release-notes-latest.md
-rg -n "bunVersion|Bun\\.serve|Beta" skills/bun-dev/references/ref-vercel-bun-runtime.md
-rg -n "bun (install|add|update|test|build)" skills/bun-dev/references/ref-bun-cli-cheatsheet.md
+rg -n "Bun.WebView|markdown\\.ansi|Bun\\.cron|availableParallelism|stripANSI" ~/.agents/skills/bun-dev/references/ref-bun-capabilities-latest.md
+rg -n "bun (install|add|update|audit|outdated|pm|build|test|run)" ~/.agents/skills/bun-dev/references/ref-bun-cli-cheatsheet.md
+rg -n "Node runtime|pnpm|npm|Yarn|package manager only" ~/.agents/skills/bun-dev/references/ref-bun-package-manager-fallbacks.md
+rg -n "bunVersion|Bun\\.serve|runtime" ~/.agents/skills/bun-dev/references/ref-vercel-bun-runtime.md
 ```

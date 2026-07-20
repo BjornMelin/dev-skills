@@ -83,8 +83,9 @@ command intentionally does not accept `--write-cache`.
 
 ## Skill integration
 
-`skills/bun-dev` owns vendor references and rule snapshots. `skills/bun-audit`
-routes audit work to the native command surface.
+`skills/bun-dev` owns vendor references, rule snapshots, and the audit/fix/validate
+command surface (its Power Tools section). The former `bun-audit` router skill has
+been consolidated into `bun-dev` and archived at `archive/skills/bun-audit`.
 
 Inside this repository, reference commands discover the tracked
 `skills/bun-dev` directory. Outside the repository, they use

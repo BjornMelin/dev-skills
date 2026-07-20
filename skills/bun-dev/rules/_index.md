@@ -5,15 +5,18 @@ Open `SKILL.md` first to route by priority. Prefer opening specific rules over r
 ## Package Manager + Lockfiles (P1)
 
 - `pm-bun-add-remove-update`
+- `pm-bun-audit-security`
 - `pm-bun-install-ci-frozen-lockfile`
 - `pm-bunx-vs-npx`
 - `pm-commit-bun-lockb`
+- `pm-linker-and-streaming-install`
 - `pm-no-mixed-lockfiles`
 - `pm-package-manager-field`
 
 ## Runtime Selection (P1)
 
 - `runtime-bun-run-bun-flag`
+- `runtime-bun-shell`
 - `runtime-bun-vs-node-choose`
 - `runtime-env-files`
 - `runtime-ts-direct-execution`
@@ -53,7 +56,6 @@ Open `SKILL.md` first to route by priority. Prefer opening specific rules over r
 
 ## Performance (P4)
 
-- `perf-avoid-node-fs-promises-hot-paths`
 - `perf-prefer-bun-native-apis`
 
 ## Migration (P5)
@@ -63,5 +65,7 @@ Open `SKILL.md` first to route by priority. Prefer opening specific rules over r
 ## Troubleshooting (P5)
 
 - `troubleshooting-esm-cjs-and-exports`
-- `troubleshooting-types-bun`
 
+## Other
+
+- `tooling-bunfig`
