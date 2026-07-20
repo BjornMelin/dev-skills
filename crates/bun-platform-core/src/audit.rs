@@ -310,30 +310,27 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
             //   1. missing dependency: a Bun-first repo with a tsconfig but no @types/bun;
             //   2. scoped-out: @types/bun is installed but `types` is a non-empty array
             //      that omits Bun's own types.
-            // A present `types` array - including an explicit empty `[]` - scopes ambient
-            // types and excludes Bun unless it lists "bun"/"bun-types". A missing or
-            // non-array `types` is not scoped (TypeScript auto-includes @types/bun).
-            let scoped_types = compiler_options
+            // Bun globals resolve only when @types/bun is installed AND
+            // `compilerOptions.types` explicitly lists a Bun entry. An unset `types` is
+            // NOT safe: TypeScript 6 defaults it to `[]` and no longer auto-includes
+            // @types packages, and current `bun init` writes `"types": ["bun"]`. So nudge
+            // whenever Bun is not listed (unset, `[]`, or an array without "bun"/"bun-types").
+            let types_lists_bun = compiler_options
                 .get("types")
                 .and_then(|value| value.as_array())
-                .map(|values| {
+                .is_some_and(|values| {
                     values
                         .iter()
-                        .filter_map(|value| value.as_str().map(ToOwned::to_owned))
-                        .collect::<Vec<_>>()
+                        .filter_map(|value| value.as_str())
+                        .any(|value| value == "bun" || value == "bun-types")
                 });
-            let scopes_out_bun = scoped_types.as_ref().is_some_and(|entries| {
-                !entries
-                    .iter()
-                    .any(|value| value == "bun" || value == "bun-types")
-            });
             let types_message = if !has_bun_types {
                 Some(
                     "Install @types/bun (dev dependency) so TypeScript resolves the Bun global and bun:* modules.",
                 )
-            } else if scopes_out_bun {
+            } else if !types_lists_bun {
                 Some(
-                    "compilerOptions.types is scoped but omits Bun's types; add \"bun\" (or \"bun-types\"), or unset types to auto-include @types/bun.",
+                    "Add \"bun\" to compilerOptions.types so the Bun global resolves; an unset types array is not safe under TypeScript 6 (it defaults to []).",
                 )
             } else {
                 None

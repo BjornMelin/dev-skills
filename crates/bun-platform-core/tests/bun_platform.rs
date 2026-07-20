@@ -219,8 +219,35 @@ fn reports_empty_types_array_as_scoping_out_bun() {
         .find(|finding| finding.rule_id == "tsconfig-bun-types")
         .expect("tsconfig-bun-types finding for empty types array");
     assert!(
-        finding.message.contains("scoped but omits Bun's types"),
-        "expected the scoped-out nudge, got: {}",
+        finding.message.contains("TypeScript 6"),
+        "expected the add-bun nudge, got: {}",
+        finding.message
+    );
+}
+
+#[test]
+fn reports_unset_types_with_bun_types_installed() {
+    let _env = TestEnv::new("unset-types-installed");
+    let root = copy_fixture("jsonc-tsconfig"); // fixture ships @types/bun installed
+    // @types/bun is installed but `types` is unset: safe under TypeScript <= 5 but not
+    // under TypeScript 6 (types defaults to []), so the audit nudges to list "bun".
+    fs::write(
+        root.join("tsconfig.json"),
+        "{\n  \"compilerOptions\": {\n    \"moduleResolution\": \"Bundler\",\n    \"target\": \"ESNext\",\n    \"module\": \"Preserve\",\n    \"allowImportingTsExtensions\": true,\n    \"verbatimModuleSyntax\": true,\n    \"noEmit\": true\n  }\n}\n",
+    )
+    .expect("write tsconfig.json");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    let finding = findings
+        .iter()
+        .find(|finding| finding.rule_id == "tsconfig-bun-types")
+        .expect("tsconfig-bun-types finding for unset types with @types/bun installed");
+    assert!(
+        finding.message.contains("Add \"bun\""),
+        "expected the add-bun nudge, got: {}",
         finding.message
     );
 }
