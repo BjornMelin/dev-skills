@@ -11,9 +11,10 @@ carries forward.
   speedup. Route to `pm-linker-and-streaming-install`, `tooling-bunfig`.
 - **`Bun.Image`**: built-in image processing (sharp-style pipeline), zero native
   installs. No dedicated rule; see `bun.com/docs/llms.txt`.
-- **HTTP/3 (QUIC) in `Bun.serve`** (`http3: true`, experimental) and experimental
-  HTTP/2 / HTTP/3 `fetch()` clients (`protocol: "http2" | "http3"`). Route to
+- **HTTP/3 (QUIC) in `Bun.serve`** (`http3: true`, experimental). Route to
   `perf-prefer-bun-native-apis`.
+- **Experimental HTTP/2 / HTTP/3 `fetch()` clients** (`protocol: "http2" | "http3"`). No
+  dedicated rule yet; see `bun.com/docs/llms.txt`.
 - **`--no-orphans`** (`[run] noOrphans`), **`process.execve()`**, **`Bun.Terminal` on
   Windows**, rewritten `fs.watch()` backend, native `using` / `await using` when
   targeting Bun, SQLite 3.53.0, FreeBSD/Android builds.

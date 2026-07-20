@@ -35,12 +35,11 @@ bun test -t "adds"
 bun test --retry 3 --coverage
 ```
 
-Scale in CI (shard 3 of 4, only changed files, isolated parallel workers):
+Scale in CI - combine the flags you need (here: only changed files, shard 3 of 4,
+isolated parallel workers, with coverage):
 
 ```bash
-bun test --shard=3/4
-bun test --changed
-bun test --parallel --coverage
+bun test --changed --shard=3/4 --parallel --coverage
 ```
 
 Minimal test:

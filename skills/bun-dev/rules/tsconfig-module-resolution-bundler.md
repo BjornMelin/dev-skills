@@ -22,6 +22,7 @@ See `tsconfig-bun-recommended` for the full Bun-friendly tsconfig baseline.
 ```json
 {
   "compilerOptions": {
+    "module": "Preserve",
     "moduleResolution": "Bundler",
     "verbatimModuleSyntax": true
   }
