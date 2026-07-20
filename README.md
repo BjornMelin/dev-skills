@@ -283,8 +283,7 @@ for local development and validation commands.
 | `autoreview` | Codex-only structured closeout review helper for local, branch, or commit diffs. | [skills/autoreview/SKILL.md](skills/autoreview/SKILL.md) |
 | `aws-architecture` | AWS architecture: service selection, boundaries, rollout, and verification. | [skills/aws-architecture/SKILL.md](skills/aws-architecture/SKILL.md) |
 | `browser-workbench-setup` | Bootstrap browser/UI QA: Playwright-interactive primary, agent-browser smoke, auth and local conventions. | [skills/browser-workbench-setup/SKILL.md](skills/browser-workbench-setup/SKILL.md) |
-| `bun-audit` | Bun-first audit/remediation router (delegates to the shared engine in `bun-dev`). | [skills/bun-audit/SKILL.md](skills/bun-audit/SKILL.md) |
-| `bun-dev` | Bun development and runtime: PM, lockfiles, monorepos, tests/build, TypeScript, Vercel Bun runtime. | [skills/bun-dev/SKILL.md](skills/bun-dev/SKILL.md) |
+| `bun-dev` | The Bun skill: development, build, and runtime knowledge (PM, lockfiles, monorepos, tests/build, TypeScript, Bun-native APIs, Vercel Bun runtime) plus an optional native audit/fix/validate engine (`codex-dev bun`). | [skills/bun-dev/SKILL.md](skills/bun-dev/SKILL.md) |
 | `caveman-compress` | Compress docs and prose for fewer tokens while keeping substance, code, URLs, and structure. | [skills/caveman-compress/SKILL.md](skills/caveman-compress/SKILL.md) |
 | `codex-sdk` | Codex SDK/CLI: JSONL threads, MCP, multi-agent orchestration, SQLite memory, sandbox patterns. | [skills/codex-sdk/SKILL.md](skills/codex-sdk/SKILL.md) |
 | `codex-utils` | Codex session utilities: plans, short MCQs before risky edits, images, web/MCP discovery, parallel tool use. | [skills/codex-utils/SKILL.md](skills/codex-utils/SKILL.md) |

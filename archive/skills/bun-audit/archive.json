@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "bun-audit",
+  "status": "archived",
+  "archived_at": "2026-07-20T00:00:00Z",
+  "replacement": "bun-dev",
+  "source_path": "skills/bun-audit",
+  "archived_path": "archive/skills/bun-audit",
+  "reason": "Consolidated into bun-dev. bun-audit was a thin router over the same codex-dev bun engine and its description overlapped bun-dev, causing trigger ambiguity. bun-dev now owns the audit/fix/validate command surface (its Power Tools section) plus the rules and references.",
+  "restore": "Move this directory back to skills/bun-audit only if a standalone audit-only router is needed again and bun-dev no longer surfaces the codex-dev bun commands."
+}
