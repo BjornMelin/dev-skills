@@ -305,10 +305,11 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                 ));
             }
 
-            // Only nudge when `types` is explicitly scoped to a non-empty array that
-            // omits Bun's types. An unset `types` auto-includes @types/bun, and `["bun"]`
-            // or `["bun-types"]` both resolve the Bun global, so none of those needs a
-            // finding.
+            // Bun globals resolve when `@types/bun` is installed AND `types` is either
+            // unset or includes a Bun entry. Nudge for the two ways that breaks:
+            //   1. missing dependency: a Bun-first repo with a tsconfig but no @types/bun;
+            //   2. scoped-out: @types/bun is installed but `types` is a non-empty array
+            //      that omits Bun's own types.
             let scoped_types = compiler_options
                 .get("types")
                 .and_then(|value| value.as_array())
@@ -323,13 +324,26 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                 && !scoped_types
                     .iter()
                     .any(|value| value == "bun" || value == "bun-types");
-            if (has_bun_types || signals.bun_first) && scopes_out_bun {
+            let types_message = if !has_bun_types {
+                Some(
+                    "Install @types/bun (dev dependency) so TypeScript resolves the Bun global and bun:* modules.",
+                )
+            } else if scopes_out_bun {
+                Some(
+                    "compilerOptions.types is scoped but omits Bun's types; add \"bun\" (or \"bun-types\"), or unset types to auto-include @types/bun.",
+                )
+            } else {
+                None
+            };
+            if (has_bun_types || signals.bun_first)
+                && let Some(message) = types_message
+            {
                 findings.push(create_finding(
                     &root,
                     "tsconfig-bun-types",
                     Severity::Info,
                     &root.join("tsconfig.json"),
-                    "compilerOptions.types is scoped but omits Bun's types; add \"bun\" (or \"bun-types\") so the Bun global resolves, or unset types to auto-include @types/bun.",
+                    message,
                     FindingOptions::default(),
                 ));
             }

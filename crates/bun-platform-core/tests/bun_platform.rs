@@ -166,6 +166,39 @@ fn parses_jsonc_tsconfig_without_rewriting_it() {
 }
 
 #[test]
+fn reports_missing_bun_types_dependency_when_types_unset() {
+    let _env = TestEnv::new("missing-bun-types");
+    let root = copy_fixture("jsonc-tsconfig");
+    // Bun-first repo with a tsconfig but no @types/bun and `types` unset: TypeScript will
+    // not know the Bun global, so the audit must still nudge. Relaxing the scoped-`types`
+    // false positive must not silence this missing-dependency case.
+    fs::write(
+        root.join("package.json"),
+        "{\n  \"name\": \"x\",\n  \"private\": true,\n  \"packageManager\": \"bun@1.3.14\"\n}\n",
+    )
+    .expect("write package.json");
+    fs::write(
+        root.join("tsconfig.json"),
+        "{\n  \"compilerOptions\": {\n    \"moduleResolution\": \"Bundler\",\n    \"target\": \"ESNext\",\n    \"module\": \"Preserve\",\n    \"allowImportingTsExtensions\": true,\n    \"verbatimModuleSyntax\": true,\n    \"noEmit\": true\n  }\n}\n",
+    )
+    .expect("write tsconfig.json");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    let finding = findings
+        .iter()
+        .find(|finding| finding.rule_id == "tsconfig-bun-types")
+        .expect("tsconfig-bun-types finding for missing @types/bun");
+    assert!(
+        finding.message.contains("Install @types/bun"),
+        "expected the install nudge, got: {}",
+        finding.message
+    );
+}
+
+#[test]
 fn rejects_invalid_jsonc_tsconfig_with_location() {
     let _env = TestEnv::new("invalid-jsonc-tsconfig");
     let root = copy_fixture("jsonc-tsconfig");
