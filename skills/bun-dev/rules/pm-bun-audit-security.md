@@ -11,10 +11,12 @@ its own auditing, so a Bun-first repo does not need a separate tool.
   packages in `bun.lock`).
 - Enable a security scanner that runs during `bun install` / `bun add` by setting it in
   `bunfig.toml`:
+
   ```toml
   [install.security]
-  scanner = "@oven/bun-security-scanner"   # replace with your scanner package
+  scanner = "<scanner-package>"   # a scanner published by a security vendor, e.g. Socket
   ```
+
   Install the scanner as a dev dependency first (`bun add -d <scanner-package>`).
 - Run `bun audit` in CI and on dependency updates; triage findings before merging.
 - Combine with `--minimum-release-age` (see `pm-linker-and-streaming-install`) to reduce
@@ -31,5 +33,5 @@ its own auditing, so a Bun-first repo does not need a separate tool.
 
 ```bash
 bun audit
-bun add -d @oven/bun-security-scanner   # then set [install.security].scanner in bunfig.toml
+bun add -d <scanner-package>   # a security-vendor scanner, then set [install.security].scanner
 ```

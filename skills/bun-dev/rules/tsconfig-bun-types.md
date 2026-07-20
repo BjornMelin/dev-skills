@@ -8,30 +8,31 @@ and poor editor support.
 
 ## Do
 
-- Install `@types/bun` as a dev dependency. This is the actual requirement: it provides
-  the `Bun` global and `bun:*` module types.
-- Leave `compilerOptions.types` **unset** for most projects. TypeScript then auto-includes
-  every `@types/*` package (including `@types/bun`), so Bun globals plus DOM/Node ambient
-  types all resolve.
-- Only scope `compilerOptions.types` when you deliberately restrict ambient types, and
-  then keep Bun's types in the list.
+- Install `@types/bun` as a dev dependency. This is the requirement: it provides the
+  `Bun` global and `bun:*` module types.
+- Explicitly list Bun in `compilerOptions.types`: `"types": ["bun"]`. This is what
+  `bun init` writes, and it works on every TypeScript version.
+- If you set `types`, include every ambient package you rely on (for example
+  `["bun", "node"]`) - a `types` array replaces auto-inclusion.
 - Restart the TS server after changing types.
 
 ## Don't
 
 - Don't paper over missing types with `any`.
-- Don't scope `compilerOptions.types` to a list that omits Bun's types (it silently drops
-  the `Bun` global).
+- Don't leave `compilerOptions.types` unset and assume Bun globals resolve. TypeScript
+  5 and earlier auto-include `node_modules/@types/*` when `types` is unset, but
+  **TypeScript 6 defaults `types` to `[]`** and no longer auto-includes anything - so set
+  it explicitly.
+- Don't scope `compilerOptions.types` to a list that omits Bun's types (it drops the
+  `Bun` global).
 
 ## Examples
 
-Install (the important step):
+Install and configure (both steps matter):
 
 ```bash
 bun add -d @types/bun
 ```
-
-Scoped types (only if you must restrict) - keep Bun in the list:
 
 ```json
 {
@@ -41,7 +42,7 @@ Scoped types (only if you must restrict) - keep Bun in the list:
 }
 ```
 
-> Audit note: the `codex-dev bun audit` engine emits an Info nudge in two cases - when
-> `@types/bun` is not installed in a Bun-first repo, or when `compilerOptions.types` is
-> scoped to a non-empty array that omits Bun's types. An unset `types` with `@types/bun`
-> installed resolves Bun globals and is not flagged.
+> Audit note: the `codex-dev bun audit` engine emits an Info nudge when `@types/bun` is
+> not installed in a Bun-first repo, or when `compilerOptions.types` does not list Bun
+> (unset, `[]`, or an array without `"bun"` / `"bun-types"`). An unset array is flagged
+> because it is unsafe under TypeScript 6.
