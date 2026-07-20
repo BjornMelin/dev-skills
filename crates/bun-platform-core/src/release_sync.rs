@@ -145,21 +145,24 @@ pub fn create_release_sync_report(context: &SkillContext) -> Result<ReleaseSyncR
             "bun-release-notes",
             regex_match(&bun_release, r"\bBun\.WebView\b")
                 && regex_match(&capabilities_doc, r"\bBun\.WebView\b"),
-            vec!["runtime-webview-automation", "runtime-bun-native-apis"],
+            // No dedicated rule intended; documented as a known gap (see llms.txt).
+            vec![],
         ),
         (
             "bun markdown ansi",
             "bun-release-notes",
             regex_match(&bun_release, r"\bBun\.markdown\.ansi\b")
                 && regex_match(&capabilities_doc, r"\bmarkdown\.ansi\b"),
-            vec!["runtime-markdown-entrypoints", "runtime-bun-native-apis"],
+            // No dedicated rule intended; documented as a known gap (see llms.txt).
+            vec![],
         ),
         (
             "bun cron callback overload",
             "bun-release-notes",
             regex_match(&bun_release, r"\bin-process\b")
                 && regex_match(&capabilities_doc, r"\bBun\.cron\(schedule, handler\)\b"),
-            vec!["runtime-cron-in-process-vs-os"],
+            // No dedicated rule intended; documented as a known gap (see llms.txt).
+            vec![],
         ),
         (
             "bun build compile browser",
@@ -197,14 +200,14 @@ pub fn create_release_sync_report(context: &SkillContext) -> Result<ReleaseSyncR
     let capability_map = capability_specs
         .into_iter()
         .map(|(topic, source, matched, rules)| {
-            let classification = if matched {
-                if rules.iter().all(|rule| rule_ids.contains(*rule)) {
-                    CapabilityClassification::CapabilityPresent
-                } else {
-                    CapabilityClassification::MissingRule
-                }
-            } else {
+            let classification = if !matched || rules.is_empty() {
+                // Not present in docs, or an intentional no-dedicated-rule capability
+                // (empty `rules`) - documented, routed to llms.txt, no rule to add.
                 CapabilityClassification::DocsOnly
+            } else if rules.iter().all(|rule| rule_ids.contains(*rule)) {
+                CapabilityClassification::CapabilityPresent
+            } else {
+                CapabilityClassification::MissingRule
             };
             CapabilityReport {
                 topic: topic.to_string(),

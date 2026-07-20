@@ -110,7 +110,6 @@ Use when:
 Route to:
 
 - no dedicated rule yet; see `bun.com/docs/llms.txt` for `Bun.WebView`
-- `perf-prefer-bun-native-apis`
 
 ### Markdown in terminal
 
@@ -121,7 +120,6 @@ Route to:
 Route to:
 
 - no dedicated rule yet; see `bun.com/docs/llms.txt` for markdown entrypoints
-- `perf-prefer-bun-native-apis`
 
 ### Cron split is now first-class
 
