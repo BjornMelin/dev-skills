@@ -29,7 +29,8 @@ Bun 1.1 and earlier wrote a binary `bun.lockb`. Since Bun 1.2 the default is the
 
 ```bash
 bun install --save-text-lockfile --frozen-lockfile --lockfile-only
-git rm --cached bun.lockb && git add bun.lock
+git rm bun.lockb   # delete the legacy binary lockfile from disk and the index
+git add bun.lock
 ```
 
 ## Examples

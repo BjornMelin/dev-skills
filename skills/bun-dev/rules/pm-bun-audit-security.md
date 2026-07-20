@@ -7,21 +7,29 @@ its own auditing, so a Bun-first repo does not need a separate tool.
 
 ## Do
 
-- Scan installed dependencies for known advisories with `bun audit`.
-- Use `bun pm scan` for Bun's package scanner (malware / known-bad signals) when
-  available.
-- Run the audit in CI and on dependency updates; triage findings before merging.
+- Scan installed dependencies for known advisories with `bun audit` (it checks the
+  packages in `bun.lock`).
+- Enable a security scanner that runs during `bun install` / `bun add` by setting it in
+  `bunfig.toml`:
+  ```toml
+  [install.security]
+  scanner = "@oven/bun-security-scanner"   # replace with your scanner package
+  ```
+  Install the scanner as a dev dependency first (`bun add -d <scanner-package>`).
+- Run `bun audit` in CI and on dependency updates; triage findings before merging.
 - Combine with `--minimum-release-age` (see `pm-linker-and-streaming-install`) to reduce
   fresh-publish risk.
 
 ## Don't
 
 - Don't wire `npm audit` / `yarn npm audit` into a Bun-first repo; use `bun audit`.
+- Don't rely on a `bun pm scan` command - package scanning is configured via
+  `[install.security]` and runs at install time, not as a standalone subcommand.
 - Don't auto-apply major-version "fixes" without reviewing breaking changes.
 
 ## Examples
 
 ```bash
 bun audit
-bun pm scan
+bun add -d @oven/bun-security-scanner   # then set [install.security].scanner in bunfig.toml
 ```

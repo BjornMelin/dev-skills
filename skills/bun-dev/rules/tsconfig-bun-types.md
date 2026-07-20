@@ -41,6 +41,7 @@ Scoped types (only if you must restrict) - keep Bun in the list:
 }
 ```
 
-> Audit note: `bun audit` emits an Info nudge only when `compilerOptions.types` is scoped
-> to a non-empty array that omits Bun's types. An unset `types` array (or one that
-> includes `"bun"` / `"bun-types"`) resolves Bun globals and is not flagged.
+> Audit note: the `codex-dev bun audit` engine emits an Info nudge in two cases - when
+> `@types/bun` is not installed in a Bun-first repo, or when `compilerOptions.types` is
+> scoped to a non-empty array that omits Bun's types. An unset `types` with `@types/bun`
+> installed resolves Bun globals and is not flagged.
