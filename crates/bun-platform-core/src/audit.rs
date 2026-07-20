@@ -305,7 +305,11 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                 ));
             }
 
-            let types = compiler_options
+            // Only nudge when `types` is explicitly scoped to a non-empty array that
+            // omits Bun's types. An unset `types` auto-includes @types/bun, and `["bun"]`
+            // or `["bun-types"]` both resolve the Bun global, so none of those needs a
+            // finding.
+            let scoped_types = compiler_options
                 .get("types")
                 .and_then(|value| value.as_array())
                 .map(|values| {
@@ -315,15 +319,17 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            if (has_bun_types || signals.bun_first)
-                && !types.iter().any(|value| value == "bun-types")
-            {
+            let scopes_out_bun = !scoped_types.is_empty()
+                && !scoped_types
+                    .iter()
+                    .any(|value| value == "bun" || value == "bun-types");
+            if (has_bun_types || signals.bun_first) && scopes_out_bun {
                 findings.push(create_finding(
                     &root,
                     "tsconfig-bun-types",
                     Severity::Info,
                     &root.join("tsconfig.json"),
-                    "Consider adding compilerOptions.types: [\"bun-types\"] for Bun globals/types.",
+                    "compilerOptions.types is scoped but omits Bun's types; add \"bun\" (or \"bun-types\") so the Bun global resolves, or unset types to auto-include @types/bun.",
                     FindingOptions::default(),
                 ));
             }

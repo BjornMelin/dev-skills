@@ -339,7 +339,7 @@ fn build_rules_index_content(context: &SkillContext) -> Result<String> {
         out.push(String::new());
     }
 
-    Ok(format!("{}\n", out.join("\n")))
+    Ok(format!("{}\n", out.join("\n").trim_end()))
 }
 
 fn build_references_index_content() -> String {
@@ -389,9 +389,8 @@ fn build_references_index_content() -> String {
             "rg -n \"bunVersion|Bun\\\\.serve|runtime\" ~/.agents/skills/bun-dev/references/{REF_VERCEL_BUN_RUNTIME}"
         ),
         "```".to_string(),
-        "".to_string(),
     ];
-    format!("{}\n", lines.join("\n"))
+    format!("{}\n", lines.join("\n").trim_end())
 }
 
 fn fetch_bun_release_snapshot() -> Result<String> {
