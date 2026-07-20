@@ -199,6 +199,33 @@ fn reports_missing_bun_types_dependency_when_types_unset() {
 }
 
 #[test]
+fn reports_empty_types_array_as_scoping_out_bun() {
+    let _env = TestEnv::new("empty-types");
+    let root = copy_fixture("jsonc-tsconfig"); // fixture ships @types/bun installed
+    // `types: []` explicitly scopes ambient types to nothing, so the Bun global is
+    // excluded even though @types/bun is installed; the audit should flag it.
+    fs::write(
+        root.join("tsconfig.json"),
+        "{\n  \"compilerOptions\": {\n    \"moduleResolution\": \"Bundler\",\n    \"target\": \"ESNext\",\n    \"module\": \"Preserve\",\n    \"allowImportingTsExtensions\": true,\n    \"verbatimModuleSyntax\": true,\n    \"noEmit\": true,\n    \"types\": []\n  }\n}\n",
+    )
+    .expect("write tsconfig.json");
+    let paths = PlatformPaths::discover().expect("paths");
+    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+
+    let findings = run_audit(&root, &config, &paths).expect("audit");
+
+    let finding = findings
+        .iter()
+        .find(|finding| finding.rule_id == "tsconfig-bun-types")
+        .expect("tsconfig-bun-types finding for empty types array");
+    assert!(
+        finding.message.contains("scoped but omits Bun's types"),
+        "expected the scoped-out nudge, got: {}",
+        finding.message
+    );
+}
+
+#[test]
 fn rejects_invalid_jsonc_tsconfig_with_location() {
     let _env = TestEnv::new("invalid-jsonc-tsconfig");
     let root = copy_fixture("jsonc-tsconfig");

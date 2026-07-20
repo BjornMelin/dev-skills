@@ -310,6 +310,9 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
             //   1. missing dependency: a Bun-first repo with a tsconfig but no @types/bun;
             //   2. scoped-out: @types/bun is installed but `types` is a non-empty array
             //      that omits Bun's own types.
+            // A present `types` array - including an explicit empty `[]` - scopes ambient
+            // types and excludes Bun unless it lists "bun"/"bun-types". A missing or
+            // non-array `types` is not scoped (TypeScript auto-includes @types/bun).
             let scoped_types = compiler_options
                 .get("types")
                 .and_then(|value| value.as_array())
@@ -318,12 +321,12 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                         .iter()
                         .filter_map(|value| value.as_str().map(ToOwned::to_owned))
                         .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            let scopes_out_bun = !scoped_types.is_empty()
-                && !scoped_types
+                });
+            let scopes_out_bun = scoped_types.as_ref().is_some_and(|entries| {
+                !entries
                     .iter()
-                    .any(|value| value == "bun" || value == "bun-types");
+                    .any(|value| value == "bun" || value == "bun-types")
+            });
             let types_message = if !has_bun_types {
                 Some(
                     "Install @types/bun (dev dependency) so TypeScript resolves the Bun global and bun:* modules.",
@@ -804,7 +807,7 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
       "vercel-bun-install-detection",
       Severity::Warn,
       &vercel_json_path,
-      "Bun runtime is enabled but no Bun lockfile is committed. Add and commit bun.lock or bun.lockb to ensure Bun installs on Vercel.",
+      "Bun runtime is enabled but no Bun lockfile is committed. Add and commit bun.lock to ensure Bun installs on Vercel.",
       FindingOptions::default(),
     ));
     }
