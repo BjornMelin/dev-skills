@@ -282,6 +282,7 @@ for local development and validation commands.
 | `ai-sdk-ui` | Chat and generative UIs with AI SDK React (`useChat`, persistence, streaming, backends). | [skills/ai-sdk-ui/SKILL.md](skills/ai-sdk-ui/SKILL.md) |
 | `autoreview` | Codex-only structured closeout review helper for local, branch, or commit diffs. | [skills/autoreview/SKILL.md](skills/autoreview/SKILL.md) |
 | `aws-architecture` | AWS architecture: service selection, boundaries, rollout, and verification. | [skills/aws-architecture/SKILL.md](skills/aws-architecture/SKILL.md) |
+| `batch-grill-with-docs` | Batch-grill a plan or design round by round with recommended answers and close-call scoring, capturing ADRs and a glossary via domain-modeling. | [skills/batch-grill-with-docs/SKILL.md](skills/batch-grill-with-docs/SKILL.md) |
 | `browser-workbench-setup` | Bootstrap browser/UI QA: Playwright-interactive primary, agent-browser smoke, auth and local conventions. | [skills/browser-workbench-setup/SKILL.md](skills/browser-workbench-setup/SKILL.md) |
 | `bun-dev` | The Bun skill: development, build, and runtime knowledge (PM, lockfiles, monorepos, tests/build, TypeScript, Bun-native APIs, Vercel Bun runtime) plus an optional native audit/fix/validate engine (`codex-dev bun`). | [skills/bun-dev/SKILL.md](skills/bun-dev/SKILL.md) |
 | `caveman-compress` | Compress docs and prose for fewer tokens while keeping substance, code, URLs, and structure. | [skills/caveman-compress/SKILL.md](skills/caveman-compress/SKILL.md) |
@@ -312,6 +313,7 @@ for local development and validation commands.
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
 | `opensrc` | Canonical source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
+| `pre-mortem` | Adversarial pre-mortem that stress-tests a plan before reality does: surface assumptions, map vulnerabilities and irreversible bets, then harden them. | [skills/pre-mortem/SKILL.md](skills/pre-mortem/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
 | `r3f-scene-polish` | Cinematic look-dev for an existing three.js / React Three Fiber scene: postprocessing, HDRI/PBR lighting, shadows, tone mapping, and camera choreography (scene setup & lifecycle route to `web-three-r3f`). | [skills/r3f-scene-polish/SKILL.md](skills/r3f-scene-polish/SKILL.md) |
 | `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |

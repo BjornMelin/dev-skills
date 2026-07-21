@@ -10,3 +10,5 @@ Ask questions one at a time using `functions.request_user_input`. Put the recomm
 If a question can be answered by exploring the codebase, explore the codebase instead.
 
 If a question can be answered by researching the web, GitHub, or package source code, use web search tools, context7, gh cli/api, or opensrc skills.
+
+For pre-mortem plan-challenge work, run the `/pre-mortem` skill.

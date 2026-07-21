@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-20T21:53:51Z",
+  "generatedAt": "2026-07-21T23:46:37.117979157Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "c141a6dd9b1a4f9682e2a368e1072c52c74a6687",
+  "sourceCommit": "0364732cbb8b39b29254c2f6ce045fccda258582",
   "sourceRef": "main",
-  "skillsCount": 65,
-  "totalSkillDirectories": 65,
+  "skillsCount": 67,
+  "totalSkillDirectories": 67,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -296,6 +296,53 @@
       },
       "package": {
         "path": "skills/dist/aws-architecture.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "batch-grill-with-docs",
+      "slug": "batch-grill-with-docs",
+      "description": "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls.",
+      "path": "skills/batch-grill-with-docs",
+      "skillMdPath": "skills/batch-grill-with-docs/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/batch-grill-with-docs",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/batch-grill-with-docs/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill batch-grill-with-docs -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill batch-grill-with-docs -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill batch-grill-with-docs"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/batch-grill-with-docs.skill",
         "present": false,
         "rejected": false
       }
@@ -1765,6 +1812,53 @@
       },
       "package": {
         "path": "skills/dist/platform-architect.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "pre-mortem",
+      "slug": "pre-mortem",
+      "description": "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request.",
+      "path": "skills/pre-mortem",
+      "skillMdPath": "skills/pre-mortem/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/pre-mortem",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/pre-mortem/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill pre-mortem -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill pre-mortem -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill pre-mortem"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 2
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/pre-mortem.skill",
         "present": false,
         "rejected": false
       }

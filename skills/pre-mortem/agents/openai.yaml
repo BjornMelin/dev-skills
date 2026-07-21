@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pre-Mortem"
+  short_description: "Stress-test a plan for failure before committing"
+  default_prompt: "Use $pre-mortem to stress-test this plan: surface the risky assumptions and irreversible bets, then harden them."
+policy:
+  allow_implicit_invocation: true

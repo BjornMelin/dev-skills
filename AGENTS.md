@@ -52,7 +52,7 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 ## Coding Style & Naming Conventions
 
 - Skill names must be **hyphen-case** and match the folder name (e.g. `langgraph-multiagent`).
-- `SKILL.md` frontmatter should only use allowed keys: `name`, `description`, `license`, `allowed-tools`, `metadata`.
+- `SKILL.md` frontmatter should only use allowed keys: `name`, `description`, `license`, `allowed-tools`, `metadata`, `disable-model-invocation` (set `true` to opt a skill out of implicit model invocation).
 - Keep `SKILL.md` concise; put large content in `references/`. Prefer scripts over massive inline code blocks.
 - When replacing or retiring a skill, move the old source to `archive/skills/<skill-name>/`, add `archive.json` with `skill_archive.v1`, remove active catalog links, and verify with `codex-dev --json skills audit`.
 - Custom subagent TOML names must be **snake_case** and must not shadow Codex built-ins (`default`, `worker`, `explorer`) unless explicitly requested.
