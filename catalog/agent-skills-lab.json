@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T20:11:59.545509052Z",
+  "generatedAt": "2026-07-21T20:14:33.829820048Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "b3fca5005a3e551265284558da352726ea89e691",
+  "sourceCommit": "f0defd0575cef45211971243117d22857e0eb874",
   "sourceRef": "main",
   "skillsCount": 67,
   "totalSkillDirectories": 67,
@@ -303,7 +303,7 @@
     {
       "name": "batch-grill-with-docs",
       "slug": "batch-grill-with-docs",
-      "description": "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls. Opt-in.",
+      "description": "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls.",
       "path": "skills/batch-grill-with-docs",
       "skillMdPath": "skills/batch-grill-with-docs/SKILL.md",
       "sourceUrls": {
