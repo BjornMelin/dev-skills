@@ -1,10 +1,11 @@
 ---
 name: pre-mortem
-description: "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Use before committing to a high-stakes or hard-to-reverse plan, when you are only hearing positive feedback, or when a decision hinges on assumptions that have not been validated. Opt-in only."
-disable-model-invocation: true
+description: "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Proactively offer it (after finishing the current request, not mid-flow) when a decision is genuinely irreversible or a one-way door such as a public API, schema migration, framework or architecture choice, or a hire, or when a plan is drawing only positive feedback or rests on unvalidated assumptions; confirm before producing the full report. Also runs on request."
 ---
 
 Stress-test this plan before reality does. Not to kill it, but to make it survive contact with reality.
+
+When you surface this proactively (rather than because the user asked): only do so when a decision is genuinely hard to reverse (a public API, schema migration, framework or architecture choice, a hire) or a plan is drawing only positive feedback, and raise it after you finish the user's current request, as a one-line offer. Produce the full Challenge Report only once they confirm. When the user invokes it directly, skip the offer and run it.
 
 The technique: imagine it is 12 months from now and this plan failed. Work backwards, find why, then harden the plan against it.
 
