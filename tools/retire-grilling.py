@@ -9,15 +9,18 @@ Re-run it after re-installing the mattpocock skill pack, since that pack
 overwrites the dependent skills back to their upstream `/grilling` wording.
 
 It is idempotent: token swaps that are already applied are no-ops, and a
-directory that is already gone is skipped. Use --dry-run to preview.
+directory that is already gone is skipped. Use --dry-run to preview. The
+rewrite is refused unless the replacement skills are installed, so dependents
+are never left pointing at a missing skill.
 
 What it does:
   1. Repoint skill references inside the 5 dependent skills:
        /grilling        -> /grill-me            (superset: one-at-a-time + scoring)
        /grill-with-docs -> /batch-grill-with-docs
-     Only leading-slash command tokens are touched, so `grilling` ticket-type
-     *labels* (no slash) are left alone.
-  2. Remove the retired skill directories if present:
+       /batch-grill-me  -> /batch-grill-with-docs
+     Only standalone leading-slash command tokens are touched, so `grilling`
+     ticket-type *labels* (no slash) and URL/path segments are left alone.
+  2. Remove the retired skill directories (or symlinks) if present:
        grilling, grill-with-docs, batch-grill-me
 """
 
@@ -45,19 +48,43 @@ RETIRED = (
     "batch-grill-me",
 )
 
-# (leading-slash command token) -> replacement. A trailing (?![a-z0-9-])
-# guard stops us from matching a longer skill name that merely starts the
+# Replacement skills the repoints target. The rewrite is refused unless these
+# are installed, so we never leave a dependent pointing at a missing skill.
+REQUIRED_REPLACEMENTS = (
+    "grill-me",
+    "batch-grill-with-docs",
+)
+
+# (leading-slash command token) -> replacement. The lookbehind keeps rewrites to
+# standalone command tokens (not URL or path segments); the trailing
+# (?![a-z0-9-]) guard avoids matching a longer skill name that merely starts the
 # same way (and makes the swaps idempotent).
 REPOINTS = (
-    (re.compile(r"/grilling(?![a-z0-9-])"), "/grill-me"),
-    (re.compile(r"/grill-with-docs(?![a-z0-9-])"), "/batch-grill-with-docs"),
+    (re.compile(r"(?<![A-Za-z0-9_./-])/grilling(?![a-z0-9-])"), "/grill-me"),
+    (
+        re.compile(r"(?<![A-Za-z0-9_./-])/grill-with-docs(?![a-z0-9-])"),
+        "/batch-grill-with-docs",
+    ),
+    (
+        re.compile(r"(?<![A-Za-z0-9_./-])/batch-grill-me(?![a-z0-9-])"),
+        "/batch-grill-with-docs",
+    ),
 )
 
 TEXT_SUFFIXES = {".md", ".markdown", ".yaml", ".yml", ".txt", ".json"}
 
 
-def repoint_file(path: Path, dry_run: bool) -> int:
-    """Apply the repoint swaps to one file. Returns the number of substitutions."""
+def repoint_file(path: Path, *, dry_run: bool) -> int:
+    """Apply the repoint swaps to one file.
+
+    Args:
+        path: Text file to rewrite in place.
+        dry_run: When True, count matches without writing changes.
+
+    Returns:
+        Number of command-token substitutions made (or that would be made
+        under dry_run).
+    """
     original = path.read_text(encoding="utf-8")
     updated = original
     total = 0
@@ -70,6 +97,12 @@ def repoint_file(path: Path, dry_run: bool) -> int:
 
 
 def main() -> int:
+    """Repoint retired-skill references and remove the retired directories.
+
+    Returns:
+        Process exit code: 0 on success, 1 if the skills root or a required
+        replacement skill is missing.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--skills-dir",
@@ -88,6 +121,16 @@ def main() -> int:
         print(f"error: skills dir not found: {skills_dir}", file=sys.stderr)
         return 1
 
+    missing = [r for r in REQUIRED_REPLACEMENTS if not (skills_dir / r).is_dir()]
+    if missing:
+        print(
+            "error: required replacement skill(s) not installed: "
+            f"{', '.join(missing)}. Install them before retiring so the "
+            "dependents are not repointed to a missing skill.",
+            file=sys.stderr,
+        )
+        return 1
+
     tag = "[dry-run] " if args.dry_run else ""
     repoint_total = 0
     files_changed = 0
@@ -102,7 +145,7 @@ def main() -> int:
         for path in sorted(dep_dir.rglob("*")):
             if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
                 continue
-            count = repoint_file(path, args.dry_run)
+            count = repoint_file(path, dry_run=args.dry_run)
             if count:
                 files_changed += 1
                 dep_changes += count
@@ -116,7 +159,14 @@ def main() -> int:
     removed = 0
     for name in RETIRED:
         target = skills_dir / name
-        if target.is_dir():
+        # is_dir() follows symlinks, but shutil.rmtree() refuses a symlink, so
+        # unlink symlinked skill dirs and only rmtree real directories.
+        if target.is_symlink():
+            print(f"    removing symlink {name}/")
+            if not args.dry_run:
+                target.unlink()
+            removed += 1
+        elif target.is_dir():
             print(f"    removing {name}/")
             if not args.dry_run:
                 shutil.rmtree(target)
@@ -125,8 +175,9 @@ def main() -> int:
             print(f"  - {name}: already gone, skipping")
 
     print(
-        f"{tag}Done: {repoint_total} reference(s) across {files_changed} file(s) "
-        f"repointed; {removed} directory(ies) removed."
+        f"{tag}Done: {repoint_total} reference(s) "
+        f"across {files_changed} file(s) repointed; "
+        f"{removed} directory(ies) removed."
     )
     return 0
 
