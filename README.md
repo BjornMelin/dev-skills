@@ -313,6 +313,7 @@ for local development and validation commands.
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
 | `opensrc` | Canonical source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
+| `pre-mortem` | Adversarial pre-mortem that stress-tests a plan before reality does: surface assumptions, map vulnerabilities and irreversible bets, then harden them. | [skills/pre-mortem/SKILL.md](skills/pre-mortem/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
 | `r3f-scene-polish` | Cinematic look-dev for an existing three.js / React Three Fiber scene: postprocessing, HDRI/PBR lighting, shadows, tone mapping, and camera choreography (scene setup & lifecycle route to `web-three-r3f`). | [skills/r3f-scene-polish/SKILL.md](skills/r3f-scene-polish/SKILL.md) |
 | `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |
