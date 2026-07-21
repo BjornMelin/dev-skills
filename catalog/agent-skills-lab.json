@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T20:06:33.124249528Z",
+  "generatedAt": "2026-07-21T20:11:59.545509052Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "4cd15e040d5997407ecc8f0b4ff9d75e10eefeae",
+  "sourceCommit": "b3fca5005a3e551265284558da352726ea89e691",
   "sourceRef": "main",
   "skillsCount": 67,
   "totalSkillDirectories": 67,
@@ -303,7 +303,7 @@
     {
       "name": "batch-grill-with-docs",
       "slug": "batch-grill-with-docs",
-      "description": "A relentless batch interview that sharpens a plan or design a round at a time: it asks the whole dependency-settled frontier each round with recommended answers (and weighted 0.0 to 10.0 scores on close calls), then captures resolved terms and decisions as domain-modeling docs (ADRs and a glossary) as it goes, and hands off to a /pre-mortem pass on high-stakes or irreversible decisions. Use to stress-test a plan round by round and produce its docs. Opt-in only.",
+      "description": "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls. Opt-in.",
       "path": "skills/batch-grill-with-docs",
       "skillMdPath": "skills/batch-grill-with-docs/SKILL.md",
       "sourceUrls": {
@@ -1819,7 +1819,7 @@
     {
       "name": "pre-mortem",
       "slug": "pre-mortem",
-      "description": "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Proactively offer it (after finishing the current request, not mid-flow) when a decision is genuinely irreversible or a one-way door such as a public API, schema migration, framework or architecture choice, or a hire, or when a plan is drawing only positive feedback or rests on unvalidated assumptions; confirm before producing the full report. Also runs on request.",
+      "description": "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request.",
       "path": "skills/pre-mortem",
       "skillMdPath": "skills/pre-mortem/SKILL.md",
       "sourceUrls": {
