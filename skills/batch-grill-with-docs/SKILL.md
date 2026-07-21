@@ -1,6 +1,6 @@
 ---
 name: batch-grill-with-docs
-description: "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls. Opt-in."
+description: "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls."
 disable-model-invocation: true
 ---
 
