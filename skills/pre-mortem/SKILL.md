@@ -1,6 +1,6 @@
 ---
 name: pre-mortem
-description: "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Proactively offer it (after finishing the current request, not mid-flow) when a decision is genuinely irreversible or a one-way door such as a public API, schema migration, framework or architecture choice, or a hire, or when a plan is drawing only positive feedback or rests on unvalidated assumptions; confirm before producing the full report. Also runs on request."
+description: "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request."
 ---
 
 Stress-test this plan before reality does. Not to kill it, but to make it survive contact with reality.

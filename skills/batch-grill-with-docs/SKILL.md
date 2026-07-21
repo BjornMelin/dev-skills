@@ -1,6 +1,6 @@
 ---
 name: batch-grill-with-docs
-description: "A relentless batch interview that sharpens a plan or design a round at a time: it asks the whole dependency-settled frontier each round with recommended answers (and weighted 0.0 to 10.0 scores on close calls), then captures resolved terms and decisions as domain-modeling docs (ADRs and a glossary) as it goes, and hands off to a /pre-mortem pass on high-stakes or irreversible decisions. Use to stress-test a plan round by round and produce its docs. Opt-in only."
+description: "Batch-grill a plan or design round by round: whole settled frontier per round, recommended answers + close-call scores, ADRs + a glossary via domain-modeling, /pre-mortem handoff on irreversible calls. Opt-in."
 disable-model-invocation: true
 ---
 
