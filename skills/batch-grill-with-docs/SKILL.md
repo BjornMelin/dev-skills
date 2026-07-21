@@ -16,4 +16,4 @@ Each round the user answers reshapes the tree: settled decisions push the fronti
 
 As terms and decisions settle, use the `/domain-modeling` skill to capture them as you go: record resolved terminology in the glossary and each significant resolved decision as an ADR. If a settled decision is high-stakes or hard to reverse, pre-mortem that branch before moving on by offering a `/pre-mortem` on it.
 
-The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed, and the docs reflect what was decided. Before you hand back, offer to run a full `/pre-mortem` on the settled plan. Do not act on the plan until the user confirms you have reached a shared understanding.
+The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed, every dispatched lookup rendezvoused before you synthesize or act, and the docs reflect what was decided. Before you hand back, offer to run a full `/pre-mortem` on the settled plan. Do not act on the plan until the user confirms you have reached a shared understanding.
