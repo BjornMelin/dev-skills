@@ -3803,6 +3803,7 @@ fn validate_skill_frontmatter(
     let allowed_properties = [
         "allowed-tools",
         "description",
+        "disable-model-invocation",
         "license",
         "metadata",
         "name",
