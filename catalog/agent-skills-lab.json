@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T19:42:30.086966187Z",
+  "generatedAt": "2026-07-21T20:06:33.124249528Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "085d48a97c8aa891f3c494a49471a8af251d0517",
+  "sourceCommit": "4cd15e040d5997407ecc8f0b4ff9d75e10eefeae",
   "sourceRef": "main",
   "skillsCount": 67,
   "totalSkillDirectories": 67,
@@ -1819,7 +1819,7 @@
     {
       "name": "pre-mortem",
       "slug": "pre-mortem",
-      "description": "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Use before committing to a high-stakes or hard-to-reverse plan, when you are only hearing positive feedback, or when a decision hinges on assumptions that have not been validated. Opt-in only.",
+      "description": "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Proactively offer it (after finishing the current request, not mid-flow) when a decision is genuinely irreversible or a one-way door such as a public API, schema migration, framework or architecture choice, or a hire, or when a plan is drawing only positive feedback or rests on unvalidated assumptions; confirm before producing the full report. Also runs on request.",
       "path": "skills/pre-mortem",
       "skillMdPath": "skills/pre-mortem/SKILL.md",
       "sourceUrls": {
