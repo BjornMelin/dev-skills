@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T18:59:33.564304861Z",
+  "generatedAt": "2026-07-21T19:42:30.086966187Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "5779481bd0dc6d6de39ebd91ce3795c84dff2a22",
+  "sourceCommit": "085d48a97c8aa891f3c494a49471a8af251d0517",
   "sourceRef": "main",
-  "skillsCount": 66,
-  "totalSkillDirectories": 66,
+  "skillsCount": 67,
+  "totalSkillDirectories": 67,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -303,7 +303,7 @@
     {
       "name": "batch-grill-with-docs",
       "slug": "batch-grill-with-docs",
-      "description": "A relentless batch interview that sharpens a plan or design a round at a time: it asks the whole dependency-settled frontier each round with recommended answers (and weighted 0.0 to 10.0 scores on close calls), then captures resolved terms and decisions as domain-modeling docs (ADRs and a glossary) as it goes. Use to stress-test a plan round by round and produce its docs. Opt-in only.",
+      "description": "A relentless batch interview that sharpens a plan or design a round at a time: it asks the whole dependency-settled frontier each round with recommended answers (and weighted 0.0 to 10.0 scores on close calls), then captures resolved terms and decisions as domain-modeling docs (ADRs and a glossary) as it goes, and hands off to a /pre-mortem pass on high-stakes or irreversible decisions. Use to stress-test a plan round by round and produce its docs. Opt-in only.",
       "path": "skills/batch-grill-with-docs",
       "skillMdPath": "skills/batch-grill-with-docs/SKILL.md",
       "sourceUrls": {
@@ -1812,6 +1812,53 @@
       },
       "package": {
         "path": "skills/dist/platform-architect.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "pre-mortem",
+      "slug": "pre-mortem",
+      "description": "Adversarial pre-mortem that stress-tests a plan or design before reality does: imagine it failed 12 months out and work backwards to surface the assumptions, vulnerabilities, dependency chains, and irreversible bets, then harden them. Use before committing to a high-stakes or hard-to-reverse plan, when you are only hearing positive feedback, or when a decision hinges on assumptions that have not been validated. Opt-in only.",
+      "path": "skills/pre-mortem",
+      "skillMdPath": "skills/pre-mortem/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/pre-mortem",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/pre-mortem/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill pre-mortem -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill pre-mortem -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill pre-mortem"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 2
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/pre-mortem.skill",
         "present": false,
         "rejected": false
       }
