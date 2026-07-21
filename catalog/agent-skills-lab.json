@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T23:39:23.796662754Z",
+  "generatedAt": "2026-07-21T23:46:37.117979157Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "ce5fad6ec12d0f440e48aabb991f6ab5bbd827c6",
+  "sourceCommit": "0364732cbb8b39b29254c2f6ce045fccda258582",
   "sourceRef": "main",
   "skillsCount": 67,
   "totalSkillDirectories": 67,
