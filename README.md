@@ -282,6 +282,7 @@ for local development and validation commands.
 | `ai-sdk-ui` | Chat and generative UIs with AI SDK React (`useChat`, persistence, streaming, backends). | [skills/ai-sdk-ui/SKILL.md](skills/ai-sdk-ui/SKILL.md) |
 | `autoreview` | Codex-only structured closeout review helper for local, branch, or commit diffs. | [skills/autoreview/SKILL.md](skills/autoreview/SKILL.md) |
 | `aws-architecture` | AWS architecture: service selection, boundaries, rollout, and verification. | [skills/aws-architecture/SKILL.md](skills/aws-architecture/SKILL.md) |
+| `batch-grill-with-docs` | Batch-grill a plan or design round by round with recommended answers and close-call scoring, capturing ADRs and a glossary via domain-modeling. | [skills/batch-grill-with-docs/SKILL.md](skills/batch-grill-with-docs/SKILL.md) |
 | `browser-workbench-setup` | Bootstrap browser/UI QA: Playwright-interactive primary, agent-browser smoke, auth and local conventions. | [skills/browser-workbench-setup/SKILL.md](skills/browser-workbench-setup/SKILL.md) |
 | `bun-dev` | The Bun skill: development, build, and runtime knowledge (PM, lockfiles, monorepos, tests/build, TypeScript, Bun-native APIs, Vercel Bun runtime) plus an optional native audit/fix/validate engine (`codex-dev bun`). | [skills/bun-dev/SKILL.md](skills/bun-dev/SKILL.md) |
 | `caveman-compress` | Compress docs and prose for fewer tokens while keeping substance, code, URLs, and structure. | [skills/caveman-compress/SKILL.md](skills/caveman-compress/SKILL.md) |
