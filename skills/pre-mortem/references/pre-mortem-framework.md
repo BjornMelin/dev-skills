@@ -1,12 +1,12 @@
 # Pre-Mortem Framework
 
-Systematically find the weaknesses in a plan before reality does. Not to kill the plan, but to make it survive contact with reality.
+Systematically find the weaknesses in a plan before reality does.
 
 ## The core idea
 
 Most plans fail for predictable reasons. Not bad luck, bad assumptions: overestimated demand or adoption, underestimated complexity, dependencies nobody questioned, timing that made sense on paper but not in the real world.
 
-The pre-mortem technique: **imagine it is 12 months from now and this plan failed. Now work backwards. Why?** That is not pessimism; it is how you build something that does not collapse.
+The pre-mortem technique: **imagine it is 12 months from now and this plan failed. Now work backwards. Why?**
 
 ## When to run one
 
@@ -78,6 +78,8 @@ HARDENING ACTIONS
 3. [Contingency to build into the plan]
 ```
 
+The template is the definition of done: the pre-mortem is complete only when every section is filled. Before you finalize, self-check the report against the template — an empty KILL SWITCHES or HARDENING ACTIONS section means the analysis isn't finished, not that there is nothing to say. Never stop at the vulnerability map.
+
 ## Patterns by plan type
 
 ### Technical design / architecture
@@ -104,6 +106,3 @@ These are the ones people skip:
 - "What are we not saying out loud because it's uncomfortable?"
 - "Who has incentives to make this plan sound better than it is?"
 - "What would an enemy of this plan attack first?"
-
-## Deliverable
-The output is not permission to stop. It is a vulnerability map. Now you can make conscious decisions: validate the risky assumptions, hedge the critical ones, or accept the bets you are making knowingly.
