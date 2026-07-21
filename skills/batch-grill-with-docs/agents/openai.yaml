@@ -1,0 +1,6 @@
+interface:
+  display_name: "Batch Grill with Docs"
+  short_description: "Batch-grill a plan round by round and write its docs"
+  default_prompt: "Use $batch-grill-with-docs to stress-test this plan a round at a time and capture ADRs + a glossary."
+policy:
+  allow_implicit_invocation: false
