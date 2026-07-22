@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewer", "verdict", "summary", "findings"],
+  "properties": {
+    "reviewer": { "type": "string" },
+    "verdict": { "type": "string", "enum": ["ship", "changes-recommended", "blocker"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "line", "title", "why", "fix", "evidence"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "nit"] },
+          "file": { "type": "string" },
+          "line": { "type": "string" },
+          "title": { "type": "string" },
+          "why": { "type": "string" },
+          "fix": { "type": "string" },
+          "evidence": { "type": "string" }
+        }
+      }
+    }
+  }
+}
