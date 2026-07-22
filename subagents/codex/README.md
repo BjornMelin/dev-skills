@@ -63,7 +63,8 @@ python3 subagents/codex/scripts/sync_agents.py --all-local-overlays --dry-run
 For maintainable private role definitions, keep the source specs in ignored
 `roles.local.json` using `roles.local.example.json` as the shape. The renderer
 loads that file when present, regenerates the matching ignored overlay TOMLs, and
-keeps `ROLE_CATALOG.md` limited to the public catalog.
+keeps `ROLE_CATALOG.md` limited to the public catalog. `model` is optional for
+existing local manifests and defaults to `gpt-5.6-sol`.
 
 Apply with timestamp backups:
 

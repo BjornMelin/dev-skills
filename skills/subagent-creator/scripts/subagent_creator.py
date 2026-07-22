@@ -26,7 +26,16 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = SKILL_DIR / "templates" / "agents"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 NICKNAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
-VALID_EFFORTS = {"minimal", "low", "medium", "high", "xhigh", "max"}
+VALID_EFFORTS = {
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+}
 VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 RESERVED_BUILTIN_AGENT_NAMES = {"default", "worker", "explorer"}
 RESEARCH_CONTRACT_AGENT_NAMES = {
@@ -1028,6 +1037,29 @@ def lookup_path_value(data: dict[str, Any], keys: list[str]) -> Any:
     return current
 
 
+def merge_config_layers(
+    base: dict[str, Any],
+    override: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge one trusted project config over the global config.
+
+    Args:
+        base: Global Codex configuration.
+        override: Trusted project configuration.
+
+    Returns:
+        Merged effective configuration.
+    """
+
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge_config_layers(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def project_trust(config: dict[str, Any], project_dir: Path) -> str | None:
     projects = config.get("projects")
     if not isinstance(projects, dict):
@@ -1068,7 +1100,23 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         elif parsed is not None:
             config = parsed
 
+    trust_level = project_trust(config, project_dir)
+    project_config_path = project_dir / ".codex" / "config.toml"
+    project_config: dict[str, Any] = {}
+    project_config_error: str | None = None
+    if trust_level == "trusted" and project_config_path.exists():
+        parsed, error = load_toml(project_config_path)
+        if error:
+            project_config_error = error
+        elif parsed is not None:
+            project_config = parsed
+    effective_config = merge_config_layers(config, project_config)
+
     template_issues = validate_paths([TEMPLATE_DIR])
+    v2_threads_key = (
+        "features.multi_agent_v2."
+        "max_concurrent_threads_per_session"
+    )
     report = {
         "codex_bin": codex_bin,
         "codex_version": codex_version,
@@ -1077,17 +1125,46 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "config_path": str(config_path),
         "config_exists": config_path.exists(),
         "config_error": config_error,
-        "features.multi_agent": lookup_path_value(config, ["features", "multi_agent"]),
-        "features.multi_agent_v2": lookup_path_value(config, ["features", "multi_agent_v2"]),
-        "agents.max_threads": lookup_path_value(config, ["agents", "max_threads"]),
-        "agents.max_depth": lookup_path_value(config, ["agents", "max_depth"]),
-        "agents.preferred_agent": lookup_path_value(config, ["agents", "preferred_agent"]),
+        "project_config_path": str(project_config_path),
+        "project_config_error": project_config_error,
+        "features.multi_agent": lookup_path_value(
+            effective_config,
+            ["features", "multi_agent"],
+        ),
+        "features.multi_agent_v2": lookup_path_value(
+            effective_config,
+            ["features", "multi_agent_v2"],
+        ),
+        v2_threads_key: lookup_path_value(
+            effective_config,
+            [
+                "features",
+                "multi_agent_v2",
+                "max_concurrent_threads_per_session",
+            ],
+        ),
+        "agents.max_threads": lookup_path_value(
+            effective_config,
+            ["agents", "max_threads"],
+        ),
+        "agents.max_concurrent_threads_per_session": lookup_path_value(
+            effective_config,
+            ["agents", "max_concurrent_threads_per_session"],
+        ),
+        "agents.max_depth": lookup_path_value(
+            effective_config,
+            ["agents", "max_depth"],
+        ),
+        "agents.preferred_agent": lookup_path_value(
+            effective_config,
+            ["agents", "preferred_agent"],
+        ),
         "global_agents_dir": str(global_agents),
         "global_agents_count": len(list(global_agents.glob("*.toml"))) if global_agents.exists() else 0,
         "project_dir": str(project_dir),
         "project_agents_dir": str(project_agents),
         "project_agents_count": len(list(project_agents.glob("*.toml"))) if project_agents.exists() else 0,
-        "project_trust_level": project_trust(config, project_dir),
+        "project_trust_level": trust_level,
         "template_validation_issues": [issue.to_dict() for issue in template_issues],
     }
 
@@ -1102,7 +1179,12 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             print(f"config error: {config_error}")
         print(f"features.multi_agent: {report['features.multi_agent']}")
         print(f"features.multi_agent_v2: {report['features.multi_agent_v2']}")
+        print(f"{v2_threads_key}: {report[v2_threads_key]}")
         print(f"agents.max_threads: {report['agents.max_threads']}")
+        print(
+            "agents.max_concurrent_threads_per_session: "
+            f"{report['agents.max_concurrent_threads_per_session']}"
+        )
         print(f"agents.max_depth: {report['agents.max_depth']}")
         print(f"agents.preferred_agent: {report['agents.preferred_agent']}")
         print(f"global agents: {global_agents} ({report['global_agents_count']} TOML files)")

@@ -13,7 +13,16 @@ from pathlib import Path
 from typing import Any
 
 
-REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
+REASONING_EFFORTS = (
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+)
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -558,7 +567,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", help="Codex model override. Defaults to the configured Codex model.")
     parser.add_argument(
         "--reasoning-effort",
-        choices=["low", "medium", "high", "xhigh", "max"],
+        choices=REASONING_EFFORTS,
         help="Codex model reasoning effort. Defaults to the configured Codex/model default.",
     )
     parser.add_argument("--codex-bin", default=os.environ.get("CODEX_BIN", "codex"))
