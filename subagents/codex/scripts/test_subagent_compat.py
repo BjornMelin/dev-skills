@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -138,6 +139,23 @@ class SubagentCompatibilityTests(unittest.TestCase):
                 },
             )
             self.assertIsNone(_run_doctor("untrusted")[key])
+
+    def test_source_validator_uses_terra_high(self) -> None:
+        """Keep source-validation templates on the retrieval model lane."""
+
+        paths = (
+            REPO_ROOT
+            / "skills/deep-researcher/templates/agents/"
+            "source_validator.toml",
+            REPO_ROOT
+            / "skills/subspawn/templates/agents/source_validator.toml",
+            REPO_ROOT
+            / "subagents/codex/agents/global/source_validator.toml",
+        )
+        for path in paths:
+            config = tomllib.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(config["model"], "gpt-5.6-terra", path)
+            self.assertEqual(config["model_reasoning_effort"], "high", path)
 
 
 if __name__ == "__main__":

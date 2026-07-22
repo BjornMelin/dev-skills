@@ -37,7 +37,7 @@ Runtime policy:
 | `reviewer` | `gpt-5.6-sol` | `medium` | `read-only` | Read-only reviewer focused on correctness, security, regressions, and missing tests. |
 | `runtime_bug_reviewer` | `gpt-5.6-sol` | `medium` | `read-only` | Read-only runtime bug reviewer for null safety, async races, lifecycle leaks, and error handling. |
 | `shallow_bug_reviewer` | `gpt-5.6-sol` | `medium` | `read-only` | Read-only high-signal reviewer for obvious diff-level bugs and regressions. |
-| `source_validator` | `gpt-5.6-sol` | `medium` | `read-only` | Read-only package/source implementation validator for verifying docs claims against actual repository or package source. |
+| `source_validator` | `gpt-5.6-terra` | `high` | `read-only` | Read-only package/source implementation validator for verifying docs claims against actual repository or package source. |
 | `test_runner` | `gpt-5.6-sol` | `medium` | `workspace-write` | Validation worker that runs focused tests and reports command-level evidence without editing source. |
 | `ui_debugger` | `gpt-5.6-sol` | `medium` | `workspace-write` | UI debugger for reproducing browser or frontend regressions and reporting actionable evidence. |
 | `deep_researcher` | `gpt-5.6-sol` | `high` | `read-only` | Lead read-only researcher for multi-source, cited, current investigations with claim ledgers and freshness checks. |

@@ -63,8 +63,9 @@ Every `spawn_agent` call should include:
 - read-only vs may-edit status
 - strict wait expectation
 - exact return format
-- explicit `(model, reasoning_effort)`
-- one-line reason when using a non-default model or effort
+- explicit `(model, reasoning_effort)` only when overriding inherited or
+  role-pinned defaults
+- one-line reason for any model or effort override
 
 ## Return contract
 
