@@ -157,6 +157,14 @@ class SubagentCompatibilityTests(unittest.TestCase):
             self.assertEqual(config["model"], "gpt-5.6-terra", path)
             self.assertEqual(config["model_reasoning_effort"], "high", path)
 
+        reference = (
+            REPO_ROOT / "docs/reference/subagent-templates.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "| `source_validator.toml` | `gpt-5.6-terra` | `high` |",
+            reference,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

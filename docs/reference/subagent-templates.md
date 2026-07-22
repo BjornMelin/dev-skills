@@ -135,7 +135,7 @@ skills/deep-researcher/templates/agents/
 | `github_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | repo/code/issues/releases |
 | `context7_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | direct Context7 REST docs |
 | `openai_docs_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | official OpenAI docs |
-| `source_validator.toml` | `gpt-5.6-sol` | `medium` | read-only | implementation/source proof |
+| `source_validator.toml` | `gpt-5.6-terra` | `high` | read-only | implementation/source proof |
 | `citation_auditor.toml` | `gpt-5.6-sol` | `medium` | read-only | source freshness and claim audit |
 
 All Focused Six roles:
