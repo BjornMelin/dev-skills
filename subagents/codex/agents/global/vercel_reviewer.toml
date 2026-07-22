@@ -2,8 +2,8 @@ name = "vercel_reviewer"
 description = """\
 Read-only Vercel reviewer for deployments, functions, routing, env vars,
 build output, and release pipeline risk."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Vercel Reviewer",

@@ -2,8 +2,8 @@ name = "docmind_docs_release_auditor"
 description = """\
 DocMind docs/release auditor for Release Please, changelogs, markdown lint,
 worklogs, and rendered docs behavior."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "DocMind Docs Release Auditor",

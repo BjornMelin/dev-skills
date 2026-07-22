@@ -2,8 +2,8 @@ name = "deep_researcher"
 description = """\
 Lead read-only researcher for multi-source, cited, current investigations
 with claim ledgers and freshness checks."""
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Deep Researcher",

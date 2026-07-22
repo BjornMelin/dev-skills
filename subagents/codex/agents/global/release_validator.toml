@@ -2,8 +2,8 @@ name = "release_validator"
 description = """\
 Read-only release validator for changelog, versioning, tags, packaging, and
 publish readiness checks."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Release Validator",

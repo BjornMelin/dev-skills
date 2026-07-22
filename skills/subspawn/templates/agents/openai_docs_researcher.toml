@@ -1,7 +1,7 @@
 name = "openai_docs_researcher"
 description = "Read-only official OpenAI documentation specialist for APIs, Codex, Agents SDK, tools, models, and subagents."
-model = "gpt-5.5"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["OpenAI Docs", "API Cartographer", "Codex Docs"]
 developer_instructions = """

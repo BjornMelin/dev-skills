@@ -2,8 +2,8 @@ name = "false_positive_validator"
 description = """\
 Read-only validator that scores candidate findings and filters weak or stale
 issues."""
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "max"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "False Positive Validator",

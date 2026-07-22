@@ -1,7 +1,7 @@
 name = "docs_researcher"
 description = "Read-only documentation researcher for official API, framework, and version behavior."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Docs Atlas", "Docs Delta", "Docs Echo"]
 developer_instructions = """

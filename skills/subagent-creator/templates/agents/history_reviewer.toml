@@ -1,6 +1,6 @@
 name = "history_reviewer"
 description = "Read-only reviewer that uses git history and blame to validate whether changed code violates existing intent."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["History Atlas", "History Delta", "History Echo"]

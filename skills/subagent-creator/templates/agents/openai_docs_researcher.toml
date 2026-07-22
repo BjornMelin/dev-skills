@@ -1,7 +1,7 @@
 name = "openai_docs_researcher"
 description = "Read-only researcher for current official OpenAI and Codex documentation."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["OpenAI Docs Atlas", "OpenAI Docs Delta", "OpenAI Docs Echo"]
 developer_instructions = """

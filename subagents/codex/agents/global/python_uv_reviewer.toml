@@ -2,8 +2,8 @@ name = "python_uv_reviewer"
 description = """\
 Read-only Python and uv reviewer for dependency resolution, lockfiles,
 packaging, tests, and runtime compatibility."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Python uv Reviewer",

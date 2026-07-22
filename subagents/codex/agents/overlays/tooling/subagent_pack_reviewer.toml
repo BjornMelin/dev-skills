@@ -2,8 +2,8 @@ name = "subagent_pack_reviewer"
 description = """\
 Agent tooling subagent pack reviewer for TOML role catalogs, model/effort
 policy, safety contracts, and smoke readiness."""
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Subagent Pack Reviewer",

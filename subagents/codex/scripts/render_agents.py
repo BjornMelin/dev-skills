@@ -23,11 +23,12 @@ class Role:
     Attributes:
         name: Snake-case subagent role name.
         description: Short role description used by Codex for routing.
-        effort: Model reasoning effort, such as low, high, or xhigh.
+        effort: Model reasoning effort, such as medium, high, or max.
         sandbox: Sandbox mode for the rendered subagent.
         body: Role-specific developer instructions.
         family: Output family. Global roles render under agents/global.
         nicknames: Optional display nickname candidates.
+        model: Model identifier for the role.
     """
 
     name: str
@@ -37,6 +38,7 @@ class Role:
     body: str
     family: str = "global"
     nicknames: tuple[str, str, str] | None = None
+    model: str = "gpt-5.6-sol"
 
 
 COMMON_BOUNDARY = """\
@@ -86,6 +88,7 @@ def role(
     body: str,
     family: str = "global",
     nicknames: tuple[str, str, str] | None = None,
+    model: str = "gpt-5.6-sol",
 ) -> Role:
     """Create a normalized role source record.
 
@@ -97,6 +100,7 @@ def role(
         body: Role-specific instruction body.
         family: Output family for the role.
         nicknames: Optional display nickname candidates.
+        model: Model identifier for the role.
 
     Returns:
         A Role with stripped instruction body text.
@@ -110,6 +114,7 @@ def role(
         body=body.strip(),
         family=family,
         nicknames=nicknames,
+        model=model,
     )
 
 
@@ -206,6 +211,7 @@ def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
                 require_string(raw_role, "body", source=path),
                 require_slug(raw_role, "family", source=path),
                 nicknames,
+                require_string(raw_role, "model", source=path),
             )
         )
     return roles
@@ -215,43 +221,47 @@ GLOBAL_ROLES: list[Role] = [
     role(
         "guidance_mapper",
         "Read-only mapper for AGENTS.md, CLAUDE.md, README, and scoped project guidance relevant to a change.",
-        "low",
+        "medium",
         "read-only",
         """Find guidance files relevant to the assigned paths, PR diff, or repo task.
 Return only applicable rules and their source paths; avoid copying large guidance blocks.
 Do not review code quality or propose implementation changes unless the parent asks.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "repo_explorer",
         "Read-only codebase explorer for bounded evidence gathering before changes without shadowing Codex built-ins.",
-        "low",
+        "high",
         "read-only",
         """Answer the exact codebase question with file and symbol evidence.
 Prefer fast search and targeted reads over broad scans.
 Do not propose broad refactors unless the parent asks for recommendations.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "docs_researcher",
         "Read-only documentation researcher for official API, framework, and version behavior.",
-        "low",
+        "high",
         "read-only",
         """Verify APIs, options, migrations, and version-specific behavior from authoritative documentation.
 Prefer official docs, source repositories, package source, and primary changelogs.
 Clearly mark uncertainty when docs and observed code disagree.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "env_validator",
         "Read-only environment and configuration validator for required variables, secrets wiring, and deployment config.",
-        "low",
+        "medium",
         "read-only",
         """Validate only the assigned environment, deployment, or configuration surface.
 Identify required variables, missing examples, unsafe defaults, secret leakage risks, and inconsistent config names.
 Report only names, presence, and wiring evidence; never print secret values.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "ci_triager",
         "Read-only CI triager for failing checks, logs, workflow contracts, and likely fixes.",
-        "high",
+        "medium",
         "read-only",
         """Triage the assigned CI failure from live check status, logs, workflow files, and repo scripts.
 Prefer exact failure evidence over speculation.
@@ -260,7 +270,7 @@ Separate infrastructure flakes from deterministic code failures.""",
     role(
         "citation_auditor",
         "Read-only auditor for claim-to-source mapping, source freshness, citation quality, and unsupported research conclusions.",
-        "high",
+        "medium",
         "read-only",
         """Audit research output for citation quality and unsupported claims.
 Check that material claims map to primary or high-quality sources and current evidence.
@@ -274,11 +284,12 @@ Return corrected confidence labels and required fixes before publication.""",
         """Research library, framework, SDK, API, and CLI documentation through Context7 when available.
 Use version-specific library IDs when the parent or repo pins a version.
 If Context7 lacks coverage, report the gap and recommend official docs, source, or package inspection.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "dependency_researcher",
         "Read-only dependency researcher for package docs, release notes, source internals, and upgrade risk.",
-        "high",
+        "medium",
         "read-only",
         """Research only the assigned dependency, version range, or package behavior.
 Prefer official release notes and docs first; inspect package source when behavior or migration risk depends on implementation.
@@ -287,7 +298,7 @@ Separate documented API changes from source-inferred behavior.""",
     role(
         "docs_auditor",
         "Read-only docs auditor for stale, missing, duplicated, or misleading repository documentation.",
-        "high",
+        "medium",
         "read-only",
         """Audit only the assigned documentation surfaces and related code/workflow truth.
 Find stale instructions, missing validation steps, duplicated authority, and misleading status claims.
@@ -301,11 +312,12 @@ Prefer one canonical documentation owner per concern.""",
         """Research GitHub evidence only.
 Hydrate search hits before citing files, issue threads, PRs, releases, tags, compare ranges, or manifests.
 Report API limitations, incomplete results, rate limits, and unsearched surfaces.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "history_reviewer",
         "Read-only reviewer that uses git history and blame to validate whether changed code violates existing intent.",
-        "high",
+        "medium",
         "read-only",
         """Use git history, blame, and nearby commits only for the assigned files or symbols.
 Identify issues visible because code violates historical intent, previous fixes, or prior review context.
@@ -314,7 +326,7 @@ Do not flag pre-existing issues unless the current change reintroduces or worsen
     role(
         "implementation_worker",
         "Scoped implementation worker for narrow fixes with explicit file ownership.",
-        "high",
+        "medium",
         "workspace-write",
         """Implement only the assigned scoped change and owned files.
 You are not alone in the codebase. Do not revert edits made by others.
@@ -329,11 +341,12 @@ Do not stage, commit, push, or modify unrelated files unless explicitly instruct
         """Research only official OpenAI sources unless the parent explicitly asks for broader context.
 Check current docs before answering model, API, Codex, or subagent behavior questions.
 Separate confirmed documentation from inference and cite exact source URLs when available.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "performance_reviewer",
         "Read-only performance reviewer for obvious algorithmic, rendering, database, bundle, and IO bottlenecks.",
-        "high",
+        "medium",
         "read-only",
         """Review only the assigned performance-sensitive code path or diff.
 Prioritize high-impact bottlenecks with concrete evidence or clear complexity/runtime reasoning.
@@ -342,7 +355,7 @@ Separate measured evidence from likely risks and avoid speculative rewrites.""",
     role(
         "release_validator",
         "Read-only release validator for changelog, versioning, tags, packaging, and publish readiness checks.",
-        "high",
+        "medium",
         "read-only",
         """Validate only the assigned release, packaging, or publish surface.
 Check version consistency, changelog truth, generated artifacts, release notes, tag expectations, and publish gates.
@@ -351,7 +364,7 @@ Report exact commands to run; do not perform destructive publish or tag operatio
     role(
         "reviewer",
         "Read-only reviewer focused on correctness, security, regressions, and missing tests.",
-        "high",
+        "medium",
         "read-only",
         """Review code like an owner.
 Prioritize correctness, security, behavioral regressions, data loss risks, and missing tests.
@@ -360,7 +373,7 @@ Lead with concrete findings ordered by severity and grounded in file, symbol, co
     role(
         "runtime_bug_reviewer",
         "Read-only runtime bug reviewer for null safety, async races, lifecycle leaks, and error handling.",
-        "high",
+        "medium",
         "read-only",
         """Review only the assigned runtime behavior surface.
 Prioritize null crashes, async races, stale state, resource leaks, missing cleanup, and swallowed errors.
@@ -369,7 +382,7 @@ Use tests, logs, and reproduction evidence when available.""",
     role(
         "shallow_bug_reviewer",
         "Read-only high-signal reviewer for obvious diff-level bugs and regressions.",
-        "high",
+        "medium",
         "read-only",
         """Review only the assigned diff or changed lines.
 Flag high-confidence issues: compile failures, undefined references, clear logic errors, data loss, or deterministic runtime failures.
@@ -378,7 +391,7 @@ Do not flag style, taste, broad architecture, or speculative issues.""",
     role(
         "source_validator",
         "Read-only package/source implementation validator for verifying docs claims against actual repository or package source.",
-        "high",
+        "medium",
         "read-only",
         """Validate claims against source code, package contents, releases, and version diffs.
 Prefer exact versions from lockfiles, package manifests, tags, or release refs.
@@ -387,7 +400,7 @@ Report exact files, symbols, versions, and refs inspected.""",
     role(
         "test_runner",
         "Validation worker that runs focused tests and reports command-level evidence without editing source.",
-        "high",
+        "medium",
         "workspace-write",
         """Run only validation commands assigned by the parent or the smallest relevant repo-native checks.
 Do not edit source files; it is acceptable for test tools to write caches, coverage, or temporary files.
@@ -396,7 +409,7 @@ Capture exact commands, pass/fail status, key failure lines, and likely owner fi
     role(
         "ui_debugger",
         "UI debugger for reproducing browser or frontend regressions and reporting actionable evidence.",
-        "high",
+        "medium",
         "workspace-write",
         """Reproduce the assigned UI or frontend issue with available browser and app tooling.
 Capture exact steps, console or network evidence, screenshots when useful, and likely owning files.
@@ -405,7 +418,7 @@ Do not edit application code unless the parent explicitly assigns an implementat
     role(
         "deep_researcher",
         "Lead read-only researcher for multi-source, cited, current investigations with claim ledgers and freshness checks.",
-        "xhigh",
+        "high",
         "read-only",
         """Lead deep research, not implementation.
 Use official docs, Context7, GitHub/source inspection, package source, and web search only as scoped by the parent.
@@ -414,16 +427,17 @@ Treat search hits as leads until hydrated into source records and produce claim-
     role(
         "false_positive_validator",
         "Read-only validator that scores candidate findings and filters weak or stale issues.",
-        "xhigh",
+        "max",
         "read-only",
         """Validate only the candidate findings provided by the parent.
 Score each candidate from 0 to 100 using evidence, impact, current-code truth, and whether the change introduced it.
 Reject stale, pre-existing, style-only, and unverified claims unless the parent sets a different threshold.""",
+        model="gpt-5.6-terra",
     ),
     role(
         "security_reviewer",
         "Read-only security reviewer for authentication, authorization, injection, secrets, and data exposure risks.",
-        "xhigh",
+        "high",
         "read-only",
         """Review only assigned security-sensitive files, flows, diffs, or claims.
 Prioritize exploitable authentication, authorization, injection, secret exposure, data leakage, and insecure defaults.
@@ -432,7 +446,7 @@ Do not perform destructive testing, credential use, or network probing unless ex
     role(
         "root_cause_investigator",
         "Read-only root-cause investigator for hard failures, regressions, flaky behavior, and conflicting evidence.",
-        "xhigh",
+        "high",
         "read-only",
         """Find the root cause before recommending fixes.
 Trace symptoms through code paths, configuration, runtime logs, tests, and recent changes when available.
@@ -441,7 +455,7 @@ Separate proximate failures from underlying causes and list the minimum verifica
     role(
         "architect_reviewer",
         "Read-only architecture reviewer for subsystem boundaries, ownership drift, and high-impact design decisions.",
-        "xhigh",
+        "high",
         "read-only",
         """Review architecture-level changes, subsystem boundaries, duplicate ownership, and contract drift.
 Prefer established repo patterns and library/platform leverage over new abstractions.
@@ -450,7 +464,7 @@ Surface decision tradeoffs, blast radius, and migration risk with evidence.""",
     role(
         "pr_shepherd",
         "Read-only PR shepherd for review-to-ship loops, unresolved threads, CI state, merge blockers, and closure evidence.",
-        "high",
+        "medium",
         "read-only",
         """Inspect the assigned pull request, review state, CI status, branch delta, and merge blockers.
 Distinguish code fixed, checks passing, review threads resolved, and merge-ready state.
@@ -468,7 +482,7 @@ Do not stage, commit, or rewrite history.""",
     role(
         "docs_aligner",
         "Read-only documentation alignment reviewer for code, workflow, contract, and user-guide drift.",
-        "high",
+        "medium",
         "read-only",
         """Compare changed behavior against README, docs, AGENTS guidance, runbooks, ADRs, and specs in scope.
 Identify stale, missing, duplicated, or misleading docs and recommend one canonical owner per fact.
@@ -490,63 +504,63 @@ PLATFORM_ROLES: list[Role] = [
     role(
         "nextjs_reviewer",
         "Read-only Next.js reviewer for App Router, routing, caching, server actions, middleware/proxy, and build behavior.",
-        "high",
+        "medium",
         "read-only",
         "Review Next.js-specific code and configuration using current official docs or source when behavior may have changed.",
     ),
     role(
         "react_reviewer",
         "Read-only React reviewer for component structure, hooks, state ownership, rendering behavior, and accessibility regressions.",
-        "high",
+        "medium",
         "read-only",
         "Review React-specific code paths for correctness, lifecycle issues, performance traps, and test gaps.",
     ),
     role(
         "expo_reviewer",
         "Read-only Expo reviewer for Expo Router, native configuration, EAS workflows, OTA/runtime version, and mobile build risk.",
-        "high",
+        "medium",
         "read-only",
         "Review Expo and React Native surfaces using installed SDK metadata, official docs, and repo-native validation contracts.",
     ),
     role(
         "convex_reviewer",
         "Read-only Convex reviewer for schema, functions, indexes, authz, components, and backend contract risk.",
-        "high",
+        "medium",
         "read-only",
         "Review Convex code for validator/schema drift, index-backed access, authz enforcement, runtime constraints, and component fit.",
     ),
     role(
         "clerk_reviewer",
         "Read-only Clerk reviewer for auth/session flows, organization context, redirects, webhooks, and browser/mobile auth behavior.",
-        "high",
+        "medium",
         "read-only",
         "Review Clerk integration surfaces using current official docs and repo-specific auth boundaries provided by the parent.",
     ),
     role(
         "vercel_reviewer",
         "Read-only Vercel reviewer for deployments, functions, routing, env vars, build output, and release pipeline risk.",
-        "high",
+        "medium",
         "read-only",
         "Review Vercel-specific config and deployment behavior using current official docs and observed repo scripts.",
     ),
     role(
         "openai_api_reviewer",
         "Read-only OpenAI API reviewer for model selection, Responses API usage, tool calling, structured output, and Codex behavior.",
-        "high",
+        "medium",
         "read-only",
         "Review OpenAI API or Codex usage against current official OpenAI documentation and clearly separate inference from documented behavior.",
     ),
     role(
         "bun_ts_reviewer",
         "Read-only Bun and TypeScript reviewer for package-manager policy, scripts, tests, runtime APIs, and strict typing.",
-        "high",
+        "medium",
         "read-only",
         "Review Bun and TypeScript surfaces for repo policy compliance, script/runtime behavior, dependency usage, and type-safety risk.",
     ),
     role(
         "python_uv_reviewer",
         "Read-only Python and uv reviewer for dependency resolution, lockfiles, packaging, tests, and runtime compatibility.",
-        "high",
+        "medium",
         "read-only",
         "Review Python and uv surfaces for lockfile integrity, environment reproducibility, package metadata, and test/runtime risk.",
     ),
@@ -558,7 +572,7 @@ OVERLAY_ROLES: list[Role] = [
         "docmind_dependency_safety_reviewer",
         "DocMind dependency safety reviewer for Dependabot, security bumps, "
         "uv locks, release notes, and source compatibility.",
-        "xhigh",
+        "high",
         "read-only",
         "Assess DocMind dependency changes from live diff, uv.lock, upstream "
         "release notes/source, CI status, and runtime usage before declaring "
@@ -569,7 +583,7 @@ OVERLAY_ROLES: list[Role] = [
         "docmind_python_runtime_reviewer",
         "DocMind Python runtime reviewer for Streamlit/runtime behavior, "
         "model loading, Apple MPS parity, and test taxonomy.",
-        "high",
+        "medium",
         "read-only",
         "Review DocMind Python runtime changes for compatibility, optional "
         "dependency behavior, device parity, and focused pytest coverage.",
@@ -579,7 +593,7 @@ OVERLAY_ROLES: list[Role] = [
         "docmind_ci_triager",
         "DocMind CI triager for GitHub Actions, uv frozen installs, docs "
         "lint, tests, and release automation failures.",
-        "high",
+        "medium",
         "read-only",
         "Start from live CI evidence and committed workflow files. Separate "
         "frozen CI installs from release lock-refresh automation.",
@@ -589,7 +603,7 @@ OVERLAY_ROLES: list[Role] = [
         "docmind_docs_release_auditor",
         "DocMind docs/release auditor for Release Please, changelogs, "
         "markdown lint, worklogs, and rendered docs behavior.",
-        "high",
+        "medium",
         "read-only",
         "Validate DocMind docs and release automation against committed "
         "configuration, rendered behavior when requested, and parseable "
@@ -600,7 +614,7 @@ OVERLAY_ROLES: list[Role] = [
         "docmind_model_source_validator",
         "DocMind model/source validator for Transformers, SigLIP, GGUF, "
         "image safety, and upstream implementation claims.",
-        "high",
+        "medium",
         "read-only",
         "Validate model/runtime claims against installed versions, source, "
         "and DocMind loader ownership. Preserve custom-model revision "
@@ -611,7 +625,7 @@ OVERLAY_ROLES: list[Role] = [
         "skill_package_validator",
         "Agent tooling skill package validator for AgentSkills metadata, "
         "packaging, quick validation, and install portability.",
-        "high",
+        "medium",
         "read-only",
         "Validate skill packages against repo tooling, agents/openai.yaml "
         "metadata, quick_validate behavior, and install-relative path rules.",
@@ -621,7 +635,7 @@ OVERLAY_ROLES: list[Role] = [
         "subagent_pack_reviewer",
         "Agent tooling subagent pack reviewer for TOML role catalogs, "
         "model/effort policy, safety contracts, and smoke readiness.",
-        "xhigh",
+        "high",
         "read-only",
         "Review Codex subagent packs against authoring guide, subspawn "
         "policy, validator constraints, and runtime smoke expectations.",
@@ -631,7 +645,7 @@ OVERLAY_ROLES: list[Role] = [
         "mcp_tooling_reviewer",
         "Agent tooling MCP/source reviewer for research CLI, Context7/GitHub/"
         "source routing, and provider evidence contracts.",
-        "high",
+        "medium",
         "read-only",
         "Review MCP/tooling changes for provider routing, evidence hydration, "
         "secret redaction, timeout behavior, and replayable source records.",
@@ -641,7 +655,7 @@ OVERLAY_ROLES: list[Role] = [
         "agent_runtime_smoke_tester",
         "Agent tooling runtime smoke tester for Codex custom agents, spawn "
         "contracts, and representative live checks.",
-        "high",
+        "medium",
         "workspace-write",
         "Run assigned non-destructive smoke commands, temporary projects, or "
         "Codex exec checks. Report exact commands and role responses.",
@@ -814,7 +828,7 @@ def render_role(role_spec: Role) -> str:
     rendered_instructions = toml_multiline_basic_string(instructions)
     return f'''name = {toml_string(role_spec.name)}
 description = {toml_multiline_string(role_spec.description)}
-model = "gpt-5.5"
+model = {toml_string(role_spec.model)}
 model_reasoning_effort = {toml_string(role_spec.effort)}
 sandbox_mode = {toml_string(role_spec.sandbox)}
 nickname_candidates = {nicknames}
@@ -872,35 +886,36 @@ def write_catalog() -> None:
         "",
         "Runtime policy:",
         "",
-        "- all roles use `gpt-5.5`; effort tier controls depth;",
-        "- `low` is for deterministic mapping and inventory;",
-        "- `high` is for most expert review, research, validation, and scoped work;",
-        "- `xhigh` is for high-risk work with ambiguity or conflicting evidence;",
+        "- `gpt-5.6-terra` handles bounded retrieval and mechanical inventory;",
+        "- `gpt-5.6-sol` handles judgment, implementation, planning, and synthesis;",
+        "- `medium` is the default worker tier and `high` is reserved for complex decisions;",
+        "- `gpt-5.6-terra` at `max` is reserved for independent adversarial validation;",
+        "- routine roles do not use Sol `xhigh`, `max`, or `ultra`;",
         "- no nested subagents by default;",
         "- parent sessions own orchestration, waiting, synthesis, and final decisions;",
         "- read-only is default; workspace-write is limited to implementation, tests, UI/browser, and smoke runners.",
         "",
         "## Global Roles",
         "",
-        "| Role | Effort | Sandbox | Purpose |",
-        "| --- | --- | --- | --- |",
+        "| Role | Model | Effort | Sandbox | Purpose |",
+        "| --- | --- | --- | --- | --- |",
     ]
     for role_spec in [*GLOBAL_ROLES, *PLATFORM_ROLES]:
         lines.append(
-            f"| `{role_spec.name}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
+            f"| `{role_spec.name}` | `{role_spec.model}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
         )
     lines.extend(
         [
             "",
             "## Project Overlays",
             "",
-            "| Repo family | Role | Effort | Sandbox | Purpose |",
-            "| --- | --- | --- | --- | --- |",
+            "| Repo family | Role | Model | Effort | Sandbox | Purpose |",
+            "| --- | --- | --- | --- | --- | --- |",
         ]
     )
     for role_spec in OVERLAY_ROLES:
         lines.append(
-            f"| `{role_spec.family}` | `{role_spec.name}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
+            f"| `{role_spec.family}` | `{role_spec.name}` | `{role_spec.model}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
         )
     lines.extend(
         [

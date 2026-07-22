@@ -1,6 +1,6 @@
 name = "ci_triager"
 description = "Read-only CI triager for failing checks, logs, workflow contracts, and likely fixes."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["CI Atlas", "CI Delta", "CI Echo"]

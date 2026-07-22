@@ -26,7 +26,7 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = SKILL_DIR / "templates" / "agents"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 NICKNAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
-VALID_EFFORTS = {"minimal", "low", "medium", "high", "xhigh"}
+VALID_EFFORTS = {"minimal", "low", "medium", "high", "xhigh", "max"}
 VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 RESERVED_BUILTIN_AGENT_NAMES = {"default", "worker", "explorer"}
 RESEARCH_CONTRACT_AGENT_NAMES = {
@@ -1078,6 +1078,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "config_exists": config_path.exists(),
         "config_error": config_error,
         "features.multi_agent": lookup_path_value(config, ["features", "multi_agent"]),
+        "features.multi_agent_v2": lookup_path_value(config, ["features", "multi_agent_v2"]),
         "agents.max_threads": lookup_path_value(config, ["agents", "max_threads"]),
         "agents.max_depth": lookup_path_value(config, ["agents", "max_depth"]),
         "agents.preferred_agent": lookup_path_value(config, ["agents", "preferred_agent"]),
@@ -1100,6 +1101,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         if config_error:
             print(f"config error: {config_error}")
         print(f"features.multi_agent: {report['features.multi_agent']}")
+        print(f"features.multi_agent_v2: {report['features.multi_agent_v2']}")
         print(f"agents.max_threads: {report['agents.max_threads']}")
         print(f"agents.max_depth: {report['agents.max_depth']}")
         print(f"agents.preferred_agent: {report['agents.preferred_agent']}")
@@ -1119,7 +1121,7 @@ def smoke_prompt(names: list[str]) -> str:
     listed = ", ".join(names)
     return (
         "Use the configured custom subagents for a harmless smoke test. "
-        f"Spawn one agent for each of these roles: {listed}. "
+        f"Spawn one fresh named V2 agent for each of these roles: {listed}. "
         "Ask each agent to reply with exactly its role name and the word READY. "
         "Wait for all agents, then summarize whether every role responded."
     )

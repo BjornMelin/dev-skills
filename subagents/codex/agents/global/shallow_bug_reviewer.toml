@@ -1,8 +1,8 @@
 name = "shallow_bug_reviewer"
 description = """\
 Read-only high-signal reviewer for obvious diff-level bugs and regressions."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Shallow Bug Reviewer",

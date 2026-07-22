@@ -55,15 +55,19 @@ Bundled resources:
 - Default: exploration + evidence only. No fan-out full doc authorship by default.
 - Prefer `1-3` focused subagents; no nested subagents unless user asks.
 - Explorer agents read-heavy, evidence-first. Implementation workers only for narrow follow-on after main agent chose authority path.
-- Every `spawn_agent` call: set `model` + `reasoning_effort`.
-- Main skill: durable cheap-first — small model for bounded exploration, tighten task before escalate, escalate only underfitting subagent. Model ladder + prompt template in `references/subagent-orchestration.md`.
+- Every `spawn_agent` call: inherit the custom role's model and effort when
+  pinned; otherwise choose from the GPT-5.6 routing policy in
+  `references/subagent-orchestration.md`.
+- Main skill: use Terra for bounded retrieval and Sol for judgment; tighten the
+  task before escalating an underfitting subagent.
 - Every delegated task specifies:
   - narrow task or question
   - allowed scope or surfaces
   - read-only vs may edit
-  - main agent wait now vs local work until synthesis gate
+  - strict wait expectation
   - exact return format
-- Default wait: continue local non-overlapping work; wait at synthesis gates before major authority, final recommendations, edits needing delegated evidence.
+- Default wait: immediately wait for every spawned subagent before substantive
+  next work or final synthesis.
 - Evidence-first returns:
   - key finding or result
   - files + symbols inspected

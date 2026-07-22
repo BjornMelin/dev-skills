@@ -119,6 +119,9 @@ If you add a local plugin under `plugins/`, validate the plugin manifest and its
 - Use native Codex web tools for current official facts; `codex-research` records provider evidence and handles external calls it owns directly.
 - Use `skills/subagent-creator/scripts/subagent_creator.py` to validate or install custom agent templates.
 - Use `skills/subspawn` when spawning agents. Use `skills/subspawn/scripts/subspawn_plan.py` for nontrivial fanout plans. After spawning a planned batch, wait for every spawned subagent before substantive next work or final synthesis.
+- Use `subagents/codex/ROLE_CATALOG.md` as the canonical GPT-5.6 model/effort
+  routing matrix. Prefer role-file pins; V2 custom or overridden spawns use a
+  fresh named fork.
 
 ## Commit & Pull Request Guidelines
 

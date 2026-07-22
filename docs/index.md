@@ -16,7 +16,7 @@ skill-authoring systems added to this repository:
   Tauri v2 apps, Axum/Tokio services, and explicit broad architecture planning.
 - `subagent-creator`: skill and Python helper for authoring, installing,
   validating, diffing, syncing, backing up, and smoke-testing Codex custom
-  agents.
+  agents with GPT-5.6 multi-agent V2 routing.
 - `subspawn`: hardened subagent delegation policy with planner-generated
   prompts, strict wait, and evidence-first synthesis.
 - `sentry-triage-to-pr`: skill and portable Python operator for ranking

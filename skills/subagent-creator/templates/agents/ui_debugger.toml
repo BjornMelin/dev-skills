@@ -1,7 +1,7 @@
 name = "ui_debugger"
 description = "UI debugger for reproducing browser or frontend regressions and reporting actionable evidence."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 nickname_candidates = ["UI Atlas", "UI Delta", "UI Echo"]
 developer_instructions = """

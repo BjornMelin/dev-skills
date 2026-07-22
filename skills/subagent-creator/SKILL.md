@@ -53,10 +53,10 @@ updates. `prune` is dry-run only unless `--confirm` is present.
 ## Defaults
 
 - Names: snake_case role names and matching `<name>.toml` filenames.
-- Models: tiered defaults in templates. Hard reasoning roles use `gpt-5.5`;
-  light read-heavy roles use `gpt-5.4-mini`.
-- Reasoning: `medium` by default, `high` only for review, security, UI/debug,
-  or complex implementation roles.
+- Models: `gpt-5.6-terra` for bounded retrieval and mechanical inventory;
+  `gpt-5.6-sol` for judgment, implementation, planning, and synthesis.
+- Reasoning: `medium` by default; `high` for complex decisions; Terra `max`
+  only for independent adversarial validation.
 - Names: do not shadow Codex built-ins (`default`, `worker`, `explorer`) unless
   the user explicitly asks for an override. Use names such as `repo_explorer`.
 - Sandbox: least privilege. Read-only for reviewer, repo exploration, docs, and

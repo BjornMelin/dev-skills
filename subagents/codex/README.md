@@ -16,10 +16,12 @@ It intentionally separates:
 
 The runtime policy is:
 
-- all roles use `gpt-5.5`;
-- simple inventory roles use `low`;
-- most expert lanes use `high`;
-- high-risk ambiguous synthesis roles use `xhigh`;
+- Terra `medium` handles mechanical inventory and Terra `high` handles bounded
+  retrieval;
+- Sol `medium` handles default judgment and implementation, while Sol `high`
+  handles planning, architecture, security, root cause, and synthesis;
+- Terra `max` is reserved for independent adversarial validation;
+- routine roles do not use Sol `xhigh`, `max`, or `ultra`;
 - no nested subagents by default;
 - read-only unless the role explicitly runs tests, browser checks, smoke tests,
   or scoped implementation.

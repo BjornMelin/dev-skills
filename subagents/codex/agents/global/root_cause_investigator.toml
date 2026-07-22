@@ -2,8 +2,8 @@ name = "root_cause_investigator"
 description = """\
 Read-only root-cause investigator for hard failures, regressions, flaky
 behavior, and conflicting evidence."""
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Root Cause Investigator",

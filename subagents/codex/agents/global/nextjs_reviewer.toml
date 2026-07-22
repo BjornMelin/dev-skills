@@ -2,8 +2,8 @@ name = "nextjs_reviewer"
 description = """\
 Read-only Next.js reviewer for App Router, routing, caching, server actions,
 middleware/proxy, and build behavior."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Nextjs Reviewer",
