@@ -32,6 +32,9 @@ Useful optional fields:
 Project-scoped config loads only for trusted projects. Current V2 settings live
 under `[features.multi_agent_v2]`; `[agents]` retains V1/fallback controls:
 
+This V2 table requires Codex CLI 0.126.0 or newer. Older releases are not
+supported by this baseline; upgrade Codex before installing it.
+
 ```toml
 [features.multi_agent_v2]
 enabled = true

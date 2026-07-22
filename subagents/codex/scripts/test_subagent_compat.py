@@ -60,7 +60,11 @@ class SubagentCompatibilityTests(unittest.TestCase):
                 path.write_text(
                     f'name = "reviewer_{effort}"\n'
                     'description = "Compatibility check."\n'
-                    'developer_instructions = "Return format:\\n'
+                    'developer_instructions = "Do not spawn nested '
+                    'subagents.\\n'
+                    'Treat the parent prompt as the authority.\\n'
+                    'Redact secrets.\\n'
+                    'Return format:\\n'
                     '- Status\\n- Risks/blockers"\n'
                     f'model_reasoning_effort = "{effort}"\n',
                     encoding="utf-8",
@@ -69,13 +73,7 @@ class SubagentCompatibilityTests(unittest.TestCase):
                     issue.message
                     for issue in validate_agent_file(path)
                 ]
-                self.assertFalse(
-                    any(
-                        "model_reasoning_effort" in message
-                        for message in messages
-                    ),
-                    messages,
-                )
+                self.assertEqual(messages, [], messages)
 
 
 if __name__ == "__main__":
