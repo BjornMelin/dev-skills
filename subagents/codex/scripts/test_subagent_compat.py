@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -16,7 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "subagents/codex/scripts"))
 sys.path.insert(0, str(REPO_ROOT / "skills/subagent-creator/scripts"))
 
+from render_agents import PUBLIC_ROLES  # noqa: E402
 from render_agents import load_local_roles  # noqa: E402
+from render_agents import render_role  # noqa: E402
 from subagent_creator import validate_agent_file  # noqa: E402
 
 
@@ -138,6 +141,45 @@ class SubagentCompatibilityTests(unittest.TestCase):
                 },
             )
             self.assertIsNone(_run_doctor("untrusted")[key])
+
+    def test_source_validator_uses_terra_high(self) -> None:
+        """Keep source-validation templates on the retrieval model lane."""
+
+        paths = (
+            REPO_ROOT
+            / "skills/deep-researcher/templates/agents/"
+            "source_validator.toml",
+            REPO_ROOT
+            / "skills/subspawn/templates/agents/source_validator.toml",
+            REPO_ROOT
+            / "subagents/codex/agents/global/source_validator.toml",
+        )
+        for path in paths:
+            config = tomllib.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(config["model"], "gpt-5.6-terra", path)
+            self.assertEqual(config["model_reasoning_effort"], "high", path)
+
+        role = next(
+            role for role in PUBLIC_ROLES if role.name == "source_validator"
+        )
+        rendered = tomllib.loads(render_role(role))
+        self.assertEqual(rendered["model"], "gpt-5.6-terra")
+        self.assertEqual(rendered["model_reasoning_effort"], "high")
+
+        reference = (
+            REPO_ROOT / "docs/reference/subagent-templates.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "| `source_validator.toml` | `gpt-5.6-terra` | `high` |",
+            reference,
+        )
+        catalog = (REPO_ROOT / "subagents/codex/ROLE_CATALOG.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "| `source_validator` | `gpt-5.6-terra` | `high` |",
+            catalog,
+        )
 
 
 if __name__ == "__main__":

@@ -224,12 +224,19 @@ def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
 GLOBAL_ROLES: list[Role] = [
     role(
         "guidance_mapper",
-        "Read-only mapper for AGENTS.md, CLAUDE.md, README, and scoped project guidance relevant to a change.",
+        (
+            "Read-only mapper for AGENTS.md, CLAUDE.md, README, and scoped "
+            "project guidance relevant to a change."
+        ),
         "medium",
         "read-only",
-        """Find guidance files relevant to the assigned paths, PR diff, or repo task.
-Return only applicable rules and their source paths; avoid copying large guidance blocks.
-Do not review code quality or propose implementation changes unless the parent asks.""",
+        (
+            "Find guidance files relevant to the assigned paths, PR diff, "
+            "or\nrepo task. Return only applicable rules and their source "
+            "paths; avoid copying\nlarge guidance blocks. Do not review code "
+            "quality or propose implementation\nchanges unless the parent "
+            "asks."
+        ),
         model="gpt-5.6-terra",
     ),
     role(
@@ -394,12 +401,19 @@ Do not flag style, taste, broad architecture, or speculative issues.""",
     ),
     role(
         "source_validator",
-        "Read-only package/source implementation validator for verifying docs claims against actual repository or package source.",
-        "medium",
+        (
+            "Read-only package/source implementation validator for verifying "
+            "docs claims against actual repository or package source."
+        ),
+        "high",
         "read-only",
-        """Validate claims against source code, package contents, releases, and version diffs.
-Prefer exact versions from lockfiles, package manifests, tags, or release refs.
-Report exact files, symbols, versions, and refs inspected.""",
+        (
+            "Validate claims against source code, package contents, "
+            "releases, and version diffs.\nPrefer exact versions from "
+            "lockfiles, package manifests, tags, or release refs.\nReport "
+            "exact files, symbols, versions, and refs inspected."
+        ),
+        model="gpt-5.6-terra",
     ),
     role(
         "test_runner",
@@ -883,7 +897,10 @@ def write_roles() -> int:
     for role_spec in all_roles:
         directory = target_dir(role_spec)
         directory.mkdir(parents=True, exist_ok=True)
-        (directory / f"{role_spec.name}.toml").write_text(render_role(role_spec), encoding="utf-8")
+        (directory / f"{role_spec.name}.toml").write_text(
+            render_role(role_spec),
+            encoding="utf-8",
+        )
     return len(all_roles)
 
 
@@ -899,14 +916,32 @@ def write_catalog() -> None:
         "",
         "Runtime policy:",
         "",
-        "- `gpt-5.6-terra` handles bounded retrieval and mechanical inventory;",
-        "- `gpt-5.6-sol` handles judgment, implementation, planning, and synthesis;",
-        "- `medium` is the default worker tier and `high` is reserved for complex decisions;",
-        "- `gpt-5.6-terra` at `max` is reserved for independent adversarial validation;",
+        (
+            "- `gpt-5.6-terra` handles bounded retrieval and mechanical "
+            "inventory;"
+        ),
+        (
+            "- `gpt-5.6-sol` handles judgment, implementation, planning, "
+            "and synthesis;"
+        ),
+        (
+            "- `medium` is the default worker tier and `high` is reserved "
+            "for complex decisions;"
+        ),
+        (
+            "- `gpt-5.6-terra` at `max` is reserved for independent "
+            "adversarial validation;"
+        ),
         "- routine roles do not use Sol `xhigh`, `max`, or `ultra`;",
         "- no nested subagents by default;",
-        "- parent sessions own orchestration, waiting, synthesis, and final decisions;",
-        "- read-only is default; workspace-write is limited to implementation, tests, UI/browser, and smoke runners.",
+        (
+            "- parent sessions own orchestration, waiting, synthesis, and "
+            "final decisions;"
+        ),
+        (
+            "- read-only is default; workspace-write is limited to "
+            "implementation, tests, UI/browser, and smoke runners."
+        ),
         "",
         "## Global Roles",
         "",
@@ -915,7 +950,9 @@ def write_catalog() -> None:
     ]
     for role_spec in [*GLOBAL_ROLES, *PLATFORM_ROLES]:
         lines.append(
-            f"| `{role_spec.name}` | `{role_spec.model}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
+            f"| `{role_spec.name}` | `{role_spec.model}` | "
+            f"`{role_spec.effort}` | `{role_spec.sandbox}` | "
+            f"{role_spec.description} |"
         )
     lines.extend(
         [
@@ -928,7 +965,9 @@ def write_catalog() -> None:
     )
     for role_spec in OVERLAY_ROLES:
         lines.append(
-            f"| `{role_spec.family}` | `{role_spec.name}` | `{role_spec.model}` | `{role_spec.effort}` | `{role_spec.sandbox}` | {role_spec.description} |"
+            f"| `{role_spec.family}` | `{role_spec.name}` | "
+            f"`{role_spec.model}` | `{role_spec.effort}` | "
+            f"`{role_spec.sandbox}` | {role_spec.description} |"
         )
     lines.extend(
         [
