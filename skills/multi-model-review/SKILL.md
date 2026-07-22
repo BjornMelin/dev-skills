@@ -1,6 +1,6 @@
 ---
 name: multi-model-review
-description: Pre-PR multi-model review of a nontrivial diff - parallel opus-4.8 review lane (Agent) + gpt-5.6-sol adversarial review lane (direct codex exec, no shim), then adversarial verification of merged findings. Read-only; the main loop presents/synthesizes and applies fixes only on request. Use before shipping nontrivial changes.
+description: Pre-PR multi-model review, parallel opus and codex exec adversarial lanes, then adversarial verification of merged findings. Read-only. Use before shipping nontrivial diffs.
 ---
 
 # Multi-Model Review

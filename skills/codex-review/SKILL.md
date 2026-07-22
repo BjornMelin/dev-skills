@@ -1,6 +1,6 @@
 ---
 name: codex-review
-description: Run a gpt-5.6 code review via the Codex CLI - normal diff review (uncommitted or vs a base branch) or a steerable adversarial review with structured JSON findings. Use before shipping nontrivial changes, or whenever an independent codex perspective on a diff is wanted.
+description: Independent gpt-5.6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.
 ---
 
 # Codex Review

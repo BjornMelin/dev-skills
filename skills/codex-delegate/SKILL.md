@@ -1,6 +1,6 @@
 ---
 name: codex-delegate
-description: Delegate implementation, investigation, or bulk/mechanical work to the gpt-5.6 codex family (sol/luna/terra) via the Codex CLI - write-capable, resumable, backgroundable. Use for clear-spec implementation, migrations, data analysis, debugging passes, or any task MODELS.md routes to codex.
+description: Delegate implementation, investigation, or bulk work to gpt-5.6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task MODELS.md routes to codex.
 ---
 
 # Codex Delegate
