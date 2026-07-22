@@ -286,6 +286,8 @@ for local development and validation commands.
 | `browser-workbench-setup` | Bootstrap browser/UI QA: Playwright-interactive primary, agent-browser smoke, auth and local conventions. | [skills/browser-workbench-setup/SKILL.md](skills/browser-workbench-setup/SKILL.md) |
 | `bun-dev` | The Bun skill: development, build, and runtime knowledge (PM, lockfiles, monorepos, tests/build, TypeScript, Bun-native APIs, Vercel Bun runtime) plus an optional native audit/fix/validate engine (`codex-dev bun`). | [skills/bun-dev/SKILL.md](skills/bun-dev/SKILL.md) |
 | `caveman-compress` | Compress docs and prose for fewer tokens while keeping substance, code, URLs, and structure. | [skills/caveman-compress/SKILL.md](skills/caveman-compress/SKILL.md) |
+| `codex-delegate` | Delegate implementation, investigation, or bulk work to the gpt-5.6 codex family via direct pinned `codex exec` (Model Routing v2 lanes, delegation gate, no Claude shims). | [skills/codex-delegate/SKILL.md](skills/codex-delegate/SKILL.md) |
+| `codex-review` | Independent gpt-5.6-sol code review via the Codex CLI: normal diff review or steerable adversarial review with structured JSON findings. | [skills/codex-review/SKILL.md](skills/codex-review/SKILL.md) |
 | `codex-sdk` | Codex SDK/CLI: JSONL threads, MCP, multi-agent orchestration, SQLite memory, sandbox patterns. | [skills/codex-sdk/SKILL.md](skills/codex-sdk/SKILL.md) |
 | `codex-utils` | Codex session utilities: plans, short MCQs before risky edits, images, web/MCP discovery, parallel tool use. | [skills/codex-utils/SKILL.md](skills/codex-utils/SKILL.md) |
 | `commit` | Stage and commit in semantic, reviewable groups. | [skills/commit/SKILL.md](skills/commit/SKILL.md) |
@@ -309,6 +311,7 @@ for local development and validation commands.
 | `gsap` | Master GSAP skill for React/Next.js and vanilla JS: tweens, timelines, ScrollTrigger, the `useGSAP` hook, every free plugin (SplitText, MorphSVG, DrawSVG, Flip, Draggable), `gsap.utils`, performance, and reduced-motion — with a Next.js recipe cookbook and the `gsap-audit` CLI. | [skills/gsap/SKILL.md](skills/gsap/SKILL.md) |
 | `kimi-ui-agent` | Explicit-only Kimi-powered UI agent for repo profiling, adapter setup, and plan-first frontend worktree orchestration. | [skills/kimi-ui-agent/SKILL.md](skills/kimi-ui-agent/SKILL.md) |
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |
+| `multi-model-review` | Pre-PR multi-model review: parallel opus-4.8 Agent lane plus direct pinned `codex exec` adversarial lane, then adversarial verification of merged findings. | [skills/multi-model-review/SKILL.md](skills/multi-model-review/SKILL.md) |
 | `new-branch` | Create a conventional, semver-friendly branch first, then plan work and the PR. | [skills/new-branch/SKILL.md](skills/new-branch/SKILL.md) |
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
 | `opensrc` | Canonical source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
