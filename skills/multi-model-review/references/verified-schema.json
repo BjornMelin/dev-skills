@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "confirmed", "rejected"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["ship", "changes-recommended", "blocker"] },
+    "confirmed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "file", "line", "title", "why", "fix", "confirmedBy", "evidence"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "nit"] },
+          "file": { "type": "string" },
+          "line": { "type": "string" },
+          "title": { "type": "string" },
+          "why": { "type": "string" },
+          "fix": { "type": "string" },
+          "confirmedBy": { "type": "string", "enum": ["opus", "codex", "both"] },
+          "evidence": { "type": "string" }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "file", "rejectionReason"],
+        "properties": {
+          "title": { "type": "string" },
+          "file": { "type": "string" },
+          "rejectionReason": { "type": "string", "description": "why this is a false positive, with evidence" }
+        }
+      }
+    }
+  }
+}

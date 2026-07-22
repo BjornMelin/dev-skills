@@ -2,10 +2,10 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-07-21T23:46:37.117979157Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "0364732cbb8b39b29254c2f6ce045fccda258582",
+  "sourceCommit": "86ea91d72375857cace83eeeaebc3b63727d1fcd",
   "sourceRef": "main",
-  "skillsCount": 67,
-  "totalSkillDirectories": 67,
+  "skillsCount": 70,
+  "totalSkillDirectories": 70,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -489,6 +489,100 @@
       },
       "package": {
         "path": "skills/dist/caveman-compress.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "codex-delegate",
+      "slug": "codex-delegate",
+      "description": "Delegate implementation, investigation, or bulk work to gpt-5.6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task MODELS.md routes to codex.",
+      "path": "skills/codex-delegate",
+      "skillMdPath": "skills/codex-delegate/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/codex-delegate",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/codex-delegate/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill codex-delegate -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill codex-delegate -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill codex-delegate"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 0
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/codex-delegate.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "codex-review",
+      "slug": "codex-review",
+      "description": "Independent gpt-5.6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.",
+      "path": "skills/codex-review",
+      "skillMdPath": "skills/codex-review/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/codex-review",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/codex-review/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill codex-review -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill codex-review -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill codex-review"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 4,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 4
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/codex-review.skill",
         "present": false,
         "rejected": false
       }
@@ -1619,6 +1713,53 @@
       },
       "package": {
         "path": "skills/dist/langgraph-multiagent.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "multi-model-review",
+      "slug": "multi-model-review",
+      "description": "Pre-PR multi-model review, parallel opus and codex exec adversarial lanes, then adversarial verification of merged findings. Read-only. Use before shipping nontrivial diffs.",
+      "path": "skills/multi-model-review",
+      "skillMdPath": "skills/multi-model-review/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/multi-model-review",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/multi-model-review/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill multi-model-review -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill multi-model-review -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill multi-model-review"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 3,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/multi-model-review.skill",
         "present": false,
         "rejected": false
       }
