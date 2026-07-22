@@ -67,8 +67,8 @@ Supported commands:
 - `prune`: remove stale installed roles, dry-run by default.
 - `backup`: back up installed roles.
 - `validate`: validate TOML roles.
-- `doctor`: inspect Codex subagent environment, including V1/V2 feature flags
-  and agent limits.
+- `doctor`: inspect Codex subagent environment, including native V2 and
+  V1/fallback concurrency limits.
 - `smoke`: create a temporary smoke setup.
 - `pack`: list or install template packs.
 

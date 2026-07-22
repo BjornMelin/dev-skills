@@ -169,6 +169,20 @@ def default_checks() -> list[EvalCheck]:
             ),
         ),
         EvalCheck(
+            id="subagent-config-compatibility",
+            name="Subagent local manifests and current effort values remain compatible",
+            command=(
+                "python3",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "subagents/codex/scripts",
+                "-p",
+                "test_*.py",
+            ),
+        ),
+        EvalCheck(
             id="subspawn-role-contracts",
             name="Subspawn role contracts validate",
             command=(

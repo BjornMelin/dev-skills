@@ -26,7 +26,16 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = SKILL_DIR / "templates" / "agents"
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 NICKNAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
-VALID_EFFORTS = {"minimal", "low", "medium", "high", "xhigh", "max"}
+VALID_EFFORTS = {
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+}
 VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 RESERVED_BUILTIN_AGENT_NAMES = {"default", "worker", "explorer"}
 RESEARCH_CONTRACT_AGENT_NAMES = {
@@ -1079,7 +1088,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "config_error": config_error,
         "features.multi_agent": lookup_path_value(config, ["features", "multi_agent"]),
         "features.multi_agent_v2": lookup_path_value(config, ["features", "multi_agent_v2"]),
+        "features.multi_agent_v2.max_concurrent_threads_per_session": lookup_path_value(
+            config,
+            ["features", "multi_agent_v2", "max_concurrent_threads_per_session"],
+        ),
         "agents.max_threads": lookup_path_value(config, ["agents", "max_threads"]),
+        "agents.max_concurrent_threads_per_session": lookup_path_value(
+            config,
+            ["agents", "max_concurrent_threads_per_session"],
+        ),
         "agents.max_depth": lookup_path_value(config, ["agents", "max_depth"]),
         "agents.preferred_agent": lookup_path_value(config, ["agents", "preferred_agent"]),
         "global_agents_dir": str(global_agents),
@@ -1102,7 +1119,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             print(f"config error: {config_error}")
         print(f"features.multi_agent: {report['features.multi_agent']}")
         print(f"features.multi_agent_v2: {report['features.multi_agent_v2']}")
+        print(
+            "features.multi_agent_v2.max_concurrent_threads_per_session: "
+            f"{report['features.multi_agent_v2.max_concurrent_threads_per_session']}"
+        )
         print(f"agents.max_threads: {report['agents.max_threads']}")
+        print(
+            "agents.max_concurrent_threads_per_session: "
+            f"{report['agents.max_concurrent_threads_per_session']}"
+        )
         print(f"agents.max_depth: {report['agents.max_depth']}")
         print(f"agents.preferred_agent: {report['agents.preferred_agent']}")
         print(f"global agents: {global_agents} ({report['global_agents_count']} TOML files)")

@@ -211,7 +211,11 @@ def load_local_roles(path: Path = DEFAULT_LOCAL_ROLES) -> list[Role]:
                 require_string(raw_role, "body", source=path),
                 require_slug(raw_role, "family", source=path),
                 nicknames,
-                require_string(raw_role, "model", source=path),
+                model=(
+                    require_string(raw_role, "model", source=path)
+                    if "model" in raw_role
+                    else "gpt-5.6-sol"
+                ),
             )
         )
     return roles

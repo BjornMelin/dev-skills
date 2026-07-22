@@ -29,15 +29,21 @@ Useful optional fields:
 - `mcp_servers`
 - `skills.config`
 
-Project-scoped config loads only for trusted projects. Global settings remain
-under `[agents]` in Codex config:
+Project-scoped config loads only for trusted projects. Current V2 settings live
+under `[features.multi_agent_v2]`; `[agents]` retains V1/fallback controls:
 
-- `agents.max_threads`, default 6 when unset
-- `agents.max_depth`, default 1 when unset
-- `agents.job_max_runtime_seconds`, used by CSV fan-out jobs
+```toml
+[features.multi_agent_v2]
+enabled = true
+max_concurrent_threads_per_session = 7 # root plus six children
 
-Keep `agents.max_depth = 1` unless recursive delegation is explicitly needed.
-Nested fan-out increases cost, latency, and predictability risk.
+[agents]
+max_concurrent_threads_per_session = 6 # V1/fallback child limit
+max_depth = 1 # V1 only; V2 ignores this key
+```
+
+Keep V1 depth at one unless recursive delegation is explicitly needed. Nested
+fan-out increases cost, latency, and predictability risk.
 
 ## Authoring Rules
 
@@ -75,6 +81,10 @@ Do not route routine reusable roles to Sol `xhigh`, `max`, or `ultra`. Keep
 Sol `max` as a root-only emergency escalation for work that remains underfit
 after tighter scope and Sol `high`.
 
+The validator accepts the complete current effort set: `none`, `minimal`,
+`low`, `medium`, `high`, `xhigh`, `max`, and `ultra`. Reusable role policy uses
+only the narrower tiers above.
+
 ## Runtime Compatibility Notes
 
 Pair custom agents with `$subspawn` for runtime orchestration.
@@ -86,10 +96,12 @@ explicit `agent_type`, `model`, or `reasoning_effort` overrides. For custom or
 specialized agents, use a fresh or partial fork unless the user explicitly asks
 for full-history inheritance.
 
-Current workstation baseline (verified 2026-07-22): enable
-`features.multi_agent_v2`, keep `agents.max_threads = 6` and
-`agents.max_depth = 1`, and use fresh named forks for pinned roles. Luna remains
-outside reusable V2 templates until native custom-agent support is verified.
+Current workstation baseline (verified 2026-07-22): enable the
+`[features.multi_agent_v2]` table with
+`max_concurrent_threads_per_session = 7` for the root plus six children. Keep
+the `[agents]` V1/fallback child limit at six and V1 depth at one. Use fresh
+named forks for pinned roles. Luna remains outside reusable V2 templates until
+native custom-agent support is verified.
 
 When the active tool schema is legacy and exposes `fork_context`, do not assume
 full-context forks can combine safely with custom role or model overrides. Use
