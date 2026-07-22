@@ -1037,6 +1037,29 @@ def lookup_path_value(data: dict[str, Any], keys: list[str]) -> Any:
     return current
 
 
+def merge_config_layers(
+    base: dict[str, Any],
+    override: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge one trusted project config over the global config.
+
+    Args:
+        base: Global Codex configuration.
+        override: Trusted project configuration.
+
+    Returns:
+        Merged effective configuration.
+    """
+
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge_config_layers(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def project_trust(config: dict[str, Any], project_dir: Path) -> str | None:
     projects = config.get("projects")
     if not isinstance(projects, dict):
@@ -1077,6 +1100,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         elif parsed is not None:
             config = parsed
 
+    trust_level = project_trust(config, project_dir)
+    project_config_path = project_dir / ".codex" / "config.toml"
+    project_config: dict[str, Any] = {}
+    project_config_error: str | None = None
+    if trust_level == "trusted" and project_config_path.exists():
+        parsed, error = load_toml(project_config_path)
+        if error:
+            project_config_error = error
+        elif parsed is not None:
+            project_config = parsed
+    effective_config = merge_config_layers(config, project_config)
+
     template_issues = validate_paths([TEMPLATE_DIR])
     v2_threads_key = (
         "features.multi_agent_v2."
@@ -1090,29 +1125,46 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "config_path": str(config_path),
         "config_exists": config_path.exists(),
         "config_error": config_error,
-        "features.multi_agent": lookup_path_value(config, ["features", "multi_agent"]),
-        "features.multi_agent_v2": lookup_path_value(config, ["features", "multi_agent_v2"]),
+        "project_config_path": str(project_config_path),
+        "project_config_error": project_config_error,
+        "features.multi_agent": lookup_path_value(
+            effective_config,
+            ["features", "multi_agent"],
+        ),
+        "features.multi_agent_v2": lookup_path_value(
+            effective_config,
+            ["features", "multi_agent_v2"],
+        ),
         v2_threads_key: lookup_path_value(
-            config,
+            effective_config,
             [
                 "features",
                 "multi_agent_v2",
                 "max_concurrent_threads_per_session",
             ],
         ),
-        "agents.max_threads": lookup_path_value(config, ["agents", "max_threads"]),
+        "agents.max_threads": lookup_path_value(
+            effective_config,
+            ["agents", "max_threads"],
+        ),
         "agents.max_concurrent_threads_per_session": lookup_path_value(
-            config,
+            effective_config,
             ["agents", "max_concurrent_threads_per_session"],
         ),
-        "agents.max_depth": lookup_path_value(config, ["agents", "max_depth"]),
-        "agents.preferred_agent": lookup_path_value(config, ["agents", "preferred_agent"]),
+        "agents.max_depth": lookup_path_value(
+            effective_config,
+            ["agents", "max_depth"],
+        ),
+        "agents.preferred_agent": lookup_path_value(
+            effective_config,
+            ["agents", "preferred_agent"],
+        ),
         "global_agents_dir": str(global_agents),
         "global_agents_count": len(list(global_agents.glob("*.toml"))) if global_agents.exists() else 0,
         "project_dir": str(project_dir),
         "project_agents_dir": str(project_agents),
         "project_agents_count": len(list(project_agents.glob("*.toml"))) if project_agents.exists() else 0,
-        "project_trust_level": project_trust(config, project_dir),
+        "project_trust_level": trust_level,
         "template_validation_issues": [issue.to_dict() for issue in template_issues],
     }
 

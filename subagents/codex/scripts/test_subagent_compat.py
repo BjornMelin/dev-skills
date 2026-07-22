@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -74,6 +76,68 @@ class SubagentCompatibilityTests(unittest.TestCase):
                     for issue in validate_agent_file(path)
                 ]
                 self.assertEqual(messages, [], messages)
+
+    def test_doctor_uses_only_trusted_project_config(self) -> None:
+        """Report trusted project overrides and ignore untrusted ones."""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            codex_home = root / "codex-home"
+            project_dir = root / "project"
+            codex_home.mkdir()
+            (project_dir / ".codex").mkdir(parents=True)
+            project_path = project_dir.as_posix()
+            project_config = project_dir / ".codex" / "config.toml"
+            project_config.write_text(
+                "[features.multi_agent_v2]\n"
+                "max_concurrent_threads_per_session = 9\n",
+                encoding="utf-8",
+            )
+
+            def _run_doctor(trust_level: str) -> dict[str, object]:
+                (codex_home / "config.toml").write_text(
+                    f'[projects."{project_path}"]\n'
+                    f'trust_level = "{trust_level}"\n'
+                    "[features.multi_agent_v2]\n"
+                    "enabled = true\n",
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(
+                            REPO_ROOT
+                            / "skills/subagent-creator/scripts/"
+                            "subagent_creator.py"
+                        ),
+                        "doctor",
+                        "--codex-bin",
+                        "missing-codex",
+                        "--project-dir",
+                        str(project_dir),
+                        "--json",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "CODEX_HOME": str(codex_home)},
+                )
+                return json.loads(result.stdout)
+
+            key = (
+                "features.multi_agent_v2."
+                "max_concurrent_threads_per_session"
+            )
+            trusted = _run_doctor("trusted")
+            self.assertEqual(trusted[key], 9)
+            self.assertEqual(
+                trusted["features.multi_agent_v2"],
+                {
+                    "enabled": True,
+                    "max_concurrent_threads_per_session": 9,
+                },
+            )
+            self.assertIsNone(_run_doctor("untrusted")[key])
 
 
 if __name__ == "__main__":

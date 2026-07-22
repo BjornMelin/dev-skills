@@ -668,9 +668,7 @@ OVERLAY_ROLES: list[Role] = [
 ]
 
 
-LOCAL_ROLES = load_local_roles()
 PUBLIC_ROLES = [*GLOBAL_ROLES, *PLATFORM_ROLES, *OVERLAY_ROLES]
-ALL_ROLES = [*PUBLIC_ROLES, *LOCAL_ROLES]
 
 
 DISPLAY_WORDS = {
@@ -855,12 +853,16 @@ def target_dir(role_spec: Role) -> Path:
     return AGENTS_ROOT / "overlays" / role_spec.family
 
 
-def clean_generated_dirs() -> None:
-    """Remove previously generated TOML files from managed directories."""
+def clean_generated_dirs(local_roles: list[Role]) -> None:
+    """Remove generated TOML files for public and supplied local roles.
+
+    Args:
+        local_roles: Local roles whose overlay directories are managed.
+    """
 
     overlay_dirs = {
         AGENTS_ROOT / "overlays" / role_spec.family
-        for role_spec in [*OVERLAY_ROLES, *LOCAL_ROLES]
+        for role_spec in [*OVERLAY_ROLES, *local_roles]
     }
     for directory in [AGENTS_ROOT / "global", *sorted(overlay_dirs)]:
         if directory.exists():
@@ -868,14 +870,21 @@ def clean_generated_dirs() -> None:
                 path.unlink()
 
 
-def write_roles() -> None:
-    """Render all public and local roles to TOML files."""
+def write_roles() -> int:
+    """Render all public and local roles to TOML files.
 
-    clean_generated_dirs()
-    for role_spec in ALL_ROLES:
+    Returns:
+        Number of rendered roles.
+    """
+
+    local_roles = load_local_roles()
+    all_roles = [*PUBLIC_ROLES, *local_roles]
+    clean_generated_dirs(local_roles)
+    for role_spec in all_roles:
         directory = target_dir(role_spec)
         directory.mkdir(parents=True, exist_ok=True)
         (directory / f"{role_spec.name}.toml").write_text(render_role(role_spec), encoding="utf-8")
+    return len(all_roles)
 
 
 def write_catalog() -> None:
@@ -958,9 +967,9 @@ def main() -> int:
         Process exit status code.
     """
 
-    write_roles()
+    role_count = write_roles()
     write_catalog()
-    print(f"rendered {len(ALL_ROLES)} roles under {AGENTS_ROOT}")
+    print(f"rendered {role_count} roles under {AGENTS_ROOT}")
     return 0
 
 
