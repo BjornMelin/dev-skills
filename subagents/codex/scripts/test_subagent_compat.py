@@ -19,7 +19,11 @@ from subagent_creator import validate_agent_file  # noqa: E402
 
 
 class SubagentCompatibilityTests(unittest.TestCase):
+    """Verify compatibility with current and legacy subagent configuration."""
+
     def test_local_role_without_model_uses_sol_default(self) -> None:
+        """Default a missing local role model to GPT-5.6 Sol."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             manifest = Path(temp_dir) / "roles.local.json"
             manifest.write_text(
@@ -32,7 +36,10 @@ class SubagentCompatibilityTests(unittest.TestCase):
                                 "effort": "medium",
                                 "sandbox": "read-only",
                                 "family": "private",
-                                "body": "Review only the assigned private scope.",
+                                "body": (
+                                    "Review only the assigned private "
+                                    "scope."
+                                ),
                             }
                         ]
                     }
@@ -45,19 +52,28 @@ class SubagentCompatibilityTests(unittest.TestCase):
         self.assertEqual(roles[0].model, "gpt-5.6-sol")
 
     def test_validator_accepts_none_and_ultra_effort(self) -> None:
+        """Accept the current lowest and highest reasoning efforts."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             for effort in ("none", "ultra"):
                 path = Path(temp_dir) / f"reviewer_{effort}.toml"
                 path.write_text(
                     f'name = "reviewer_{effort}"\n'
                     'description = "Compatibility check."\n'
-                    'developer_instructions = "Return format:\\n- Status\\n- Risks/blockers"\n'
+                    'developer_instructions = "Return format:\\n'
+                    '- Status\\n- Risks/blockers"\n'
                     f'model_reasoning_effort = "{effort}"\n',
                     encoding="utf-8",
                 )
-                messages = [issue.message for issue in validate_agent_file(path)]
+                messages = [
+                    issue.message
+                    for issue in validate_agent_file(path)
+                ]
                 self.assertFalse(
-                    any("model_reasoning_effort" in message for message in messages),
+                    any(
+                        "model_reasoning_effort" in message
+                        for message in messages
+                    ),
                     messages,
                 )
 

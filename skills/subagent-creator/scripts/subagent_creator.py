@@ -1078,6 +1078,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             config = parsed
 
     template_issues = validate_paths([TEMPLATE_DIR])
+    v2_threads_key = (
+        "features.multi_agent_v2."
+        "max_concurrent_threads_per_session"
+    )
     report = {
         "codex_bin": codex_bin,
         "codex_version": codex_version,
@@ -1088,9 +1092,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         "config_error": config_error,
         "features.multi_agent": lookup_path_value(config, ["features", "multi_agent"]),
         "features.multi_agent_v2": lookup_path_value(config, ["features", "multi_agent_v2"]),
-        "features.multi_agent_v2.max_concurrent_threads_per_session": lookup_path_value(
+        v2_threads_key: lookup_path_value(
             config,
-            ["features", "multi_agent_v2", "max_concurrent_threads_per_session"],
+            [
+                "features",
+                "multi_agent_v2",
+                "max_concurrent_threads_per_session",
+            ],
         ),
         "agents.max_threads": lookup_path_value(config, ["agents", "max_threads"]),
         "agents.max_concurrent_threads_per_session": lookup_path_value(
@@ -1119,10 +1127,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             print(f"config error: {config_error}")
         print(f"features.multi_agent: {report['features.multi_agent']}")
         print(f"features.multi_agent_v2: {report['features.multi_agent_v2']}")
-        print(
-            "features.multi_agent_v2.max_concurrent_threads_per_session: "
-            f"{report['features.multi_agent_v2.max_concurrent_threads_per_session']}"
-        )
+        print(f"{v2_threads_key}: {report[v2_threads_key]}")
         print(f"agents.max_threads: {report['agents.max_threads']}")
         print(
             "agents.max_concurrent_threads_per_session: "

@@ -170,7 +170,10 @@ def default_checks() -> list[EvalCheck]:
         ),
         EvalCheck(
             id="subagent-config-compatibility",
-            name="Subagent local manifests and current effort values remain compatible",
+            name=(
+                "Subagent local manifests and current effort values "
+                "remain compatible"
+            ),
             command=(
                 "python3",
                 "-m",
