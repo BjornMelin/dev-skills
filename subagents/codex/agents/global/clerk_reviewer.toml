@@ -2,8 +2,8 @@ name = "clerk_reviewer"
 description = """\
 Read-only Clerk reviewer for auth/session flows, organization context,
 redirects, webhooks, and browser/mobile auth behavior."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Clerk Reviewer",

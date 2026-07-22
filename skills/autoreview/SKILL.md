@@ -46,7 +46,7 @@ commit or branch diff instead.
 ## Options
 
 - `--model <model>`: pass a Codex model override; omit it to inherit the configured Codex model.
-- `--reasoning-effort low|medium|high|xhigh`: pass Codex model reasoning effort; omit it to inherit the configured/model default.
+- `--reasoning-effort low|medium|high|xhigh|max`: pass Codex model reasoning effort; omit it to inherit the configured/model default.
 - `--web-search`: opt into Codex web search for dependency/API/security research; default is off to match Codex review behavior.
 - `--prompt` / `--prompt-file`: add task-specific review instructions.
 - `--dataset <file>`: include extra evidence in the review bundle.

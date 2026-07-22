@@ -1,7 +1,7 @@
 name = "github_researcher"
 description = "Read-only GitHub specialist for repository, code, issue, pull request, release, changelog, and package-manifest evidence."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["GitHub Atlas", "Repo Scout", "Source Scout"]
 developer_instructions = """

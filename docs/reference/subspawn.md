@@ -67,6 +67,8 @@ Default presets:
 Use `--role` to select explicit roles, `--mode edit` only when write surfaces
 are disjoint, `--max-agents` to keep the batch bounded, and
 `--allow-large-batch` only when the user explicitly requests a larger batch.
+Prefer 1-3 roles; use 4-6 only for independent read, test, or audit lanes with
+one writer at most.
 In a full repository checkout, the planner loads the deeper research and
 subagent template directories first. In a packaged standalone `subspawn` skill,
 it falls back to the local `skills/subspawn/templates/agents/` copies so preset
@@ -174,8 +176,13 @@ Template roles may emit narrower return headings from their TOML
 Default posture:
 
 - inherit model/effort when role files already pin them;
-- use `gpt-5.5` for hard review, debugging, security, and planning;
-- use `gpt-5.4-mini` for lighter read-heavy scans;
+- use Terra `medium` for mechanical reads and Terra `high` for bounded source
+  gathering;
+- use Sol `medium` for default judgment and implementation, and Sol `high` for
+  planning, architecture, security, root-cause work, and synthesis;
+- reserve Terra `max` for independent adversarial validation;
+- do not use routine Sol `xhigh`, `max`, or `ultra`, and keep Luna outside V2
+  until native custom-agent support is verified;
 - raise effort only after tightening scope and output expectations.
 
 ## Synthesis

@@ -1,6 +1,6 @@
 name = "env_validator"
 description = "Read-only environment and configuration validator for required variables, secrets wiring, and deployment config."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-terra"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["Env Atlas", "Env Delta", "Env Echo"]

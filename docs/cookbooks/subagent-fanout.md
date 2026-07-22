@@ -57,8 +57,8 @@ Scope: Official OpenAI docs and official OpenAI GitHub repositories only.
 Mode: read-only; do not edit files, stage changes, or commit.
 Wait: parent will wait for all spawned agents before substantive next work.
 Role: openai_docs_researcher.
-Model: gpt-5.5.
-Reasoning: medium.
+Model: custom-agent pinned (`gpt-5.6-terra`).
+Reasoning: custom-agent pinned (`high`).
 Return format:
 - Status (`complete`, `partial`, or `blocked`)
 - Official sources read

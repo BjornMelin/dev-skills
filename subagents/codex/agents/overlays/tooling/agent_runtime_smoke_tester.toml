@@ -2,8 +2,8 @@ name = "agent_runtime_smoke_tester"
 description = """\
 Agent tooling runtime smoke tester for Codex custom agents, spawn contracts,
 and representative live checks."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "workspace-write"
 nickname_candidates = [
   "Agent Runtime Smoke Tester",

@@ -1,7 +1,7 @@
 name = "runtime_bug_reviewer"
 description = "Read-only runtime bug reviewer for null safety, async races, lifecycle leaks, and error handling."
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["Runtime Atlas", "Runtime Delta", "Runtime Echo"]
 developer_instructions = """

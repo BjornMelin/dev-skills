@@ -2,8 +2,8 @@ name = "skill_package_validator"
 description = """\
 Agent tooling skill package validator for AgentSkills metadata, packaging,
 quick validation, and install portability."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Skill Package Validator",

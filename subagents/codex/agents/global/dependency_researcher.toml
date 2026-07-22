@@ -2,8 +2,8 @@ name = "dependency_researcher"
 description = """\
 Read-only dependency researcher for package docs, release notes, source
 internals, and upgrade risk."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Dependency Researcher",

@@ -2,8 +2,8 @@ name = "security_reviewer"
 description = """\
 Read-only security reviewer for authentication, authorization, injection,
 secrets, and data exposure risks."""
-model = "gpt-5.5"
-model_reasoning_effort = "xhigh"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Security Reviewer",

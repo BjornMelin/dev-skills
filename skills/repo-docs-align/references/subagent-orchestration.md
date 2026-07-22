@@ -27,35 +27,17 @@ Subagents improve this skill when they stay bounded and evidence-focused. They s
 - Avoid broad fan-out.
 - Do not spawn nested subagents unless the user explicitly asks.
 
-## Budget-optimized model policy
+## Model policy
 
-Default model ladder:
-- first choice: `gpt-5.4-mini`
-- larger fallback: `gpt-5.3-codex`
-- near-instant text-only triage: `gpt-5.3-codex-spark`
+- Terra `medium`: deterministic mapping and inventory.
+- Terra `high`: bounded repo, docs, GitHub, and source retrieval.
+- Sol `medium`: default review, evidence adjudication, and narrow implementation.
+- Sol `high`: planning, architecture, security, root-cause work, and synthesis.
+- Terra `max`: independent adversarial validation only.
 
-### `gpt-5.4-mini`
-
-- default effort: `medium`
-- use `medium` for most repo mapping, read-heavy scans, codebase tracing, focused audits, doc/API verification, standard review passes, and normal bounded implementation
-- use `high` for ambiguous findings, cross-file reasoning, conflicting evidence, tricky debugging, security-sensitive inspection, or critical logic-path review
-- use `low` only for simple deterministic tasks such as path lookup, quick grep confirmation, tiny file checks, surface inventory, or basic doc lookup
-
-Prefer `medium` over `low` by default. Before moving from `medium` to `high`, tighten the task statement, expected output, and verification requirements first.
-
-### `gpt-5.3-codex`
-
-Use only when `gpt-5.4-mini` is clearly underfitting after one tighter pass, or when the task is cross-cutting, ambiguous, or high-risk.
-
-- use `low` for straightforward implementation
-- use `medium` for normal non-trivial work
-- use `high` only when genuinely necessary
-
-Do not use `xhigh` by default.
-
-### `gpt-5.3-codex-spark`
-
-Use only for near-instant, text-only drafting or triage. Do not use Spark for code changes, final decisions, or high-risk reasoning.
+Do not use routine Sol `xhigh`, `max`, or `ultra`. Keep Luna outside V2 until
+native custom-agent support is verified. Prefer role-file pins over per-spawn
+overrides; pinned custom roles use `fork_turns = "none"`.
 
 ## Escalation rules
 
@@ -69,11 +51,9 @@ Escalate only the specific subagent that is underfitting. Do not escalate the wh
 ## Wait policy
 
 Default posture:
-- spawn bounded explorers
-- keep the main agent doing non-overlapping local work
-- wait at synthesis gates before major authority decisions, final recommendations, or edits that depend on delegated evidence
-
-Only wait immediately when the very next step is blocked on the delegated result.
+- spawn one bounded batch
+- immediately wait for every spawned subagent
+- synthesize only after the batch completes
 
 ## Mandatory spawn checklist
 
@@ -81,7 +61,7 @@ Every `spawn_agent` call should include:
 - exact task or question
 - allowed scope or surfaces
 - read-only vs may-edit status
-- whether the main agent should wait now or continue until a synthesis gate
+- strict wait expectation
 - exact return format
 - explicit `(model, reasoning_effort)`
 - one-line reason when using a non-default model or effort
@@ -108,7 +88,7 @@ Use a prompt like:
 Task: <one narrow question>
 Scope: <allowed files, docs, APIs, or repo surfaces only>
 Mode: <read-only | may edit>
-Wait policy: <main agent waits now | main agent continues until synthesis gate>
+Wait policy: parent immediately waits for the full batch
 Return format:
 - Key finding/result
 - Files/symbols inspected

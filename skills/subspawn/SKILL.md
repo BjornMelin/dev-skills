@@ -75,7 +75,8 @@ subagent-creator templates first.
 
 ## Fan-Out Rules
 
-- Prefer 1-3 focused subagents.
+- Prefer 1-3 focused subagents; use 4-6 only for genuinely independent read,
+  test, or audit lanes with one writer at most.
 - No nested subagents unless user asks.
 - Explorer-style: read-heavy, evidence-focused. Prefer a custom
   `repo_explorer` role when installed; keep Codex built-in `explorer` as a
@@ -113,13 +114,16 @@ session.
 
 - Omit per-call `model` and `reasoning_effort` when inheriting the parent model
   or when a custom agent file already pins them.
-- Use `gpt-5.5` for demanding review, debugging, security, planning, and
-  implementation agents when available.
-- Use `gpt-5.4` when `gpt-5.5` is unavailable or the workflow is pinned to it.
-- Use `gpt-5.4-mini` for lighter read-heavy scans, docs checks, inventories,
-  and supporting workers.
-- Use `gpt-5.3-codex-spark` only for low-latency, low-token, text-only triage
-  where depth is not required.
+- Use `gpt-5.6-terra` at `medium` for mechanical inventory and at `high` for
+  bounded retrieval and source gathering.
+- Use `gpt-5.6-sol` at `medium` for default judgment and implementation; use
+  Sol `high` for planning, architecture, security, root-cause work, and lead
+  synthesis.
+- Use Terra `max` only for independent adversarial validation.
+- Do not use Sol `xhigh`, `max`, or `ultra` for routine delegated work. Sol
+  `max` is a root-only emergency escalation after tighter scope and Sol `high`
+  still underfit.
+- Do not route Luna in V2 until native custom-agent support is verified.
 
 Only set `model` or `reasoning_effort` directly when the user asks or the
 current tool schema supports that override and it is necessary. Include a
@@ -132,10 +136,9 @@ Use `medium` as the default for most agents.
 - Use `high` when an agent must trace complex logic, check assumptions, handle
   edge cases, investigate security-sensitive code, or resolve conflicting
   evidence.
-- Use `low` only for straightforward lookup, inventory, or deterministic
-  narrow checks.
-- Use `xhigh` rarely, only for unusually hard bounded reasoning where the
-  selected model supports it.
+- Use Terra `high` for bounded read-heavy source gathering.
+- Use Terra `max` only for an independent adversarial lane, never the primary
+  planner or implementer.
 
 Before increasing effort, tighten:
 

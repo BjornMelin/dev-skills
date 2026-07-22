@@ -2,8 +2,8 @@ name = "docmind_python_runtime_reviewer"
 description = """\
 DocMind Python runtime reviewer for Streamlit/runtime behavior, model
 loading, Apple MPS parity, and test taxonomy."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "DocMind Python Runtime Reviewer",

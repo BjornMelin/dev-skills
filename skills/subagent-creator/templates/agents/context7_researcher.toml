@@ -1,7 +1,7 @@
 name = "context7_researcher"
 description = "Read-only Context7 specialist for current library documentation lookups through Context7 MCP or ctx7 CLI."
-model = "gpt-5.4-mini"
-model_reasoning_effort = "medium"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = ["Context7 Atlas", "Context7 Delta", "Context7 Echo"]
 developer_instructions = """

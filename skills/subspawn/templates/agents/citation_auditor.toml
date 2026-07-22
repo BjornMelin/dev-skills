@@ -1,6 +1,6 @@
 name = "citation_auditor"
 description = "Read-only auditor for claim-to-source mapping, source freshness, citation quality, and unsupported research conclusions."
-model = "gpt-5.4-mini"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = ["Citation Audit", "Evidence Audit", "Claim Check"]

@@ -2,8 +2,8 @@ name = "mcp_tooling_reviewer"
 description = """\
 Agent tooling MCP/source reviewer for research CLI, Context7/GitHub/source
 routing, and provider evidence contracts."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "MCP Tooling Reviewer",

@@ -2,7 +2,7 @@ name = "dependency_upgrade_planner"
 description = """\
 Read-only dependency upgrade planner for safe package bumps,
 changelog/source review, and verification lanes."""
-model = "gpt-5.5"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [

@@ -2,8 +2,8 @@ name = "expo_reviewer"
 description = """\
 Read-only Expo reviewer for Expo Router, native configuration, EAS
 workflows, OTA/runtime version, and mobile build risk."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Expo Reviewer",

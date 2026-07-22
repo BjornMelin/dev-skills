@@ -131,12 +131,12 @@ skills/deep-researcher/templates/agents/
 
 | Template | Model | Effort | Sandbox | Use |
 | --- | --- | --- | --- | --- |
-| `deep_researcher.toml` | `gpt-5.5` | `high` | read-only | lead multi-source research |
-| `github_researcher.toml` | `gpt-5.4-mini` | `medium` | read-only | repo/code/issues/releases |
-| `context7_researcher.toml` | `gpt-5.4-mini` | `medium` | read-only | direct Context7 REST docs |
-| `openai_docs_researcher.toml` | `gpt-5.5` | `medium` | read-only | official OpenAI docs |
-| `source_validator.toml` | `gpt-5.4-mini` | `medium` | read-only | implementation/source proof |
-| `citation_auditor.toml` | `gpt-5.4-mini` | `medium` | read-only | source freshness and claim audit |
+| `deep_researcher.toml` | `gpt-5.6-sol` | `high` | read-only | lead multi-source research |
+| `github_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | repo/code/issues/releases |
+| `context7_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | direct Context7 REST docs |
+| `openai_docs_researcher.toml` | `gpt-5.6-terra` | `high` | read-only | official OpenAI docs |
+| `source_validator.toml` | `gpt-5.6-sol` | `medium` | read-only | implementation/source proof |
+| `citation_auditor.toml` | `gpt-5.6-sol` | `medium` | read-only | source freshness and claim audit |
 
 All Focused Six roles:
 

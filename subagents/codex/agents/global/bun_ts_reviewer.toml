@@ -2,8 +2,8 @@ name = "bun_ts_reviewer"
 description = """\
 Read-only Bun and TypeScript reviewer for package-manager policy, scripts,
 tests, runtime APIs, and strict typing."""
-model = "gpt-5.5"
-model_reasoning_effort = "high"
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "Bun TS Reviewer",

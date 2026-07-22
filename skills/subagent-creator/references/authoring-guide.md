@@ -5,7 +5,7 @@ defaults. Prefer current official OpenAI Codex docs when behavior may have
 changed.
 
 Last verified against OpenAI Codex docs and source-adjacent behavior:
-2026-05-07.
+2026-07-22.
 
 ## Current Codex Model
 
@@ -59,31 +59,37 @@ Nested fan-out increases cost, latency, and predictability risk.
 
 ## Model Defaults
 
-Use tiered defaults:
+Use the GPT-5.6 routing tiers:
 
-- `gpt-5.5`: demanding review, security, debugging, implementation, and
-  ambiguous multi-step work.
-- `gpt-5.4`: fallback when `gpt-5.5` is unavailable or a workflow is pinned to
-  it.
-- `gpt-5.4-mini`: lighter read-heavy scans, documentation checks, inventories,
-  and supporting workers.
-- `gpt-5.3-codex-spark`: low-latency text-only triage when depth is not needed.
+- `gpt-5.6-terra` at `medium`: deterministic mapping, environment inventory,
+  and other mechanical reads.
+- `gpt-5.6-terra` at `high`: bounded documentation, GitHub, source, and repo
+  retrieval.
+- `gpt-5.6-sol` at `medium`: default review, implementation, testing, and
+  evidence adjudication.
+- `gpt-5.6-sol` at `high`: planning, architecture, security, root-cause work,
+  and lead synthesis.
+- `gpt-5.6-terra` at `max`: independent adversarial validation only.
 
-Use `model_reasoning_effort = "medium"` by default. Use `high` only for roles
-that need complex logic tracing, security review, edge-case analysis, or
-debugging. Avoid `xhigh` in reusable templates unless the role is explicitly
-for unusually hard bounded reasoning.
+Do not route routine reusable roles to Sol `xhigh`, `max`, or `ultra`. Keep
+Sol `max` as a root-only emergency escalation for work that remains underfit
+after tighter scope and Sol `high`.
 
 ## Runtime Compatibility Notes
 
 Pair custom agents with `$subspawn` for runtime orchestration.
 
-For Codex multi-agent v2 surfaces, `spawn_agent` may expose `task_name` and
+For Codex multi-agent v2 surfaces, `spawn_agent` exposes `task_name` and
 `fork_turns`. Current public Codex source has a sharp edge: omitting
 `fork_turns` defaults to full-history fork, and full-history forks reject
 explicit `agent_type`, `model`, or `reasoning_effort` overrides. For custom or
 specialized agents, use a fresh or partial fork unless the user explicitly asks
 for full-history inheritance.
+
+Current workstation baseline (verified 2026-07-22): enable
+`features.multi_agent_v2`, keep `agents.max_threads = 6` and
+`agents.max_depth = 1`, and use fresh named forks for pinned roles. Luna remains
+outside reusable V2 templates until native custom-agent support is verified.
 
 When the active tool schema is legacy and exposes `fork_context`, do not assume
 full-context forks can combine safely with custom role or model overrides. Use
