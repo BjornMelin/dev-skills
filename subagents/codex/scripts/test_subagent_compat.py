@@ -17,7 +17,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "subagents/codex/scripts"))
 sys.path.insert(0, str(REPO_ROOT / "skills/subagent-creator/scripts"))
 
+from render_agents import PUBLIC_ROLES  # noqa: E402
 from render_agents import load_local_roles  # noqa: E402
+from render_agents import render_role  # noqa: E402
 from subagent_creator import validate_agent_file  # noqa: E402
 
 
@@ -157,12 +159,26 @@ class SubagentCompatibilityTests(unittest.TestCase):
             self.assertEqual(config["model"], "gpt-5.6-terra", path)
             self.assertEqual(config["model_reasoning_effort"], "high", path)
 
+        role = next(
+            role for role in PUBLIC_ROLES if role.name == "source_validator"
+        )
+        rendered = tomllib.loads(render_role(role))
+        self.assertEqual(rendered["model"], "gpt-5.6-terra")
+        self.assertEqual(rendered["model_reasoning_effort"], "high")
+
         reference = (
             REPO_ROOT / "docs/reference/subagent-templates.md"
         ).read_text(encoding="utf-8")
         self.assertIn(
             "| `source_validator.toml` | `gpt-5.6-terra` | `high` |",
             reference,
+        )
+        catalog = (REPO_ROOT / "subagents/codex/ROLE_CATALOG.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "| `source_validator` | `gpt-5.6-terra` | `high` |",
+            catalog,
         )
 
 

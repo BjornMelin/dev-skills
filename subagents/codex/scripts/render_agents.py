@@ -230,10 +230,13 @@ GLOBAL_ROLES: list[Role] = [
         ),
         "medium",
         "read-only",
-        """Find guidance files relevant to the assigned paths, PR diff, or
-repo task. Return only applicable rules and their source paths; avoid copying
-large guidance blocks. Do not review code quality or propose implementation
-changes unless the parent asks.""",
+        (
+            "Find guidance files relevant to the assigned paths, PR diff, "
+            "or\nrepo task. Return only applicable rules and their source "
+            "paths; avoid copying\nlarge guidance blocks. Do not review code "
+            "quality or propose implementation\nchanges unless the parent "
+            "asks."
+        ),
         model="gpt-5.6-terra",
     ),
     role(
@@ -404,9 +407,12 @@ Do not flag style, taste, broad architecture, or speculative issues.""",
         ),
         "high",
         "read-only",
-        """Validate claims against source code, package contents, releases, and version diffs.
-Prefer exact versions from lockfiles, package manifests, tags, or release refs.
-Report exact files, symbols, versions, and refs inspected.""",
+        (
+            "Validate claims against source code, package contents, "
+            "releases, and version diffs.\nPrefer exact versions from "
+            "lockfiles, package manifests, tags, or release refs.\nReport "
+            "exact files, symbols, versions, and refs inspected."
+        ),
         model="gpt-5.6-terra",
     ),
     role(
