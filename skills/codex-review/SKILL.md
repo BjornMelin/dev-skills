@@ -12,7 +12,9 @@ workflow stages (no plugin runtime required).
 Reviews run on `gpt-5.6-sol` (MODELS.md: code review = Sol) - pin BOTH the model
 (`-m gpt-5.6-sol`) and the effort (`-c model_reasoning_effort="medium"`, or
 `"high"` for consequential/cross-cutting diffs) on every command below rather
-than inheriting CLI defaults.
+than inheriting CLI defaults. For `codex review`, `-m` is a GLOBAL flag and must
+come before the subcommand. Paths written as `<skill-dir>` mean this skill's
+base directory (provided when the skill is invoked).
 
 ## Mode selection
 
@@ -24,9 +26,9 @@ than inheriting CLI defaults.
 ## Normal review
 
 ```bash
-codex review -m gpt-5.6-sol -c model_reasoning_effort="medium" --uncommitted   # staged + unstaged + untracked
-codex review -m gpt-5.6-sol -c model_reasoning_effort="medium" --base main     # branch vs base
-codex review -m gpt-5.6-sol -c model_reasoning_effort="medium" --commit <sha>  # a single commit
+codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --uncommitted   # staged + unstaged + untracked
+codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --base main     # branch vs base
+codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --commit <sha>  # a single commit
 ```
 
 - Multi-file/large diffs take minutes: run via Bash `run_in_background: true`; the
@@ -44,7 +46,7 @@ codex review -m gpt-5.6-sol -c model_reasoning_effort="medium" --commit <sha>  #
    prompt from stdin; a plain `< file` redirect keeps the command pipe-free):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema /home/bjorn/.claude/skills/codex-review/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
+codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
 ```
 
 3. Read the output JSON: `verdict` (`approve` | `needs-attention`), `findings[]`
@@ -69,4 +71,5 @@ consequential or cross-cutting diffs. **Never xhigh or ultra.** If a Sol-high
 review still leaves material doubt, escalate per MODELS.md: Fable resolves the
 hard part inline, or one independent `gpt-5.6-terra` `"max"` adversarial pass.
 
-References adapted from openai/codex-plugin-cc (Apache-2.0, see references/NOTICE).
+References adapted from openai/codex-plugin-cc (Apache-2.0; see references/NOTICE
+and the full license text in references/LICENSE).

@@ -17,7 +17,7 @@
           "title": { "type": "string" },
           "why": { "type": "string" },
           "fix": { "type": "string" },
-          "confirmedBy": { "type": "string", "description": "opus | codex | both" },
+          "confirmedBy": { "type": "string", "enum": ["opus", "codex", "both"] },
           "evidence": { "type": "string" }
         }
       }

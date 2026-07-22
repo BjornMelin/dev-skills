@@ -71,7 +71,9 @@ Rules:
 - Use isolated worktrees when parallel writers could overlap; one owner per
   file/domain.
 - Follow-ups continue the same Codex session:
-  `codex exec resume --last "<follow-up instruction>"`.
+  `codex exec resume --last "<follow-up instruction>"`. Sessions are looked up
+  from the working directory, so run this from the same cwd/repo scope as the
+  original call (or pass the recorded session id instead of `--last`).
 
 ## Closing the loop
 

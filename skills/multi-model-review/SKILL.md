@@ -27,11 +27,15 @@ Shared review contract (put in BOTH lane prompts):
 **Opus lane** - `Agent(model: 'opus', effort: 'high', run_in_background: true)`.
 Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
 \"opus-4.8\". Return ONLY a JSON object matching
-`~/.claude/skills/multi-model-review/references/findings-schema.json`
+`<skill-dir>/references/findings-schema.json`
 (read it first) - no prose around it."
 
+`<skill-dir>` throughout means this skill's base directory (provided when the
+skill is invoked) - substitute the real absolute path in every prompt/command.
+
 **Codex lane** - direct `codex exec`, no relay agent:
-1. Fill `~/.claude/skills/codex-review/references/adversarial-prompt.md`:
+1. Fill `<skill-dir>/references/adversarial-prompt.md` (this skill's own
+   template - its output contract matches findings-schema.json):
    `TARGET_LABEL` = "diff vs <base> in <repo>", `USER_FOCUS` = focus,
    `REVIEW_COLLECTION_GUIDANCE` = "Collect the diff yourself with git
    (git diff <base>...HEAD, falling back to uncommitted changes if empty) and
@@ -40,7 +44,7 @@ Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
 2. Run ONE bare background Bash command (600000ms timeout):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema /home/bjorn/.claude/skills/multi-model-review/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
+codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
 ```
 
 Effort routing per MODELS.md: `"medium"` (Sol worker) is the default review
@@ -70,7 +74,7 @@ shared contract, the merged lane JSON, and:
 > severity. Overall verdict: "blocker" if any confirmed critical/high,
 > "changes-recommended" if any confirmed finding remains, else "ship".
 > Return ONLY a JSON object matching
-> `~/.claude/skills/multi-model-review/references/verified-schema.json`.
+> `<skill-dir>/references/verified-schema.json`.
 
 For a tiny finding set (≤3), Fable may verify inline instead of spawning.
 
