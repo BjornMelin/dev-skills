@@ -9,7 +9,6 @@ import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS_ROOT = ROOT / "agents"
 DEFAULT_LOCAL_ROLES = ROOT / "roles.local.json"
@@ -281,7 +280,7 @@ Separate infrastructure flakes from deterministic code failures.""",
     role(
         "citation_auditor",
         "Read-only auditor for claim-to-source mapping, source freshness, citation quality, and unsupported research conclusions.",
-        "medium",
+        "high",
         "read-only",
         """Audit research output for citation quality and unsupported claims.
 Check that material claims map to primary or high-quality sources and current evidence.
@@ -300,7 +299,7 @@ If Context7 lacks coverage, report the gap and recommend official docs, source, 
     role(
         "dependency_researcher",
         "Read-only dependency researcher for package docs, release notes, source internals, and upgrade risk.",
-        "medium",
+        "high",
         "read-only",
         """Research only the assigned dependency, version range, or package behavior.
 Prefer official release notes and docs first; inspect package source when behavior or migration risk depends on implementation.
@@ -309,7 +308,7 @@ Separate documented API changes from source-inferred behavior.""",
     role(
         "docs_auditor",
         "Read-only docs auditor for stale, missing, duplicated, or misleading repository documentation.",
-        "medium",
+        "high",
         "read-only",
         """Audit only the assigned documentation surfaces and related code/workflow truth.
 Find stale instructions, missing validation steps, duplicated authority, and misleading status claims.
@@ -328,7 +327,7 @@ Report API limitations, incomplete results, rate limits, and unsearched surfaces
     role(
         "history_reviewer",
         "Read-only reviewer that uses git history and blame to validate whether changed code violates existing intent.",
-        "medium",
+        "high",
         "read-only",
         """Use git history, blame, and nearby commits only for the assigned files or symbols.
 Identify issues visible because code violates historical intent, previous fixes, or prior review context.
@@ -337,7 +336,7 @@ Do not flag pre-existing issues unless the current change reintroduces or worsen
     role(
         "implementation_worker",
         "Scoped implementation worker for narrow fixes with explicit file ownership.",
-        "medium",
+        "high",
         "workspace-write",
         """Implement only the assigned scoped change and owned files.
 You are not alone in the codebase. Do not revert edits made by others.
@@ -357,7 +356,7 @@ Separate confirmed documentation from inference and cite exact source URLs when 
     role(
         "performance_reviewer",
         "Read-only performance reviewer for obvious algorithmic, rendering, database, bundle, and IO bottlenecks.",
-        "medium",
+        "high",
         "read-only",
         """Review only the assigned performance-sensitive code path or diff.
 Prioritize high-impact bottlenecks with concrete evidence or clear complexity/runtime reasoning.
@@ -366,7 +365,7 @@ Separate measured evidence from likely risks and avoid speculative rewrites.""",
     role(
         "release_validator",
         "Read-only release validator for changelog, versioning, tags, packaging, and publish readiness checks.",
-        "medium",
+        "high",
         "read-only",
         """Validate only the assigned release, packaging, or publish surface.
 Check version consistency, changelog truth, generated artifacts, release notes, tag expectations, and publish gates.
@@ -375,7 +374,7 @@ Report exact commands to run; do not perform destructive publish or tag operatio
     role(
         "reviewer",
         "Read-only reviewer focused on correctness, security, regressions, and missing tests.",
-        "medium",
+        "high",
         "read-only",
         """Review code like an owner.
 Prioritize correctness, security, behavioral regressions, data loss risks, and missing tests.
@@ -384,7 +383,7 @@ Lead with concrete findings ordered by severity and grounded in file, symbol, co
     role(
         "runtime_bug_reviewer",
         "Read-only runtime bug reviewer for null safety, async races, lifecycle leaks, and error handling.",
-        "medium",
+        "high",
         "read-only",
         """Review only the assigned runtime behavior surface.
 Prioritize null crashes, async races, stale state, resource leaks, missing cleanup, and swallowed errors.
@@ -427,7 +426,7 @@ Capture exact commands, pass/fail status, key failure lines, and likely owner fi
     role(
         "ui_debugger",
         "UI debugger for reproducing browser or frontend regressions and reporting actionable evidence.",
-        "medium",
+        "high",
         "workspace-write",
         """Reproduce the assigned UI or frontend issue with available browser and app tooling.
 Capture exact steps, console or network evidence, screenshots when useful, and likely owning files.
@@ -500,7 +499,7 @@ Do not stage, commit, or rewrite history.""",
     role(
         "docs_aligner",
         "Read-only documentation alignment reviewer for code, workflow, contract, and user-guide drift.",
-        "medium",
+        "high",
         "read-only",
         """Compare changed behavior against README, docs, AGENTS guidance, runbooks, ADRs, and specs in scope.
 Identify stale, missing, duplicated, or misleading docs and recommend one canonical owner per fact.
@@ -522,63 +521,63 @@ PLATFORM_ROLES: list[Role] = [
     role(
         "nextjs_reviewer",
         "Read-only Next.js reviewer for App Router, routing, caching, server actions, middleware/proxy, and build behavior.",
-        "medium",
+        "high",
         "read-only",
         "Review Next.js-specific code and configuration using current official docs or source when behavior may have changed.",
     ),
     role(
         "react_reviewer",
         "Read-only React reviewer for component structure, hooks, state ownership, rendering behavior, and accessibility regressions.",
-        "medium",
+        "high",
         "read-only",
         "Review React-specific code paths for correctness, lifecycle issues, performance traps, and test gaps.",
     ),
     role(
         "expo_reviewer",
         "Read-only Expo reviewer for Expo Router, native configuration, EAS workflows, OTA/runtime version, and mobile build risk.",
-        "medium",
+        "high",
         "read-only",
         "Review Expo and React Native surfaces using installed SDK metadata, official docs, and repo-native validation contracts.",
     ),
     role(
         "convex_reviewer",
         "Read-only Convex reviewer for schema, functions, indexes, authz, components, and backend contract risk.",
-        "medium",
+        "high",
         "read-only",
         "Review Convex code for validator/schema drift, index-backed access, authz enforcement, runtime constraints, and component fit.",
     ),
     role(
         "clerk_reviewer",
         "Read-only Clerk reviewer for auth/session flows, organization context, redirects, webhooks, and browser/mobile auth behavior.",
-        "medium",
+        "high",
         "read-only",
         "Review Clerk integration surfaces using current official docs and repo-specific auth boundaries provided by the parent.",
     ),
     role(
         "vercel_reviewer",
         "Read-only Vercel reviewer for deployments, functions, routing, env vars, build output, and release pipeline risk.",
-        "medium",
+        "high",
         "read-only",
         "Review Vercel-specific config and deployment behavior using current official docs and observed repo scripts.",
     ),
     role(
         "openai_api_reviewer",
         "Read-only OpenAI API reviewer for model selection, Responses API usage, tool calling, structured output, and Codex behavior.",
-        "medium",
+        "high",
         "read-only",
         "Review OpenAI API or Codex usage against current official OpenAI documentation and clearly separate inference from documented behavior.",
     ),
     role(
         "bun_ts_reviewer",
         "Read-only Bun and TypeScript reviewer for package-manager policy, scripts, tests, runtime APIs, and strict typing.",
-        "medium",
+        "high",
         "read-only",
         "Review Bun and TypeScript surfaces for repo policy compliance, script/runtime behavior, dependency usage, and type-safety risk.",
     ),
     role(
         "python_uv_reviewer",
         "Read-only Python and uv reviewer for dependency resolution, lockfiles, packaging, tests, and runtime compatibility.",
-        "medium",
+        "high",
         "read-only",
         "Review Python and uv surfaces for lockfile integrity, environment reproducibility, package metadata, and test/runtime risk.",
     ),
@@ -925,8 +924,9 @@ def write_catalog() -> None:
             "and synthesis;"
         ),
         (
-            "- `medium` is the default worker tier and `high` is reserved "
-            "for complex decisions;"
+            "- `high` is the default judgment/implementation/review tier "
+            "(2026-07-24 recalibration); `medium` is reserved for "
+            "deliberately shallow or mechanical lanes;"
         ),
         (
             "- `gpt-5.6-terra` at `max` is reserved for independent "
