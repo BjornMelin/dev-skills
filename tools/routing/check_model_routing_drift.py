@@ -114,9 +114,9 @@ def main() -> int:
             if anchor not in claude_models:
                 fail(f"~/.claude/MODELS.md: missing v4 anchor: {anchor!r}")
     codex_models = read(os.path.join(HOME, ".codex", "MODELS.md"))
-    if codex_models is not None:
-        if "| worker (default) | gpt-5.6-sol | high |" not in codex_models:
-            fail("~/.codex/MODELS.md: Sol worker default is not high")
+    if (codex_models is not None
+            and "| worker (default) | gpt-5.6-sol | high |" not in codex_models):
+        fail("~/.codex/MODELS.md: Sol worker default is not high")
 
     if failures:
         print(f"MODEL ROUTING DRIFT ({len(failures)}):")
