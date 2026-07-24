@@ -2,9 +2,14 @@
 """Model Routing drift gate (v4, calibrated 2026-07-24, CursorBench 3.2).
 
 The routing doctrine lives in ~/.claude/MODELS.md but is mirrored across the
-estate: this repo's routing skills, the installed skill copies, the codex
-subagent TOMLs (repo source + installed), and ~/.codex/MODELS.md. Mirrors
-drift silently when the doctrine recalibrates; this gate makes drift loud.
+estate: this repo's routing skills, the installed skill copies, and the live
+doctrine anchors. Mirrors drift silently when the doctrine recalibrates; this
+gate makes drift loud.
+
+Scope (founder ruling 2026-07-24): CLAUDE-INITIATED lanes only. The codex
+multi_agent_v2 custom-agent TOMLs (subagents/codex/) are governed by the
+codex-native runtime doc (~/.codex/MODELS.md, calibrated separately) and are
+deliberately NOT checked here - the opus-5 recalibration does not reach them.
 
 Repository files are the source of truth and MUST exist (missing = failure);
 installed copies are optional per machine and are skipped when absent.
@@ -28,18 +33,6 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 HOME = os.path.expanduser("~")
 
 ROUTING_SKILLS = ["codex-delegate", "codex-review", "multi-model-review"]
-
-# Sol judgment roles pinned "high" since v4; the four deliberately-cheap
-# mechanical roles (ci_triager, shallow_bug_reviewer, test_runner,
-# pr_shepherd) stay "medium" by design and are not listed here.
-SOL_HIGH_ROLES = [
-    "bun_ts_reviewer", "clerk_reviewer", "convex_reviewer", "expo_reviewer",
-    "nextjs_reviewer", "openai_api_reviewer", "python_uv_reviewer",
-    "react_reviewer", "vercel_reviewer", "reviewer", "runtime_bug_reviewer",
-    "performance_reviewer", "history_reviewer", "citation_auditor",
-    "docs_auditor", "dependency_researcher", "implementation_worker",
-    "docs_aligner", "ui_debugger", "release_validator",
-]
 
 # Patterns that must not appear in any v4 routing surface. The standalone
 # role name "Fable" is retired (the v4 role is "Root"); the negative
@@ -149,32 +142,7 @@ def main() -> int:
             installed_path, f"~/.agents/skills/{skill}/SKILL.md"
         )
 
-    # 3. Sol judgment roles pinned high: repo TOMLs required, installed
-    #    TOMLs optional.
-    repo_toml_base = os.path.join(
-        REPO, "subagents", "codex", "agents", "global"
-    )
-    installed_toml_base = os.path.join(HOME, ".codex", "agents")
-    for role in SOL_HIGH_ROLES:
-        repo_toml = read(os.path.join(repo_toml_base, f"{role}.toml"))
-        if repo_toml is None:
-            fail(
-                f"subagents/codex/agents/global/{role}.toml: required "
-                f"role TOML missing"
-            )
-        elif 'model_reasoning_effort = "high"' not in repo_toml:
-            fail(
-                f"subagents/codex/agents/global/{role}.toml: judgment "
-                f"role not pinned high"
-            )
-        installed_toml = read(
-            os.path.join(installed_toml_base, f"{role}.toml")
-        )
-        if (installed_toml is not None
-                and 'model_reasoning_effort = "high"' not in installed_toml):
-            fail(f"~/.codex/agents/{role}.toml: judgment role not pinned high")
-
-    # 4. Live doctrine anchors present (skipped on machines without the
+    # 3. Live doctrine anchors present (skipped on machines without the
     #    doctrine files - they are per-user config, not repo sources).
     claude_models = read(os.path.join(HOME, ".claude", "MODELS.md"))
     if claude_models is not None:
@@ -185,12 +153,6 @@ def main() -> int:
         for anchor in anchors:
             if anchor not in claude_models:
                 fail(f"~/.claude/MODELS.md: missing v4 anchor: {anchor!r}")
-    codex_models = read(os.path.join(HOME, ".codex", "MODELS.md"))
-    if (codex_models is not None
-            and "| worker (default) | gpt-5.6-sol | high |"
-            not in codex_models):
-        fail("~/.codex/MODELS.md: Sol worker default is not high")
-
     if failures:
         print(f"MODEL ROUTING DRIFT ({len(failures)}):")
         for item in failures:
