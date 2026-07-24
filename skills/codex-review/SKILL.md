@@ -10,9 +10,9 @@ lets Codex modify the repo. Works identically from the main loop, subagents, and
 workflow stages (no plugin runtime required).
 
 Reviews run on `gpt-5.6-sol` (MODELS.md: code review = Sol) - pin BOTH the model
-(`-m gpt-5.6-sol`) and the effort (`-c model_reasoning_effort="medium"`, or
-`"high"` for consequential/cross-cutting diffs) on every command below rather
-than inheriting CLI defaults. For `codex review`, `-m` is a GLOBAL flag and must
+(`-m gpt-5.6-sol`) and the effort (`-c model_reasoning_effort="high"`, the
+v4 standard tier; `"medium"` only for trivial bounded diffs) on every command
+below rather than inheriting CLI defaults. For `codex review`, `-m` is a GLOBAL flag and must
 come before the subcommand. Paths written as `<skill-dir>` mean this skill's
 base directory (provided when the skill is invoked).
 
@@ -26,9 +26,9 @@ base directory (provided when the skill is invoked).
 ## Normal review
 
 ```bash
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --uncommitted   # staged + unstaged + untracked
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --base main     # branch vs base
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --commit <sha>  # a single commit
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --uncommitted   # staged + unstaged + untracked
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --base main     # branch vs base
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --commit <sha>  # a single commit
 ```
 
 - Multi-file/large diffs take minutes: run via Bash `run_in_background: true`; the
@@ -46,7 +46,7 @@ codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --commit <sha>  #
    prompt from stdin; a plain `< file` redirect keeps the command pipe-free):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
+codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
 ```
 
 3. Read the output JSON: `verdict` (`approve` | `needs-attention`), `findings[]`
@@ -65,10 +65,10 @@ codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <
 
 ## Effort
 
-Always pin effort explicitly - sol's vendor default is `low`. Per MODELS.md:
-`"medium"` (Sol worker) is the standard review tier; `"high"` (Sol lead) for
-consequential or cross-cutting diffs. **Never xhigh or ultra.** If a Sol-high
-review still leaves material doubt, escalate per MODELS.md: Fable resolves the
+Always pin effort explicitly - sol's vendor default is `low`. Per MODELS.md
+(2026-07-24 recalibration): `"high"` (Sol worker) is the standard review tier;
+`"medium"` only for trivial bounded diffs. **Never xhigh or ultra.** If a Sol-high
+review still leaves material doubt, escalate per MODELS.md: Root resolves the
 hard part inline, or one independent `gpt-5.6-terra` `"max"` adversarial pass.
 
 References adapted from openai/codex-plugin-cc (Apache-2.0; see references/NOTICE

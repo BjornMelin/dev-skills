@@ -8,7 +8,7 @@ description: Pre-PR multi-model review, parallel opus and codex exec adversarial
 Two independent review lanes run in parallel, then every merged finding is
 adversarially verified against the actual code. Replaces the retired
 `multi-model-review` workflow: per MODELS.md there is **no Claude shim** - the
-main loop (Fable) runs the codex lane itself via direct background Bash.
+main loop (Root) runs the codex lane itself via direct background Bash.
 
 Inputs: `repo` (absolute path, required), `base` (default `main`), `focus`
 (default: correctness, security, edge cases, API contracts, maintainability).
@@ -26,7 +26,7 @@ Shared review contract (put in BOTH lane prompts):
 
 **Opus lane** - `Agent(model: 'opus', effort: 'high', run_in_background: true)`.
 Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
-\"opus-4.8\". Return ONLY a JSON object matching
+\"opus-5\". Return ONLY a JSON object matching
 `<skill-dir>/references/findings-schema.json`
 (read it first) - no prose around it."
 
@@ -44,11 +44,11 @@ skill is invoked) - substitute the real absolute path in every prompt/command.
 2. Run ONE bare background Bash command (600000ms timeout):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
+codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
 ```
 
-Effort routing per MODELS.md: `"medium"` (Sol worker) is the default review
-tier; pin `"high"` for consequential or cross-cutting diffs. Never xhigh.
+Effort routing per MODELS.md (2026-07-24 recalibration): `"high"` (Sol worker)
+is the default review tier; `"medium"` only for trivial bounded diffs. Never xhigh.
 
 3. On completion, read `mmr-codex-findings.json`; set reviewer to
    "gpt-5.6-sol" if absent.
@@ -76,7 +76,7 @@ shared contract, the merged lane JSON, and:
 > Return ONLY a JSON object matching
 > `<skill-dir>/references/verified-schema.json`.
 
-For a tiny finding set (≤3), Fable may verify inline instead of spawning.
+For a tiny finding set (≤3), Root may verify inline instead of spawning.
 
 ## Presenting results
 
