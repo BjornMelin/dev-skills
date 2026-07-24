@@ -10,9 +10,9 @@ lets Codex modify the repo. Works identically from the main loop, subagents, and
 workflow stages (no plugin runtime required).
 
 Reviews run on `gpt-5.6-sol` (MODELS.md: code review = Sol) - pin BOTH the model
-(`-m gpt-5.6-sol`) and the effort (`-c model_reasoning_effort="medium"`, or
-`"high"` for consequential/cross-cutting diffs) on every command below rather
-than inheriting CLI defaults. For `codex review`, `-m` is a GLOBAL flag and must
+(`-m gpt-5.6-sol`) and the effort (`-c model_reasoning_effort="high"`, the
+v4 standard tier; `"medium"` only for trivial bounded diffs) on every command
+below rather than inheriting CLI defaults. For `codex review`, `-m` is a GLOBAL flag and must
 come before the subcommand. Paths written as `<skill-dir>` mean this skill's
 base directory (provided when the skill is invoked).
 
@@ -46,7 +46,7 @@ codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --commit <sha>  # a
    prompt from stdin; a plain `< file` redirect keeps the command pipe-free):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
+codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
 ```
 
 3. Read the output JSON: `verdict` (`approve` | `needs-attention`), `findings[]`

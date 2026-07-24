@@ -41,10 +41,19 @@ ROUTING_SKILLS = ["codex-delegate", "codex-review", "multi-model-review"]
 BANNED = [
     (re.compile(r"\bFable\b(?!-\d)"),
      "retired role name 'Fable' (v4 role is 'Root')"),
-    (re.compile(r"opus-4[.-]8"), "retired opus-4.8 lane reference"),
+    (re.compile(r"opus-4[.-]8", re.IGNORECASE),
+     "retired opus-4.8 lane reference"),
     (re.compile(r'"medium"\s*\(Sol worker\) is the (standard|default)'),
      "Sol medium described as default tier (v4 default is high)"),
+    (re.compile(r'model_reasoning_effort="medium"'),
+     ("literal medium effort pin in a routing surface (v4 default is high; "
+      "routine-lane docs use the lane-table pin style, not command flags)")),
 ]
+
+# Reduced pattern set for the live doctrine file: its calibration history
+# and benchmark appendix legitimately cite retired names (opus-4.8, Fable),
+# so only phrasing/pin bans apply there - never the name bans.
+DOCTRINE_BANNED = BANNED[2:]
 
 failures: list[str] = []
 
@@ -86,20 +95,26 @@ def sha(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
-def check_banned(path: str, label: str, required: bool = False) -> None:
+def check_banned(
+    path: str,
+    label: str,
+    required: bool = False,
+    patterns: list[tuple[re.Pattern[str], str]] | None = None,
+) -> None:
     """Scan one file for retired-doctrine patterns.
 
     Args:
         path: Absolute path of the file to scan.
         label: Display label used in drift findings.
         required: When True, a missing file is itself a failure.
+        patterns: Pattern set override; defaults to the full BANNED list.
     """
     text = read(path)
     if text is None:
         if required:
             fail(f"{label}: required source file missing or unreadable")
         return
-    for pattern, why in BANNED:
+    for pattern, why in patterns if patterns is not None else BANNED:
         for match in pattern.finditer(text):
             line = text.count("\n", 0, match.start()) + 1
             fail(f"{label}:{line}: {why}")
@@ -153,6 +168,11 @@ def main() -> int:
         for anchor in anchors:
             if anchor not in claude_models:
                 fail(f"~/.claude/MODELS.md: missing v4 anchor: {anchor!r}")
+        check_banned(
+            os.path.join(HOME, ".claude", "MODELS.md"),
+            "~/.claude/MODELS.md",
+            patterns=DOCTRINE_BANNED,
+        )
     if failures:
         print(f"MODEL ROUTING DRIFT ({len(failures)}):")
         for item in failures:
