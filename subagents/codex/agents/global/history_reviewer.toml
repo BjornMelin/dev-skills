@@ -3,7 +3,7 @@ description = """\
 Read-only reviewer that uses git history and blame to validate whether
 changed code violates existing intent."""
 model = "gpt-5.6-sol"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "high"
 sandbox_mode = "read-only"
 nickname_candidates = [
   "History Reviewer",

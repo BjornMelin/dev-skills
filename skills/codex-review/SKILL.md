@@ -65,10 +65,10 @@ codex exec -m gpt-5.6-sol -c model_reasoning_effort="medium" -s read-only --cd <
 
 ## Effort
 
-Always pin effort explicitly - sol's vendor default is `low`. Per MODELS.md:
-`"medium"` (Sol worker) is the standard review tier; `"high"` (Sol lead) for
-consequential or cross-cutting diffs. **Never xhigh or ultra.** If a Sol-high
-review still leaves material doubt, escalate per MODELS.md: Fable resolves the
+Always pin effort explicitly - sol's vendor default is `low`. Per MODELS.md
+(2026-07-24 recalibration): `"high"` (Sol worker) is the standard review tier;
+`"medium"` only for trivial bounded diffs. **Never xhigh or ultra.** If a Sol-high
+review still leaves material doubt, escalate per MODELS.md: Root resolves the
 hard part inline, or one independent `gpt-5.6-terra` `"max"` adversarial pass.
 
 References adapted from openai/codex-plugin-cc (Apache-2.0; see references/NOTICE

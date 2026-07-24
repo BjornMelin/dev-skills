@@ -18,8 +18,10 @@ The runtime policy is:
 
 - Terra `medium` handles mechanical inventory and Terra `high` handles bounded
   retrieval;
-- Sol `medium` handles default judgment and implementation, while Sol `high`
-  handles planning, architecture, security, root cause, and synthesis;
+- Sol `high` handles default judgment, review, and implementation (2026-07-24
+  CursorBench recalibration: +3.5pt over medium for +$0.84 - the best value
+  jump on the board); Sol `medium` covers only deliberately shallow or
+  mechanical lanes (ci_triager, shallow_bug_reviewer, test_runner, pr_shepherd);
 - Terra `max` is reserved for independent adversarial validation;
 - routine roles do not use Sol `xhigh`, `max`, or `ultra`;
 - no nested subagents by default;
