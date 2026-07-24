@@ -38,7 +38,8 @@ exception); Sol high is the independent second opinion there, or the primary
 when Claude quota is the binding constraint.
 
 Escalation ladder: **Luna high → Sol medium (routine only) → Sol high**, then
-one of: an Opus xhigh worker or Root finishes the hard part inline, Terra max
+one of: Root finishes the hard part inline (or an Opus high worker when a
+delegation shape holds), Terra max
 runs one adversarial/alternate pass, or (rarely) Sol max.
 
 Bans: **no Sol xhigh or ultra; no Luna effort other than high; no Terra effort
