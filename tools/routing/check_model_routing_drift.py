@@ -6,6 +6,9 @@ estate: this repo's routing skills, the installed skill copies, the codex
 subagent TOMLs (repo source + installed), and ~/.codex/MODELS.md. Mirrors
 drift silently when the doctrine recalibrates; this gate makes drift loud.
 
+Repository files are the source of truth and MUST exist (missing = failure);
+installed copies are optional per machine and are skipped when absent.
+
 Run from anywhere:  python3 tools/routing/check_model_routing_drift.py
 Exit 0 = converged. Exit 1 = drift (each line says where and what).
 
@@ -38,10 +41,13 @@ SOL_HIGH_ROLES = [
     "docs_aligner", "ui_debugger", "release_validator",
 ]
 
-# Patterns that must not appear in any v4 routing surface. "Fable" as a role
-# name is retired (the role is "Root"); opus-4.8 lane pins are retired.
+# Patterns that must not appear in any v4 routing surface. The standalone
+# role name "Fable" is retired (the v4 role is "Root"); the negative
+# lookahead keeps legitimate "Fable-5" model references matchable text
+# out of scope. opus-4.8 lane pins are retired.
 BANNED = [
-    (re.compile(r"\bFable\b"), "retired role name 'Fable' (v4 role is 'Root')"),
+    (re.compile(r"\bFable\b(?!-\d)"),
+     "retired role name 'Fable' (v4 role is 'Root')"),
     (re.compile(r"opus-4[.-]8"), "retired opus-4.8 lane reference"),
     (re.compile(r'"medium"\s*\(Sol worker\) is the (standard|default)'),
      "Sol medium described as default tier (v4 default is high)"),
@@ -51,10 +57,23 @@ failures: list[str] = []
 
 
 def fail(msg: str) -> None:
+    """Record one drift finding for the final report.
+
+    Args:
+        msg: Human-readable description of where and what drifted.
+    """
     failures.append(msg)
 
 
 def read(path: str) -> str | None:
+    """Read a text file, tolerating absence.
+
+    Args:
+        path: Absolute path to read.
+
+    Returns:
+        File contents, or None when the file is missing or unreadable.
+    """
     try:
         with open(path, encoding="utf-8") as fh:
             return fh.read()
@@ -63,12 +82,29 @@ def read(path: str) -> str | None:
 
 
 def sha(text: str) -> str:
+    """Return a short content fingerprint for mismatch reporting.
+
+    Args:
+        text: Content to fingerprint.
+
+    Returns:
+        First 12 hex chars of the SHA-256 digest.
+    """
     return hashlib.sha256(text.encode()).hexdigest()[:12]
 
 
-def check_banned(path: str, label: str) -> None:
+def check_banned(path: str, label: str, required: bool = False) -> None:
+    """Scan one file for retired-doctrine patterns.
+
+    Args:
+        path: Absolute path of the file to scan.
+        label: Display label used in drift findings.
+        required: When True, a missing file is itself a failure.
+    """
     text = read(path)
     if text is None:
+        if required:
+            fail(f"{label}: required source file missing or unreadable")
         return
     for pattern, why in BANNED:
         for match in pattern.finditer(text):
@@ -77,45 +113,82 @@ def check_banned(path: str, label: str) -> None:
 
 
 def main() -> int:
-    # 1. Repo routing skills carry no retired doctrine.
-    for skill in ROUTING_SKILLS:
-        check_banned(os.path.join(REPO, "skills", skill, "SKILL.md"),
-                     f"skills/{skill}/SKILL.md")
+    """Run every convergence check and report drift.
 
-    # 2. Installed copies match the repo byte-for-byte (skip if not installed).
+    Returns:
+        Process exit code: 0 when converged, 1 when any drift was found.
+    """
+    # 1. Repo routing skills exist and carry no retired doctrine.
+    for skill in ROUTING_SKILLS:
+        check_banned(
+            os.path.join(REPO, "skills", skill, "SKILL.md"),
+            f"skills/{skill}/SKILL.md",
+            required=True,
+        )
+
+    # 2. Installed copies match the repo byte-for-byte. The repo side is
+    #    required; the installed side is optional per machine.
     for skill in ROUTING_SKILLS:
         repo_path = os.path.join(REPO, "skills", skill, "SKILL.md")
-        installed_path = os.path.join(HOME, ".agents", "skills", skill, "SKILL.md")
-        repo_text, installed_text = read(repo_path), read(installed_path)
-        if repo_text is None or installed_text is None:
-            continue
+        installed_path = os.path.join(
+            HOME, ".agents", "skills", skill, "SKILL.md"
+        )
+        repo_text = read(repo_path)
+        if repo_text is None:
+            continue  # already failed as required in check 1
+        installed_text = read(installed_path)
+        if installed_text is None:
+            continue  # not installed on this machine
         if sha(repo_text) != sha(installed_text):
-            fail(f"~/.agents/skills/{skill}: installed copy diverges from repo "
-                 f"(repo {sha(repo_text)} vs installed {sha(installed_text)}) - re-sync")
-        check_banned(installed_path, f"~/.agents/skills/{skill}/SKILL.md")
+            fail(
+                f"~/.agents/skills/{skill}: installed copy diverges from "
+                f"repo (repo {sha(repo_text)} vs installed "
+                f"{sha(installed_text)}) - re-sync"
+            )
+        check_banned(
+            installed_path, f"~/.agents/skills/{skill}/SKILL.md"
+        )
 
-    # 3. Sol judgment roles pinned high in repo TOMLs and installed TOMLs.
+    # 3. Sol judgment roles pinned high: repo TOMLs required, installed
+    #    TOMLs optional.
+    repo_toml_base = os.path.join(
+        REPO, "subagents", "codex", "agents", "global"
+    )
+    installed_toml_base = os.path.join(HOME, ".codex", "agents")
     for role in SOL_HIGH_ROLES:
-        for base, label in [
-            (os.path.join(REPO, "subagents", "codex", "agents", "global"),
-             "subagents/codex/agents/global"),
-            (os.path.join(HOME, ".codex", "agents"), "~/.codex/agents"),
-        ]:
-            text = read(os.path.join(base, f"{role}.toml"))
-            if text is None:
-                continue
-            if 'model_reasoning_effort = "high"' not in text:
-                fail(f"{label}/{role}.toml: judgment role not pinned high")
+        repo_toml = read(os.path.join(repo_toml_base, f"{role}.toml"))
+        if repo_toml is None:
+            fail(
+                f"subagents/codex/agents/global/{role}.toml: required "
+                f"role TOML missing"
+            )
+        elif 'model_reasoning_effort = "high"' not in repo_toml:
+            fail(
+                f"subagents/codex/agents/global/{role}.toml: judgment "
+                f"role not pinned high"
+            )
+        installed_toml = read(
+            os.path.join(installed_toml_base, f"{role}.toml")
+        )
+        if (installed_toml is not None
+                and 'model_reasoning_effort = "high"' not in installed_toml):
+            fail(f"~/.codex/agents/{role}.toml: judgment role not pinned high")
 
-    # 4. Live doctrine anchors present (skip silently on machines without them).
+    # 4. Live doctrine anchors present (skipped on machines without the
+    #    doctrine files - they are per-user config, not repo sources).
     claude_models = read(os.path.join(HOME, ".claude", "MODELS.md"))
     if claude_models is not None:
-        for anchor in ["## Workflow Gate", "| root (default) | opus-5 | xhigh |"]:
+        anchors = [
+            "## Workflow Gate",
+            "| root (default) | opus-5 | xhigh |",
+        ]
+        for anchor in anchors:
             if anchor not in claude_models:
                 fail(f"~/.claude/MODELS.md: missing v4 anchor: {anchor!r}")
     codex_models = read(os.path.join(HOME, ".codex", "MODELS.md"))
     if (codex_models is not None
-            and "| worker (default) | gpt-5.6-sol | high |" not in codex_models):
+            and "| worker (default) | gpt-5.6-sol | high |"
+            not in codex_models):
         fail("~/.codex/MODELS.md: Sol worker default is not high")
 
     if failures:

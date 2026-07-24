@@ -26,9 +26,9 @@ base directory (provided when the skill is invoked).
 ## Normal review
 
 ```bash
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --uncommitted   # staged + unstaged + untracked
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --base main     # branch vs base
-codex -m gpt-5.6-sol -c model_reasoning_effort="medium" review --commit <sha>  # a single commit
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --uncommitted   # staged + unstaged + untracked
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --base main     # branch vs base
+codex -m gpt-5.6-sol -c model_reasoning_effort="high" review --commit <sha>  # a single commit
 ```
 
 - Multi-file/large diffs take minutes: run via Bash `run_in_background: true`; the

@@ -8,7 +8,7 @@ Runtime policy:
 
 - `gpt-5.6-terra` handles bounded retrieval and mechanical inventory;
 - `gpt-5.6-sol` handles judgment, implementation, planning, and synthesis;
-- `medium` is the default worker tier and `high` is reserved for complex decisions;
+- `high` is the default judgment/implementation/review tier (2026-07-24 recalibration); `medium` is reserved for deliberately shallow or mechanical lanes;
 - `gpt-5.6-terra` at `max` is reserved for independent adversarial validation;
 - routine roles do not use Sol `xhigh`, `max`, or `ultra`;
 - no nested subagents by default;
