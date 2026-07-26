@@ -329,6 +329,70 @@ ST.create({ trigger: ".x" });"#,
 }
 
 #[test]
+fn configured_gsap_module_suppresses_registration_rule() {
+    // A workspace re-export that centralizes registerPlugin. The final path
+    // segment is `gsap`, so it counts as the configured entrypoint.
+    let scoped = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { gsap } from "@scope/motion/web/gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+ScrollTrigger.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(&scoped, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // The historical forms must keep working.
+    for source in ["./gsap", "lib/gsap", "~/lib/gsap"] {
+        let legacy = analyze(
+            "src/a.tsx",
+            "tsx",
+            &format!(
+                r#"import {{ gsap }} from "{source}";
+import {{ ScrollTrigger }} from "gsap/ScrollTrigger";
+ScrollTrigger.create({{ trigger: ".x" }});"#
+            ),
+        );
+        assert!(
+            !fired(&legacy, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER),
+            "configured module {source} should suppress the rule"
+        );
+    }
+
+    // Negative control: an unrelated module must NOT suppress it.
+    let unrelated = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { helper } from "@scope/motion/web/utils";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+ScrollTrigger.create({ trigger: ".x" });
+void helper;"#,
+    );
+    assert!(fired(&unrelated, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+}
+
+#[test]
+fn dynamic_import_of_configured_gsap_module_suppresses_registration_rule() {
+    let dynamic = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
+void import("@scope/motion/web/gsap").then(({ gsap }) => gsap.to(".x", { x: 1 }));
+ScrollTrigger.create({ trigger: ".x" });"#,
+    );
+    assert!(!fired(&dynamic, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // Negative control: dynamically importing something else must not suppress.
+    let other = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
+void import("@scope/motion/web/utils").then(() => {});
+ScrollTrigger.create({ trigger: ".x" });"#,
+    );
+    assert!(fired(&other, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+}
+
+#[test]
 fn rule_usegsap_not_registered() {
     let bad = analyze(
         "src/a.tsx",

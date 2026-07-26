@@ -211,6 +211,9 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 record_plugin_import_aliases(import, &mut facts);
                 record_configured_gsap_imports(import, &mut facts);
             }
+            AstKind::ImportExpression(import) => {
+                record_configured_gsap_dynamic_import(import, &mut facts);
+            }
             AstKind::IdentifierReference(identifier)
                 if plugin_name_for_identifier(identifier.name.as_str(), &facts).is_some()
                     && !reference_is_ts_type_position(semantic, node.id()) =>
@@ -486,9 +489,32 @@ fn import_source_is_gsap_trial(source: &str) -> bool {
 }
 
 fn import_source_is_configured_gsap_module(source: &str) -> bool {
+    // Any local or workspace module whose final path segment is `gsap` is
+    // treated as the project's configured GSAP entrypoint (the module that
+    // owns `registerPlugin`). This covers `./gsap`, `lib/gsap`, `~/lib/gsap`
+    // and scoped workspace re-exports such as `@scope/motion/web/gsap`.
     !import_source_is_gsap_package(source)
         && !import_source_is_gsap_trial(source)
-        && (source == "lib/gsap" || source.ends_with("/lib/gsap") || source == "./gsap")
+        && source.rsplit('/').next() == Some("gsap")
+}
+
+/// Record a dynamic `import("<configured gsap module>")`.
+///
+/// Bindings from a dynamic import arrive through a `.then()` callback rather
+/// than import specifiers, so the local names cannot be resolved the way the
+/// static path does. Recording the module-level `gsap` marker is enough: it is
+/// the same signal the static default-import branch sets, and it proves the
+/// file routes through the entrypoint that owns registration.
+fn record_configured_gsap_dynamic_import(
+    import: &oxc_ast::ast::ImportExpression<'_>,
+    facts: &mut FileFacts,
+) {
+    let Expression::StringLiteral(source) = import.source.without_parentheses() else {
+        return;
+    };
+    if import_source_is_configured_gsap_module(source.value.as_str()) {
+        facts.configured_gsap_imports.insert("gsap".to_string());
+    }
 }
 
 fn plugin_name_from_import_source(source: &str) -> Option<&str> {
