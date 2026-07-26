@@ -1,7 +1,6 @@
 ---
 name: firecrawl
-description: |
-  Use this skill for Firecrawl CLI web-data work: web search, URL scraping, site mapping, crawling, structured extraction, page interaction, monitoring changes, Firecrawl-native public research, feedback/doctor troubleshooting, offline site download via x download, local .firecrawl artifact reuse, and parsing local documents such as PDF, DOCX, XLSX, HTML, DOC, ODT, or RTF. Trigger for requests to search the web, look up current info, fetch/read/scrape a URL, extract website data, crawl docs, click/fill/login/paginate a page, monitor page changes, save a site offline, parse a document, or avoid duplicate Firecrawl credits. Do not trigger for generic local file reads/edits, git/deploy/code tasks, or Firecrawl app integration work.
+description: "Firecrawl CLI for web data. Use to search the web, scrape or fetch a URL, map or crawl a site, extract structured data, interact with a page by clicking or filling or paginating, monitor changes, download a site offline, or parse local PDF, DOCX, XLSX and HTML documents."
 license: ISC
 allowed-tools: Bash(firecrawl *) Bash(bunx --bun firecrawl-cli@latest *) Bash(node *firecrawl-*.mjs *)
 ---

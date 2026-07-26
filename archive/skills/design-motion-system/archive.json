@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "design-motion-system",
+  "status": "archived",
+  "archived_at": "2026-07-26T00:00:00Z",
+  "replacement": "design-motion-audit",
+  "source_path": "skills/design-motion-system",
+  "archived_path": "archive/skills/design-motion-system",
+  "reason": "Pure cross-skill router: its body dispatched to expo-motion, gsap, r3f-scene-polish and design-motion-audit rather than carrying content, which paid the skill-listing cost twice and forced its description to enumerate every target's triggers. Its unique assets (scaffold_motion_tokens.py, references/design-system-tokens.md, scripts/tests) were absorbed into design-motion-audit; the rest were already byte-identical duplicates there.",
+  "restore": "Move back to skills/design-motion-system only if cross-stack motion direction needs an entrypoint separate from design-motion-audit, and re-add it to plugins/design-motion/scripts/sync-skills.mjs SKILLS."
+}

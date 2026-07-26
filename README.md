@@ -39,6 +39,7 @@ Key docs:
 - [gsap-audit reference](docs/reference/gsap-audit.md)
 - [expo-motion-audit reference](docs/reference/expo-motion-audit.md)
 - [motion-token-audit reference](docs/reference/motion-token-audit.md)
+- [claude-config-audit reference](docs/reference/claude-config-audit.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -96,6 +97,7 @@ crates/
   expo-motion-audit/      # Rust CLI that audits Expo/React Native motion (Reanimated) usage
   motion-token-audit-core/ # oxc-based engine for cross-stack motion-token drift/orphan analysis
   motion-token-audit/     # Rust CLI that audits motion-token consistency across CSS/R3F/Reanimated/GSAP
+  claude-config-audit/    # Rust CLI that audits a Claude Code config estate for drift
 docs/
   index.md                # documentation portal
   architecture/           # system design
@@ -258,7 +260,7 @@ claude plugin install design-motion@bjorn-dev-skills
 
 (The former `native-motion` plugin was consolidated into the standalone `expo-motion` skill — install it with `skills add BjornMelin/dev-skills -g -s expo-motion`.)
 
-The `design-motion` plugin bundles the `design-motion-system`, `design-motion-audit`, and `r3f-scene-polish` skills plus seven specialist subagents and a director output style; those three skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`). To use the seven subagents **without** the plugin, install them into your Claude Code agents directory:
+The `design-motion` plugin bundles the `design-motion-audit` and `r3f-scene-polish` skills plus seven specialist subagents and a director output style; those two skills are also individually installable (e.g. `skills add BjornMelin/dev-skills -g -s design-motion-audit`). To use the seven subagents **without** the plugin, install them into your Claude Code agents directory:
 
 ```bash
 python3 plugins/design-motion/scripts/install_agents.py --target global   # ~/.claude/agents
@@ -272,7 +274,7 @@ for local development and validation commands.
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
 | `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
-| `design-motion` | `design-motion-system`, `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: an orchestration router, a motion-quality audit, cinematic R3F look-dev, seven specialist motion subagents (including a runtime-proof verifier), and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json) |
+| `design-motion` | `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: a motion-quality audit with token scaffolding, cinematic R3F look-dev, seven specialist motion subagents (including a runtime-proof verifier), and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json) |
 
 | Skill | Description | Source |
 | --- | --- | --- |
@@ -299,7 +301,6 @@ for local development and validation commands.
 | `dash-audit` | Audit Dash apps: callbacks, state, layout, accessibility, Dash-specific UX. | [skills/dash-audit/SKILL.md](skills/dash-audit/SKILL.md) |
 | `deep-researcher` | Deep cited research across Codex web, Context7 API, GitHub, source, rendered pages, Firecrawl, and evidence ledgers. | [skills/deep-researcher/SKILL.md](skills/deep-researcher/SKILL.md) |
 | `design-motion-audit` | Audit a repo, route, screen, or 3D scene for motion quality — token consistency, R3F/Reanimated polish, performance, reduced-motion, and accessibility — returning a prioritized punch list. | [skills/design-motion-audit/SKILL.md](skills/design-motion-audit/SKILL.md) |
-| `design-motion-system` | Cross-stack motion & design-system director: turns vague premium/cinematic requests into a named vocabulary, design tokens, and a routed plan across web 3D and native; routes single-stack work to the owning skill. | [skills/design-motion-system/SKILL.md](skills/design-motion-system/SKILL.md) |
 | `dmc-best-practices` | DMC + Dash best practices: architecture, callbacks, styling, performance, theming. | [skills/dmc-best-practices/SKILL.md](skills/dmc-best-practices/SKILL.md) |
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |

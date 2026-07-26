@@ -8,8 +8,6 @@ Upgrade, modernize, and simplify this repo or monorepo end-to-end.
 Use these skills and tools throughout this task:
 - `$bun-dev`
 - `$hard-cut`
-- `$clean-code`
-- `$reducing-entropy`
 - `$github`
 - `context7`
 - `web.run`
@@ -20,8 +18,7 @@ Conditional skill and tool routing:
   - official Expo docs and changelogs
   - Expo CLI, EAS CLI, and `expo-doctor`
 - If Convex is present, also use:
-  - `$convex-audit`
-  - official Convex docs and latest guidance
+    - official Convex docs and latest guidance
 - If Next.js is present, also use:
   - `$vercel:nextjs`
   - official Next.js upgrade guides, codemods, and migration docs

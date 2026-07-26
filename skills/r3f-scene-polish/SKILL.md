@@ -1,6 +1,6 @@
 ---
 name: r3f-scene-polish
-description: Art-direct an EXISTING three.js / React Three Fiber scene to premium, cinematic quality — postprocessing (bloom, depth-of-field, N8AO, tone mapping), HDRI/PBR lighting, contact & accumulative shadows, transmission/glass materials, and camera choreography. Use for look-development and "make this 3D scene cinematic / premium / hyperrealistic" once it already renders. Do NOT use for scene setup or correctness — route Canvas/createRoot lifecycle, loaders, GLTF, disposal, SSR/client boundaries, and DPR to web-three-r3f; native (Expo/RN) motion to expo-motion; repo-wide motion-system direction to design-motion-system.
+description: "Art-directs an existing three.js or React Three Fiber scene to cinematic quality with postprocessing, HDRI and PBR lighting, contact shadows, transmission materials, and camera choreography. Use for look-development once the scene renders, not for scene setup or lifecycle."
 license: MIT
 ---
 
@@ -20,7 +20,7 @@ renders correctly. It does **not** own setup or correctness:
   DPR, "blank canvas" and resize bugs → **`web-three-r3f`**.
 - Native (Expo / React Native) motion → **`expo-motion`**.
 - Cross-stack motion-system direction / tokens / repo-wide upgrades →
-  **`design-motion-system`**.
+  **`design-motion-audit`**.
 
 If the scene doesn't render yet, start in `web-three-r3f`, then return here.
 

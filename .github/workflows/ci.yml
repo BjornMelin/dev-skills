@@ -38,6 +38,8 @@ jobs:
         run: cargo run -q -p codex-dev -- --json policy docs-check
       - name: Smoke native Bun platform
         run: cargo run -q -p codex-dev -- --json bun doctor
+      - name: Smoke claude-config-audit
+        run: cargo run -q -p claude-config-audit -- doctor
       - name: Verify Agent Skills Lab catalog
         run: bash tools/skill/check_catalog.sh "$GITHUB_SHA"
       - name: Test catalog checker isolation
@@ -83,7 +85,7 @@ jobs:
       - name: Validate design-motion tooling
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s skills/design-motion-system/scripts/tests
+          python3 -m unittest discover -s skills/design-motion-audit/scripts/tests
           node skills/r3f-scene-polish/scripts/audit.mjs doctor
       - name: Validate bootstrap manifests
         run: python3 tools/bootstrap/render_bootstrap_pack.py --validate

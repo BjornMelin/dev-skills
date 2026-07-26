@@ -1,17 +1,6 @@
 ---
 name: fan-out
-description: >-
-  Delegate work to bounded subagents and synthesize their evidence in Claude Code. You stay the
-  planner and sole decision-maker; subagents are tightly scoped, return structured evidence, and you
-  read every result before acting. Use when the user asks to delegate, fan out, parallelize, spawn
-  subagents, or set a spawn policy; when a task splits into 2-5 independent subtasks (multi-area code
-  search, parallel research, multi-file review); when you need a Task subagent, a custom .claude/agents
-  role, or the dynamic Workflow tool (pipeline/parallel/agent); or when long jobs should run as
-  background Bash tasks while the parent stays responsive. Covers mechanism choice, spawn contracts,
-  read-only vs scoped-edit roles, disjoint write surfaces, model policy (Opus for hard reasoning),
-  rendezvous discipline, and conflict-ledger synthesis. Spawn only when asked or when independence
-  clearly helps. Not for authoring agent definitions (claude-subagent-creator) or web research
-  (deep-research).
+description: "Delegates work to bounded subagents and synthesizes their evidence. Use when asked to delegate, fan out, parallelize, or spawn subagents, or when a task splits into 2-5 independent subtasks such as multi-area code search or parallel review. You stay the planner and read every result."
 license: MIT
 ---
 

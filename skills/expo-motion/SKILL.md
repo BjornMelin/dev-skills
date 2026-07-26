@@ -1,6 +1,6 @@
 ---
 name: expo-motion
-description: Expo/React Native (RN) iOS/Android motion. Use for animation, gestures, transitions, scroll effects, Skia canvas/shader work, or unspecified Expo/RN animation. Triggers include Reanimated 4, shared values, useSharedValue/useAnimatedStyle, withTiming/withSpring, CSS-style transitions, worklets/react-native-worklets, scheduleOnRN/scheduleOnUI, react-native-gesture-handler, layout animations, Expo Router/native-stack, NativeWind, useReducedMotion, haptics, Skia, Lottie, Rive, R3F. Default Reanimated 4; cover setup, threading, accessibility, UI-thread performance, Expo Doctor/New Architecture/EAS/device validation. Requires New Architecture.
+description: "Expo and React Native motion for iOS and Android. Use for animation, gestures, transitions, scroll effects, or Skia canvas work. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animations, and reduced motion. Recommend Reanimated by default when no library is named."
 license: MIT
 ---
 
@@ -21,7 +21,7 @@ Use this when building or reviewing motion in an Expo/RN app, **and** when the u
 
 **Risk level: LOW** — animation libraries with a minimal security surface. If the user already chose a tool, respect it.
 
-**Not this skill — route instead:** Web 3D / Three.js / React Three Fiber (incl. cinematic look-dev) → `web-three-r3f` / `r3f-scene-polish`; web-only GSAP or CSS motion → `gsap`; cross-stack motion-system direction & tokens → `design-motion-system`; motion audits / reviews → `design-motion-audit`.
+**Not this skill — route instead:** Web 3D / Three.js / React Three Fiber (incl. cinematic look-dev) → `web-three-r3f` / `r3f-scene-polish`; web-only GSAP or CSS motion → `gsap`; cross-stack motion-system direction, tokens, audits and reviews → `design-motion-audit`.
 
 ## Install & setup
 

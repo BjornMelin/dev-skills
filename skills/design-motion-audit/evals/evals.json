@@ -11,7 +11,7 @@
         "Checks design-token consistency (hardcoded durations/easings vs tokenized values, intent naming)",
         "Flags missing reduced-motion branches for camera moves, parallax, loops, and bounce",
         "Identifies missing hallmark-motion opportunities (or explicitly notes there are none) rather than only listing defects",
-        "Routes the actual implementation fixes to the owning skill (design-motion-system / expo-motion / web-three-r3f / r3f-scene-polish / gsap) rather than building them itself",
+        "Routes the actual implementation fixes to the owning skill (expo-motion / web-three-r3f for R3F setup and correctness / r3f-scene-polish for look-dev / gsap) rather than building them itself, handling token and system-level items in this skill",
         "Treats any static-analyzer output as leads to verify against the real code, not final findings"
       ]
     },
@@ -51,7 +51,7 @@
         "Identifies specific missing hallmark-motion opportunities where a signature interaction would add value",
         "Assesses interaction physicality (velocity-aware release, interruptibility, cancellation-safety)",
         "Returns a prioritized punch list rather than implementing the animations",
-        "Routes any build work to design-motion-system or the owning per-stack skill"
+        "Routes any build work to the owning per-stack skill"
       ]
     }
   ]

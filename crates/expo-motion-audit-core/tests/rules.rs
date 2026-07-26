@@ -929,3 +929,117 @@ const fn = () => runOnJS(setText)("done");"#,
     assert!(value["findings"].is_array());
     assert!(value["summary"]["total"].as_u64().unwrap() >= 1);
 }
+
+// ---------------------------------------------------------------------------
+// Reanimated 4 accessor API (`sv.get()` / `sv.set()`)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn reanimated4_setter_drives_missing_cancel_animation() {
+    // Reanimated 4 shape: `sv.set(withSpring(...))`. Previously invisible to the
+    // lifecycle rule, which only matched `sv.value = withSpring(...)`.
+    let r4 = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withSpring } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const press = () => { sv.set(withSpring(0.97)); };
+  return press;
+}"#,
+    );
+    assert!(fired(&r4, ids::LIFECYCLE_MISSING_CANCEL_ANIMATION));
+
+    // Reanimated 3 shape must keep firing.
+    let r3 = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withSpring } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const press = () => { sv.value = withSpring(0.97); };
+  return press;
+}"#,
+    );
+    assert!(fired(&r3, ids::LIFECYCLE_MISSING_CANCEL_ANIMATION));
+
+    // With cancelAnimation present, neither shape fires.
+    let cleaned = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withSpring, cancelAnimation } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const press = () => { sv.set(withSpring(0.97)); };
+  const stop = () => cancelAnimation(sv);
+  return [press, stop];
+}"#,
+    );
+    assert!(!fired(&cleaned, ids::LIFECYCLE_MISSING_CANCEL_ANIMATION));
+
+    // An unrelated receiver must not count, even in a file that imports a
+    // `with*` factory. Regression guard for the setter matcher.
+    let unrelated_receiver = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withTiming } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const controller = { set: (_v: unknown) => {} };
+  const go = () => { controller.set(withTiming(100)); };
+  return [sv, go];
+}"#,
+    );
+    assert!(!fired(
+        &unrelated_receiver,
+        ids::LIFECYCLE_MISSING_CANCEL_ANIMATION
+    ));
+
+    // A non-animation setter argument must not count as driving an animation.
+    let plain = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const press = () => { sv.set(0.97); };
+  return press;
+}"#,
+    );
+    assert!(!fired(&plain, ids::LIFECYCLE_MISSING_CANCEL_ANIMATION));
+}
+
+#[test]
+fn reanimated4_accessors_are_not_js_thread_violations() {
+    // `sv.get()` / `sv.set()` are the sanctioned Reanimated 4 API for touching a
+    // shared value from the JS thread, so they must NOT be reported as
+    // value-access-on-js. Only the raw `.value` crossing counts.
+    let accessors = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withSpring } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const onPressIn = () => { sv.set(withSpring(0.97)); };
+  const read = () => sv.get();
+  return [onPressIn, read];
+}"#,
+    );
+    assert!(!fired(
+        &accessors,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+
+    // The raw `.value` property on the JS thread still fires.
+    let raw = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const onPressIn = () => { sv.value = 0.97; };
+  return onPressIn;
+}"#,
+    );
+    assert!(fired(&raw, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+}

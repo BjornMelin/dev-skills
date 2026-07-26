@@ -212,6 +212,9 @@ fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
                         facts.uses_reanimated_animation = true;
                     }
                 }
+                if call_drives_shared_value(call, semantic) {
+                    facts.animates_shared_value = true;
+                }
             }
             AstKind::JSXAttribute(attribute) => {
                 if let Some(name) = jsx_attribute_name(&attribute.name)
@@ -394,8 +397,8 @@ fn check_shared_value_reassign<'a, F>(
         Severity::High,
         Confidence::High,
         assignment.span,
-        format!("`{name}` is a shared value but is reassigned directly instead of via `.value`."),
-        "Write `sv.value = ...`; reassigning the binding replaces the shared value object.",
+        format!("`{name}` is a shared value but the binding itself is reassigned."),
+        "Write `sv.set(...)` (Reanimated 4) or `sv.value = ...`; reassigning the binding replaces the shared value object.",
     );
 }
 
@@ -451,6 +454,9 @@ fn check_value_access_on_js<'a, F>(
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
+    // Reanimated 4's `sv.get()` / `sv.set()` accessors are the sanctioned way to
+    // touch a shared value from the JS thread, so they are deliberately NOT
+    // flagged here. Only the raw `.value` property crossing counts.
     if member.property.name.as_str() != "value" {
         return;
     }
@@ -817,6 +823,32 @@ fn jsx_member_root_name<'a>(object: &'a JSXMemberExpressionObject<'a>) -> Option
 /// shared value is being driven. We accept any `something.value = with*(...)`
 /// or `something.value = <expr>` where the RHS is a `with*` factory call, which
 /// is the common "animate this shared value" shape.
+/// Whether a call animates a shared value through the Reanimated 4 setter,
+/// i.e. `sv.set(withTiming(...))`. This is the call-shaped counterpart to
+/// `assignment_drives_shared_value`, which only sees `sv.value = withTiming(...)`.
+fn call_drives_shared_value<'a>(call: &CallExpression<'a>, semantic: &Semantic<'a>) -> bool {
+    let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
+        return false;
+    };
+    if member.property.name.as_str() != "set" {
+        return false;
+    }
+    // `.set(withTiming(...))` is only a shared-value animation when the receiver
+    // actually is one. Without this, an unrelated `controller.set(withTiming(1))`
+    // in a file that imports `withTiming` would mark the file as animating a
+    // shared value and produce a bogus missing-cancelAnimation finding.
+    let Expression::Identifier(object) = member.object.without_parentheses() else {
+        return false;
+    };
+    if !identifier_resolves_to_shared_value(object, semantic) {
+        return false;
+    }
+    call.arguments
+        .first()
+        .and_then(|argument| argument.as_expression())
+        .is_some_and(expression_is_with_animation)
+}
+
 fn assignment_drives_shared_value(assignment: &oxc_ast::ast::AssignmentExpression<'_>) -> bool {
     let is_value_target = matches!(
         &assignment.left,

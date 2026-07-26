@@ -2,7 +2,7 @@
 
 `motion-token-audit` is a static auditor for cross-stack motion token drift. It
 discovers the shared motion-token vocabulary emitted by
-`skills/design-motion-system/scripts/scaffold_motion_tokens.py`, then checks CSS,
+`skills/design-motion-audit/scripts/scaffold_motion_tokens.py`, then checks CSS,
 Reanimated, GSAP, and Motion React usage for hardcoded duration, easing, and
 spring literals.
 

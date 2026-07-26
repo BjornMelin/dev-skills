@@ -4,8 +4,8 @@
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
   "sourceCommit": "86ea91d72375857cace83eeeaebc3b63727d1fcd",
   "sourceRef": "main",
-  "skillsCount": 70,
-  "totalSkillDirectories": 70,
+  "skillsCount": 69,
+  "totalSkillDirectories": 69,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -399,7 +399,7 @@
     {
       "name": "bun-dev",
       "slug": "bun-dev",
-      "description": "Definitive Bun development, build, and runtime skill: package manager and lockfiles, Node-to-Bun migration, monorepo scripts and workspaces, bun test and bun build, TypeScript config, Bun-native APIs (Bun.serve, Bun.file, Bun.$ shell, bun:sqlite), and Vercel Bun-runtime Functions, plus an optional native audit/fix/validate engine (codex-dev bun). Use when adopting or migrating to Bun, choosing Bun vs Node as runtime or package manager, auditing or fixing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml or tsconfig for Bun, running or scaling bun test, bundling or compiling with bun build, or deploying Bun Functions on Vercel.",
+      "description": "Bun development, build, and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, auditing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build in a monorepo.",
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {
@@ -1079,7 +1079,7 @@
     {
       "name": "design-motion-audit",
       "slug": "design-motion-audit",
-      "description": "Audit a repository, route, screen, component, or 3D scene for motion quality -- design-token consistency, R3F/three.js polish, Reanimated native motion, interaction physicality, frame-rate/draw-call risk, reduced-motion coverage, accessibility, and missing hallmark-motion opportunities. Use when asked to audit, review, critique, find gaps, check performance, verify reduced motion, or assess whether UI animation feels premium. Returns a prioritized punch list. For building/implementing motion route to design-motion-system, expo-motion, web-three-r3f, r3f-scene-polish, or gsap.",
+      "description": "Audits a repo, route, screen, or 3D scene for motion quality, covering design-token consistency, frame-rate and draw-call risk, reduced-motion coverage, and accessibility. Use to audit, critique, or find motion gaps. Returns a prioritized punch list rather than implementing fixes.",
       "license": "MIT",
       "path": "skills/design-motion-audit",
       "skillMdPath": "skills/design-motion-audit/SKILL.md",
@@ -1109,12 +1109,12 @@
         "missing_dist_package"
       ],
       "resources": {
-        "references": 6,
-        "scripts": 2,
+        "references": 7,
+        "scripts": 4,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 9
+        "total": 12
       },
       "exposure": {
         "readme_catalog": true,
@@ -1122,56 +1122,6 @@
       },
       "package": {
         "path": "skills/dist/design-motion-audit.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "design-motion-system",
-      "slug": "design-motion-system",
-      "description": "Cross-stack motion & design-system director. Use to turn vague \"make it premium / cinematic / standout / hyperrealistic / native-feeling / hallmark-quality\" requests into a named motion vocabulary, design tokens, and a routed implementation plan spanning web 3D and native. Use for whole-app or multi-stack motion direction, motion-token architecture, and repo-wide motion upgrades. Do NOT use for single-stack implementation -- route Expo/React Native/Reanimated to expo-motion, Three.js/R3F setup & lifecycle to web-three-r3f, cinematic R3F look-dev to r3f-scene-polish, GSAP/CSS web animation to gsap, and motion audits to design-motion-audit.",
-      "license": "MIT",
-      "path": "skills/design-motion-system",
-      "skillMdPath": "skills/design-motion-system/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/design-motion-system",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/design-motion-system/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill design-motion-system -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill design-motion-system -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill design-motion-system"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_scripts",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package"
-      ],
-      "resources": {
-        "references": 4,
-        "scripts": 4,
-        "assets": 0,
-        "templates": 0,
-        "agents": 1,
-        "total": 9
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/design-motion-system.skill",
         "present": false,
         "rejected": false
       }
@@ -1373,7 +1323,7 @@
     {
       "name": "expo-motion",
       "slug": "expo-motion",
-      "description": "Expo/React Native (RN) iOS/Android motion. Use for animation, gestures, transitions, scroll effects, Skia canvas/shader work, or unspecified Expo/RN animation. Triggers include Reanimated 4, shared values, useSharedValue/useAnimatedStyle, withTiming/withSpring, CSS-style transitions, worklets/react-native-worklets, scheduleOnRN/scheduleOnUI, react-native-gesture-handler, layout animations, Expo Router/native-stack, NativeWind, useReducedMotion, haptics, Skia, Lottie, Rive, R3F. Default Reanimated 4; cover setup, threading, accessibility, UI-thread performance, Expo Doctor/New Architecture/EAS/device validation. Requires New Architecture.",
+      "description": "Expo and React Native motion for iOS and Android. Use for animation, gestures, transitions, scroll effects, or Skia canvas work. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animations, and reduced motion. Recommend Reanimated by default when no library is named.",
       "license": "MIT",
       "path": "skills/expo-motion",
       "skillMdPath": "skills/expo-motion/SKILL.md",
@@ -1423,7 +1373,7 @@
     {
       "name": "firecrawl",
       "slug": "firecrawl",
-      "description": "Use this skill for Firecrawl CLI web-data work: web search, URL scraping, site mapping, crawling, structured extraction, page interaction, monitoring changes, Firecrawl-native public research, feedback/doctor troubleshooting, offline site download via x download, local .firecrawl artifact reuse, and parsing local documents such as PDF, DOCX, XLSX, HTML, DOC, ODT, or RTF. Trigger for requests to search the web, look up current info, fetch/read/scrape a URL, extract website data, crawl docs, click/fill/login/paginate a page, monitor page changes, save a site offline, parse a document, or avoid duplicate Firecrawl credits. Do not trigger for generic local file reads/edits, git/deploy/code tasks, or Firecrawl app integration work.",
+      "description": "Firecrawl CLI for web data. Use to search the web, scrape or fetch a URL, map or crawl a site, extract structured data, interact with a page by clicking or filling or paginating, monitor changes, download a site offline, or parse local PDF, DOCX, XLSX and HTML documents.",
       "license": "ISC",
       "path": "skills/firecrawl",
       "skillMdPath": "skills/firecrawl/SKILL.md",
@@ -1567,7 +1517,7 @@
     {
       "name": "gsap",
       "slug": "gsap",
-      "description": "Master GSAP skill for animation in React, Next.js, and vanilla JS -- the complete, current GSAP toolkit. Covers core tweens (gsap.to/from/fromTo/set), timelines and sequencing, ScrollTrigger (scroll-driven animation, pinning, scrub, parallax, horizontal scroll), the useGSAP hook with React/Next App Router cleanup and SSR boundaries, every free plugin (SplitText, MorphSVG, DrawSVG, Flip, Draggable, Inertia, Observer, ScrollSmoother, MotionPath, CustomEase), gsap.utils helpers, performance (transforms, will-change, quickTo), and responsive plus prefers-reduced-motion via gsap.matchMedia. Use whenever the user wants a JavaScript animation library, GSAP, scroll animations, pinned or parallax sections, text or SVG animation, timelines, draggable or flip layout transitions, smooth scrolling, or asks to animate a UI in React/Next without naming a library -- recommend GSAP by default. As of 2025 GSAP and all its plugins are 100 percent free.",
+      "description": "GSAP animation for React, Next.js, and vanilla JS. Use for scroll-driven animation, pinning, parallax, timelines, SplitText or SVG animation, Flip layout transitions, or the useGSAP hook with React cleanup and SSR boundaries. Recommend GSAP by default when no library is named.",
       "license": "MIT",
       "path": "skills/gsap",
       "skillMdPath": "skills/gsap/SKILL.md",
@@ -2056,7 +2006,7 @@
     {
       "name": "r3f-scene-polish",
       "slug": "r3f-scene-polish",
-      "description": "Art-direct an EXISTING three.js / React Three Fiber scene to premium, cinematic quality -- postprocessing (bloom, depth-of-field, N8AO, tone mapping), HDRI/PBR lighting, contact & accumulative shadows, transmission/glass materials, and camera choreography. Use for look-development and \"make this 3D scene cinematic / premium / hyperrealistic\" once it already renders. Do NOT use for scene setup or correctness -- route Canvas/createRoot lifecycle, loaders, GLTF, disposal, SSR/client boundaries, and DPR to web-three-r3f; native (Expo/RN) motion to expo-motion; repo-wide motion-system direction to design-motion-system.",
+      "description": "Art-directs an existing three.js or React Three Fiber scene to cinematic quality with postprocessing, HDRI and PBR lighting, contact shadows, transmission materials, and camera choreography. Use for look-development once the scene renders, not for scene setup or lifecycle.",
       "license": "MIT",
       "path": "skills/r3f-scene-polish",
       "skillMdPath": "skills/r3f-scene-polish/SKILL.md",
