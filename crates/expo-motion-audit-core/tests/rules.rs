@@ -977,6 +977,24 @@ export function C() {
     );
     assert!(!fired(&cleaned, ids::LIFECYCLE_MISSING_CANCEL_ANIMATION));
 
+    // An unrelated receiver must not count, even in a file that imports a
+    // `with*` factory. Regression guard for the setter matcher.
+    let unrelated_receiver = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useSharedValue, withTiming } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(1);
+  const controller = { set: (_v: unknown) => {} };
+  const go = () => { controller.set(withTiming(100)); };
+  return [sv, go];
+}"#,
+    );
+    assert!(!fired(
+        &unrelated_receiver,
+        ids::LIFECYCLE_MISSING_CANCEL_ANIMATION
+    ));
+
     // A non-animation setter argument must not count as driving an animation.
     let plain = analyze(
         "src/a.tsx",

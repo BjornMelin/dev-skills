@@ -38,6 +38,8 @@ jobs:
         run: cargo run -q -p codex-dev -- --json policy docs-check
       - name: Smoke native Bun platform
         run: cargo run -q -p codex-dev -- --json bun doctor
+      - name: Smoke claude-config-audit
+        run: cargo run -q -p claude-config-audit -- doctor
       - name: Verify Agent Skills Lab catalog
         run: bash tools/skill/check_catalog.sh "$GITHUB_SHA"
       - name: Test catalog checker isolation

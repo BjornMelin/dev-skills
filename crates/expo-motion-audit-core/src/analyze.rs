@@ -212,7 +212,7 @@ fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
                         facts.uses_reanimated_animation = true;
                     }
                 }
-                if call_drives_shared_value(call) {
+                if call_drives_shared_value(call, semantic) {
                     facts.animates_shared_value = true;
                 }
             }
@@ -826,11 +826,21 @@ fn jsx_member_root_name<'a>(object: &'a JSXMemberExpressionObject<'a>) -> Option
 /// Whether a call animates a shared value through the Reanimated 4 setter,
 /// i.e. `sv.set(withTiming(...))`. This is the call-shaped counterpart to
 /// `assignment_drives_shared_value`, which only sees `sv.value = withTiming(...)`.
-fn call_drives_shared_value(call: &CallExpression<'_>) -> bool {
+fn call_drives_shared_value<'a>(call: &CallExpression<'a>, semantic: &Semantic<'a>) -> bool {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return false;
     };
     if member.property.name.as_str() != "set" {
+        return false;
+    }
+    // `.set(withTiming(...))` is only a shared-value animation when the receiver
+    // actually is one. Without this, an unrelated `controller.set(withTiming(1))`
+    // in a file that imports `withTiming` would mark the file as animating a
+    // shared value and produce a bogus missing-cancelAnimation finding.
+    let Expression::Identifier(object) = member.object.without_parentheses() else {
+        return false;
+    };
+    if !identifier_resolves_to_shared_value(object, semantic) {
         return false;
     }
     call.arguments

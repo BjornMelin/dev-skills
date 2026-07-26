@@ -9,8 +9,8 @@ license: MIT
 Audit the target surface (a repo, route, screen, component, or 3D scene) for
 motion quality and implementation safety, and return a **prioritized punch list**
 with exact files, severity, reasoning, and concrete fixes. This skill diagnoses;
-it routes implementation to the owning skill (`expo-motion`, `r3f-scene-polish`,
-or `gsap`). Token and motion-system work is handled here via
+it routes implementation to the owning skill (`expo-motion`, `web-three-r3f`
+for R3F setup and correctness, `r3f-scene-polish` for look-dev, or `gsap`). Token and motion-system work is handled here via
 `references/design-system-tokens.md` and `scripts/scaffold_motion_tokens.py`.
 
 ## How to run

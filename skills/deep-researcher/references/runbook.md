@@ -26,7 +26,7 @@ Use when the query is ambiguous, high-stakes, recent, or source-heavy.
    - package implementation source;
    - rendered/crawled web;
    - citation audit.
-3. Spawn focused subagents with `$fan-out`, then immediately wait for all.
+3. Spawn focused subagents with `$subspawn`, then immediately wait for all.
 4. Hydrate all search hits before synthesis.
 5. Ask one follow-up only if a policy/security/freshness decision remains
    genuinely blocked.

@@ -371,23 +371,53 @@ void helper;"#,
 }
 
 #[test]
-fn dynamic_import_of_configured_gsap_module_suppresses_registration_rule() {
-    let dynamic = analyze(
+fn sequenced_dynamic_import_of_configured_gsap_module_suppresses_registration_rule() {
+    // An AWAITED dynamic import orders the registration side effect ahead of the
+    // later plugin use, so it legitimately suppresses the rule.
+    let awaited = analyze(
         "src/a.tsx",
         "tsx",
         r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
-void import("@scope/motion/web/gsap").then(({ gsap }) => gsap.to(".x", { x: 1 }));
+export async function setup() {
+  await import("@scope/motion/web/gsap");
+  ScrollTrigger.create({ trigger: ".x" });
+}"#,
+    );
+    assert!(!fired(&awaited, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // A `.then()` chain sequences the callback after resolution, so it also
+    // suppresses. This is the common lazy-load shape.
+    let chained = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
+void import("@scope/motion/web/gsap").then(({ gsap }) => {
+  gsap.to(".x", { x: 1 });
+  ScrollTrigger.create({ trigger: ".x" });
+});"#,
+    );
+    assert!(!fired(&chained, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+
+    // A BARE floating import proves nothing about ordering: the plugin is used
+    // before the module resolves. That is exactly the bug this rule catches.
+    let floating = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
+void import("@scope/motion/web/gsap");
 ScrollTrigger.create({ trigger: ".x" });"#,
     );
-    assert!(!fired(&dynamic, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
+    assert!(fired(&floating, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 
-    // Negative control: dynamically importing something else must not suppress.
+    // Negative control: awaiting an unrelated module must not suppress.
     let other = analyze(
         "src/a.tsx",
         "tsx",
         r#"import { ScrollTrigger } from "gsap/ScrollTrigger";
-void import("@scope/motion/web/utils").then(() => {});
-ScrollTrigger.create({ trigger: ".x" });"#,
+export async function setup() {
+  await import("@scope/motion/web/utils");
+  ScrollTrigger.create({ trigger: ".x" });
+}"#,
     );
     assert!(fired(&other, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 }

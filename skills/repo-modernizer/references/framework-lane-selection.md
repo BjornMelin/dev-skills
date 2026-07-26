@@ -80,7 +80,7 @@ Verification bias:
 Activate when Convex is the backend or data-contract authority.
 
 Use:
-- `$signr-convex` (or the project's own Convex skill)
+- `$convex-audit`
 - official Convex docs and current guidance
 
 Priorities:

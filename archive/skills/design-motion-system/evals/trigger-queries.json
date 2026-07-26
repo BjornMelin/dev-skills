@@ -1,0 +1,25 @@
+[
+  { "query": "make our whole app feel premium and standout — not sure where to start, it spans web and a native app", "should_trigger": true },
+  { "query": "design a shared motion-token system we can reuse across our web and react native codebases", "should_trigger": true },
+  { "query": "i want a signature motion feel that's consistent across our r3f web hero and our expo app", "should_trigger": true },
+  { "query": "we have hardcoded durations and easings everywhere — architect a motion design-token system", "should_trigger": true },
+  { "query": "run a repo-wide motion upgrade across all our routes and screens, this is a big migration", "should_trigger": true },
+  { "query": "turn 'make it cinematic and hallmark-quality' into an actual plan for the whole product", "should_trigger": true },
+  { "query": "our product feels generic and templated — direct a cross-stack motion language for it", "should_trigger": true },
+  { "query": "plan the motion system for our app: vocabulary, tokens, per-stack routing, and a perf budget", "should_trigger": true },
+  { "query": "i want the app to feel native and tactile everywhere but i haven't decided on any libraries yet", "should_trigger": true },
+  { "query": "coordinate a motion overhaul spanning our web 3d scenes and our native screens", "should_trigger": true },
+  { "query": "define named motion tokens and choreography, then route implementation to the right stacks", "should_trigger": true },
+  { "query": "how do we make the entire experience feel layered and premium across web and mobile", "should_trigger": true },
+
+  { "query": "add a gsap scrolltrigger pin to the hero section on my next.js landing page", "should_trigger": false },
+  { "query": "animate a bottom sheet in my expo app with reanimated so it snaps open and closed", "should_trigger": false },
+  { "query": "my r3f canvas is blank and won't render, help me set up the scene", "should_trigger": false },
+  { "query": "add cinematic bloom and depth of field to my already-working three.js hero scene", "should_trigger": false },
+  { "query": "audit our app's animations and tell me where reduced motion is missing", "should_trigger": false },
+  { "query": "review this screen's motion and give me a punch list of what to fix", "should_trigger": false },
+  { "query": "load a gltf model and wire up the loaders in my react three fiber canvas", "should_trigger": false },
+  { "query": "build a swipe-to-dismiss card gesture in react native", "should_trigger": false },
+  { "query": "write a css keyframes shimmer for my loading skeleton", "should_trigger": false },
+  { "query": "make my drei scene look cinematic with agx tonemapping and hdri lighting", "should_trigger": false }
+]

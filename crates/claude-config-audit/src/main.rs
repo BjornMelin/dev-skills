@@ -119,45 +119,56 @@ struct Frontmatter {
     disable_model_invocation: bool,
 }
 
+/// Parse the frontmatter block as real YAML.
+///
+/// A hand-rolled line scanner accepts blocks the actual loader and the
+/// repository validator reject, for example valid `name:`/`description:` lines
+/// sitting alongside malformed YAML such as `metadata: [`. Parsing the whole
+/// block means a file that would fail validation fails here too.
 fn parse_frontmatter(text: &str) -> Option<Frontmatter> {
     let rest = text.strip_prefix("---\n")?;
     let end = rest.find("\n---")?;
     let block = &rest[..end];
-    let mut name = None;
-    let mut description = None;
-    let mut disable = false;
-    let mut lines = block.lines().peekable();
-    while let Some(line) = lines.next() {
-        if let Some(v) = line.strip_prefix("name:") {
-            name = Some(v.trim().trim_matches(['"', '\'']).to_string());
-        } else if let Some(v) = line.strip_prefix("disable-model-invocation:") {
-            disable = v.trim() == "true";
-        } else if let Some(v) = line.strip_prefix("description:") {
-            let mut acc = v.trim().to_string();
-            // Fold YAML block scalars and indented continuations.
-            while let Some(next) = lines.peek() {
-                if next.starts_with(' ') || next.starts_with('\t') || next.trim().is_empty() {
-                    let n = lines.next().unwrap_or_default();
-                    if !n.trim().is_empty() {
-                        acc.push(' ');
-                        acc.push_str(n.trim());
-                    }
-                } else {
-                    break;
-                }
-            }
-            description = Some(
-                acc.trim_matches(['"', '\'', '|', '>', '-'])
-                    .trim()
-                    .to_string(),
-            );
-        }
-    }
+    let value: serde_yaml_ng::Value = serde_yaml_ng::from_str(block).ok()?;
+    let map = value.as_mapping()?;
+    let get_str = |key: &str| {
+        map.get(serde_yaml_ng::Value::String(key.to_string()))
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    };
     Some(Frontmatter {
-        name,
-        description,
-        disable_model_invocation: disable,
+        name: get_str("name"),
+        description: get_str("description"),
+        disable_model_invocation: map
+            .get(serde_yaml_ng::Value::String(
+                "disable-model-invocation".to_string(),
+            ))
+            .and_then(serde_yaml_ng::Value::as_bool)
+            .unwrap_or(false),
     })
+}
+
+/// Whether a matched phrase is preceded by a negation or sits inside a quote,
+/// e.g. "do not show your reasoning" or "avoid `explain your reasoning`".
+fn phrase_is_negated(haystack: &str, at: usize) -> bool {
+    const NEGATORS: &[&str] = &[
+        "do not",
+        "don't",
+        "never",
+        "avoid",
+        "without",
+        "no ",
+        "not ",
+        "must not",
+        "should not",
+        "refrain from",
+        "instead of",
+        "rather than",
+        "prevent",
+    ];
+    let start = at.saturating_sub(60);
+    let window = &haystack[start..at];
+    NEGATORS.iter().any(|n| window.contains(n))
 }
 
 /// Every `SKILL.md` reachable from a skills root, following symlinks.
@@ -300,7 +311,12 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
                 "transcribe your thinking",
                 "echo your reasoning",
             ] {
-                if lowered.contains(probe) {
+                // Only affirmative requests count. Guidance that forbids
+                // extraction ("do not show your reasoning; return conclusions")
+                // is the opposite of the risk and must not be reported.
+                if let Some(at) = lowered.find(probe)
+                    && !phrase_is_negated(&lowered, at)
+                {
                     findings.push(Finding {
                         id: "model.reasoning-extraction-risk",
                         severity: Severity::Medium,
@@ -312,31 +328,42 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
                 }
             }
 
-            if fm.disable_model_invocation {
-                continue; // excluded from the listing; costs nothing
-            }
             let desc = fm.description.unwrap_or_default();
-            if desc.len() > DESC_MAX_CHARS {
+            // Count characters, not UTF-8 bytes. The cap is a character limit and
+            // the repository validator counts code points, so measuring bytes
+            // would flag a valid accented description as over-cap.
+            let desc_chars = desc.chars().count();
+
+            // The hard cap applies regardless of `disable-model-invocation`: that
+            // flag removes a skill from the automatic listing, it does not exempt
+            // its frontmatter from validation.
+            if desc_chars > DESC_MAX_CHARS {
                 findings.push(Finding {
                     id: "skill.description-over-cap",
                     severity: Severity::High,
                     subject: name.clone(),
                     message: format!(
-                        "description is {} chars, above the {DESC_MAX_CHARS} cap",
-                        desc.len()
+                        "description is {desc_chars} chars, above the {DESC_MAX_CHARS} cap"
                     ),
                     suggestion: "Trim; the frontmatter cap is enforced by the loader.",
                 });
-            } else if desc.len() > DESC_TARGET_CHARS {
+            }
+
+            if fm.disable_model_invocation {
+                // Excluded from the automatic listing, so it has no listing cost
+                // and the listing-hog rule does not apply.
+                continue;
+            }
+            if desc_chars <= DESC_MAX_CHARS && desc_chars > DESC_TARGET_CHARS {
                 findings.push(Finding {
                     id: "skill.description-listing-hog",
                     severity: Severity::Low,
                     subject: name.clone(),
-                    message: format!("description is {} chars (~{} tokens), above the ~{DESC_TARGET_CHARS}-char target", desc.len(), desc.len() / 4),
+                    message: format!("description is {desc_chars} chars (~{} tokens), above the ~{DESC_TARGET_CHARS}-char target", desc_chars / 4),
                     suggestion: "Lead with the key use case and keep concrete trigger phrases.",
                 });
             }
-            listed.insert(name.clone(), (name.len() + desc.len() + 20, true));
+            listed.insert(name.clone(), (name.chars().count() + desc_chars + 20, true));
         }
     }
 
@@ -387,12 +414,15 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
     }
 
     // ---- agents ------------------------------------------------------------
-    let mut agent_names: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    let mut agent_dirs = vec![home.join("agents")];
+    // Keyed by (scope, name). A project agent intentionally shadowing a global
+    // one is a supported configuration, so only duplicates WITHIN a scope are a
+    // defect: those are the ones the loader silently discards.
+    let mut agent_names: BTreeMap<(&str, String), Vec<String>> = BTreeMap::new();
+    let mut agent_dirs = vec![("user", home.join("agents"))];
     if let Some(p) = project {
-        agent_dirs.push(p.join(".claude").join("agents"));
+        agent_dirs.push(("project", p.join(".claude").join("agents")));
     }
-    for dir in &agent_dirs {
+    for (scope, dir) in &agent_dirs {
         if !dir.exists() {
             continue;
         }
@@ -409,7 +439,7 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
             };
             let Some(name) = fm.name else { continue };
             agent_names
-                .entry(name)
+                .entry((scope, name))
                 .or_default()
                 .push(path.display().to_string());
             if let Some(d) = fm.description
@@ -429,12 +459,12 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
             }
         }
     }
-    for (name, paths) in agent_names {
+    for ((scope, name), paths) in agent_names {
         if paths.len() > 1 {
             findings.push(Finding {
                 id: "agent.duplicate-name",
                 severity: Severity::High,
-                subject: name,
+                subject: format!("{name} ({scope} scope)"),
                 message: format!("declared by {} files: {}", paths.len(), paths.join(", ")),
                 suggestion: "The loader keeps one and silently discards the rest. Rename or remove.",
             });
@@ -444,12 +474,21 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
     // ---- guides ------------------------------------------------------------
     let mut guides = vec![home.join("CLAUDE.md")];
     if let Some(p) = project {
+        // No depth cap: a guide at packages/app/src/CLAUDE.md is real and would
+        // otherwise pass an audit while over budget. Pruning below keeps the
+        // walk cheap.
         for entry in WalkDir::new(p)
-            .max_depth(3)
             .into_iter()
             .filter_entry(|e| {
                 let n = e.file_name().to_string_lossy();
-                n != "node_modules" && n != ".git" && n != "target"
+                n != "node_modules"
+                    && n != ".git"
+                    && n != "target"
+                    && n != "dist"
+                    && n != "build"
+                    && n != ".next"
+                    && n != ".turbo"
+                    && n != "worktrees"
             })
             .flatten()
         {

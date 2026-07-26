@@ -1,0 +1,57 @@
+{
+  "skill_name": "design-motion-system",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our marketing site and companion Expo app both feel generic. I want the whole product to feel premium and 'standout' — a signature motion feel across web and mobile. Where do we start?",
+      "expected_output": "States a one-sentence signature motion thesis, defines a tokenized cross-stack motion system named by intent (durations, easing, springs, depth), maps each surface to the owning implementation skill (gsap / web-three-r3f / r3f-scene-polish for web, expo-motion for native), sets performance and reduced-motion budgets, and sequences the work — rather than hand-animating one component.",
+      "files": [],
+      "assertions": [
+        "Produces a named signature motion concept/thesis in one sentence before proposing any code",
+        "Defines cross-stack motion tokens (durations, easing, springs, depth) named by intent, not raw numeric constants",
+        "Routes native/Expo work to expo-motion and web work to gsap / web-three-r3f / r3f-scene-polish rather than implementing every stack itself",
+        "Specifies a performance budget and reduced-motion behavior as first-class parts of the system",
+        "Does not answer by hand-authoring a single one-off component animation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We have hardcoded durations and easings scattered across our web and React Native codebases. Design a shared motion-token system we can reuse everywhere.",
+      "expected_output": "A tokenized architecture covering the token groups (duration, easing, spring, depth, shadow, parallax, blur, glow, quality, reduced-motion) with a single source of truth (one const / CSS variables / Tailwind theme), intent-based naming, and how each stack consumes the tokens (Reanimated vs CSS/GSAP vs R3F).",
+      "files": [],
+      "assertions": [
+        "Defines tokens grouped by intent (duration/easing/spring/depth/etc.), replacing scattered hardcoded constants",
+        "Provides a single source of truth (one const / CSS variables / Tailwind theme) consumed by both web and native",
+        "Includes a reduced-motion token group (e.g. fadeOnly / noParallax / noCameraTravel), not only visual tokens",
+        "Explains how each stack consumes the tokens and routes stack-specific wiring to the owning skill",
+        "Names tokens by intent (short/medium/emphasized/brand) rather than numeric values"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I want one 'signature' card interaction that feels identical whether you're on the R3F-powered web hero or the native iOS app — same physics, same personality. Direct this.",
+      "expected_output": "Describes the signature card behavior in shared named vocabulary (overshoot/settle, interruption-first, depth), specifies the shared token values (spring, depth, shadow) so the feel matches, then routes the R3F/web implementation to r3f-scene-polish / web-three-r3f and the Reanimated/native implementation to expo-motion, with reduced-motion parity on both.",
+      "files": [],
+      "assertions": [
+        "Describes the signature interaction in shared named motion vocabulary (e.g. pop-in overshoot, interruption-first) used across both stacks",
+        "Specifies shared token values (spring/depth/shadow) so the feel matches on web and native",
+        "Routes the web 3D implementation to r3f-scene-polish / web-three-r3f and the native implementation to expo-motion",
+        "Requires reduced-motion parity on both platforms so state stays clear when large motion is removed",
+        "Keeps the interaction interruptible / velocity-aware rather than fire-and-forget"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Do a repo-wide motion upgrade across all our routes and screens — this is a big migration, not one file. How should we run it?",
+      "expected_output": "Recognizes repo-wide scope and recommends a dynamic/ultracode workflow that fans out by package/route/screen/scene, classifies stack, finds motion gaps (missing tokens, hardcoded durations, weak choreography, missing reduced-motion, perf risk), has specialists propose fixes, cross-checks with a performance/QA pass, and synthesizes a prioritized plan with a file list and acceptance criteria.",
+      "files": [],
+      "assertions": [
+        "Recognizes this as repo-wide scope and proposes a dynamic/ultracode workflow rather than editing files one-by-one in the main thread",
+        "Fans out by package/route/screen/scene and classifies the stack of each slice",
+        "Looks for motion gaps: missing tokens, hardcoded durations, weak choreography, missing reduced-motion, performance risk",
+        "Includes a performance/QA cross-check stage and synthesizes a prioritized plan with a file list and acceptance criteria",
+        "Routes concrete implementation fixes to the owning per-stack skills"
+      ]
+    }
+  ]
+}

@@ -43,5 +43,6 @@ runtime claim left unverified and why. See references/runtime-verification.md.>
 
 Score against `references/quality-gates.md`. Treat every static-tool finding as a
 lead — verify against the real code before reporting it. Hand each punch-list item
-to the owning skill (`expo-motion`, `r3f-scene-polish`, or `gsap`) for the fix.
+to the owning skill (`expo-motion`, `web-three-r3f` for R3F setup/correctness,
+`r3f-scene-polish` for look-dev, or `gsap`) for the fix.
 Token and system-level items are handled in this skill.

@@ -39,6 +39,7 @@ Key docs:
 - [gsap-audit reference](docs/reference/gsap-audit.md)
 - [expo-motion-audit reference](docs/reference/expo-motion-audit.md)
 - [motion-token-audit reference](docs/reference/motion-token-audit.md)
+- [claude-config-audit reference](docs/reference/claude-config-audit.md)
 - [codex-research v0.2 follow-up spec](docs/specs/codex-research-v0.2.md)
 - [codex-research CLI reference](docs/reference/codex-research-cli.md)
 - [codex-research crate reference](docs/reference/codex-research-crate.md)
@@ -96,6 +97,7 @@ crates/
   expo-motion-audit/      # Rust CLI that audits Expo/React Native motion (Reanimated) usage
   motion-token-audit-core/ # oxc-based engine for cross-stack motion-token drift/orphan analysis
   motion-token-audit/     # Rust CLI that audits motion-token consistency across CSS/R3F/Reanimated/GSAP
+  claude-config-audit/    # Rust CLI that audits a Claude Code config estate for drift
 docs/
   index.md                # documentation portal
   architecture/           # system design

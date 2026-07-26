@@ -1,0 +1,6 @@
+interface:
+  display_name: "Design Motion System"
+  short_description: "Cross-stack motion and design-system direction"
+  default_prompt: "Use $design-motion-system to turn vague premium/cinematic/standout quality goals into a named motion vocabulary, cross-stack design tokens, and a routed implementation plan spanning web 3D and native, then route each stack to its owning skill."
+policy:
+  allow_implicit_invocation: true
