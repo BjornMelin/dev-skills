@@ -84,7 +84,7 @@ Use hybrid GitHub access:
 
 ## Subagent Orchestration
 
-When using subagents, follow `$subspawn` strict rendezvous behavior. The main
+When using subagents, follow `$fan-out` strict rendezvous behavior. The main
 Codex session spawns specialized research subagents, immediately waits for all
 spawned agents in the batch, then synthesizes. Research subagents must not spawn
 nested subagents.

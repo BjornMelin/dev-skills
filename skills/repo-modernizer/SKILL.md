@@ -55,8 +55,6 @@ Use these throughout the task:
 
 - `$bun-dev`
 - `$hard-cut`
-- `$clean-code`
-- `$reducing-entropy`
 - `$github`
 - `context7`
 - `web.run`
