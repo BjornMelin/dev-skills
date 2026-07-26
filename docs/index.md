@@ -70,6 +70,10 @@ out of version control.
   exit-code contract.
 - [motion-token-audit Reference](reference/motion-token-audit.md): cross-stack
   motion-token drift and orphan analysis across CSS, R3F, Reanimated, and GSAP.
+- [claude-config-audit Reference](reference/claude-config-audit.md): drift audit
+  for a Claude Code configuration estate, covering broken skill symlinks, stale
+  skill overrides, duplicate agent names, oversized guides and skill bodies, and
+  descriptions past the frontmatter cap.
 - [codex-dev TUI Reference](reference/codex-dev-tui.md): optional Ratatui
   workbench for local capsule scanning across Overview, Evidence, Subagents,
   PR, PR Agent, Validation, and Help panels.
