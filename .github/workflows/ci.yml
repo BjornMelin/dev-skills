@@ -83,7 +83,7 @@ jobs:
       - name: Validate design-motion tooling
         run: |
           set -euo pipefail
-          python3 -m unittest discover -s skills/design-motion-system/scripts/tests
+          python3 -m unittest discover -s skills/design-motion-audit/scripts/tests
           node skills/r3f-scene-polish/scripts/audit.mjs doctor
       - name: Validate bootstrap manifests
         run: python3 tools/bootstrap/render_bootstrap_pack.py --validate
