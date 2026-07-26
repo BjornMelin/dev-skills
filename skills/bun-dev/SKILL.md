@@ -1,6 +1,6 @@
 ---
 name: bun-dev
-description: "Definitive Bun development, build, and runtime skill: package manager and lockfiles, Node-to-Bun migration, monorepo scripts and workspaces, bun test and bun build, TypeScript config, Bun-native APIs (Bun.serve, Bun.file, Bun.$ shell, bun:sqlite), and Vercel Bun-runtime Functions, plus an optional native audit/fix/validate engine (codex-dev bun). Use when adopting or migrating to Bun, choosing Bun vs Node as runtime or package manager, auditing or fixing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml or tsconfig for Bun, running or scaling bun test, bundling or compiling with bun build, or deploying Bun Functions on Vercel."
+description: "Bun development, build, and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, auditing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build in a monorepo."
 metadata:
   version: "2.0"
 ---

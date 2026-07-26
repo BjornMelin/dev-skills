@@ -1,14 +1,6 @@
 ---
 name: hotspot-optimizer
-description: >-
-  Find algorithmic complexity and performance hotspots across a codebase, then optimize them safely
-  behind tests without changing behavior. Use when asked to scan for slow code, inefficient or nested
-  loops, repeated scans, costly re-renders or recomputation, N+1 queries, avoidable quadratic work, or
-  to reduce complexity while preserving tests, APIs, ordering, and outputs; or when a request mentions
-  performance hotspots, hot paths, render churn, "this is slow", or "optimize for speed". Fans out
-  across files with Task subagents, ranks findings by impact, proves current behavior with focused
-  tests, applies localized edits, and re-runs the narrow test plus broad type, lint, and build to
-  verify. Defaults to an analysis-only report unless you ask to implement, fix, apply, or refactor.
+description: "Finds algorithmic complexity and performance hotspots, then optimizes them behind tests without changing behavior. Use for nested loops, repeated scans, N+1 queries, costly re-renders, or when a request mentions hot paths or slow code. Defaults to an analysis-only report."
 license: MIT
 ---
 

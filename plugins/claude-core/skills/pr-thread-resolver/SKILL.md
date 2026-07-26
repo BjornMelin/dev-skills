@@ -1,16 +1,6 @@
 ---
 name: pr-thread-resolver
-description: >-
-  Fetch, fix, and resolve unresolved GitHub PR review threads end-to-end with the gh CLI and Claude
-  Code's edit/verify loop. Use when addressing PR review comments or reviewer feedback, fixing or
-  resolving review threads, clearing unresolved or blocking conversations before merge, or applying
-  GitHub suggested changes. Pulls fresh review-thread state via gh GraphQL, verifies each finding
-  against current code (skips stale or already-fixed), fans independent threads out to parallel Task
-  subagents, applies minimal fixes, runs repo-native verification, makes scoped conventional commits,
-  pushes, then resolves only threads backed by a committed and verified fix. Never resolves on head
-  drift, failed verification, or skipped threads. Not for local Codex/Zen/manual review notes (use
-  review-remediation), passive PR or CI watching until merge (use babysit-pr), or CI-log-only failures
-  with no review thread.
+description: "Fetches, fixes, and resolves unresolved GitHub PR review threads with the gh CLI. Use when addressing reviewer feedback, clearing blocking conversations before merge, or applying GitHub suggested changes. Verifies each finding against current code and resolves only what it fixed."
 license: MIT
 ---
 
