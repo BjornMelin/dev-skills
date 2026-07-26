@@ -21,7 +21,7 @@ Use this when building or reviewing motion in an Expo/RN app, **and** when the u
 
 **Risk level: LOW** — animation libraries with a minimal security surface. If the user already chose a tool, respect it.
 
-**Not this skill — route instead:** Web 3D / Three.js / React Three Fiber (incl. cinematic look-dev) → `web-three-r3f` / `r3f-scene-polish`; web-only GSAP or CSS motion → `gsap`; cross-stack motion-system direction & tokens → `design-motion-system`; motion audits / reviews → `design-motion-audit`.
+**Not this skill — route instead:** Web 3D / Three.js / React Three Fiber (incl. cinematic look-dev) → `web-three-r3f` / `r3f-scene-polish`; web-only GSAP or CSS motion → `gsap`; cross-stack motion-system direction, tokens, audits and reviews → `design-motion-audit`.
 
 ## Install & setup
 

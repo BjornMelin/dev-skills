@@ -1,6 +1,6 @@
 ---
 name: design-motion-audit
-description: Audit a repository, route, screen, component, or 3D scene for motion quality — design-token consistency, R3F/three.js polish, Reanimated native motion, interaction physicality, frame-rate/draw-call risk, reduced-motion coverage, accessibility, and missing hallmark-motion opportunities. Use when asked to audit, review, critique, find gaps, check performance, verify reduced motion, or assess whether UI animation feels premium. Returns a prioritized punch list. For building/implementing motion route to design-motion-system, expo-motion, web-three-r3f, r3f-scene-polish, or gsap.
+description: "Audits a repo, route, screen, or 3D scene for motion quality, covering design-token consistency, frame-rate and draw-call risk, reduced-motion coverage, and accessibility. Use to audit, critique, or find motion gaps. Returns a prioritized punch list rather than implementing fixes."
 license: MIT
 ---
 
@@ -9,8 +9,9 @@ license: MIT
 Audit the target surface (a repo, route, screen, component, or 3D scene) for
 motion quality and implementation safety, and return a **prioritized punch list**
 with exact files, severity, reasoning, and concrete fixes. This skill diagnoses;
-it routes implementation to the owning skill (`design-motion-system` for
-system/token work, `expo-motion`, `web-three-r3f`, `r3f-scene-polish`, or `gsap`).
+it routes implementation to the owning skill (`expo-motion`, `r3f-scene-polish`,
+or `gsap`). Token and motion-system work is handled here via
+`references/design-system-tokens.md` and `scripts/scaffold_motion_tokens.py`.
 
 ## How to run
 

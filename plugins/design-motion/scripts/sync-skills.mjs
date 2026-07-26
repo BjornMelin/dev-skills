@@ -17,7 +17,7 @@ const PLUGIN = join(HERE, '..');          // plugins/design-motion
 const REPO = join(PLUGIN, '..', '..');    // repo root
 const CANON = join(REPO, 'skills');
 const MIRROR = join(PLUGIN, 'skills');
-const SKILLS = ['design-motion-system', 'design-motion-audit', 'r3f-scene-polish'];
+const SKILLS = ['design-motion-audit', 'r3f-scene-polish'];
 const check = process.argv.includes('--check');
 
 const skip = (name) => name === '__pycache__' || name.endsWith('.pyc');
