@@ -128,9 +128,14 @@ column, message, and suggestion.
 
 ## Exit Codes
 
-- `0`: clean, or only low-severity findings were reported.
-- `2`: at least one medium- or high-severity finding is present.
+- `0`: no finding met `--min-severity`.
+- `2`: at least one finding met `--min-severity` (default `medium`).
 - `1`: a usage or IO error occurred.
+
+`--min-severity low|medium|high` sets where the gate trips. It changes the exit
+code only: the report always contains every finding, so raising the bar to get
+a repository green never hides the work still to do. A repository with a known
+backlog can gate on `high` today and tighten to `low` once clean.
 
 ## Validation
 
