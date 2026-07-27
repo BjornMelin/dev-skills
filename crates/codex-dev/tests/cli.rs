@@ -8507,10 +8507,10 @@ fn evidence_append_records_typed_entries_and_status_counts() {
         .stdout
         .clone();
 
-    // The same append citing an artifact that was never produced must fail.
-    // Without this, `evidence append` records any claim put to it, which is
-    // the opposite of what an evidence ledger is for.
-    Command::cargo_bin("codex-dev")
+    // The same append citing an artifact that was never produced must fail,
+    // and must fail *for that reason*. A bare `.failure()` would also pass if
+    // argument parsing broke, hiding a regression in artifact verification.
+    let missing_artifact_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args([
             "--json",
@@ -8528,7 +8528,20 @@ fn evidence_append_records_typed_entries_and_status_counts() {
             "never-produced.md",
         ])
         .assert()
-        .failure();
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let missing_artifact_json: Value =
+        serde_json::from_slice(&missing_artifact_output).expect("missing artifact json");
+    let message = missing_artifact_json["result"]["error"]["message"]
+        .as_str()
+        .expect("error message");
+    assert!(
+        message.contains("does not exist on disk") && message.contains("never-produced.md"),
+        "expected an artifact-existence failure, got: {message}"
+    );
+
     let append_json: Value = serde_json::from_slice(&append_output).expect("append json");
     assert_eq!(append_json["command"], "evidence append");
     assert_eq!(append_json["result"]["record"]["kind"], "decision");
@@ -9355,4 +9368,57 @@ fn evidence_append_json_errors_are_typed_and_do_not_write() {
         std::fs::read_to_string(&evidence_path).expect("evidence after"),
         evidence_before
     );
+}
+
+/// `--artifact` is documented as taking a `<path-or-id>`. Verifying that
+/// hand-authored artifacts exist must not turn an opaque identifier into an
+/// error, since the filesystem has nothing to say about `artifact:build-123`.
+#[test]
+fn evidence_append_accepts_an_opaque_artifact_id() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Opaque artifact id",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "opaque-artifact",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    for artifact in ["artifact:build-123", "issue:42"] {
+        Command::cargo_bin("codex-dev")
+            .expect("binary")
+            .args([
+                "--json",
+                "evidence",
+                "append",
+                "--capsule",
+                capsule,
+                "--kind",
+                "decision",
+                "--summary",
+                "Cite an opaque artifact id",
+                "--at",
+                "2026-05-09T06:06:00Z",
+                "--artifact",
+                artifact,
+            ])
+            .assert()
+            .success();
+    }
 }

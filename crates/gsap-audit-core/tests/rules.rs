@@ -1366,19 +1366,106 @@ export function Panel() {
     );
     assert!(fired(&on_update, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
 
-    let raf = analyze(
+    // A callback that schedules the next frame from inside itself is a loop.
+    let raf_loop = analyze(
         "src/Ticker.tsx",
         "tsx",
         r#"
 import { useState } from "react";
 export function Ticker() {
   const [t, setT] = useState(0);
-  requestAnimationFrame(() => setT(performance.now()));
+  requestAnimationFrame(function tick() {
+    setT(performance.now());
+    requestAnimationFrame(tick);
+  });
   return null;
 }
 "#,
     );
-    assert!(fired(&raf, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+    assert!(fired(&raf_loop, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_one_shot_animation_frame() {
+    // `requestAnimationFrame` runs its callback once unless something
+    // reschedules. A single deferred state update is not a per-frame render.
+    let findings = analyze(
+        "src/Ready.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Ready() {
+  const [ready, setReady] = useState(false);
+  requestAnimationFrame(() => setReady(true));
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_on_update_outside_gsap() {
+    // `onUpdate` is an ordinary callback name. Only a GSAP call puts a frame
+    // loop behind it, so an unrelated library's config must not be reported.
+    let findings = analyze(
+        "src/Editor.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { editor } from "some-editor";
+export function Editor() {
+  const [value, setValue] = useState("");
+  editor.configure({ onUpdate: () => setValue("x") });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_on_refresh() {
+    // ScrollTrigger fires onRefresh on refresh, not per frame.
+    let findings = analyze(
+        "src/Refresh.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import gsap from "gsap";
+export function Refresh() {
+  const [n, setN] = useState(0);
+  gsap.to(".p", { scrollTrigger: { onRefresh: () => setN(1) } });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_resolves_setters_by_symbol() {
+    // Two components, each with its own `setProgress`. Only the one actually
+    // bound to useState inside a continuous handler may be reported; a
+    // same-named prop must not be.
+    let findings = analyze(
+        "src/Two.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Passthrough({ setProgress }: { setProgress: (n: number) => void }) {
+  return <div onScroll={() => setProgress(1)} />;
+}
+export function Owner() {
+  const [progress, setProgress] = useState(0);
+  return <div onClick={() => setProgress(1)} />;
+}
+"#,
+    );
+    assert!(
+        !fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION),
+        "a prop named like a setter is not a useState setter: {findings:?}"
+    );
 }
 
 #[test]

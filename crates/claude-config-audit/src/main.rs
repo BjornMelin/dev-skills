@@ -12,7 +12,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use walkdir::WalkDir;
@@ -222,13 +222,73 @@ fn read_overrides(settings: &Path) -> BTreeMap<String, String> {
     out
 }
 
+/// Generated output that lives beside a skill without being part of it.
+///
+/// Reporting a stale `.pyc` as drift would be noise, and noise is how a rule
+/// teaches people to ignore it.
+fn is_generated_noise(relative: &Path) -> bool {
+    relative.components().any(|component| {
+        matches!(
+            component.as_os_str().to_string_lossy().as_ref(),
+            "__pycache__" | "node_modules" | ".DS_Store" | ".pytest_cache" | ".ruff_cache"
+        )
+    })
+}
+
+/// Every meaningful file under `root`, as paths relative to it.
+fn relative_files(root: &Path) -> BTreeSet<PathBuf> {
+    WalkDir::new(root)
+        .into_iter()
+        .flatten()
+        .filter(|entry| entry.file_type().is_file())
+        .filter_map(|entry| {
+            entry
+                .path()
+                .strip_prefix(root)
+                .ok()
+                .map(std::path::Path::to_path_buf)
+        })
+        .filter(|relative| !is_generated_noise(relative))
+        .collect()
+}
+
+/// The first difference between two skill directories, described for a reader.
+///
+/// Returns `None` when the trees hold the same files with the same bytes.
+/// Reporting only the first difference keeps the finding readable; the point is
+/// to say *that* a skill drifted, not to render a diff.
+fn first_tree_difference(left: &Path, right: &Path) -> Option<String> {
+    let left_files = relative_files(left);
+    let right_files = relative_files(right);
+
+    if let Some(missing) = left_files.difference(&right_files).next() {
+        return Some(format!("{} is not installed", missing.display()));
+    }
+    if let Some(extra) = right_files.difference(&left_files).next() {
+        return Some(format!("{} exists only in the install", extra.display()));
+    }
+    for name in &left_files {
+        let (Ok(a), Ok(b)) = (fs::read(left.join(name)), fs::read(right.join(name))) else {
+            continue;
+        };
+        if a != b {
+            return Some(format!("{} differs", name.display()));
+        }
+    }
+    None
+}
+
 /// Plugins the user has explicitly switched off, as `plugin@marketplace` keys.
 ///
 /// A skill supplied only by a disabled plugin is not loadable, so an override
 /// naming it is just as inert as one naming a deleted skill. Counting those
 /// names as "known" is why an earlier version reported such overrides as fine.
+/// `settings_files` must be ordered lowest precedence first. A later file wins,
+/// so a project that re-enables a plugin the user disabled globally is reported
+/// as enabled. Accumulating every `false` instead would mark a plugin inert
+/// while it is actually active for the project.
 fn disabled_plugins(settings_files: &[PathBuf]) -> BTreeSet<String> {
-    let mut out = BTreeSet::new();
+    let mut effective: BTreeMap<String, bool> = BTreeMap::new();
     for settings in settings_files {
         let Ok(text) = fs::read_to_string(settings) else {
             continue;
@@ -238,13 +298,16 @@ fn disabled_plugins(settings_files: &[PathBuf]) -> BTreeSet<String> {
         };
         if let Some(map) = value.get("enabledPlugins").and_then(|v| v.as_object()) {
             for (key, enabled) in map {
-                if enabled.as_bool() == Some(false) {
-                    out.insert(key.clone());
+                if let Some(enabled) = enabled.as_bool() {
+                    effective.insert(key.clone(), enabled);
                 }
             }
         }
     }
-    out
+    effective
+        .into_iter()
+        .filter_map(|(key, enabled)| (!enabled).then_some(key))
+        .collect()
 }
 
 /// Map a marketplace SKILL.md path back to the `plugin@marketplace` key that
@@ -272,6 +335,20 @@ fn scan(
     farms: &[PathBuf],
 ) -> Result<(Vec<Finding>, usize, usize)> {
     let mut findings = Vec::new();
+
+    // A root the caller named explicitly must exist. Skipping a mistyped or
+    // unmounted --mirror/--farm would let the scan print "No drift detected"
+    // having audited neither, which is the failure this tool exists to end.
+    if let Some(mirror) = mirror
+        && !mirror.is_dir()
+    {
+        bail!("--mirror path is not a directory: {}", mirror.display());
+    }
+    for farm in farms {
+        if !farm.is_dir() {
+            bail!("--farm path is not a directory: {}", farm.display());
+        }
+    }
 
     // ---- skill roots -------------------------------------------------------
     let home_skills = home.join("skills");
@@ -513,18 +590,19 @@ fn scan(
             let Some(dst) = live.get(&name) else {
                 continue; // authored but deliberately not installed
             };
-            let (Ok(a), Ok(b)) = (fs::read_to_string(&src), fs::read_to_string(dst)) else {
+            // Compare the whole skill directory, not just SKILL.md. A skill's
+            // references/, scripts/ and assets/ change its behaviour just as
+            // much as its entrypoint, and an entrypoint-only check missed a
+            // real 51-line reference drift in this very estate.
+            let (Some(src_dir), Some(dst_dir)) = (src.parent(), dst.parent()) else {
                 continue;
             };
-            if a != b {
+            if let Some(detail) = first_tree_difference(src_dir, dst_dir) {
                 findings.push(Finding {
                     id: "mirror.drift",
                     severity: Severity::Medium,
                     subject: name,
-                    message: format!(
-                        "differs between {} and the installed copy",
-                        src.display()
-                    ),
+                    message: format!("{} differs from the installed copy: {detail}", src_dir.display()),
                     suggestion:
                         "Decide which side is authoritative and sync it; committing does not deploy.",
                 });

@@ -59,6 +59,9 @@ Options:
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`.
+- `--min-severity <low|medium|high>`: lowest severity that makes the exit
+  code non-zero. Default `medium`. Changes the exit code only; every
+  finding is still reported.
 
 `scan` reports hardcoded motion literals as:
 

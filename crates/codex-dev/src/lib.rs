@@ -9641,6 +9641,16 @@ fn is_repo_root(path: &Path) -> bool {
     path.join(".git").exists() || path.join("Cargo.toml").is_file()
 }
 
+/// Whether a directory is a version-control root.
+///
+/// Preferred over [`is_repo_root`] when *discovering* a root by walking up:
+/// a Cargo workspace member carries its own `Cargo.toml`, so a nearest-match
+/// walk would stop at `crates/codex-dev` and run repo-relative gates from
+/// there, breaking every `tools/...` and `docs/...` path.
+fn is_vcs_root(path: &Path) -> bool {
+    path.join(".git").exists()
+}
+
 fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
     let root = fs::canonicalize(root)
         .with_context(|| format!("failed to canonicalize repo root {}", root.display()))?;
@@ -9680,9 +9690,14 @@ fn resolve_policy_docs_repo_root(explicit: Option<&Path>) -> Result<PathBuf> {
 }
 
 fn find_repo_root(start: &Path) -> Option<PathBuf> {
+    // Prefer the enclosing VCS root over the nearest Cargo package. Inside a
+    // workspace both match, but only the VCS root makes repo-relative gate
+    // paths resolve. Fall back to a package root only when there is no `.git`
+    // anywhere above, which is the non-VCS checkout case.
     start
         .ancestors()
-        .find(|path| is_repo_root(path))
+        .find(|path| is_vcs_root(path))
+        .or_else(|| start.ancestors().find(|path| is_repo_root(path)))
         .and_then(|path| fs::canonicalize(path).ok())
 }
 
@@ -9740,6 +9755,31 @@ fn skip_gate(gate: &PolicyGate, reason: &str) -> PolicyGateResult {
     )
 }
 
+/// Terminate an entire process group, first politely then not.
+///
+/// Killing only the immediate child is not enough: a gate is typically `cargo`
+/// or a test runner, and its descendants inherit the stdout/stderr pipes. Those
+/// survivors hold the write ends open, so the reader threads below never see
+/// EOF and a "timed out" gate hangs anyway, which is the exact failure
+/// `--timeout-secs` exists to prevent.
+#[cfg(unix)]
+fn kill_process_group(pid: u32) {
+    // Negative pid targets the group. The child is made a group leader at spawn
+    // time, so the group id equals its pid.
+    let group = -(pid as i32);
+    unsafe {
+        libc::kill(group, libc::SIGTERM);
+    }
+    // Give a well-behaved tree a moment to unwind before removing the choice.
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    unsafe {
+        libc::kill(group, libc::SIGKILL);
+    }
+}
+
+#[cfg(not(unix))]
+fn kill_process_group(_pid: u32) {}
+
 /// Run a child to completion, or kill it once `timeout` elapses.
 ///
 /// `Command::output()` waits forever, so a gate that hangs hangs the whole run
@@ -9774,6 +9814,10 @@ fn wait_with_timeout(
         match child.try_wait()? {
             Some(status) => break Some(status),
             None if std::time::Instant::now() >= deadline => {
+                // Kill the whole tree, not just the child, or the reader
+                // threads joined below will block on pipes held open by
+                // surviving grandchildren.
+                kill_process_group(child.id());
                 let _ = child.kill();
                 let _ = child.wait();
                 break None;
@@ -9829,6 +9873,14 @@ fn execute_gate(
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
+    // Put the gate in its own process group so a timeout can terminate the
+    // whole tree. Without this the group id is the runner's own, and killing
+    // it would take down this process too.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
 
     let child = match command.spawn() {
         Ok(child) => child,
@@ -11548,6 +11600,11 @@ enabled = false
 
     fn write_repo_fixture(root: &Path) {
         fs::create_dir_all(root.join("docs/runbooks")).expect("docs dir");
+        // A `.git` marker makes the fixture a self-contained VCS root. Without
+        // it, root discovery walks past the fixture to whatever repository
+        // happens to sit above the temp directory, which makes these tests
+        // depend on the machine they run on.
+        fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
         fs::write(root.join("docs/runbooks/validation.md"), "# Validation\n")
             .expect("validation doc");

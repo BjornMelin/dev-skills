@@ -72,6 +72,9 @@ Options:
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`. When the cap is hit, the report sets `truncated: true`.
+- `--min-severity <low|medium|high>`: lowest severity that makes the exit
+  code non-zero. Default `medium`. Changes the exit code only; every
+  finding is still reported.
 
 The walk includes `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
 source files plus the supported config files, and skips `node_modules`, `.git`,

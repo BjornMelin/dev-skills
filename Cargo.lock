@@ -331,6 +331,7 @@ dependencies = [
  "clap_complete",
  "clap_mangen",
  "codex-dev-core",
+ "libc",
  "predicates",
  "serde",
  "serde_json",

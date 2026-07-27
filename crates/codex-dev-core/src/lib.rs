@@ -7207,6 +7207,24 @@ fn validate_evidence_record(record: &EvidenceRecord) -> Vec<String> {
     errors
 }
 
+/// Whether an artifact reference is an opaque identifier rather than a path.
+///
+/// `--artifact` is documented as taking a `<path-or-id>`, so `artifact:build-123`
+/// and `issue:42` are valid records naming something outside the filesystem. A
+/// scheme prefix distinguishes them. A Windows drive letter (`C:\out`) is not a
+/// scheme, so a single-character prefix does not qualify.
+fn artifact_is_opaque_id(artifact: &str) -> bool {
+    let Some((scheme, rest)) = artifact.split_once(':') else {
+        return false;
+    };
+    scheme.len() > 1
+        && !rest.starts_with('/')
+        && !rest.starts_with('\\')
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
 /// Resolve an artifact reference to a path on disk.
 ///
 /// Absolute paths are taken as given. A relative path is interpreted against
@@ -7225,13 +7243,18 @@ fn resolve_artifact(capsule: &Path, artifact: &str) -> Option<PathBuf> {
     from_cwd.exists().then_some(from_cwd)
 }
 
-/// Errors for artifacts a record cites but that do not exist on disk.
+/// Errors for artifacts a record cites as files but that do not exist on disk.
+///
+/// Opaque identifiers pass through untouched: the documented contract admits
+/// them, and the filesystem has nothing to say about `artifact:build-123`.
 fn evidence_artifact_errors(capsule: &Path, record: &EvidenceRecord) -> Vec<String> {
     record
         .artifacts
         .iter()
         .enumerate()
-        .filter(|(_, artifact)| resolve_artifact(capsule, artifact).is_none())
+        .filter(|(_, artifact)| {
+            !artifact_is_opaque_id(artifact) && resolve_artifact(capsule, artifact).is_none()
+        })
         .map(|(index, artifact)| format!("artifacts[{index}] does not exist on disk: {artifact}"))
         .collect()
 }
@@ -10807,6 +10830,64 @@ description: Alpha skill.
             format!("{error:#}").contains("human_verified must be set"),
             "{error:#}"
         );
+    }
+
+    #[test]
+    fn resolve_artifact_covers_absolute_capsule_and_cwd() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = temp.path().join("capsule");
+        fs::create_dir_all(&capsule).expect("capsule dir");
+
+        // absolute
+        let absolute = temp.path().join("absolute.txt");
+        fs::write(&absolute, "x").expect("write");
+        assert!(resolve_artifact(&capsule, absolute.to_str().expect("utf8")).is_some());
+
+        // capsule-relative
+        fs::write(capsule.join("inside.md"), "x").expect("write");
+        assert!(resolve_artifact(&capsule, "inside.md").is_some());
+
+        // cwd-relative: Cargo runs tests from the crate root, which has a
+        // Cargo.toml, so it exercises the fallback without a fixture.
+        assert!(resolve_artifact(&capsule, "Cargo.toml").is_some());
+
+        // absent everywhere
+        assert!(resolve_artifact(&capsule, "definitely-not-here.md").is_none());
+    }
+
+    #[test]
+    fn evidence_artifact_errors_reports_missing_paths_but_passes_opaque_ids() {
+        let temp = tempdir().expect("tempdir");
+        let capsule = temp.path().join("capsule");
+        fs::create_dir_all(&capsule).expect("capsule dir");
+        fs::write(capsule.join("real.md"), "x").expect("write");
+
+        let record = EvidenceRecord {
+            schema: EVIDENCE_SCHEMA.to_string(),
+            kind: EvidenceKind::Decision,
+            at: "2026-05-09T05:00:00Z".parse().expect("timestamp"),
+            summary: "summary".to_string(),
+            command: None,
+            exit_code: None,
+            source_ids: Vec::new(),
+            actor: None,
+            tool: None,
+            confidence: None,
+            residual_risk: None,
+            artifacts: vec![
+                "real.md".to_string(),
+                // `--artifact` is documented as <path-or-id>; an id has no
+                // filesystem meaning and must not be rejected.
+                "artifact:build-123".to_string(),
+                "issue:42".to_string(),
+                "never-written.md".to_string(),
+            ],
+        };
+
+        let errors = evidence_artifact_errors(&capsule, &record);
+        assert_eq!(errors.len(), 1, "unexpected errors: {errors:?}");
+        assert!(errors[0].contains("artifacts[3]"), "got {}", errors[0]);
+        assert!(errors[0].contains("never-written.md"), "got {}", errors[0]);
     }
 
     #[test]

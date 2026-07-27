@@ -67,6 +67,9 @@ Options:
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`. When the cap is hit, the report sets `truncated: true`.
+- `--min-severity <low|medium|high>`: lowest severity that makes the exit
+  code non-zero. Default `medium`. Changes the exit code only; every
+  finding is still reported.
 
 ## doctor
 
@@ -128,30 +131,43 @@ set is maintained in the crate and can change between builds. Run
 
 One rule is worth calling out because it encodes a design rule rather than an
 API misuse. `react.state-in-continuous-motion` fires when a `useState` setter is
-called from a source that fires every frame: a `onScroll`/`onPointerMove`-class
-JSX handler, a `scroll`/`pointermove`-class `addEventListener`, a GSAP
-`onUpdate`/`onRefresh` callback, `requestAnimationFrame`, or `gsap.ticker.add`.
-Each of those re-renders the component on every frame.
+called from a source that runs every frame:
 
-Discrete handlers are deliberately not reported. A state update per click is
+- an `onScroll`/`onWheel`/`onPointerMove`/`onMouseMove`/`onTouchMove`/`onDrag`
+  JSX handler,
+- a `scroll`/`wheel`/`pointermove`/`mousemove`/`touchmove`/`drag`
+  `addEventListener`,
+- an `onUpdate` callback **inside a GSAP call**,
+- a `requestAnimationFrame` callback **that schedules another frame**,
+- `gsap.ticker.add`.
+
+The qualifiers matter. `onUpdate` is an ordinary callback name, so
+`editor.configure({ onUpdate })` is not reported; only a GSAP or ScrollTrigger
+call puts a frame loop behind it. `onRefresh` is excluded entirely, because
+ScrollTrigger fires it on refresh rather than per frame. And a bare
+`requestAnimationFrame(() => setReady(true))` runs once, so it is a single
+deferred update rather than a loop.
+
+Setters are resolved through the symbol table, not by name, so a prop or helper
+that merely shares a name with a `useState` setter elsewhere in the file is not
+reported.
+
+Discrete handlers are deliberately excluded. A state update per click is
 ordinary React; the defect is a state update per *frame*. Writing to a ref from
 the same handler is the prescribed fix and is not reported either, since a rule
 that flagged the fix would push authors back toward the defect.
 
-The check is a heuristic and reports at medium confidence. Two limits are worth
-knowing before treating a clean run as proof:
+The check is still a heuristic and reports at medium confidence. Two limits are
+worth knowing before treating a clean run as proof:
 
 - **Only inline callbacks are matched.** The setter must sit inside a function
   written at the call site. A named callback (`const update = () => {...}` then
   `requestAnimationFrame(update)`) is not matched, and that indirection is
   common in real code. A clean scan is evidence, not a guarantee.
-- **Setters are resolved per file**, from `const [x, setX] = useState()`. A
-  setter received through props is not matched.
-
-Note also that a matched call is not automatically a defect. Setting a *boolean*
-from a scroll handler re-renders only when the value flips, because React bails
-out on an unchanged value; the anti-pattern is storing a continuously varying
-number. Treat a finding as a prompt to check which of the two it is.
+- **A match is not automatically a defect.** Setting a *boolean* from a scroll
+  handler re-renders only when the value flips, because React bails out on an
+  unchanged value; the anti-pattern is storing a continuously varying number.
+  Treat a finding as a prompt to check which of the two it is.
 
 ## Output Formats
 

@@ -112,10 +112,12 @@ fn clean_estate_reports_nothing() {
     assert!(f.is_empty(), "expected no findings, got {:?}", ids(&f));
 }
 
+// Gated at the function, not just the setup: gating only the `symlink` call
+// would leave the assertion running on a target that never created one.
+#[cfg(unix)]
 #[test]
 fn broken_symlink_in_a_claude_root_is_high() {
     let e = Estate::new("brokenlink");
-    #[cfg(unix)]
     std::os::unix::fs::symlink(
         e.home().join("skills/does-not-exist"),
         e.home().join("skills/dangling"),
@@ -306,6 +308,7 @@ fn mirror_drift_reports_only_skills_that_actually_differ() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn farm_dangling_and_duplicate_links_are_reported() {
     let e = Estate::new("farm");
@@ -318,15 +321,66 @@ fn farm_dangling_and_duplicate_links_are_reported() {
     .unwrap();
     let farm = e.root.join("farm");
     fs::create_dir_all(&farm).unwrap();
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(&real, farm.join("alpha")).unwrap();
-        std::os::unix::fs::symlink(&real, farm.join("alpha-old-name")).unwrap();
-        std::os::unix::fs::symlink(e.root.join("shared/gone"), farm.join("dangling")).unwrap();
-    }
+    std::os::unix::fs::symlink(&real, farm.join("alpha")).unwrap();
+    std::os::unix::fs::symlink(&real, farm.join("alpha-old-name")).unwrap();
+    std::os::unix::fs::symlink(e.root.join("shared/gone"), farm.join("dangling")).unwrap();
     let f = e.scan(&["--farm", farm.to_str().unwrap()]);
     assert!(has(&f, "farm.broken-symlink"), "got {:?}", ids(&f));
     assert!(has(&f, "farm.duplicate-target"), "got {:?}", ids(&f));
+}
+
+#[test]
+fn an_explicitly_named_root_that_does_not_exist_is_an_error() {
+    // Silently skipping a mistyped --mirror or --farm would let the scan print
+    // "No drift detected" having audited neither, which is exactly the silent
+    // pass this tool exists to eliminate.
+    let e = Estate::new("missingroot");
+    e.skill("alpha", "name: alpha\ndescription: Short.", "body");
+
+    for flag in ["--mirror", "--farm"] {
+        let out = Command::new(bin())
+            .arg("scan")
+            .arg("--home")
+            .arg(e.home())
+            .arg(flag)
+            .arg(e.root.join("nope"))
+            .output()
+            .expect("run");
+        assert_eq!(
+            out.status.code(),
+            Some(1),
+            "{flag} on a missing path must exit with the IO-error code"
+        );
+    }
+}
+
+#[test]
+fn mirror_drift_covers_the_whole_skill_directory() {
+    // references/, scripts/ and assets/ change a skill's behaviour as much as
+    // its entrypoint. An entrypoint-only comparison missed a real 51-line
+    // reference drift in the estate this tool audits.
+    let e = Estate::new("mirrortree");
+    let mirror = e.root.join("mirror");
+    fs::create_dir_all(&mirror).unwrap();
+
+    let front = "name: deep\ndescription: Identical entrypoint.";
+    e.skill("deep", front, "same body");
+    e.skill_at(&mirror, "deep", front, "same body");
+    fs::create_dir_all(e.home().join("skills/deep/references")).unwrap();
+    fs::create_dir_all(mirror.join("deep/references")).unwrap();
+    fs::write(
+        e.home().join("skills/deep/references/guide.md"),
+        "old guidance\n",
+    )
+    .unwrap();
+    fs::write(mirror.join("deep/references/guide.md"), "new guidance\n").unwrap();
+
+    let f = e.scan(&["--mirror", mirror.to_str().unwrap()]);
+    assert!(
+        has_for(&f, "mirror.drift", "deep"),
+        "a reference-only difference is still drift; got {:?}",
+        ids(&f)
+    );
 }
 
 #[test]
@@ -367,18 +421,44 @@ fn agent_shadowing_across_scopes_is_allowed_but_within_a_scope_is_not() {
     assert!(dups[0].subject.contains("user"), "got {}", dups[0].subject);
 }
 
+/// Every rule id the scanner can emit. Kept exhaustive on purpose: a partial
+/// list lets a new rule ship undocumented, which is the drift this tool is
+/// supposed to catch in other people's configuration.
+const ALL_RULE_IDS: &[&str] = &[
+    "links.broken-skill-symlink",
+    "skill.oversized-skipped",
+    "skill.body-too-long",
+    "skill.missing-frontmatter",
+    "skill.name-mismatch",
+    "skill.description-over-cap",
+    "skill.description-listing-hog",
+    "model.reasoning-extraction-risk",
+    "overrides.stale",
+    "overrides.targets-disabled-plugin",
+    "mirror.drift",
+    "farm.broken-symlink",
+    "farm.duplicate-target",
+    "agent.duplicate-name",
+    "agent.description-bloat",
+    "guide.over-line-budget",
+];
+
 #[test]
 fn doctor_lists_every_rule_the_scanner_can_emit() {
     let out = Command::new(bin()).arg("doctor").output().unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
-    for id in [
-        "links.broken-skill-symlink",
-        "overrides.stale",
-        "overrides.targets-disabled-plugin",
-        "mirror.drift",
-        "farm.broken-symlink",
-        "farm.duplicate-target",
-    ] {
+    for id in ALL_RULE_IDS {
         assert!(text.contains(id), "doctor is missing {id}");
     }
+    // Catch the reverse too: a rule in the catalog that this list forgot.
+    let listed = text
+        .lines()
+        .filter(|line| !line.starts_with(' ') && line.contains('.') && !line.trim().is_empty())
+        .count();
+    assert_eq!(
+        listed,
+        ALL_RULE_IDS.len(),
+        "doctor lists {listed} rules but ALL_RULE_IDS has {}; update both",
+        ALL_RULE_IDS.len()
+    );
 }
