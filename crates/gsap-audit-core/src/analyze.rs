@@ -121,6 +121,12 @@ struct FileFacts {
     plugin_aliases: BTreeMap<String, String>,
     /// Local import aliases for dev-only helpers, keyed by local binding.
     dev_only_aliases: BTreeMap<String, String>,
+    /// Setter bindings from `const [value, setValue] = useState(...)`.
+    ///
+    /// Calling one of these on every frame of a scroll, pointer or ticker
+    /// callback re-renders the component per frame. `docs/design.md` treats
+    /// that as a defect rather than a style choice.
+    use_state_setters: BTreeSet<String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -247,12 +253,220 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                         .scoped_usegsap_configs
                         .insert(identifier.name.as_str().to_string());
                 }
+                record_use_state_setter(declarator, &mut facts);
             }
             _ => {}
         }
     }
 
     facts
+}
+
+/// Record the setter from `const [value, setValue] = useState(...)`.
+///
+/// Only the second element of the array pattern is taken. A destructure that
+/// omits it (`const [value] = useState()`) yields no setter, and a renamed
+/// setter is recorded under whatever local name it was given, since that is
+/// the name the call site will use.
+fn record_use_state_setter(
+    declarator: &oxc_ast::ast::VariableDeclarator<'_>,
+    facts: &mut FileFacts,
+) {
+    use oxc_ast::ast::{BindingPattern, Expression};
+
+    let Some(init) = &declarator.init else {
+        return;
+    };
+    let Expression::CallExpression(call) = init.without_parentheses() else {
+        return;
+    };
+    let is_use_state = match &call.callee {
+        Expression::Identifier(identifier) => identifier.name.as_str() == "useState",
+        Expression::StaticMemberExpression(member) => member.property.name.as_str() == "useState",
+        _ => false,
+    };
+    if !is_use_state {
+        return;
+    }
+    let BindingPattern::ArrayPattern(pattern) = &declarator.id else {
+        return;
+    };
+    if let Some(Some(element)) = pattern.elements.get(1)
+        && let Some(identifier) = element.get_binding_identifier()
+    {
+        facts
+            .use_state_setters
+            .insert(identifier.name.as_str().to_string());
+    }
+}
+
+/// JSX handler props that fire continuously while the user scrolls or moves.
+///
+/// `onClick` and friends are deliberately absent: a state update per click is
+/// ordinary React. The defect is a state update per *frame*.
+const CONTINUOUS_JSX_HANDLERS: &[&str] = &[
+    "onScroll",
+    "onWheel",
+    "onPointerMove",
+    "onMouseMove",
+    "onTouchMove",
+    "onDrag",
+];
+
+/// DOM events that fire continuously, as passed to `addEventListener`.
+const CONTINUOUS_DOM_EVENTS: &[&str] = &[
+    "scroll",
+    "wheel",
+    "pointermove",
+    "mousemove",
+    "touchmove",
+    "drag",
+];
+
+/// Whether `node_id` sits inside a callback driven by a continuous motion
+/// source, and if so what to name it in the message.
+///
+/// Walks outward to the nearest enclosing function, then classifies that
+/// function by how it is passed. Bounded so a deeply nested expression cannot
+/// walk the whole file.
+fn continuous_motion_driver(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+    use oxc_ast::ast::{Expression, PropertyKey};
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+
+    // Find the nearest enclosing function expression.
+    let function_node = loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::ArrowFunctionExpression(_) | AstKind::Function(_) => break parent_id,
+            _ => current = parent_id,
+        }
+    };
+
+    // Classify by how that function is used.
+    let mut current = function_node;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            // <div onScroll={() => setX(...)} />
+            AstKind::JSXExpressionContainer(_) => {
+                let attribute_id = nodes.parent_id(parent_id);
+                if let AstKind::JSXAttribute(attribute) = nodes.kind(attribute_id)
+                    && let Some(name) = attribute.name.as_identifier()
+                    && CONTINUOUS_JSX_HANDLERS.contains(&name.name.as_str())
+                {
+                    return Some(format!("the `{}` handler", name.name));
+                }
+                return None;
+            }
+            // { onUpdate: () => setX(...) } — a GSAP tween or ScrollTrigger config.
+            AstKind::ObjectProperty(property) => {
+                if let PropertyKey::StaticIdentifier(key) = &property.key
+                    && matches!(key.name.as_str(), "onUpdate" | "onRefresh")
+                {
+                    return Some(format!("the `{}` callback", key.name));
+                }
+                return None;
+            }
+            AstKind::CallExpression(call) => {
+                match &call.callee {
+                    Expression::Identifier(identifier)
+                        if identifier.name.as_str() == "requestAnimationFrame" =>
+                    {
+                        return Some("a requestAnimationFrame loop".to_string());
+                    }
+                    Expression::StaticMemberExpression(member) => {
+                        let property = member.property.name.as_str();
+                        // el.addEventListener("scroll", fn)
+                        if property == "addEventListener"
+                            && let Some(Expression::StringLiteral(event)) =
+                                call.arguments.first().and_then(|a| a.as_expression())
+                            && CONTINUOUS_DOM_EVENTS.contains(&event.value.as_str())
+                        {
+                            return Some(format!("a `{}` listener", event.value));
+                        }
+                        // gsap.ticker.add(fn)
+                        if property == "add" && member_expression_mentions(member, "ticker") {
+                            return Some("a gsap.ticker callback".to_string());
+                        }
+                        return None;
+                    }
+                    _ => return None,
+                }
+            }
+            _ => current = parent_id,
+        }
+    }
+    None
+}
+
+/// Rule: a `useState` setter called from a continuous motion source.
+///
+/// Driving scroll, pointer or ticker values through React state re-renders the
+/// component on every frame. The fix is to write to a ref or a
+/// `gsap.quickTo`/`quickSetter` and leave React out of the frame loop.
+fn check_state_in_continuous_motion<'a, F>(
+    call: &oxc_ast::ast::CallExpression<'a>,
+    node_id: oxc_semantic::NodeId,
+    semantic: &Semantic<'a>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    use oxc_ast::ast::Expression;
+
+    let Expression::Identifier(callee) = call.callee.without_parentheses() else {
+        return;
+    };
+    let setter = callee.name.as_str();
+    if !facts.use_state_setters.contains(setter) {
+        return;
+    }
+    let Some(driver) = continuous_motion_driver(semantic, node_id) else {
+        return;
+    };
+    emit(
+        ids::REACT_STATE_IN_CONTINUOUS_MOTION,
+        Severity::High,
+        Confidence::Medium,
+        call.span,
+        format!("`{setter}` is called from {driver}, re-rendering on every frame."),
+        "Drive continuous motion outside React: write to a ref, or use gsap.quickTo/quickSetter and keep state for discrete changes only.",
+    );
+}
+
+/// Whether a member expression chain mentions `name` anywhere in its object.
+fn member_expression_mentions(
+    member: &oxc_ast::ast::StaticMemberExpression<'_>,
+    name: &str,
+) -> bool {
+    use oxc_ast::ast::Expression;
+    let mut current = member.object.without_parentheses();
+    for _ in 0..4 {
+        match current {
+            Expression::StaticMemberExpression(inner) => {
+                if inner.property.name.as_str() == name {
+                    return true;
+                }
+                current = inner.object.without_parentheses();
+            }
+            Expression::Identifier(identifier) => return identifier.name.as_str() == name,
+            _ => return false,
+        }
+    }
+    false
 }
 
 fn record_configured_gsap_imports(
@@ -664,6 +878,7 @@ fn check_node<'a, F>(
         }
         AstKind::CallExpression(call) => {
             check_call(call, semantic, facts, emit);
+            check_state_in_continuous_motion(call, node.id(), semantic, facts, emit);
         }
         // Rule 2: dev-only helpers referenced in non-test source. Skip TS
         // type-only positions (e.g. `let x: GSDevTools`), which are erased at build time.

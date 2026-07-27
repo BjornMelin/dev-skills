@@ -109,7 +109,8 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
 - `core`: core GSAP API misuse, including obsolete `gsap-trial` imports and
   animating layout-affecting properties instead of transforms.
 - `react`: React/Next integration issues such as unregistered `useGSAP`,
-  running GSAP during SSR, unscoped selectors, and contexts that never revert.
+  running GSAP during SSR, unscoped selectors, contexts that never revert, and
+  React state driven from a continuous motion source.
 - `scrolltrigger`: ScrollTrigger configuration problems such as debug markers
   left in production and conflicting `scrub`/`toggleActions` settings.
 - `timeline`: timeline and sequencing issues such as GSAP-2 duration-as-second
@@ -122,6 +123,35 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
 This doc describes rules only at the category level on purpose: the per-rule id
 set is maintained in the crate and can change between builds. Run
 `gsap-audit doctor` for the authoritative current rule list.
+
+### react.state-in-continuous-motion
+
+One rule is worth calling out because it encodes a design rule rather than an
+API misuse. `react.state-in-continuous-motion` fires when a `useState` setter is
+called from a source that fires every frame: a `onScroll`/`onPointerMove`-class
+JSX handler, a `scroll`/`pointermove`-class `addEventListener`, a GSAP
+`onUpdate`/`onRefresh` callback, `requestAnimationFrame`, or `gsap.ticker.add`.
+Each of those re-renders the component on every frame.
+
+Discrete handlers are deliberately not reported. A state update per click is
+ordinary React; the defect is a state update per *frame*. Writing to a ref from
+the same handler is the prescribed fix and is not reported either, since a rule
+that flagged the fix would push authors back toward the defect.
+
+The check is a heuristic and reports at medium confidence. Two limits are worth
+knowing before treating a clean run as proof:
+
+- **Only inline callbacks are matched.** The setter must sit inside a function
+  written at the call site. A named callback (`const update = () => {...}` then
+  `requestAnimationFrame(update)`) is not matched, and that indirection is
+  common in real code. A clean scan is evidence, not a guarantee.
+- **Setters are resolved per file**, from `const [x, setX] = useState()`. A
+  setter received through props is not matched.
+
+Note also that a matched call is not automatically a defect. Setting a *boolean*
+from a scroll handler re-renders only when the value flips, because React bails
+out on an unchanged value; the anti-pattern is storing a continuously varying
+number. Treat a finding as a prompt to check which of the two it is.
 
 ## Output Formats
 

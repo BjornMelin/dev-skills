@@ -23,6 +23,7 @@ pub mod ids {
     pub const REACT_GSAP_IN_SSR: &str = "react.gsap-in-ssr";
     pub const REACT_UNSCOPED_SELECTOR: &str = "react.unscoped-selector";
     pub const REACT_CONTEXT_MISSING_REVERT: &str = "react.context-missing-revert";
+    pub const REACT_STATE_IN_CONTINUOUS_MOTION: &str = "react.state-in-continuous-motion";
 }
 
 /// The full, ordered rule catalog. Order here drives `doctor` output order.
@@ -110,6 +111,13 @@ pub const CATALOG: &[RuleDescriptor] = &[
         severity: Severity::High,
         confidence: Confidence::Medium,
         summary: "gsap.context() result is never reverted or returned for cleanup.",
+    },
+    RuleDescriptor {
+        id: ids::REACT_STATE_IN_CONTINUOUS_MOTION,
+        category: Category::React,
+        severity: Severity::High,
+        confidence: Confidence::Medium,
+        summary: "React state is set from a continuous motion source, forcing a render per frame.",
     },
 ];
 

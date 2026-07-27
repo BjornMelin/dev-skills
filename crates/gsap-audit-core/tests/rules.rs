@@ -1332,3 +1332,107 @@ function C() {
     );
     assert!(!fired(&clean_context, ids::REACT_UNSCOPED_SELECTOR));
 }
+
+#[test]
+fn rule_state_in_continuous_motion_fires_for_scroll_handler() {
+    let bad = analyze(
+        "src/Hero.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Hero() {
+  const [progress, setProgress] = useState(0);
+  return <div onScroll={(e) => setProgress(e.currentTarget.scrollTop)} />;
+}
+"#,
+    );
+    assert!(fired(&bad, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_fires_for_gsap_on_update_and_raf() {
+    let on_update = analyze(
+        "src/Panel.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import gsap from "gsap";
+export function Panel() {
+  const [y, setY] = useState(0);
+  gsap.to(".p", { scrollTrigger: { onUpdate: (self) => setY(self.progress) } });
+  return null;
+}
+"#,
+    );
+    assert!(fired(&on_update, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+
+    let raf = analyze(
+        "src/Ticker.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Ticker() {
+  const [t, setT] = useState(0);
+  requestAnimationFrame(() => setT(performance.now()));
+  return null;
+}
+"#,
+    );
+    assert!(fired(&raf, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_discrete_handlers() {
+    // A state update per click is ordinary React. The defect is a state update
+    // per frame, so a discrete handler in the same component must stay silent.
+    let findings = analyze(
+        "src/Toggle.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Toggle() {
+  const [open, setOpen] = useState(false);
+  return <button onClick={() => setOpen(true)} />;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_ref_write() {
+    // The prescribed fix must not itself be reported, or the rule pushes
+    // authors back toward the defect.
+    let findings = analyze(
+        "src/Fine.tsx",
+        "tsx",
+        r#"
+import { useRef } from "react";
+export function Fine() {
+  const ref = useRef(0);
+  return <div onScroll={(e) => { ref.current = e.currentTarget.scrollTop; }} />;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_is_catalogued_under_react() {
+    let bad = analyze(
+        "src/Hero.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Hero() {
+  const [p, setP] = useState(0);
+  return <div onPointerMove={() => setP(1)} />;
+}
+"#,
+    );
+    let finding = bad
+        .iter()
+        .find(|f| f.id == ids::REACT_STATE_IN_CONTINUOUS_MOTION)
+        .expect("finding");
+    assert_eq!(finding.category, Category::React);
+}
