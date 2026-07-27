@@ -88,6 +88,17 @@ enum Command {
         /// Optional project root containing a .claude directory.
         #[arg(long)]
         project: Option<String>,
+        /// Authoring source of truth for skills, e.g. a repo's `skills/`
+        /// directory. Skills present in both it and the live install are
+        /// compared; a difference means an edit was committed but never
+        /// deployed, or deployed but never committed.
+        #[arg(long)]
+        mirror: Option<String>,
+        /// Additional per-skill symlink farm belonging to another agent, e.g.
+        /// ~/.cursor/skills. Repeatable. Checked for dangling links and for two
+        /// names pointing at the same skill.
+        #[arg(long = "farm")]
+        farms: Vec<String>,
         #[arg(long, value_enum, default_value_t = Format::Markdown)]
         format: Format,
         /// Exit non-zero only at or above this severity.
@@ -211,8 +222,55 @@ fn read_overrides(settings: &Path) -> BTreeMap<String, String> {
     out
 }
 
+/// Plugins the user has explicitly switched off, as `plugin@marketplace` keys.
+///
+/// A skill supplied only by a disabled plugin is not loadable, so an override
+/// naming it is just as inert as one naming a deleted skill. Counting those
+/// names as "known" is why an earlier version reported such overrides as fine.
+fn disabled_plugins(settings_files: &[PathBuf]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for settings in settings_files {
+        let Ok(text) = fs::read_to_string(settings) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
+            continue;
+        };
+        if let Some(map) = value.get("enabledPlugins").and_then(|v| v.as_object()) {
+            for (key, enabled) in map {
+                if enabled.as_bool() == Some(false) {
+                    out.insert(key.clone());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Map a marketplace SKILL.md path back to the `plugin@marketplace` key that
+/// gates it, when the layout makes that derivable.
+///
+/// Recognised layout: `<marketplaces>/<market>/plugins/<plugin>/**/SKILL.md`.
+/// Skills that sit directly under `<marketplaces>/<market>/skills/**` are not
+/// plugin-gated in this way and return `None`.
+fn plugin_key_for(marketplaces: &Path, skill: &Path) -> Option<String> {
+    let rel = skill.strip_prefix(marketplaces).ok()?;
+    let mut parts = rel.components().map(|c| c.as_os_str().to_string_lossy());
+    let market = parts.next()?.to_string();
+    if parts.next()? != "plugins" {
+        return None;
+    }
+    let plugin = parts.next()?.to_string();
+    Some(format!("{plugin}@{market}"))
+}
+
 #[allow(clippy::too_many_lines)]
-fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usize)> {
+fn scan(
+    home: &Path,
+    project: Option<&Path>,
+    mirror: Option<&Path>,
+    farms: &[PathBuf],
+) -> Result<(Vec<Finding>, usize, usize)> {
     let mut findings = Vec::new();
 
     // ---- skill roots -------------------------------------------------------
@@ -367,10 +425,22 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
         }
     }
 
+    let mut settings_files = vec![home.join("settings.json"), home.join("settings.local.json")];
+    if let Some(p) = project {
+        settings_files.push(p.join(".claude").join("settings.json"));
+        settings_files.push(p.join(".claude").join("settings.local.json"));
+    }
+    let disabled = disabled_plugins(&settings_files);
+
     // Plugin marketplaces contribute skills too. They are not audited for size
     // (they are upstream), but their names must be known so overrides that
     // target them are not misreported as stale.
+    //
+    // Skills reachable only through a DISABLED plugin are tracked separately:
+    // they are not loadable, so an override naming one is inert, and reporting
+    // it as fine hides exactly the drift this tool exists to surface.
     let marketplaces = home.join("plugins").join("marketplaces");
+    let mut disabled_only: BTreeMap<String, String> = BTreeMap::new();
     if marketplaces.exists() {
         for entry in WalkDir::new(&marketplaces)
             .max_depth(6)
@@ -380,24 +450,44 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
             if entry.file_name() != "SKILL.md" {
                 continue;
             }
-            if let Some(dir) = entry.path().parent()
-                && let Some(name) = dir.file_name()
-            {
-                known.insert(name.to_string_lossy().to_string());
+            let Some(dir) = entry.path().parent() else {
+                continue;
+            };
+            let Some(name) = dir.file_name() else {
+                continue;
+            };
+            let name = name.to_string_lossy().to_string();
+            match plugin_key_for(&marketplaces, entry.path()) {
+                Some(key) if disabled.contains(&key) => {
+                    disabled_only.entry(name).or_insert(key);
+                }
+                _ => {
+                    disabled_only.remove(&name);
+                    known.insert(name);
+                }
             }
         }
     }
 
     // ---- overrides ---------------------------------------------------------
-    let mut settings_files = vec![home.join("settings.json"), home.join("settings.local.json")];
-    if let Some(p) = project {
-        settings_files.push(p.join(".claude").join("settings.json"));
-        settings_files.push(p.join(".claude").join("settings.local.json"));
-    }
     for settings in &settings_files {
         for (skill, mode) in read_overrides(settings) {
             // Plugin-namespaced entries (`plugin:skill`) are not resolvable here.
             if skill.contains(':') || known.contains(&skill) {
+                continue;
+            }
+            if let Some(key) = disabled_only.get(&skill) {
+                findings.push(Finding {
+                    id: "overrides.targets-disabled-plugin",
+                    severity: Severity::Medium,
+                    subject: format!("{skill} = {mode}"),
+                    message: format!(
+                        "override in {} targets a skill supplied only by `{key}`, which is disabled",
+                        settings.display()
+                    ),
+                    suggestion:
+                        "Enable the plugin or drop the override; as written it has no effect.",
+                });
                 continue;
             }
             findings.push(Finding {
@@ -410,6 +500,82 @@ fn scan(home: &Path, project: Option<&Path>) -> Result<(Vec<Finding>, usize, usi
                 ),
                 suggestion: "Delete the entry; it silently does nothing and hides real intent.",
             });
+        }
+    }
+
+    // ---- mirror drift ------------------------------------------------------
+    // The authoring repo and the live install are separate trees with no
+    // automatic sync. A skill edited in one and not the other looks shipped
+    // while the running estate never changed.
+    if let Some(mirror) = mirror {
+        let live: BTreeMap<String, PathBuf> = roots.iter().flat_map(|r| skill_files(r)).collect();
+        for (name, src) in skill_files(mirror) {
+            let Some(dst) = live.get(&name) else {
+                continue; // authored but deliberately not installed
+            };
+            let (Ok(a), Ok(b)) = (fs::read_to_string(&src), fs::read_to_string(dst)) else {
+                continue;
+            };
+            if a != b {
+                findings.push(Finding {
+                    id: "mirror.drift",
+                    severity: Severity::Medium,
+                    subject: name,
+                    message: format!(
+                        "differs between {} and the installed copy",
+                        src.display()
+                    ),
+                    suggestion:
+                        "Decide which side is authoritative and sync it; committing does not deploy.",
+                });
+            }
+        }
+    }
+
+    // ---- sibling agent farms ----------------------------------------------
+    // Other agents (Cursor, Factory, Codex) curate the same shared skill
+    // library through their own symlink farms. A dangling link there is
+    // invisible in exactly the same way it is here.
+    for farm in farms {
+        if !farm.exists() {
+            continue;
+        }
+        let mut targets: BTreeMap<PathBuf, Vec<String>> = BTreeMap::new();
+        for entry in fs::read_dir(farm)
+            .with_context(|| format!("read {}", farm.display()))?
+            .flatten()
+        {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !path.is_symlink() {
+                continue;
+            }
+            if fs::metadata(&path).is_err() {
+                let target = fs::read_link(&path).unwrap_or_default();
+                findings.push(Finding {
+                    id: "farm.broken-symlink",
+                    severity: Severity::Medium,
+                    subject: path.display().to_string(),
+                    message: format!("symlink target does not resolve: {}", target.display()),
+                    suggestion: "Repoint or remove it; the owning agent skips it in silence.",
+                });
+                continue;
+            }
+            if let Ok(real) = fs::canonicalize(&path) {
+                targets.entry(real).or_default().push(name);
+            }
+        }
+        for (target, mut names) in targets {
+            if names.len() > 1 {
+                names.sort();
+                findings.push(Finding {
+                    id: "farm.duplicate-target",
+                    severity: Severity::Low,
+                    subject: format!("{} -> {}", farm.display(), target.display()),
+                    message: format!("{} names resolve to one skill: {}", names.len(), names.join(", ")),
+                    suggestion: "Keep the canonical name; an alias shadows it under a stale identity.",
+                });
+            }
         }
     }
 
@@ -557,13 +723,17 @@ fn main() -> ExitCode {
         Command::Scan {
             home,
             project,
+            mirror,
+            farms,
             format,
             min_severity,
         } => {
             let home = expand(&home);
             let project = project.map(|p| expand(&p));
+            let mirror = mirror.map(|m| expand(&m));
+            let farms: Vec<PathBuf> = farms.iter().map(|f| expand(f)).collect();
             let (mut findings, listing_tokens, skills_listed) =
-                match scan(&home, project.as_deref()) {
+                match scan(&home, project.as_deref(), mirror.as_deref(), &farms) {
                     Ok(v) => v,
                     Err(e) => {
                         eprintln!("error: {e:#}");
@@ -640,6 +810,22 @@ const RULES: &[(&str, &str)] = &[
     (
         "overrides.stale",
         "A skillOverrides entry targets a skill that no longer exists.",
+    ),
+    (
+        "overrides.targets-disabled-plugin",
+        "An override targets a skill supplied only by a disabled plugin, so it has no effect.",
+    ),
+    (
+        "mirror.drift",
+        "A skill differs between its authoring source and the installed copy; committing does not deploy.",
+    ),
+    (
+        "farm.broken-symlink",
+        "A dangling link in another agent's skill farm (--farm), silently skipped by that agent.",
+    ),
+    (
+        "farm.duplicate-target",
+        "Two names in one farm resolve to the same skill, shadowing the canonical identity.",
     ),
     (
         "agent.duplicate-name",
