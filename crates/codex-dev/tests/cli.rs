@@ -3518,7 +3518,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
     let missing_manifest_message = missing_manifest_json["result"]["error"]["message"]
         .as_str()
         .expect("missing manifest error message");
-    assert!(missing_manifest_message.contains("repo root must contain Cargo.toml"));
+    assert!(missing_manifest_message.contains("repo root must contain .git or Cargo.toml"));
     assert!(missing_manifest_message.contains("--include-local-paths"));
     assert!(!missing_manifest_message.contains(missing_manifest_arg));
 
@@ -3577,6 +3577,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
             "--json",
             "policy",
             "run",
+            "--dry-run",
             "--capsule",
             capsule,
             "--checked-at",
@@ -3594,6 +3595,83 @@ fn policy_manifest_and_dry_run_update_capsule() {
         .as_array()
         .expect("policy run gates");
     assert!(run_gates.iter().all(|gate| gate["status"] == "planned"));
+    // A plan satisfies `passed` vacuously, so it must not also claim to have
+    // verified anything. This is the distinction that made a bare `policy run`
+    // report success while executing nothing.
+    assert_eq!(run_json["result"]["passed"], true);
+    assert_eq!(run_json["result"]["verified"], false);
+}
+
+/// `policy run` without `--dry-run` must actually execute. Planning used to be
+/// the default, so the command reported every gate satisfied without running
+/// one; the regression that would reintroduce it is silent, so it is asserted
+/// here rather than left to review.
+#[test]
+fn policy_run_executes_by_default() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Execute by default",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "execute-by-default",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    // The capsule sits in a temp directory with no repository around it, so
+    // executing gates cannot resolve a repo root and the command must fail.
+    // Under the old default it "succeeded" here, having run nothing at all.
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "run",
+            "--capsule",
+            capsule,
+            "--checked-at",
+            "2026-05-09T05:00:00.123456789Z",
+        ])
+        .assert()
+        .failure();
+
+    // The same invocation with an explicit --dry-run still plans happily,
+    // so the failure above is the default changing, not the command breaking.
+    let dry_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "policy",
+            "run",
+            "--dry-run",
+            "--capsule",
+            capsule,
+            "--checked-at",
+            "2026-05-09T05:00:00.123456789Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let dry_json: Value = serde_json::from_slice(&dry_output).expect("policy dry run json");
+    assert_eq!(dry_json["result"]["dry_run"], true);
+    assert_eq!(dry_json["result"]["verified"], false);
 }
 
 #[test]
@@ -8388,6 +8466,14 @@ fn evidence_append_records_typed_entries_and_status_counts() {
     let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
     let capsule = init_json["result"]["path"].as_str().expect("capsule path");
 
+    // A hand-authored record must cite an artifact that exists, so the test
+    // produces one rather than asserting a filename into being.
+    std::fs::write(
+        std::path::Path::new(capsule).join("decision-notes.md"),
+        "# Decision notes\n",
+    )
+    .expect("write artifact");
+
     let append_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args([
@@ -8413,13 +8499,36 @@ fn evidence_append_records_typed_entries_and_status_counts() {
             "--residual-risk",
             "future PR normalizers still need fixtures",
             "--artifact",
-            "docs/reference/codex-dev-cli.md",
+            "decision-notes.md",
         ])
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
+
+    // The same append citing an artifact that was never produced must fail.
+    // Without this, `evidence append` records any claim put to it, which is
+    // the opposite of what an evidence ledger is for.
+    Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "evidence",
+            "append",
+            "--capsule",
+            capsule,
+            "--kind",
+            "decision",
+            "--summary",
+            "Cite an artifact that does not exist",
+            "--at",
+            "2026-05-09T06:05:00Z",
+            "--artifact",
+            "never-produced.md",
+        ])
+        .assert()
+        .failure();
     let append_json: Value = serde_json::from_slice(&append_output).expect("append json");
     assert_eq!(append_json["command"], "evidence append");
     assert_eq!(append_json["result"]["record"]["kind"], "decision");

@@ -613,6 +613,7 @@ fn tool_import(args: ToolImportArgs) -> Result<CommandOutput> {
     let append_result = append_evidence(AppendEvidenceArgs {
         capsule: args.capsule.clone(),
         record: record.clone(),
+        verify_artifacts: false,
     })?;
     let result = json!({
         "schema": EXTERNAL_TOOL_REPORT_IMPORT_SCHEMA,

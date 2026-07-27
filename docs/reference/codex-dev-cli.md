@@ -1038,7 +1038,7 @@ workstation setup and the JSON will not be pasted into hosted review evidence.
 The report includes the gate purpose, source, rendered command, required tools,
 missing local prerequisites, network/secrets posture, expected artifacts, docs
 mirror status, and failure interpretation for each gate. Use it before
-`policy run --execute` when deciding which profile fits a branch or when an
+`policy run` when deciding which profile fits a branch or when an
 installed binary is being used outside the checkout; pass `--repo-root <path>`
 when documentation mirror discovery would otherwise be ambiguous.
 
@@ -1058,24 +1058,40 @@ profiles.
 
 ## policy run
 
-Plan or execute policy gates and record the result in a capsule:
+Execute policy gates and record the result in a capsule:
 
 ```bash
 cargo run -q -p codex-dev -- --json policy run --capsule .codex/tasks/<id>
 ```
 
-By default, `policy run` is a dry run. It updates `verification.json`, appends
-planned gate evidence to `evidence.jsonl`, and updates `capsule.json`
-`updated_at` monotonically, but does not execute commands.
+`policy run` executes. Planning was once the default, which meant a bare
+`policy run` executed nothing, reported every gate as satisfied and exited 0 —
+a result indistinguishable from a real pass for anything reading the exit code.
 
-Execute gates explicitly:
+Plan without running anything by asking for it:
 
 ```bash
 cargo run -q -p codex-dev -- --json policy run \
   --capsule .codex/tasks/<id> \
   --profile codex_dev \
-  --execute
+  --dry-run
 ```
+
+A dry run updates `verification.json`, appends planned gate evidence to
+`evidence.jsonl`, and advances `capsule.json` `updated_at` monotonically,
+without executing commands.
+
+Two booleans distinguish the outcomes, and the difference matters when
+scripting a release:
+
+| field | meaning |
+| --- | --- |
+| `passed` | No required gate failed. A dry run satisfies this vacuously. |
+| `verified` | Every required gate actually ran and succeeded. Always `false` for a dry run. |
+
+Each gate is given `--timeout-secs` (default 900) of wall clock. A gate that
+exceeds it is killed and recorded as failed, rather than hanging the run with
+no diagnostic.
 
 Executed required-gate failures set `ok: false` and exit nonzero. Use
 `--keep-going` to continue after a failed required gate. Gates marked as

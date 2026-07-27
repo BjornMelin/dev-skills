@@ -208,7 +208,7 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",
@@ -284,7 +284,7 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",
@@ -708,7 +708,7 @@ cat > "$tmp/evidence-bundle.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json research import-bundle --capsule "$tmp/validation-smoke" --bundle "$tmp/evidence-bundle.json" --source-command "codex-research --json bundle --strict" --source-exit-code 0 --imported-at 2026-05-09T04:35:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",

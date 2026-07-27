@@ -440,6 +440,14 @@ pub struct PrRecordArgs {
 pub struct AppendEvidenceArgs {
     pub capsule: PathBuf,
     pub record: EvidenceRecord,
+    /// Require every cited artifact to exist on disk.
+    ///
+    /// Set for hand-authored records, where an artifact list is a claim about
+    /// work that was done and nothing else checked it. Left off for internal
+    /// recorders that cite conventional destinations such as
+    /// `.codex/research/report.md`, which name where an artifact belongs
+    /// rather than asserting it is already there.
+    pub verify_artifacts: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1450,7 +1458,12 @@ pub struct PolicyRunResult {
     pub repo_root: Option<PathBuf>,
     pub profile: PolicyProfile,
     pub dry_run: bool,
+    /// No required gate failed. A dry run satisfies this vacuously.
     pub passed: bool,
+    /// Every required gate actually ran and succeeded. This is the claim to
+    /// gate a release on; `passed` alone is true for a plan that ran nothing.
+    #[serde(default)]
+    pub verified: bool,
     pub gates: Vec<PolicyGateResult>,
     pub verification_path: PathBuf,
     pub evidence_path: PathBuf,
@@ -1646,7 +1659,14 @@ pub fn append_evidence(args: AppendEvidenceArgs) -> Result<AppendEvidenceResult>
         );
     }
 
-    let errors = validate_evidence_record(&args.record);
+    let mut errors = validate_evidence_record(&args.record);
+    // Text validation alone lets a record assert anything: a summary, an exit
+    // code and a list of artifacts that were never produced all pass. Evidence
+    // whose artifacts do not exist is not evidence, so a hand-authored record
+    // has its claims checked against the filesystem before they are recorded.
+    if args.verify_artifacts {
+        errors.extend(evidence_artifact_errors(&args.capsule, &args.record));
+    }
     if !errors.is_empty() {
         bail!("invalid evidence record: {}", errors.join("; "));
     }
@@ -7187,6 +7207,35 @@ fn validate_evidence_record(record: &EvidenceRecord) -> Vec<String> {
     errors
 }
 
+/// Resolve an artifact reference to a path on disk.
+///
+/// Absolute paths are taken as given. A relative path is interpreted against
+/// the capsule first, since that is where a capsule's own outputs live, then
+/// against the working directory for artifacts produced elsewhere in a run.
+fn resolve_artifact(capsule: &Path, artifact: &str) -> Option<PathBuf> {
+    let raw = Path::new(artifact);
+    if raw.is_absolute() {
+        return raw.exists().then(|| raw.to_path_buf());
+    }
+    let from_capsule = capsule.join(raw);
+    if from_capsule.exists() {
+        return Some(from_capsule);
+    }
+    let from_cwd = std::env::current_dir().ok()?.join(raw);
+    from_cwd.exists().then_some(from_cwd)
+}
+
+/// Errors for artifacts a record cites but that do not exist on disk.
+fn evidence_artifact_errors(capsule: &Path, record: &EvidenceRecord) -> Vec<String> {
+    record
+        .artifacts
+        .iter()
+        .enumerate()
+        .filter(|(_, artifact)| resolve_artifact(capsule, artifact).is_none())
+        .map(|(index, artifact)| format!("artifacts[{index}] does not exist on disk: {artifact}"))
+        .collect()
+}
+
 fn validate_optional_text(field: &str, value: Option<&str>, errors: &mut Vec<String>) {
     if let Some(value) = value {
         validate_non_empty_text(field, value, errors);
@@ -10783,6 +10832,7 @@ description: Alpha skill.
                 residual_risk: Some("future PR normalizers still need fixtures".to_string()),
                 artifacts: vec!["docs/reference/codex-dev-cli.md".to_string()],
             },
+            verify_artifacts: false,
         })
         .expect("append evidence");
 
@@ -10838,6 +10888,7 @@ description: Alpha skill.
                 residual_risk: None,
                 artifacts: Vec::new(),
             },
+            verify_artifacts: false,
         })
         .expect_err("invalid evidence rejected");
 
@@ -10874,6 +10925,7 @@ description: Alpha skill.
                 residual_risk: None,
                 artifacts: Vec::new(),
             },
+            verify_artifacts: false,
         })
         .expect("append backfilled evidence");
 
@@ -10914,6 +10966,7 @@ description: Alpha skill.
                 residual_risk: None,
                 artifacts: Vec::new(),
             },
+            verify_artifacts: false,
         })
         .expect_err("symlinked evidence rejected");
 
