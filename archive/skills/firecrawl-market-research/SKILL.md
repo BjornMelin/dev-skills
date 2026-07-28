@@ -7,10 +7,6 @@ metadata:
   version: "0.1.0"
   homepage: https://www.firecrawl.dev
   source: https://github.com/firecrawl/firecrawl-workflows
-inputs:
-  - name: FIRECRAWL_API_KEY
-    description: Firecrawl API key for hosted Firecrawl requests.
-    required: true
 ---
 
 # Firecrawl Market Research

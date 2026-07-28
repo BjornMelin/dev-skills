@@ -320,16 +320,11 @@ for local development and validation commands.
 | `pre-mortem` | Adversarial pre-mortem that stress-tests a plan before reality does: surface assumptions, map vulnerabilities and irreversible bets, then harden them. | [skills/pre-mortem/SKILL.md](skills/pre-mortem/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
 | `r3f-scene-polish` | Cinematic look-dev for an existing three.js / React Three Fiber scene: postprocessing, HDRI/PBR lighting, shadows, tone mapping, and camera choreography (scene setup & lifecycle route to `web-three-r3f`). | [skills/r3f-scene-polish/SKILL.md](skills/r3f-scene-polish/SKILL.md) |
-| `repo-context-builder` | Build `REPO_CONTEXT.md` and `REVIEW_BRIEF.md` artifacts for grounded future handoffs. | [skills/repo-context-builder/SKILL.md](skills/repo-context-builder/SKILL.md) |
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
 | `repo-modernizer` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernizer/SKILL.md](skills/repo-modernizer/SKILL.md) |
 | `review-remediation` | Fix local review notes with verify-first triage; excludes hosted GitHub PR review loops. | [skills/review-remediation/SKILL.md](skills/review-remediation/SKILL.md) |
 | `rust-cli-clap` | Rust CLI and Clap command design: parsers, output contracts, tests, packaging. | [skills/rust-cli-clap/SKILL.md](skills/rust-cli-clap/SKILL.md) |
 | `rust-expert` | Core Rust engineering router for ownership, async, crates, tests, performance, and security. | [skills/rust-expert/SKILL.md](skills/rust-expert/SKILL.md) |
-| `rust-mega-eng` | Explicit Rust architecture orchestrator for broad multi-crate strategy and release planning. | [skills/rust-mega-eng/SKILL.md](skills/rust-mega-eng/SKILL.md) |
-| `rust-tauri-apps` | Tauri v2 Rust app backends: commands, secure IPC, capabilities, bundling, distribution. | [skills/rust-tauri-apps/SKILL.md](skills/rust-tauri-apps/SKILL.md) |
-| `rust-tui-ratatui` | Rust terminal UI architecture with Ratatui, crossterm event loops, snapshots, and UX. | [skills/rust-tui-ratatui/SKILL.md](skills/rust-tui-ratatui/SKILL.md) |
-| `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `sentry-cli-fix-issues` | Fix Sentry issues from CLI evidence: issues, events, traces, logs, replays, Seer, privacy, and verification. | [skills/sentry-cli-fix-issues/SKILL.md](skills/sentry-cli-fix-issues/SKILL.md) |
 | `sentry-triage-to-pr` | Rank unresolved Sentry issues, group PR-sized fixes, render GitHub issue plans, and plan subspawn worktrees. | [skills/sentry-triage-to-pr/SKILL.md](skills/sentry-triage-to-pr/SKILL.md) |
@@ -342,7 +337,6 @@ for local development and validation commands.
 | `tanstack-query` | TanStack Query v5: queryOptions, keys, cache defaults, mutations, invalidation, SSR hydration, errors. | [skills/tanstack-query/SKILL.md](skills/tanstack-query/SKILL.md) |
 | `tanstack-router` | TanStack Router: file routes, typed context, search params, loaders, navigation, code splitting, errors. | [skills/tanstack-router/SKILL.md](skills/tanstack-router/SKILL.md) |
 | `tanstack-start` | TanStack Start: server functions, middleware, server routes, auth boundaries, SSR, deployment. | [skills/tanstack-start/SKILL.md](skills/tanstack-start/SKILL.md) |
-| `taste-metaskill` | Route frontend UI work to focused visual-taste references (premium, distinct, anti-generic). | [skills/taste-metaskill/SKILL.md](skills/taste-metaskill/SKILL.md) |
 | `technical-writing` | Internal engineering docs: PRDs, specs, architecture, runbooks, migrations, and maintainer guides. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
 | `vitest-dev` | Vitest for TypeScript + Next.js: stable suites, fast local + CI, sharding. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
@@ -408,7 +402,7 @@ the subagent template authority model and duplicate-role expectations.
 Rust skill suite validation:
 
 ```bash
-node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
+node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap
 node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
 ```
 

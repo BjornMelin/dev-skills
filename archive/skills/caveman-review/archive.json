@@ -4,8 +4,8 @@
   "status": "archived",
   "archived_at": "2026-07-28T00:00:00Z",
   "replacement": "caveman-compress",
-  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "source_path": "skills/caveman-review",
   "archived_path": "archive/skills/caveman-review",
-  "reason": "An output-format preference for PR comments rather than a review capability; compression is owned by caveman-compress and review by /review, multi-model-review and codex-review.",
+  "reason": "An output-format preference for PR comments rather than a review capability; compression is owned by caveman-compress and review by /review, multi-model-review and codex-review. This skill was install-only and never tracked in skills/; the path is recorded in the canonical form the archive schema requires.",
   "restore": "Move this directory back to skills/caveman-review and relink it from the consuming agents' skill farms."
 }
