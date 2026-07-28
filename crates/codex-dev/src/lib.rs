@@ -11524,6 +11524,53 @@ enabled = false
         assert!(error.to_string().contains("pass --repo-root"), "{error:#}");
     }
 
+    /// Planning must not be the default again.
+    ///
+    /// Asserted at the argument layer on purpose. Driving the real binary would
+    /// either execute the whole gate suite or depend on what sits above the
+    /// temp directory for repo-root discovery, and an earlier version of this
+    /// test did both: it passed locally only because a stray `/tmp/.git` made
+    /// discovery fail, and in CI it ran every gate for real and then failed on
+    /// the wrong assertion.
+    #[test]
+    fn policy_run_executes_unless_dry_run_is_requested() {
+        use clap::Parser;
+
+        let bare = Cli::try_parse_from(["codex-dev", "policy", "run", "--capsule", "/tmp/x"])
+            .expect("parse bare policy run");
+        let Commands::Policy {
+            command: PolicyCommand::Run(args),
+        } = bare.command
+        else {
+            panic!("expected policy run");
+        };
+        assert!(
+            !args.dry_run,
+            "a bare `policy run` must execute; planning is opt-in"
+        );
+        assert_eq!(
+            args.timeout_secs, 900,
+            "gates must carry a wall-clock bound"
+        );
+
+        let planned = Cli::try_parse_from([
+            "codex-dev",
+            "policy",
+            "run",
+            "--dry-run",
+            "--capsule",
+            "/tmp/x",
+        ])
+        .expect("parse dry-run policy run");
+        let Commands::Policy {
+            command: PolicyCommand::Run(args),
+        } = planned.command
+        else {
+            panic!("expected policy run");
+        };
+        assert!(args.dry_run, "--dry-run must plan");
+    }
+
     #[test]
     fn policy_gate_skip_reason_requires_secret_opt_in() {
         let mut gate = cargo_fmt_gate();
