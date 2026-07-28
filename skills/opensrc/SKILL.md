@@ -1,6 +1,6 @@
 ---
 name: opensrc
-description: "Inspect dependency/upstream source with opensrc CLI. Trigger for implementation beyond docs/types, package internals, source paths, version diffs, upgrade audits, npm/PyPI/crates/repo source. Avoid general web or release-note-only tasks."
+description: "Inspect dependency and upstream source with the opensrc CLI. Use for package internals, exact source paths, version diffs and upgrade audits across npm, PyPI, crates and git repos. Not for general web search or release notes alone."
 allowed-tools: Bash(opensrc:*)
 ---
 

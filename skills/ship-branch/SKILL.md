@@ -1,6 +1,6 @@
 ---
 name: ship-branch
-description: Finalize a branch by staging only task-related files, splitting work into semantic reviewable conventional commits, pushing to remote, and opening a PR into main with a conventional-commits title and reviewer-ready body. Use when the user asks to commit, push, and open a PR, or to scaffold missing repo PR/release defaults on request.
+description: Commit + push relevant files, split conventional commits, open PR to main with title/body. Triggers—commit, push, open PR, scaffold PR/release defaults.
 ---
 
 # Ship Branch
@@ -17,6 +17,8 @@ description: Finalize a branch by staging only task-related files, splitting wor
 8. Open a PR into `main` with `gh pr create`.
 9. Use a Conventional Commits PR title and a reviewer-ready PR body built from [repo-defaults.md](references/repo-defaults.md).
 
+For one-shot PR shipping formerly covered by `ship-pr`, read [one-shot-pr.md](references/one-shot-pr.md) and use `scripts/inspect_git_state.py`.
+
 ## Commit Rules
 
 - Prefer one commit per semantic change.
@@ -28,3 +30,9 @@ description: Finalize a branch by staging only task-related files, splitting wor
 
 - If the user explicitly asks to create missing repo defaults, scaffold the files from [repo-defaults.md](references/repo-defaults.md).
 - Otherwise, do not add repo-level template or Release Please files.
+
+## Resources
+
+- `scripts/inspect_git_state.py`
+- [references/one-shot-pr.md](references/one-shot-pr.md)
+- [references/repo-defaults.md](references/repo-defaults.md)

@@ -4,4 +4,4 @@ interface:
   default_prompt: "Use $caveman-compress to compress repo docs or notes with git-aware discovery, low-confidence user prompts, and preservation of code, URLs, paths, and headings."
 
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false
