@@ -62,6 +62,13 @@ Options:
 - `--min-severity <low|medium|high>`: lowest severity that makes the exit
   code non-zero. Default `medium`. Changes the exit code only; every
   finding is still reported.
+- `--exclude <GLOB>`: skip findings whose path matches this glob. Repeatable.
+  Supports `*` (does not cross `/`), `**` (does) and `?`. A bare name with no
+  separator or wildcard matches any path component, so `--exclude node_modules`
+  works as expected.
+- `--baseline <PATH>`: report only findings absent from this baseline file.
+- `--write-baseline <PATH>`: write the current findings to a baseline and exit
+  `0` without gating.
 
 `scan` reports hardcoded motion literals as:
 
@@ -128,6 +135,40 @@ Both `scan` and `doctor` support `--format markdown` (default) and
 
 Each finding includes rule id, category, severity, confidence, file, line,
 column, message, and suggestion.
+
+## Gating a repository that is not yet clean
+
+Three flags make this usable as a CI gate before the backlog is at zero.
+
+```bash
+# record today's findings, then block only on new ones
+motion-token-audit scan --write-baseline .audit/motion-token-audit-baseline.json
+motion-token-audit scan --baseline .audit/motion-token-audit-baseline.json
+
+# keep vendored trees out of the verdict entirely
+motion-token-audit scan --exclude '**/vendor/**' --exclude node_modules
+
+# render findings as annotations on the diff
+motion-token-audit scan --format sarif > motion-token-audit.sarif
+```
+
+A baseline suppresses known findings from the **report** as well as from the
+exit code, so "clean" means one thing throughout the output. A finding absent
+from the baseline still gates, which is what separates a baseline from turning
+the gate off; the test suite asserts exactly that.
+
+Baseline entries are fingerprinted as `rule-id::file`, deliberately excluding
+the line number and the message. Findings move when unrelated lines above them
+change and messages get reworded, and a baseline that expires on contact with
+ordinary editing is one people delete rather than maintain. The trade is that
+moving a finding to a different file un-baselines it, which is the right
+default: that is usually new code.
+
+`--format sarif` emits SARIF 2.1.0 with `partialFingerprints`, so a viewer can
+track a finding across moves. Severity maps to SARIF's three levels: high is
+`error`, medium is `warning`, low is `note`. It applies to `scan` only —
+`doctor` prints a rule catalog, not results, and rejects the format rather than
+emitting an empty run.
 
 ## Exit Codes
 

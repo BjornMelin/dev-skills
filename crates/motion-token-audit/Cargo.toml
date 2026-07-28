@@ -13,6 +13,7 @@ name = "motion-token-audit"
 path = "src/main.rs"
 
 [dependencies]
+audit-gate = { path = "../audit-gate" }
 anyhow = "1.0"
 clap = { version = "4.6", features = ["derive"] }
 clap_complete = "4.6"

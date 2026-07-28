@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/audit-gate",
     "crates/bun-platform-core",
     "crates/claude-config-audit",
     "crates/codex-dev-core",

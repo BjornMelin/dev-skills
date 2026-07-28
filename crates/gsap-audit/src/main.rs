@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::process;
 
 use anyhow::{Context, Result};
+use audit_gate::{Baseline, GateFinding, GateSeverity, is_excluded, to_sarif};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
 use gsap_audit_core::output::{format_catalog_json, format_catalog_markdown};
@@ -76,6 +77,24 @@ enum Commands {
             help = "Lowest severity that makes the exit code non-zero."
         )]
         min_severity: MinSeverity,
+        #[arg(
+            long = "exclude",
+            value_name = "GLOB",
+            help = "Skip findings whose path matches this glob. Repeatable. Supports *, ** and ?."
+        )]
+        exclude: Vec<String>,
+        #[arg(
+            long = "baseline",
+            value_name = "PATH",
+            help = "Report only findings absent from this baseline file."
+        )]
+        baseline: Option<PathBuf>,
+        #[arg(
+            long = "write-baseline",
+            value_name = "PATH",
+            help = "Write the current findings to a baseline file and exit 0."
+        )]
+        write_baseline: Option<PathBuf>,
     },
     #[command(
         about = "Print the tool version and the full rule catalog.",
@@ -128,6 +147,8 @@ impl MinSeverity {
 enum OutputFormat {
     Markdown,
     Json,
+    /// SARIF 2.1.0, for rendering findings as annotations on a diff.
+    Sarif,
 }
 
 fn main() {
@@ -151,20 +172,31 @@ fn run() -> Result<i32> {
             output,
             max_files,
             min_severity,
-        } => run_scan(
+            exclude,
+            baseline,
+            write_baseline,
+        } => run_scan(ScanRequest {
             root,
             format,
-            categories.as_deref(),
+            categories: categories.as_deref(),
             output,
             max_files,
             min_severity,
-        ),
+            exclude: &exclude,
+            baseline: baseline.as_deref(),
+            write_baseline: write_baseline.as_deref(),
+        }),
         Commands::Doctor { format } => {
             let text = match format {
                 OutputFormat::Markdown => format_catalog_markdown(TOOL_NAME, TOOL_VERSION),
                 OutputFormat::Json => {
                     let value = format_catalog_json(TOOL_NAME, TOOL_VERSION);
                     serde_json::to_string_pretty(&value)?
+                }
+                // SARIF describes findings in a scan; a rule catalog is not a
+                // result set, so refuse rather than emit an empty run.
+                OutputFormat::Sarif => {
+                    anyhow::bail!("--format sarif applies to `scan`, not `doctor`")
                 }
             };
             print_line(&text)?;
@@ -179,17 +211,63 @@ fn run() -> Result<i32> {
 }
 
 /// Execute the `scan` subcommand and compute its exit code.
-fn run_scan(
+/// Everything `scan` needs, grouped so the signature stays readable as the
+/// gate layer grows.
+struct ScanRequest<'a> {
     root: PathBuf,
     format: OutputFormat,
-    categories: Option<&str>,
+    categories: Option<&'a str>,
     output: Option<PathBuf>,
     max_files: usize,
     min_severity: MinSeverity,
-) -> Result<i32> {
+    exclude: &'a [String],
+    baseline: Option<&'a std::path::Path>,
+    write_baseline: Option<&'a std::path::Path>,
+}
+
+fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
+    let ScanRequest {
+        root,
+        format,
+        categories,
+        output,
+        max_files,
+        min_severity,
+        exclude,
+        baseline,
+        write_baseline,
+    } = request;
     let categories = parse_categories(categories)?;
     let options = ScanOptions::new(root, categories, max_files);
-    let outcome = scan_root(&options)?;
+    let mut outcome = scan_root(&options)?;
+
+    // Exclusion runs before everything else: a vendored tree should not decide
+    // the exit code, appear in the report, or land in a baseline.
+    if !exclude.is_empty() {
+        outcome
+            .findings
+            .retain(|finding| !is_excluded(&finding.file, exclude));
+    }
+
+    if let Some(path) = write_baseline {
+        Baseline::from_findings(&to_gate_findings(&outcome.findings)).save(path)?;
+        return Ok(0);
+    }
+
+    // A baseline suppresses known findings from the report as well as from the
+    // exit code. Leaving them in a report that claims to be gated would make
+    // "clean" mean two different things in the same output.
+    if let Some(path) = baseline {
+        let known = Baseline::load(path)?;
+        let gate = to_gate_findings(&outcome.findings);
+        let keep: Vec<bool> = gate.iter().map(|f| !known.contains(f)).collect();
+        let mut index = 0;
+        outcome.findings.retain(|_| {
+            let keep_this = keep[index];
+            index += 1;
+            keep_this
+        });
+    }
 
     let rendered = match format {
         OutputFormat::Markdown => {
@@ -202,6 +280,11 @@ fn run_scan(
             }
             text
         }
+        OutputFormat::Sarif => serde_json::to_string_pretty(&to_sarif(
+            TOOL_NAME,
+            TOOL_VERSION,
+            &to_gate_findings(&outcome.findings),
+        ))?,
         OutputFormat::Json => {
             let mut value = format_json(TOOL_NAME, TOOL_VERSION, &outcome.findings);
             if let Some(object) = value.as_object_mut() {
@@ -243,6 +326,27 @@ fn run_scan(
 
 /// Parse the `--categories` CSV into a category set. An empty/missing value
 /// means "all categories". An unknown token is a usage error.
+/// Convert core findings into the shared gate shape.
+///
+/// The cores keep their own severity enums; this is the one place the mapping
+/// lives, so the gate layer needs no dependency on any parser crate.
+fn to_gate_findings(findings: &[gsap_audit_core::types::Finding]) -> Vec<GateFinding> {
+    findings
+        .iter()
+        .map(|finding| GateFinding {
+            id: finding.id.clone(),
+            severity: match finding.severity {
+                Severity::Low => GateSeverity::Low,
+                Severity::Medium => GateSeverity::Medium,
+                Severity::High => GateSeverity::High,
+            },
+            file: finding.file.clone(),
+            line: finding.line,
+            message: finding.message.clone(),
+        })
+        .collect()
+}
+
 fn parse_categories(value: Option<&str>) -> Result<BTreeSet<Category>> {
     let mut set = BTreeSet::new();
     let Some(value) = value else {
@@ -309,14 +413,17 @@ mod tests {
         let root = temp_scan_root("medium");
         fs::write(root.join("app.ts"), "gsap.ticker.lagSmoothing(0);\n").unwrap();
 
-        let code = run_scan(
-            root.clone(),
-            OutputFormat::Json,
-            Some("performance"),
-            Some(root.join("out.json")),
-            5000,
-            MinSeverity::Medium,
-        )
+        let code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("performance"),
+            output: Some(root.join("out.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: None,
+            write_baseline: None,
+        })
         .unwrap();
 
         assert_eq!(code, 2);
@@ -328,14 +435,17 @@ mod tests {
         let root = temp_scan_root("clean");
         fs::write(root.join("app.ts"), "const value = 1;\n").unwrap();
 
-        let code = run_scan(
-            root.clone(),
-            OutputFormat::Json,
-            None,
-            Some(root.join("out.json")),
-            5000,
-            MinSeverity::Medium,
-        )
+        let code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: None,
+            output: Some(root.join("out.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: None,
+            write_baseline: None,
+        })
         .unwrap();
 
         assert_eq!(code, 0);
@@ -348,23 +458,29 @@ mod tests {
         // A medium finding and nothing more severe.
         fs::write(root.join("app.ts"), "gsap.ticker.lagSmoothing(0);\n").unwrap();
 
-        let at_medium = run_scan(
-            root.clone(),
-            OutputFormat::Json,
-            Some("performance"),
-            Some(root.join("medium.json")),
-            5000,
-            MinSeverity::Medium,
-        )
+        let at_medium = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("performance"),
+            output: Some(root.join("medium.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: None,
+            write_baseline: None,
+        })
         .unwrap();
-        let at_high = run_scan(
-            root.clone(),
-            OutputFormat::Json,
-            Some("performance"),
-            Some(root.join("high.json")),
-            5000,
-            MinSeverity::High,
-        )
+        let at_high = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("performance"),
+            output: Some(root.join("high.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::High,
+            exclude: &[],
+            baseline: None,
+            write_baseline: None,
+        })
         .unwrap();
 
         assert_eq!(at_medium, 2, "a medium finding must trip the default gate");
@@ -393,6 +509,90 @@ mod tests {
         assert!(MinSeverity::Medium.is_met_by(Severity::Medium));
         assert!(!MinSeverity::High.is_met_by(Severity::Medium));
         assert!(MinSeverity::High.is_met_by(Severity::High));
+    }
+
+    #[test]
+    fn exclude_baseline_and_new_findings_compose() {
+        let root = temp_scan_root("gate");
+        fs::create_dir_all(root.join("vendor")).unwrap();
+        let offending = "gsap.ticker.lagSmoothing(0);\n";
+        fs::write(root.join("app.ts"), offending).unwrap();
+        fs::write(root.join("vendor/copy.ts"), offending).unwrap();
+
+        // Exclusion removes a finding from the report, not just the exit code:
+        // a gate that hid a path from its own output would be lying.
+        let excluded_report = root.join("excluded.json");
+        run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: None,
+            output: Some(excluded_report.clone()),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &["vendor".to_string()],
+            baseline: None,
+            write_baseline: None,
+        })
+        .unwrap();
+        let text = fs::read_to_string(&excluded_report).unwrap();
+        assert!(
+            !text.contains("vendor/copy.ts"),
+            "excluded path still reported"
+        );
+        assert!(text.contains("app.ts"), "non-excluded path missing");
+
+        // Baselining the current state makes the gate pass...
+        let baseline = root.join("baseline.json");
+        let code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: None,
+            output: Some(root.join("out.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: None,
+            write_baseline: Some(baseline.as_path()),
+        })
+        .unwrap();
+        assert_eq!(code, 0, "writing a baseline exits 0 without gating");
+
+        let code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: None,
+            output: Some(root.join("out2.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: Some(baseline.as_path()),
+            write_baseline: None,
+        })
+        .unwrap();
+        assert_eq!(code, 0, "a fully baselined tree must pass");
+
+        // ...but a NEW finding still trips it. Without this a baseline would be
+        // indistinguishable from switching the gate off.
+        fs::write(
+            root.join("new.ts"),
+            "import { Flip } from \"gsap-trial\";\nexport const f = Flip;\n",
+        )
+        .unwrap();
+        let code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: None,
+            output: Some(root.join("out3.json")),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: Some(baseline.as_path()),
+            write_baseline: None,
+        })
+        .unwrap();
+        assert_eq!(code, 2, "a finding absent from the baseline must gate");
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     fn temp_scan_root(name: &str) -> PathBuf {

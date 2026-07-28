@@ -68,6 +68,9 @@ out of version control.
   CLI for the standalone `gsap` skill that audits GSAP usage in JS/TS/JSX/TSX,
   with scan/doctor/completions commands, rule categories, and the scan
   exit-code contract.
+- [audit-gate Reference](reference/audit-gate.md): the shared CI-gate layer
+  behind the three motion auditors, covering path exclusion, finding baselines,
+  and SARIF output.
 - [motion-token-audit Reference](reference/motion-token-audit.md): cross-stack
   motion-token drift and orphan analysis across CSS, R3F, Reanimated, and GSAP.
 - [claude-config-audit Reference](reference/claude-config-audit.md): drift audit
