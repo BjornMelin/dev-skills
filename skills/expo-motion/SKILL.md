@@ -1,6 +1,6 @@
 ---
 name: expo-motion
-description: "Expo and React Native motion for iOS and Android. Use for animation, gestures, transitions, scroll effects, or Skia canvas work. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animations, and reduced motion. Recommend Reanimated by default when no library is named."
+description: "Expo and React Native motion for iOS and Android: animation, gestures, transitions, scroll effects and Skia. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animation and reduced motion."
 license: MIT
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: firecrawl
-description: "Firecrawl CLI for web data. Use to search the web, scrape or fetch a URL, map or crawl a site, extract structured data, interact with a page by clicking or filling or paginating, monitor changes, download a site offline, or parse local PDF, DOCX, XLSX and HTML documents."
+description: "Firecrawl CLI for web data. Use to search the web, scrape or crawl a site, map URLs, extract structured data, interact with a page, monitor changes, or parse local PDF, DOCX, XLSX and HTML files."
 license: ISC
 allowed-tools: Bash(firecrawl *) Bash(bunx --bun firecrawl-cli@latest *) Bash(node *firecrawl-*.mjs *)
 ---

@@ -2,7 +2,7 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-07-21T23:46:37.117979157Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "e246d1a8d3d261291efe6462a4a539c726a99a22",
+  "sourceCommit": "2933029fd34b346f80d3344049ece2a51489cef7",
   "sourceRef": "main",
   "skillsCount": 63,
   "totalSkillDirectories": 63,
@@ -399,7 +399,7 @@
     {
       "name": "bun-dev",
       "slug": "bun-dev",
-      "description": "Bun development, build, and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, auditing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build in a monorepo.",
+      "description": "Bun development, build and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, fixing lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build.",
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {
@@ -1323,7 +1323,7 @@
     {
       "name": "expo-motion",
       "slug": "expo-motion",
-      "description": "Expo and React Native motion for iOS and Android. Use for animation, gestures, transitions, scroll effects, or Skia canvas work. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animations, and reduced motion. Recommend Reanimated by default when no library is named.",
+      "description": "Expo and React Native motion for iOS and Android: animation, gestures, transitions, scroll effects and Skia. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animation and reduced motion.",
       "license": "MIT",
       "path": "skills/expo-motion",
       "skillMdPath": "skills/expo-motion/SKILL.md",
@@ -1373,7 +1373,7 @@
     {
       "name": "firecrawl",
       "slug": "firecrawl",
-      "description": "Firecrawl CLI for web data. Use to search the web, scrape or fetch a URL, map or crawl a site, extract structured data, interact with a page by clicking or filling or paginating, monitor changes, download a site offline, or parse local PDF, DOCX, XLSX and HTML documents.",
+      "description": "Firecrawl CLI for web data. Use to search the web, scrape or crawl a site, map URLs, extract structured data, interact with a page, monitor changes, or parse local PDF, DOCX, XLSX and HTML files.",
       "license": "ISC",
       "path": "skills/firecrawl",
       "skillMdPath": "skills/firecrawl/SKILL.md",
@@ -1517,7 +1517,7 @@
     {
       "name": "gsap",
       "slug": "gsap",
-      "description": "GSAP animation for React, Next.js, and vanilla JS. Use for scroll-driven animation, pinning, parallax, timelines, SplitText or SVG animation, Flip layout transitions, or the useGSAP hook with React cleanup and SSR boundaries. Recommend GSAP by default when no library is named.",
+      "description": "GSAP animation for React, Next.js and vanilla JS. Use for scroll-driven animation, pinning, parallax, timelines, SplitText or SVG animation, Flip transitions, or useGSAP with SSR-safe cleanup.",
       "license": "MIT",
       "path": "skills/gsap",
       "skillMdPath": "skills/gsap/SKILL.md",
@@ -1910,7 +1910,7 @@
     {
       "name": "pre-mortem",
       "slug": "pre-mortem",
-      "description": "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request.",
+      "description": "Assume the plan already failed, then work backwards to surface risky assumptions and irreversible bets. Offer it before a one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions.",
       "path": "skills/pre-mortem",
       "skillMdPath": "skills/pre-mortem/SKILL.md",
       "sourceUrls": {
@@ -2202,7 +2202,7 @@
     {
       "name": "rust-cli-clap",
       "slug": "rust-cli-clap",
-      "description": "Implicit Rust CLI and Clap skill. Use for command-line apps and tools, clap derive or builder APIs, subcommands, flags, config and env precedence, stdin/stdout/stderr contracts, JSON output, exit codes, completions, manpages, shell UX, CLI tests, and binary distribution.",
+      "description": "Rust command-line apps with clap: derive and builder APIs, subcommands, flags, config and env precedence, stdout, stderr and JSON contracts, exit codes, completions, and binary distribution.",
       "license": "MIT",
       "path": "skills/rust-cli-clap",
       "skillMdPath": "skills/rust-cli-clap/SKILL.md",
@@ -2253,7 +2253,7 @@
     {
       "name": "rust-expert",
       "slug": "rust-expert",
-      "description": "Core implicit Rust engineering skill. Use for Rust implementation, debugging, code review, refactors, compiler errors, ownership/lifetimes, traits/generics, async/concurrency internals, typed errors, API design, Cargo/toolchain/MSRV, crate selection, tests, performance, unsafe, and security. Excludes focused framework or product-surface work when a narrower Rust specialist skill applies.",
+      "description": "Core Rust engineering. Use for implementation, debugging, review, compiler errors, ownership and lifetimes, traits and generics, async and concurrency, typed errors, Cargo and MSRV, crate choice, tests, performance, unsafe and security.",
       "path": "skills/rust-expert",
       "skillMdPath": "skills/rust-expert/SKILL.md",
       "sourceUrls": {
@@ -2303,7 +2303,7 @@
     {
       "name": "sentry-cli-fix-issues",
       "slug": "sentry-cli-fix-issues",
-      "description": "Fix production Sentry issues from CLI evidence using sentry issue, event, trace, replay, log, explore, schema, and api commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures, AI telemetry gaps, and production crashes.",
+      "description": "Fix production Sentry issues from CLI evidence, using the issue, event, trace, replay, log and explore commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures and crashes.",
       "license": "MIT",
       "path": "skills/sentry-cli-fix-issues",
       "skillMdPath": "skills/sentry-cli-fix-issues/SKILL.md",
@@ -2703,7 +2703,7 @@
     {
       "name": "tanstack-integration",
       "slug": "tanstack-integration",
-      "description": "Integration guidance for TanStack Start, Router, and Query together: QueryClient router context, router SSR query setup, loader prefetching with ensureQueryData, suspense reads, cache ownership, invalidation after mutations, streaming caveats, and Convex/Clerk/Bun integration cautions.",
+      "description": "Using TanStack Start, Router and Query together: QueryClient router context, SSR query setup, loader prefetching with ensureQueryData, cache ownership, invalidation after mutations, and streaming caveats.",
       "path": "skills/tanstack-integration",
       "skillMdPath": "skills/tanstack-integration/SKILL.md",
       "sourceUrls": {
@@ -2750,7 +2750,7 @@
     {
       "name": "tanstack-query",
       "slug": "tanstack-query",
-      "description": "TanStack Query v5 guidance for React server-state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration, error boundaries, disabling/lazy queries, infinite queries, and Router/Start integration. Use when designing or reviewing React Query data flows.",
+      "description": "TanStack Query v5 for React server state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration and infinite queries. Use when designing or reviewing data flows.",
       "path": "skills/tanstack-query",
       "skillMdPath": "skills/tanstack-query/SKILL.md",
       "sourceUrls": {
@@ -2797,7 +2797,7 @@
     {
       "name": "tanstack-router",
       "slug": "tanstack-router",
-      "description": "TanStack Router guidance for React apps: file-based routing, generated route trees, root context typing, loaders, loaderDeps, validated search params, navigation, code splitting, error/not-found handling, and Query integration. Use when creating, refactoring, or reviewing TanStack Router routes and route contracts.",
+      "description": "TanStack Router for React: file-based routing, generated route trees, root context typing, loaders and loaderDeps, validated search params, code splitting and error handling. Use when writing or reviewing routes.",
       "path": "skills/tanstack-router",
       "skillMdPath": "skills/tanstack-router/SKILL.md",
       "sourceUrls": {
@@ -2844,7 +2844,7 @@
     {
       "name": "tanstack-start",
       "slug": "tanstack-start",
-      "description": "TanStack Start guidance for full-stack React apps: server functions, middleware, server routes, execution boundaries, auth, SSR modes, deployment, and Start + Router setup. Use when building or reviewing TanStack Start routes, server logic, auth boundaries, SSR, or deployment behavior.",
+      "description": "TanStack Start for full-stack React: server functions, middleware, server routes, execution boundaries, auth, SSR modes and deployment. Use when building or reviewing Start server logic or SSR.",
       "path": "skills/tanstack-start",
       "skillMdPath": "skills/tanstack-start/SKILL.md",
       "sourceUrls": {

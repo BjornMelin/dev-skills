@@ -1,6 +1,6 @@
 ---
 name: pre-mortem
-description: "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request."
+description: "Assume the plan already failed, then work backwards to surface risky assumptions and irreversible bets. Offer it before a one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions."
 ---
 
 Stress-test this plan before reality does. Not to kill it, but to make it survive contact with reality.
