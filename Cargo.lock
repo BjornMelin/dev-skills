@@ -104,6 +104,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "audit-gate"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -687,6 +696,7 @@ name = "expo-motion-audit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "clap",
  "clap_complete",
  "expo-motion-audit-core",
@@ -698,6 +708,7 @@ name = "expo-motion-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
@@ -860,6 +871,7 @@ name = "gsap-audit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "clap",
  "clap_complete",
  "gsap-audit-core",
@@ -871,6 +883,7 @@ name = "gsap-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
@@ -1432,6 +1445,7 @@ name = "motion-token-audit"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "clap",
  "clap_complete",
  "motion-token-audit-core",
@@ -1443,6 +1457,7 @@ name = "motion-token-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",

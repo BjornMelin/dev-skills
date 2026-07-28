@@ -74,6 +74,9 @@ pub struct ScanOptions {
     pub categories: BTreeSet<Category>,
     /// Maximum number of candidate files to analyze before truncating.
     pub max_files: usize,
+    /// Path globs to skip entirely. Applied while walking, so an
+    /// excluded tree never consumes the `max_files` budget.
+    pub exclude: Vec<String>,
 }
 
 impl ScanOptions {
@@ -84,7 +87,18 @@ impl ScanOptions {
             root,
             categories,
             max_files,
+            exclude: Vec::new(),
         }
+    }
+
+    /// Skip paths matching these globs. Exclusion happens during the walk
+    /// rather than after: an excluded tree that still got parsed would consume
+    /// the `max_files` budget and could truncate the scan before reaching
+    /// included sources, producing a false clean result.
+    #[must_use]
+    pub fn with_exclude(mut self, exclude: Vec<String>) -> ScanOptions {
+        self.exclude = exclude;
+        self
     }
 }
 
@@ -130,14 +144,23 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     let mut expo_sdk_major = None;
     let mut config_files: Vec<ConfigFile> = Vec::new();
 
+    let excluded = |path: &std::path::Path| -> bool {
+        if options.exclude.is_empty() {
+            return false;
+        }
+        let relative = path.strip_prefix(root).unwrap_or(path);
+        audit_gate::is_excluded(&relative.to_string_lossy(), &options.exclude)
+    };
+
     let walker = WalkDir::new(root).into_iter().filter_entry(|entry| {
         // Skip well-known build/vendor/native directories by name.
         if entry.file_type().is_dir()
             && let Some(name) = entry.file_name().to_str()
+            && SKIP_DIRS.contains(&name)
         {
-            return !SKIP_DIRS.contains(&name);
+            return false;
         }
-        true
+        !excluded(entry.path())
     });
 
     for entry in walker {

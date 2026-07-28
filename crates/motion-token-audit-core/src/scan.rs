@@ -33,6 +33,9 @@ pub struct ScanOptions {
     pub root: PathBuf,
     pub categories: BTreeSet<Category>,
     pub max_files: usize,
+    /// Path globs to skip entirely. Applied while walking, so an
+    /// excluded tree never consumes the `max_files` budget.
+    pub exclude: Vec<String>,
 }
 
 impl ScanOptions {
@@ -42,7 +45,18 @@ impl ScanOptions {
             root,
             categories,
             max_files,
+            exclude: Vec::new(),
         }
+    }
+
+    /// Skip paths matching these globs. Exclusion happens during the walk
+    /// rather than after: an excluded tree that still got parsed would consume
+    /// the `max_files` budget and could truncate the scan before reaching
+    /// included sources, producing a false clean result.
+    #[must_use]
+    pub fn with_exclude(mut self, exclude: Vec<String>) -> ScanOptions {
+        self.exclude = exclude;
+        self
     }
 }
 
@@ -69,7 +83,7 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
         root.display()
     );
 
-    let (files, truncated) = collect_files(root, options.max_files);
+    let (files, truncated) = collect_files(root, options.max_files, &options.exclude);
     let mut tokens = MotionTokens::default();
     for file in &files {
         let source = match std::fs::read_to_string(&file.path) {
@@ -141,16 +155,25 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     Ok(outcome)
 }
 
-fn collect_files(root: &Path, max_files: usize) -> (Vec<SourceFile>, bool) {
+fn collect_files(root: &Path, max_files: usize, exclude: &[String]) -> (Vec<SourceFile>, bool) {
     let mut files = Vec::new();
     let mut truncated = false;
+    let excluded = |path: &std::path::Path| -> bool {
+        if exclude.is_empty() {
+            return false;
+        }
+        let relative = path.strip_prefix(root).unwrap_or(path);
+        audit_gate::is_excluded(&relative.to_string_lossy(), exclude)
+    };
+
     let walker = WalkDir::new(root).into_iter().filter_entry(|entry| {
         if entry.file_type().is_dir()
             && let Some(name) = entry.file_name().to_str()
+            && SKIP_DIRS.contains(&name)
         {
-            return !SKIP_DIRS.contains(&name);
+            return false;
         }
-        true
+        !excluded(entry.path())
     });
 
     for entry in walker {

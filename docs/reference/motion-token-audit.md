@@ -52,7 +52,9 @@ motion-token-audit scan --root ./src --format json --categories tokens-css,token
 Options:
 
 - `--root <PATH>`: directory to scan. Default `.`.
-- `--format <markdown|json>`: output format. Default `markdown`.
+- `--format <markdown|json|sarif>`: output format. Default `markdown`.
+  `sarif` applies to `scan` only; `doctor` prints a rule catalog and accepts
+  `markdown` or `json`.
 - `--categories <CSV>`: comma-separated subset of rule categories to run
   (`ssot`, `tokens-css`, `tokens-reanimated`, `tokens-gsap`, `tokens-react`,
   `tokens-r3f`). Default runs every category.
@@ -62,6 +64,13 @@ Options:
 - `--min-severity <low|medium|high>`: lowest severity that makes the exit
   code non-zero. Default `medium`. Changes the exit code only; every
   finding is still reported.
+- `--exclude <GLOB>`: skip findings whose path matches this glob. Repeatable.
+  Supports `*` (does not cross `/`), `**` (does) and `?`. A bare name with no
+  separator or wildcard matches any path component, so `--exclude node_modules`
+  works as expected.
+- `--baseline <PATH>`: report only findings absent from this baseline file.
+- `--write-baseline <PATH>`: write the current findings to a baseline and exit
+  `0` without gating.
 
 `scan` reports hardcoded motion literals as:
 
@@ -128,6 +137,49 @@ Both `scan` and `doctor` support `--format markdown` (default) and
 
 Each finding includes rule id, category, severity, confidence, file, line,
 column, message, and suggestion.
+
+## Gating a repository that is not yet clean
+
+Three flags make this usable as a CI gate before the backlog is at zero.
+
+```bash
+# record today's findings, then block only on new ones
+motion-token-audit scan --write-baseline .audit/motion-token-audit-baseline.json
+motion-token-audit scan --baseline .audit/motion-token-audit-baseline.json
+
+# keep vendored trees out of the verdict entirely
+motion-token-audit scan --exclude '**/vendor/**' --exclude node_modules
+
+# render findings as annotations on the diff
+motion-token-audit scan --format sarif > motion-token-audit.sarif
+```
+
+A baseline suppresses known findings from the **report** as well as from the
+exit code, so "clean" means one thing throughout the output. A finding absent
+from the baseline still gates, which is what separates a baseline from turning
+the gate off; the test suite asserts exactly that.
+
+Three refusals keep a baseline honest:
+
+- `--baseline` and `--write-baseline` are separate modes and cannot be combined,
+  so a malformed path is never silently ignored.
+- Writing a baseline from a **truncated** scan is rejected. Blessing an
+  inventory that was never taken would let later runs under the same cap pass
+  while everything past it stayed unexamined.
+- Exclusion is applied while walking, not after. An excluded tree that still got
+  parsed would consume `--max-files` and could truncate the scan before reaching
+  included sources, producing a false clean result.
+
+Baseline identity is `rule-id::file::ordinal`. The ordinal matters because
+several rules fire once per literal, so one file can hold many occurrences of a
+rule; without it, a newly added occurrence would collide with an existing entry
+and pass unnoticed.
+
+`--format sarif` emits SARIF 2.1.0 with `partialFingerprints`, so a viewer can
+track a finding across moves. Severity maps to SARIF's three levels: high is
+`error`, medium is `warning`, low is `note`. It applies to `scan` only —
+`doctor` prints a rule catalog, not results, and rejects the format rather than
+emitting an empty run.
 
 ## Exit Codes
 
