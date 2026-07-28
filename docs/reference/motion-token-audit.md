@@ -52,7 +52,9 @@ motion-token-audit scan --root ./src --format json --categories tokens-css,token
 Options:
 
 - `--root <PATH>`: directory to scan. Default `.`.
-- `--format <markdown|json>`: output format. Default `markdown`.
+- `--format <markdown|json|sarif>`: output format. Default `markdown`.
+  `sarif` applies to `scan` only; `doctor` prints a rule catalog and accepts
+  `markdown` or `json`.
 - `--categories <CSV>`: comma-separated subset of rule categories to run
   (`ssot`, `tokens-css`, `tokens-reanimated`, `tokens-gsap`, `tokens-react`,
   `tokens-r3f`). Default runs every category.
@@ -157,12 +159,21 @@ exit code, so "clean" means one thing throughout the output. A finding absent
 from the baseline still gates, which is what separates a baseline from turning
 the gate off; the test suite asserts exactly that.
 
-Baseline entries are fingerprinted as `rule-id::file`, deliberately excluding
-the line number and the message. Findings move when unrelated lines above them
-change and messages get reworded, and a baseline that expires on contact with
-ordinary editing is one people delete rather than maintain. The trade is that
-moving a finding to a different file un-baselines it, which is the right
-default: that is usually new code.
+Three refusals keep a baseline honest:
+
+- `--baseline` and `--write-baseline` are separate modes and cannot be combined,
+  so a malformed path is never silently ignored.
+- Writing a baseline from a **truncated** scan is rejected. Blessing an
+  inventory that was never taken would let later runs under the same cap pass
+  while everything past it stayed unexamined.
+- Exclusion is applied while walking, not after. An excluded tree that still got
+  parsed would consume `--max-files` and could truncate the scan before reaching
+  included sources, producing a false clean result.
+
+Baseline identity is `rule-id::file::ordinal`. The ordinal matters because
+several rules fire once per literal, so one file can hold many occurrences of a
+rule; without it, a newly added occurrence would collide with an existing entry
+and pass unnoticed.
 
 `--format sarif` emits SARIF 2.1.0 with `partialFingerprints`, so a viewer can
 track a finding across moves. Severity maps to SARIF's three levels: high is

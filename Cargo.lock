@@ -708,6 +708,7 @@ name = "expo-motion-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
@@ -882,6 +883,7 @@ name = "gsap-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",
@@ -1455,6 +1457,7 @@ name = "motion-token-audit-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit-gate",
  "oxc_allocator",
  "oxc_ast",
  "oxc_ast_visit",

@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process;
 
 use anyhow::{Context, Result};
-use audit_gate::{Baseline, GateFinding, GateSeverity, is_excluded, to_sarif};
+use audit_gate::{Baseline, GateFinding, GateSeverity, to_sarif};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
 use motion_token_audit_core::output::{format_catalog_json, format_catalog_markdown};
@@ -231,18 +231,28 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
         write_baseline,
     } = request;
     let categories = parse_categories(categories)?;
-    let options = ScanOptions::new(root, categories, max_files);
+    let options =
+        ScanOptions::new(root.clone(), categories, max_files).with_exclude(exclude.to_vec());
+    // The two baseline flags are separate modes. Accepting both would silently
+    // ignore one of them, including a malformed path the caller expected to be
+    // read.
+    anyhow::ensure!(
+        !(baseline.is_some() && write_baseline.is_some()),
+        "--baseline and --write-baseline are separate modes; pass one"
+    );
+
     let mut outcome = scan_root(&options)?;
 
-    // Exclusion runs before everything else: a vendored tree should not decide
-    // the exit code, appear in the report, or land in a baseline.
-    if !exclude.is_empty() {
-        outcome
-            .findings
-            .retain(|finding| !is_excluded(&finding.file, exclude));
-    }
-
     if let Some(path) = write_baseline {
+        // A baseline recorded from a truncated scan blesses an inventory that
+        // was never taken. Later runs under the same cap would then pass while
+        // everything past it stayed unexamined.
+        anyhow::ensure!(
+            !outcome.truncated,
+            "refusing to write a baseline from a truncated scan ({} files hit --max-files); \
+             raise --max-files or narrow --root",
+            outcome.files_scanned
+        );
         Baseline::from_findings(&to_gate_findings(&outcome.findings)).save(path)?;
         return Ok(0);
     }
@@ -252,14 +262,13 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
     // "clean" mean two different things in the same output.
     if let Some(path) = baseline {
         let known = Baseline::load(path)?;
-        let gate = to_gate_findings(&outcome.findings);
-        let keep: Vec<bool> = gate.iter().map(|f| !known.contains(f)).collect();
-        let mut index = 0;
-        outcome.findings.retain(|_| {
-            let keep_this = keep[index];
-            index += 1;
-            keep_this
-        });
+        let unseen = known.unseen(&to_gate_findings(&outcome.findings));
+        outcome.findings = outcome
+            .findings
+            .into_iter()
+            .zip(unseen)
+            .filter_map(|(finding, keep)| keep.then_some(finding))
+            .collect();
     }
 
     let rendered = match format {
@@ -278,10 +287,13 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
             }
             text
         }
+        // Findings are relative to --root; SARIF consumers resolve against the
+        // repository, so re-anchor them or annotations land on the wrong file.
         OutputFormat::Sarif => serde_json::to_string_pretty(&to_sarif(
             TOOL_NAME,
             TOOL_VERSION,
             &to_gate_findings(&outcome.findings),
+            &sarif_path_prefix(&root),
         ))?,
         OutputFormat::Json => {
             let mut value = format_json(
@@ -325,6 +337,24 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
         0
     };
     Ok(code)
+}
+
+/// The scan root expressed relative to the current directory, for SARIF URIs.
+///
+/// `--root app` yields findings like `src/x.ts`; a repository uploader needs
+/// `app/src/x.ts`. An absolute or outside-the-cwd root yields no prefix rather
+/// than a wrong one.
+fn sarif_path_prefix(root: &std::path::Path) -> String {
+    let Ok(current) = std::env::current_dir() else {
+        return String::new();
+    };
+    let Ok(absolute) = root.canonicalize() else {
+        return String::new();
+    };
+    absolute
+        .strip_prefix(&current)
+        .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default()
 }
 
 /// Convert core findings into the shared gate shape.

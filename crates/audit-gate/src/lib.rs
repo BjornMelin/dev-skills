@@ -15,7 +15,7 @@
 //! than a shared type: the cores stay independent, and this crate stays free of
 //! any parser dependency.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -73,17 +73,36 @@ pub struct GateFinding {
 }
 
 impl GateFinding {
-    /// A stable identity for baselining.
-    ///
-    /// Deliberately excludes the line number and the message. Findings move
-    /// when unrelated lines above them change, and messages get reworded; a
-    /// fingerprint sensitive to either would make a baseline expire on contact
-    /// with ordinary editing, which is the failure that makes teams delete
-    /// baselines rather than maintain them.
-    #[must_use]
-    pub fn fingerprint(&self) -> String {
+    /// The rule-and-file part of the identity, shared by every occurrence.
+    fn site(&self) -> String {
         format!("{}::{}", self.id, self.file)
     }
+}
+
+/// Fingerprints for a whole result set, one per finding.
+///
+/// Identity is `rule-id::file::ordinal`. Line numbers and messages are excluded
+/// on purpose: findings move when unrelated lines above them change and
+/// messages get reworded, and a baseline that expires on contact with ordinary
+/// editing is one people delete rather than maintain.
+///
+/// The ordinal is what makes counts survive. Several rules fire once per
+/// literal or per call, so a file can hold many occurrences of one rule;
+/// without it, a second occurrence added later would collide with the first in
+/// the baseline set and pass unnoticed.
+#[must_use]
+pub fn fingerprints(findings: &[GateFinding]) -> Vec<String> {
+    let mut seen: BTreeMap<String, usize> = BTreeMap::new();
+    findings
+        .iter()
+        .map(|finding| {
+            let site = finding.site();
+            let ordinal = seen.entry(site.clone()).or_insert(0);
+            let value = format!("{site}::{ordinal}");
+            *ordinal += 1;
+            value
+        })
+        .collect()
 }
 
 /// Known findings a repository has chosen to accept for now.
@@ -102,7 +121,7 @@ impl Baseline {
     pub fn from_findings(findings: &[GateFinding]) -> Self {
         Self {
             schema: BASELINE_SCHEMA.to_string(),
-            findings: findings.iter().map(GateFinding::fingerprint).collect(),
+            findings: fingerprints(findings).into_iter().collect(),
         }
     }
 
@@ -132,9 +151,17 @@ impl Baseline {
         std::fs::write(path, text).with_context(|| format!("write {}", path.display()))
     }
 
+    /// Which of `findings` are absent from this baseline, in the same order.
+    ///
+    /// Takes the whole set because identity is occurrence-sensitive: a second
+    /// occurrence of a rule in a file is a different fingerprint from the
+    /// first, and only the set knows which occurrence a finding is.
     #[must_use]
-    pub fn contains(&self, finding: &GateFinding) -> bool {
-        self.findings.contains(&finding.fingerprint())
+    pub fn unseen(&self, findings: &[GateFinding]) -> Vec<bool> {
+        fingerprints(findings)
+            .into_iter()
+            .map(|fingerprint| !self.findings.contains(&fingerprint))
+            .collect()
     }
 }
 
@@ -159,12 +186,20 @@ fn matches_from(pattern: &[u8], path: &[u8]) -> bool {
     }
     // `**` consumes any number of characters, separators included.
     if pattern.starts_with(b"**") {
-        let rest = &pattern[2..];
-        let rest = rest.strip_prefix(b"/").unwrap_or(rest);
+        let after = &pattern[2..];
+        // `a/**/b` must still require a component boundary before `b`;
+        // dropping the slash outright would let it match `a/xb`.
+        let (rest, needs_boundary) = match after.strip_prefix(b"/") {
+            Some(rest) => (rest, true),
+            None => (after, false),
+        };
         if rest.is_empty() {
             return true;
         }
         for split in 0..=path.len() {
+            if needs_boundary && split != 0 && path.get(split - 1) != Some(&b'/') {
+                continue;
+            }
             if matches_from(rest, &path[split..]) {
                 return true;
             }
@@ -199,7 +234,20 @@ pub fn is_excluded(path: &str, patterns: &[String]) -> bool {
 /// `results` carry the rule id, so GitHub groups annotations by rule, and the
 /// `partialFingerprints` field lets it track a finding across moves.
 #[must_use]
-pub fn to_sarif(tool: &str, version: &str, findings: &[GateFinding]) -> serde_json::Value {
+pub fn to_sarif(
+    tool: &str,
+    version: &str,
+    findings: &[GateFinding],
+    path_prefix: &str,
+) -> serde_json::Value {
+    let anchor = |file: &str| -> String {
+        if path_prefix.is_empty() {
+            file.to_string()
+        } else {
+            format!("{}/{}", path_prefix.trim_end_matches('/'), file)
+        }
+    };
+    let prints = fingerprints(findings);
     let rules: BTreeSet<&str> = findings.iter().map(|f| f.id.as_str()).collect();
     serde_json::json!({
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -216,14 +264,14 @@ pub fn to_sarif(tool: &str, version: &str, findings: &[GateFinding]) -> serde_js
                     })).collect::<Vec<_>>(),
                 }
             },
-            "results": findings.iter().map(|f| serde_json::json!({
+            "results": findings.iter().enumerate().map(|(i, f)| serde_json::json!({
                 "ruleId": f.id,
                 "level": f.severity.sarif_level(),
                 "message": { "text": f.message },
-                "partialFingerprints": { "auditGate/v1": f.fingerprint() },
+                "partialFingerprints": { "auditGate/v1": prints[i].clone() },
                 "locations": [{
                     "physicalLocation": {
-                        "artifactLocation": { "uri": f.file },
+                        "artifactLocation": { "uri": anchor(&f.file) },
                         // SARIF lines are 1-based and a 0 is invalid.
                         "region": { "startLine": f.line.max(1) },
                     }
@@ -274,6 +322,26 @@ mod tests {
     }
 
     #[test]
+    fn double_star_keeps_the_separator_boundary() {
+        // `**/vendor/**` must not match a component merely ending in "vendor".
+        assert!(glob_matches("**/vendor/**", "apps/web/vendor/x.js"));
+        assert!(!glob_matches("**/vendor/**", "apps/web/myvendor/x.js"));
+        assert!(glob_matches("a/**/b", "a/x/b"));
+        assert!(!glob_matches("a/**/b", "a/xb"));
+    }
+
+    #[test]
+    fn sarif_anchors_paths_to_a_prefix() {
+        let findings = vec![finding("rule.one", "src/a.ts", 4)];
+        let sarif = to_sarif("gsap-audit", "0.1.0", &findings, "app");
+        assert_eq!(
+            sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
+                ["uri"],
+            "app/src/a.ts"
+        );
+    }
+
+    #[test]
     fn exclusion_normalizes_windows_separators() {
         let patterns = vec!["**/vendor/**".to_string()];
         assert!(is_excluded(r"apps\web\vendor\x.js", &patterns));
@@ -281,11 +349,31 @@ mod tests {
 
     #[test]
     fn fingerprints_survive_a_line_move_but_not_a_file_move() {
-        let a = finding("rule.one", "src/a.ts", 10);
-        let moved_down = finding("rule.one", "src/a.ts", 90);
-        let other_file = finding("rule.one", "src/b.ts", 10);
-        assert_eq!(a.fingerprint(), moved_down.fingerprint());
-        assert_ne!(a.fingerprint(), other_file.fingerprint());
+        let moved = fingerprints(&[finding("rule.one", "src/a.ts", 90)]);
+        let original = fingerprints(&[finding("rule.one", "src/a.ts", 10)]);
+        let other_file = fingerprints(&[finding("rule.one", "src/b.ts", 10)]);
+        assert_eq!(
+            original, moved,
+            "a finding that moved down is the same finding"
+        );
+        assert_ne!(original, other_file);
+    }
+
+    #[test]
+    fn a_second_occurrence_in_one_file_is_not_baselined_by_the_first() {
+        // Several rules fire once per literal, so one file can hold many
+        // occurrences. Collapsing them would let a newly added one pass.
+        let one = vec![finding("rule.one", "src/a.ts", 10)];
+        let two = vec![
+            finding("rule.one", "src/a.ts", 10),
+            finding("rule.one", "src/a.ts", 40),
+        ];
+        let baseline = Baseline::from_findings(&one);
+        assert_eq!(
+            baseline.unseen(&two),
+            vec![false, true],
+            "the second occurrence must still be reported"
+        );
     }
 
     #[test]
@@ -297,8 +385,14 @@ mod tests {
         let baseline = Baseline::from_findings(&[finding("rule.one", "src/a.ts", 3)]);
         baseline.save(&path).unwrap();
         let loaded = Baseline::load(&path).unwrap();
-        assert!(loaded.contains(&finding("rule.one", "src/a.ts", 3)));
-        assert!(!loaded.contains(&finding("rule.two", "src/a.ts", 3)));
+        assert_eq!(
+            loaded.unseen(&[finding("rule.one", "src/a.ts", 3)]),
+            vec![false]
+        );
+        assert_eq!(
+            loaded.unseen(&[finding("rule.two", "src/a.ts", 3)]),
+            vec![true]
+        );
 
         std::fs::write(&path, r#"{"schema":"something.else","findings":[]}"#).unwrap();
         assert!(
@@ -320,7 +414,7 @@ mod tests {
                 ..finding("rule.two", "src/b.ts", 7)
             },
         ];
-        let sarif = to_sarif("gsap-audit", "0.1.0", &findings);
+        let sarif = to_sarif("gsap-audit", "0.1.0", &findings, "");
         let results = sarif["runs"][0]["results"].as_array().unwrap();
         assert_eq!(results[0]["level"], "error");
         assert_eq!(results[1]["level"], "note");

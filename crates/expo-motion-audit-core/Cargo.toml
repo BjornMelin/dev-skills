@@ -9,6 +9,7 @@ repository.workspace = true
 description = "Core static-analysis library for auditing Expo/React Native motion code (Reanimated 4)"
 
 [dependencies]
+audit-gate = { path = "../audit-gate" }
 anyhow = "1.0"
 oxc_allocator = "0.137.0"
 oxc_ast = "0.137.0"

@@ -15,15 +15,19 @@ free of any parser dependency.
 | --- | --- | --- |
 | Path exclusion | `--exclude <GLOB>` | `*`, `**`, `?`. A bare name matches any path component. |
 | Finding baselines | `--baseline`, `--write-baseline` | Fingerprinted `rule-id::file`. |
-| SARIF 2.1.0 output | `--format sarif` | Includes `partialFingerprints`. |
+| SARIF 2.1.0 output | `--format sarif` | Includes `partialFingerprints`; paths are re-anchored to the repository root so annotations land correctly when `--root` is nested. |
 
 ## Fingerprints
 
-A baseline entry is `rule-id::file`. Line numbers and messages are excluded on
-purpose: findings move when unrelated lines above them change, and messages get
-reworded. A fingerprint sensitive to either produces a baseline that expires on
-contact with ordinary editing, which is the failure that makes teams delete
-baselines rather than maintain them.
+A baseline entry is `rule-id::file::ordinal`. Line numbers and messages are
+excluded on purpose: findings move when unrelated lines above them change, and
+messages get reworded. A fingerprint sensitive to either produces a baseline
+that expires on contact with ordinary editing, which is the failure that makes
+teams delete baselines rather than maintain them.
+
+The ordinal preserves counts. Several rules fire once per literal or per call,
+so one file can hold many occurrences of the same rule; collapsing them to a
+single entry would let a newly added occurrence pass unnoticed.
 
 The cost is that moving a finding to a different file un-baselines it. That is
 the right default, because it usually is new code.
