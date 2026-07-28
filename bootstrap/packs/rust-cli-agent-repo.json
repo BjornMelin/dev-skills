@@ -6,9 +6,6 @@
     "skills": [
       "rust-expert",
       "rust-cli-clap",
-      "rust-tui-ratatui",
-      "rust-web-services",
-      "clean-code",
       "subspawn"
     ],
     "subagent_sources": [

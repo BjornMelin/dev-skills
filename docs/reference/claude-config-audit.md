@@ -88,7 +88,18 @@ keeps those in step. An edit committed and merged in the repo can sit there
 indefinitely while every session keeps loading the old copy, and the reverse
 happens just as easily when a skill is edited in place.
 
-`--mirror` compares the two and reports each skill whose `SKILL.md` differs.
+`--mirror` compares the two and reports each skill whose contents differ. The
+comparison covers the **whole skill directory**, not just the entrypoint:
+`references/`, `scripts/`, `assets/` and any other file change a skill's
+behaviour as much as its `SKILL.md` does, and an entrypoint-only check missed
+a real 51-line reference drift in the estate this tool audits. Expect a finding
+whose message names a reference or script even when the two `SKILL.md` files
+are identical.
+
+Generated output is ignored: `__pycache__`, `node_modules`, `.DS_Store`,
+`.pytest_cache` and `.ruff_cache`. Symlinks are followed, so a skill whose
+`references/` is a shared symlinked directory is not reported as missing files.
+
 It deliberately says nothing about direction: which side is right is a judgment
 about what that skill should say, not something a byte comparison can decide.
 

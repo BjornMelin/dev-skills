@@ -9777,6 +9777,12 @@ fn kill_process_group(pid: u32) {
     }
 }
 
+/// Windows has no process groups in the POSIX sense; bounding a gate's whole
+/// tree there needs a Job Object, which this crate does not create. The
+/// immediate child is still killed, so a self-contained gate times out
+/// correctly, but a gate that spawns descendants can still block the reader
+/// threads. This toolchain targets Linux and macOS, so the gap is recorded
+/// rather than half-implemented against something untestable here.
 #[cfg(not(unix))]
 fn kill_process_group(_pid: u32) {}
 

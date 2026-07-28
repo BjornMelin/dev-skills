@@ -236,8 +236,15 @@ fn is_generated_noise(relative: &Path) -> bool {
 }
 
 /// Every meaningful file under `root`, as paths relative to it.
+///
+/// `follow_links` matters here. WalkDir follows the root even without it, so a
+/// skill installed as a symlink already walked correctly, but a symlink *inside*
+/// a skill (a shared `references/` directory, say) was skipped, and its files
+/// were then reported as "not installed" against an identical mirror. Symlink
+/// cycles surface as walk errors and are dropped by `flatten`.
 fn relative_files(root: &Path) -> BTreeSet<PathBuf> {
     WalkDir::new(root)
+        .follow_links(true)
         .into_iter()
         .flatten()
         .filter(|entry| entry.file_type().is_file())
@@ -254,28 +261,36 @@ fn relative_files(root: &Path) -> BTreeSet<PathBuf> {
 
 /// The first difference between two skill directories, described for a reader.
 ///
-/// Returns `None` when the trees hold the same files with the same bytes.
+/// Returns `Ok(None)` when the trees hold the same files with the same bytes.
 /// Reporting only the first difference keeps the finding readable; the point is
 /// to say *that* a skill drifted, not to render a diff.
-fn first_tree_difference(left: &Path, right: &Path) -> Option<String> {
+///
+/// A file that cannot be read is an error rather than a silent "equal". An
+/// unreadable mirror would otherwise scan clean, which is exactly the false
+/// all-clear this tool exists to prevent.
+fn first_tree_difference(left: &Path, right: &Path) -> Result<Option<String>> {
     let left_files = relative_files(left);
     let right_files = relative_files(right);
 
     if let Some(missing) = left_files.difference(&right_files).next() {
-        return Some(format!("{} is not installed", missing.display()));
+        return Ok(Some(format!("{} is not installed", missing.display())));
     }
     if let Some(extra) = right_files.difference(&left_files).next() {
-        return Some(format!("{} exists only in the install", extra.display()));
+        return Ok(Some(format!(
+            "{} exists only in the install",
+            extra.display()
+        )));
     }
     for name in &left_files {
-        let (Ok(a), Ok(b)) = (fs::read(left.join(name)), fs::read(right.join(name))) else {
-            continue;
-        };
+        let a = fs::read(left.join(name))
+            .with_context(|| format!("read {}", left.join(name).display()))?;
+        let b = fs::read(right.join(name))
+            .with_context(|| format!("read {}", right.join(name).display()))?;
         if a != b {
-            return Some(format!("{} differs", name.display()));
+            return Ok(Some(format!("{} differs", name.display())));
         }
     }
-    None
+    Ok(None)
 }
 
 /// Plugins the user has explicitly switched off, as `plugin@marketplace` keys.
@@ -597,7 +612,7 @@ fn scan(
             let (Some(src_dir), Some(dst_dir)) = (src.parent(), dst.parent()) else {
                 continue;
             };
-            if let Some(detail) = first_tree_difference(src_dir, dst_dir) {
+            if let Some(detail) = first_tree_difference(src_dir, dst_dir)? {
                 findings.push(Finding {
                     id: "mirror.drift",
                     severity: Severity::Medium,

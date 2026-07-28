@@ -411,9 +411,10 @@ This smoke performs read-only hosted collection plus local capsule writes. The
 `--apply`; they must not be used as evidence that hosted review comments were
 resolved, failed jobs were rerun, or a PR was merged.
 
-Policy gate execution is explicit. Use `--execute` only when you intend to run
-the repo-native commands from the manifest; the default dry run records the
-planned gate snapshot in the capsule without running commands.
+`policy run` executes the repo-native commands from the manifest. Pass
+`--dry-run` to record the planned gate snapshot in the capsule without running
+anything. Each gate is bounded by `--timeout-secs` (default 900); a gate that
+exceeds it is killed along with its process group and recorded as failed.
 Execution discovers the repository root from the current directory or capsule
 path. Pass `--repo-root <path>` when running an installed binary from outside
 the repository. If capsule-path and current-directory discovery point at

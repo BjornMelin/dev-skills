@@ -403,7 +403,7 @@ Rust skill suite validation:
 
 ```bash
 node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap
-node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
+node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap
 ```
 
 Notes:

@@ -1523,3 +1523,107 @@ export function Hero() {
         .expect("finding");
     assert_eq!(finding.category, Category::React);
 }
+
+#[test]
+fn rule_state_in_continuous_motion_resolves_aliased_use_state_imports() {
+    // `import { useState as useReactState }` binds a different local name; a
+    // text comparison would miss the setter entirely.
+    let findings = analyze(
+        "src/Aliased.tsx",
+        "tsx",
+        r#"
+import { useState as useReactState } from "react";
+export function Aliased() {
+  const [progress, setProgress] = useReactState(0);
+  return <div onScroll={(e) => setProgress(e.currentTarget.scrollTop)} />;
+}
+"#,
+    );
+    assert!(fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_non_gsap_ticker() {
+    // `analytics.ticker.add` shares a property name with gsap.ticker but has
+    // no frame loop behind it.
+    let findings = analyze(
+        "src/Analytics.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { analytics } from "./analytics";
+export function Analytics() {
+  const [n, setN] = useState(0);
+  analytics.ticker.add(() => setN(1));
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_finite_frame_sequence() {
+    // Two scheduled frames is not a loop: neither callback reschedules itself.
+    let findings = analyze(
+        "src/TwoFrames.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function TwoFrames() {
+  const [x, setX] = useState(0);
+  requestAnimationFrame(() => {
+    setX(1);
+    requestAnimationFrame(renderOnce);
+  });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_recognises_aliased_scroll_trigger() {
+    let findings = analyze(
+        "src/Aliased.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { ScrollTrigger as ST } from "gsap/ScrollTrigger";
+export function Aliased() {
+  const [x, setX] = useState(0);
+  ST.create({ onUpdate: (self) => setX(self.progress) });
+  return null;
+}
+"#,
+    );
+    assert!(fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_downgrades_a_boolean_threshold() {
+    // React bails out when the next state equals the current one, so a
+    // threshold boolean re-renders only on the flip. Report it, but do not
+    // fail a default-severity gate on the prescribed pattern.
+    let findings = analyze(
+        "src/Stuck.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Stuck() {
+  const [stuck, setStuck] = useState(false);
+  return <div onScroll={(e) => setStuck(e.currentTarget.scrollTop > 100)} />;
+}
+"#,
+    );
+    let finding = findings
+        .iter()
+        .find(|f| f.id == ids::REACT_STATE_IN_CONTINUOUS_MOTION)
+        .expect("still reported");
+    assert_eq!(
+        finding.severity,
+        gsap_audit_core::types::Severity::Low,
+        "a boolean threshold must not trip the default medium gate"
+    );
+}

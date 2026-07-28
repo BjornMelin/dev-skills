@@ -8,7 +8,7 @@
       "assertions": [
         "Output classifies the request as a technical spec or equivalent pre-implementation design mode",
         "Output includes rollout and rollback guidance",
-        "Output does not route this request to user-guide-writing or changelog-maintenance"
+        "Output does not route this request to a documentation lane outside this skill or a documentation lane outside this skill"
       ]
     },
     {
@@ -34,9 +34,9 @@
     {
       "id": 4,
       "prompt": "Write a beginner tutorial with screenshots that shows customers how to export their data.",
-      "expected_output": "The skill routes the request to user-guide-writing because it is end-user onboarding/help content, not internal technical documentation.",
+      "expected_output": "The skill declines the request as outside the internal-documentation lane because it is end-user onboarding/help content, not internal technical documentation.",
       "assertions": [
-        "Output routes the request to user-guide-writing or explicitly declines technical-writing as the main skill",
+        "Output declines the request as outside the internal-documentation lane or explicitly declines technical-writing as the main skill",
         "Output explains the boundary with end-user tutorials",
         "Output does not claim this is an internal spec, ADR, runbook, migration guide, or internal developer guide"
       ]
@@ -44,9 +44,9 @@
     {
       "id": 5,
       "prompt": "Refresh our public webhook quickstart and auth troubleshooting page for external developers using the new signing flow.",
-      "expected_output": "The skill routes the request to api-documentation because the main job is published developer-facing API documentation.",
+      "expected_output": "The skill declines the request as outside the internal-documentation lane because the main job is published developer-facing API documentation.",
       "assertions": [
-        "Output routes the request to api-documentation or explicitly declines technical-writing as the main skill",
+        "Output declines the request as outside the internal-documentation lane or explicitly declines technical-writing as the main skill",
         "Output explains that published API/SDK/docs-portal work is out of scope for technical-writing",
         "Output does not frame the request as an internal spec, ADR, runbook, migration guide, or internal developer guide"
       ]
@@ -54,9 +54,9 @@
     {
       "id": 6,
       "prompt": "Update our release notes and CHANGELOG.md for the v4.2 rollout, including upgrade notes for customers and a short summary for developers.",
-      "expected_output": "The skill routes the request to changelog-maintenance because the main job is release-history and audience-specific release communication.",
+      "expected_output": "The skill declines the request as outside the internal-documentation lane because the main job is release-history and audience-specific release communication.",
       "assertions": [
-        "Output routes the request to changelog-maintenance or explicitly declines technical-writing as the main skill",
+        "Output declines the request as outside the internal-documentation lane or explicitly declines technical-writing as the main skill",
         "Output explains the boundary with release notes or CHANGELOG.md maintenance",
         "Output does not claim the request is primarily an internal spec, architecture doc, ADR, runbook, or internal guide"
       ]

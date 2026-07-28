@@ -1086,8 +1086,12 @@ scripting a release:
 
 | field | meaning |
 | --- | --- |
-| `passed` | No required gate failed. A dry run satisfies this vacuously. |
+| `passed` | Every required gate is `passed` or `planned`. A dry run satisfies this vacuously, and a required gate that was **skipped** does not: without `--allow-network`, the `skills`, `release` and `full_local` profiles skip a required gate and `passed` is `false`. |
 | `verified` | Every required gate actually ran and succeeded. Always `false` for a dry run. |
+
+`passed` is deliberately not "nothing failed". A skipped required gate has not
+been shown to hold, so treating it as a pass would let an unrun gate look
+satisfied — the same conflation that made a bare `policy run` report success.
 
 Each gate is given `--timeout-secs` (default 900) of wall clock. A gate that
 exceeds it is killed and recorded as failed, rather than hanging the run with
