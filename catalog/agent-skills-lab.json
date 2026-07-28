@@ -2,10 +2,10 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-07-21T23:46:37.117979157Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "86ea91d72375857cace83eeeaebc3b63727d1fcd",
+  "sourceCommit": "2933029fd34b346f80d3344049ece2a51489cef7",
   "sourceRef": "main",
-  "skillsCount": 69,
-  "totalSkillDirectories": 69,
+  "skillsCount": 63,
+  "totalSkillDirectories": 63,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -399,7 +399,7 @@
     {
       "name": "bun-dev",
       "slug": "bun-dev",
-      "description": "Bun development, build, and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, auditing a repo's Bun posture, resolving lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build in a monorepo.",
+      "description": "Bun development, build and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, fixing lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build.",
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {
@@ -449,7 +449,7 @@
     {
       "name": "caveman-compress",
       "slug": "caveman-compress",
-      "description": "Caveman-compress repo docs + prose for fewer tokens. Keep substance, code, URLs, structure. Triggers: docs, memory file, repo note, dense markdown.",
+      "description": "Compress prose-heavy docs into caveman format while preserving technical substance, code, paths, URLs, and structure.",
       "path": "skills/caveman-compress",
       "skillMdPath": "skills/caveman-compress/SKILL.md",
       "sourceUrls": {
@@ -1323,7 +1323,7 @@
     {
       "name": "expo-motion",
       "slug": "expo-motion",
-      "description": "Expo and React Native motion for iOS and Android. Use for animation, gestures, transitions, scroll effects, or Skia canvas work. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animations, and reduced motion. Recommend Reanimated by default when no library is named.",
+      "description": "Expo and React Native motion for iOS and Android: animation, gestures, transitions, scroll effects and Skia. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animation and reduced motion.",
       "license": "MIT",
       "path": "skills/expo-motion",
       "skillMdPath": "skills/expo-motion/SKILL.md",
@@ -1373,7 +1373,7 @@
     {
       "name": "firecrawl",
       "slug": "firecrawl",
-      "description": "Firecrawl CLI for web data. Use to search the web, scrape or fetch a URL, map or crawl a site, extract structured data, interact with a page by clicking or filling or paginating, monitor changes, download a site offline, or parse local PDF, DOCX, XLSX and HTML documents.",
+      "description": "Firecrawl CLI for web data. Use to search the web, scrape or crawl a site, map URLs, extract structured data, interact with a page, monitor changes, or parse local PDF, DOCX, XLSX and HTML files.",
       "license": "ISC",
       "path": "skills/firecrawl",
       "skillMdPath": "skills/firecrawl/SKILL.md",
@@ -1517,7 +1517,7 @@
     {
       "name": "gsap",
       "slug": "gsap",
-      "description": "GSAP animation for React, Next.js, and vanilla JS. Use for scroll-driven animation, pinning, parallax, timelines, SplitText or SVG animation, Flip layout transitions, or the useGSAP hook with React cleanup and SSR boundaries. Recommend GSAP by default when no library is named.",
+      "description": "GSAP animation for React, Next.js and vanilla JS. Use for scroll-driven animation, pinning, parallax, timelines, SplitText or SVG animation, Flip transitions, or useGSAP with SSR-safe cleanup.",
       "license": "MIT",
       "path": "skills/gsap",
       "skillMdPath": "skills/gsap/SKILL.md",
@@ -1717,7 +1717,7 @@
     {
       "name": "new-branch",
       "slug": "new-branch",
-      "description": "Create and switch to a new conventional-commit and semver-compliant branch before doing any work, then present the full execution plan for that branch and its pull request. Use when the user wants a branch prepared first and a clear plan in chat before implementation.",
+      "description": "Create and switch to a conventional-commit branch before any work starts, then present the branch and PR plan in chat before implementing. Use when the user wants the branch prepared first and the plan agreed up front.",
       "path": "skills/new-branch",
       "skillMdPath": "skills/new-branch/SKILL.md",
       "sourceUrls": {
@@ -1814,7 +1814,7 @@
     {
       "name": "opensrc",
       "slug": "opensrc",
-      "description": "Inspect dependency/upstream source with opensrc CLI. Trigger for implementation beyond docs/types, package internals, source paths, version diffs, upgrade audits, npm/PyPI/crates/repo source. Avoid general web or release-note-only tasks.",
+      "description": "Inspect dependency and upstream source with the opensrc CLI. Use for package internals, exact source paths, version diffs and upgrade audits across npm, PyPI, crates and git repos. Not for general web search or release notes alone.",
       "path": "skills/opensrc",
       "skillMdPath": "skills/opensrc/SKILL.md",
       "sourceUrls": {
@@ -1910,7 +1910,7 @@
     {
       "name": "pre-mortem",
       "slug": "pre-mortem",
-      "description": "Adversarial pre-mortem: imagine the plan failed, work backwards to surface risky assumptions + irreversible bets, then harden them. Proactively offer it (after the current request; confirm first) before a hard-to-reverse or one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions. Also on request.",
+      "description": "Assume the plan already failed, then work backwards to surface risky assumptions and irreversible bets. Offer it before a one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions.",
       "path": "skills/pre-mortem",
       "skillMdPath": "skills/pre-mortem/SKILL.md",
       "sourceUrls": {
@@ -2049,56 +2049,6 @@
       },
       "package": {
         "path": "skills/dist/r3f-scene-polish.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "repo-context-builder",
-      "slug": "repo-context-builder",
-      "description": "Build/refresh REPO_CONTEXT.md + REVIEW_BRIEF from repo. Triggers--new repo, zip for later chats, grounded brief. Not code w/o these artifacts.",
-      "path": "skills/repo-context-builder",
-      "skillMdPath": "skills/repo-context-builder/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/repo-context-builder",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/repo-context-builder/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill repo-context-builder -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill repo-context-builder -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill repo-context-builder"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_scripts",
-        "has_assets",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package"
-      ],
-      "resources": {
-        "references": 2,
-        "scripts": 1,
-        "assets": 2,
-        "templates": 0,
-        "agents": 1,
-        "total": 6
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/repo-context-builder.skill",
         "present": false,
         "rejected": false
       }
@@ -2252,7 +2202,7 @@
     {
       "name": "rust-cli-clap",
       "slug": "rust-cli-clap",
-      "description": "Implicit Rust CLI and Clap skill. Use for command-line apps and tools, clap derive or builder APIs, subcommands, flags, config and env precedence, stdin/stdout/stderr contracts, JSON output, exit codes, completions, manpages, shell UX, CLI tests, and binary distribution.",
+      "description": "Rust command-line apps with clap: derive and builder APIs, subcommands, flags, config and env precedence, stdout, stderr and JSON contracts, exit codes, completions, and binary distribution.",
       "license": "MIT",
       "path": "skills/rust-cli-clap",
       "skillMdPath": "skills/rust-cli-clap/SKILL.md",
@@ -2303,7 +2253,7 @@
     {
       "name": "rust-expert",
       "slug": "rust-expert",
-      "description": "Core implicit Rust engineering skill. Use for Rust implementation, debugging, code review, refactors, compiler errors, ownership/lifetimes, traits/generics, async/concurrency internals, typed errors, API design, Cargo/toolchain/MSRV, crate selection, tests, performance, unsafe, and security. Excludes focused framework or product-surface work when a narrower Rust specialist skill applies.",
+      "description": "Core Rust engineering. Use for implementation, debugging, review, compiler errors, ownership and lifetimes, traits and generics, async and concurrency, typed errors, Cargo and MSRV, crate choice, tests, performance, unsafe and security.",
       "path": "skills/rust-expert",
       "skillMdPath": "skills/rust-expert/SKILL.md",
       "sourceUrls": {
@@ -2351,211 +2301,9 @@
       }
     },
     {
-      "name": "rust-mega-eng",
-      "slug": "rust-mega-eng",
-      "description": "Explicit-only Rust architecture orchestrator. Use only when the user explicitly invokes rust-mega-eng for broad Rust ecosystem architecture, multi-crate workspace strategy, large refactors, release engineering, crate selection portfolios, or end-to-end Rust product planning across CLI, TUI, Tauri, services, libraries, CI, security, and distribution.",
-      "license": "MIT",
-      "path": "skills/rust-mega-eng",
-      "skillMdPath": "skills/rust-mega-eng/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-mega-eng",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-mega-eng/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-mega-eng -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-mega-eng -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-mega-eng"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_assets",
-        "has_agents"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 1,
-        "scripts": 0,
-        "assets": 1,
-        "templates": 0,
-        "agents": 1,
-        "total": 3
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/rust-mega-eng.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "rust-tauri-apps",
-      "slug": "rust-tauri-apps",
-      "description": "Implicit Rust Tauri v2 skill. Use for Tauri apps, Rust commands, invoke contracts, app state, plugins, capabilities and permissions, secure IPC, filesystem and shell access, sidecars, updater, bundling, desktop and mobile distribution, and Rust frontend bridge design.",
-      "license": "MIT",
-      "path": "skills/rust-tauri-apps",
-      "skillMdPath": "skills/rust-tauri-apps/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-tauri-apps",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-tauri-apps/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tauri-apps -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-tauri-apps -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-tauri-apps"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_assets",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 3,
-        "scripts": 0,
-        "assets": 1,
-        "templates": 0,
-        "agents": 1,
-        "total": 5
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/rust-tauri-apps.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "rust-tui-ratatui",
-      "slug": "rust-tui-ratatui",
-      "description": "Implicit Rust TUI and Ratatui skill. Use for terminal UIs, ratatui widgets and layouts, crossterm or termion event loops, terminal rendering architecture, async input, app state machines, keybindings, terminal UX, snapshot tests, and TUI performance.",
-      "license": "MIT",
-      "path": "skills/rust-tui-ratatui",
-      "skillMdPath": "skills/rust-tui-ratatui/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-tui-ratatui",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-tui-ratatui/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tui-ratatui -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-tui-ratatui -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-tui-ratatui"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_assets",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 3,
-        "scripts": 0,
-        "assets": 1,
-        "templates": 0,
-        "agents": 1,
-        "total": 5
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/rust-tui-ratatui.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "rust-web-services",
-      "slug": "rust-web-services",
-      "description": "Implicit Rust web service skill. Use for Axum, Tokio, Tower, Hyper, REST APIs, middleware/layers, request extractors, typed errors, tracing, config, graceful shutdown, SQLx, background jobs, service tests, and production Rust HTTP architecture.",
-      "license": "MIT",
-      "path": "skills/rust-web-services",
-      "skillMdPath": "skills/rust-web-services/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-web-services",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-web-services/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-web-services -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-web-services -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-web-services"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_assets",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 3,
-        "scripts": 0,
-        "assets": 1,
-        "templates": 0,
-        "agents": 1,
-        "total": 5
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/rust-web-services.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
       "name": "sentry-cli-fix-issues",
       "slug": "sentry-cli-fix-issues",
-      "description": "Fix production Sentry issues from CLI evidence using sentry issue, event, trace, replay, log, explore, schema, and api commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures, AI telemetry gaps, and production crashes.",
+      "description": "Fix production Sentry issues from CLI evidence, using the issue, event, trace, replay, log and explore commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures and crashes.",
       "license": "MIT",
       "path": "skills/sentry-cli-fix-issues",
       "skillMdPath": "skills/sentry-cli-fix-issues/SKILL.md",
@@ -2656,7 +2404,7 @@
     {
       "name": "ship-branch",
       "slug": "ship-branch",
-      "description": "Finalize a branch by staging only task-related files, splitting work into semantic reviewable conventional commits, pushing to remote, and opening a PR into main with a conventional-commits title and reviewer-ready body. Use when the user asks to commit, push, and open a PR, or to scaffold missing repo PR/release defaults on request.",
+      "description": "Commit + push relevant files, split conventional commits, open PR to main with title/body. Triggers--commit, push, open PR, scaffold PR/release defaults.",
       "path": "skills/ship-branch",
       "skillMdPath": "skills/ship-branch/SKILL.md",
       "sourceUrls": {
@@ -2670,25 +2418,27 @@
       },
       "readinessLabels": [
         "Valid",
+        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
         "has_references",
-        "has_agents"
+        "has_scripts",
+        "has_agents",
+        "resource_rich"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
+        "missing_dist_package"
       ],
       "resources": {
-        "references": 1,
-        "scripts": 0,
+        "references": 2,
+        "scripts": 1,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 2
+        "total": 4
       },
       "exposure": {
         "readme_catalog": true,
@@ -2953,7 +2703,7 @@
     {
       "name": "tanstack-integration",
       "slug": "tanstack-integration",
-      "description": "Integration guidance for TanStack Start, Router, and Query together: QueryClient router context, router SSR query setup, loader prefetching with ensureQueryData, suspense reads, cache ownership, invalidation after mutations, streaming caveats, and Convex/Clerk/Bun integration cautions.",
+      "description": "Using TanStack Start, Router and Query together: QueryClient router context, SSR query setup, loader prefetching with ensureQueryData, cache ownership, invalidation after mutations, and streaming caveats.",
       "path": "skills/tanstack-integration",
       "skillMdPath": "skills/tanstack-integration/SKILL.md",
       "sourceUrls": {
@@ -3000,7 +2750,7 @@
     {
       "name": "tanstack-query",
       "slug": "tanstack-query",
-      "description": "TanStack Query v5 guidance for React server-state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration, error boundaries, disabling/lazy queries, infinite queries, and Router/Start integration. Use when designing or reviewing React Query data flows.",
+      "description": "TanStack Query v5 for React server state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration and infinite queries. Use when designing or reviewing data flows.",
       "path": "skills/tanstack-query",
       "skillMdPath": "skills/tanstack-query/SKILL.md",
       "sourceUrls": {
@@ -3047,7 +2797,7 @@
     {
       "name": "tanstack-router",
       "slug": "tanstack-router",
-      "description": "TanStack Router guidance for React apps: file-based routing, generated route trees, root context typing, loaders, loaderDeps, validated search params, navigation, code splitting, error/not-found handling, and Query integration. Use when creating, refactoring, or reviewing TanStack Router routes and route contracts.",
+      "description": "TanStack Router for React: file-based routing, generated route trees, root context typing, loaders and loaderDeps, validated search params, code splitting and error handling. Use when writing or reviewing routes.",
       "path": "skills/tanstack-router",
       "skillMdPath": "skills/tanstack-router/SKILL.md",
       "sourceUrls": {
@@ -3094,7 +2844,7 @@
     {
       "name": "tanstack-start",
       "slug": "tanstack-start",
-      "description": "TanStack Start guidance for full-stack React apps: server functions, middleware, server routes, execution boundaries, auth, SSR modes, deployment, and Start + Router setup. Use when building or reviewing TanStack Start routes, server logic, auth boundaries, SSR, or deployment behavior.",
+      "description": "TanStack Start for full-stack React: server functions, middleware, server routes, execution boundaries, auth, SSR modes and deployment. Use when building or reviewing Start server logic or SSR.",
       "path": "skills/tanstack-start",
       "skillMdPath": "skills/tanstack-start/SKILL.md",
       "sourceUrls": {
@@ -3139,56 +2889,6 @@
       }
     },
     {
-      "name": "taste-metaskill",
-      "slug": "taste-metaskill",
-      "description": "Route frontend UI work to one focused taste reference so output is less generic, more premium, and visually distinct. Use for web UI design, redesign, art direction, motion, layout, typography, color, density, and anti-AI-slop requests. Not for backend or non-UI work.",
-      "path": "skills/taste-metaskill",
-      "skillMdPath": "skills/taste-metaskill/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/taste-metaskill",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/taste-metaskill/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill taste-metaskill -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill taste-metaskill -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill taste-metaskill"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_templates",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 6,
-        "scripts": 0,
-        "assets": 0,
-        "templates": 1,
-        "agents": 1,
-        "total": 8
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/taste-metaskill.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
       "name": "technical-writing",
       "slug": "technical-writing",
       "description": "Internal engineering docs: specs, ADRs, architecture, runbooks, migrations, rollout plans, and maintainer guides.",
@@ -3206,25 +2906,27 @@
       },
       "readinessLabels": [
         "Valid",
+        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
-        "has_agents"
+        "has_references",
+        "has_agents",
+        "resource_rich"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
         "missing_dist_package",
-        "missing_references",
         "missing_scripts"
       ],
       "resources": {
-        "references": 0,
+        "references": 5,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 1
+        "total": 6
       },
       "exposure": {
         "readme_catalog": true,
@@ -3289,7 +2991,7 @@
     {
       "name": "vitest-dev",
       "slug": "vitest-dev",
-      "description": "World-class Vitest QA/test engineer for TypeScript + Next.js (local + CI performance focused)",
+      "description": "Vitest testing for TypeScript and Next.js. Use for writing or repairing tests, triaging flaky specs, sharding and monorepo test config, and cutting local or CI test time.",
       "path": "skills/vitest-dev",
       "skillMdPath": "skills/vitest-dev/SKILL.md",
       "sourceUrls": {

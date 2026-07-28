@@ -208,7 +208,7 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",
@@ -284,7 +284,7 @@ cargo run -q -p codex-dev -- --json capsule init --title "validation smoke" --br
 cargo run -q -p codex-dev -- --json capsule validate "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule status "$tmp/validation-smoke"
 cargo run -q -p codex-dev -- capsule render "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",
@@ -411,9 +411,10 @@ This smoke performs read-only hosted collection plus local capsule writes. The
 `--apply`; they must not be used as evidence that hosted review comments were
 resolved, failed jobs were rerun, or a PR was merged.
 
-Policy gate execution is explicit. Use `--execute` only when you intend to run
-the repo-native commands from the manifest; the default dry run records the
-planned gate snapshot in the capsule without running commands.
+`policy run` executes the repo-native commands from the manifest. Pass
+`--dry-run` to record the planned gate snapshot in the capsule without running
+anything. Each gate is bounded by `--timeout-secs` (default 900); a gate that
+exceeds it is killed along with its process group and recorded as failed.
 Execution discovers the repository root from the current directory or capsule
 path. Pass `--repo-root <path>` when running an installed binary from outside
 the repository. If capsule-path and current-directory discovery point at
@@ -708,7 +709,7 @@ cat > "$tmp/evidence-bundle.json" <<'JSON'
 JSON
 cargo run -q -p codex-dev -- --json research import-bundle --capsule "$tmp/validation-smoke" --bundle "$tmp/evidence-bundle.json" --source-command "codex-research --json bundle --strict" --source-exit-code 0 --imported-at 2026-05-09T04:35:00Z
 cargo run -q -p codex-dev -- --json capsule status "$tmp/validation-smoke"
-cargo run -q -p codex-dev -- --json policy run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
+cargo run -q -p codex-dev -- --json policy run --dry-run --capsule "$tmp/validation-smoke" --checked-at 2026-05-09T05:00:00Z
 cat > "$tmp/subspawn-plan.json" <<'JSON'
 {
   "task": "validation smoke review",

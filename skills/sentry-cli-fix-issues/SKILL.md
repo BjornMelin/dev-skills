@@ -1,6 +1,6 @@
 ---
 name: sentry-cli-fix-issues
-description: Fix production Sentry issues from CLI evidence using sentry issue, event, trace, replay, log, explore, schema, and api commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures, AI telemetry gaps, and production crashes.
+description: "Fix production Sentry issues from CLI evidence, using the issue, event, trace, replay, log and explore commands. Use for Sentry errors, performance regressions, noisy groups, source-map failures and crashes."
 license: MIT
 ---
 

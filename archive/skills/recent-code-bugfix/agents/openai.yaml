@@ -1,0 +1,6 @@
+interface:
+  display_name: "Recent Code Bugfix"
+  short_description: "Find and fix bugs from recent local commits"
+  default_prompt: "Use $recent-code-bugfix to find and fix a bug from my commits in the last week."
+policy:
+  allow_implicit_invocation: false

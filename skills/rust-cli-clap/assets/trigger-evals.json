@@ -17,16 +17,16 @@
   {
     "query": "Implement a ratatui dashboard with async key handling.",
     "should_trigger": false,
-    "reason": "TUI work belongs to rust-tui-ratatui."
+    "reason": "Not command-line argument work; rust-expert owns general Rust implementation."
   },
   {
     "query": "Secure a Tauri command exposed to the frontend.",
     "should_trigger": false,
-    "reason": "Tauri command and capability work belongs to rust-tauri-apps."
+    "reason": "Not command-line argument work; rust-expert owns general Rust implementation."
   },
   {
     "query": "Create an Axum middleware stack with tower layers.",
     "should_trigger": false,
-    "reason": "Web service architecture belongs to rust-web-services."
+    "reason": "Not command-line argument work; rust-expert owns general Rust implementation."
   }
 ]

@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "codex-session-cleanup",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "source_path": "skills/codex-session-cleanup",
+  "archived_path": "archive/skills/codex-session-cleanup",
+  "relocated_to": "~/.codex/skills/codex-session-cleanup",
+  "reason": "Codex-specific: it scans, quarantines and purges Codex session, history, state and memory artifacts. It has no Claude equivalent and no reason to occupy the shared library or any Claude listing budget, so it now lives in the Codex skill root where Codex loads it directly. This copy exists only to keep it under version control, since the shared library is not a git checkout. This skill was install-only and never tracked in skills/; the path is recorded in the canonical form the archive schema requires.",
+  "restore": "It is not retired. Edit ~/.codex/skills/codex-session-cleanup; refresh this copy when it changes."
+}

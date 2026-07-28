@@ -1,6 +1,6 @@
 ---
 name: rust-expert
-description: "Core implicit Rust engineering skill. Use for Rust implementation, debugging, code review, refactors, compiler errors, ownership/lifetimes, traits/generics, async/concurrency internals, typed errors, API design, Cargo/toolchain/MSRV, crate selection, tests, performance, unsafe, and security. Excludes focused framework or product-surface work when a narrower Rust specialist skill applies."
+description: "Core Rust engineering. Use for implementation, debugging, review, compiler errors, ownership and lifetimes, traits and generics, async and concurrency, typed errors, Cargo and MSRV, crate choice, tests, performance, unsafe and security."
 ---
 
 # Rust Expert
@@ -26,17 +26,14 @@ design evidence.
 
 ## Domain Routing
 
-Use these implicit specialist skills when the task clearly belongs there:
-
 | Signal | Prefer |
 | --- | --- |
 | Command-line app, subcommands, flags, config precedence, JSON/stdout contracts | `rust-cli-clap` |
-| Terminal UI, interactive dashboards, Ratatui widgets/layout/events | `rust-tui-ratatui` |
-| Tauri v2, `src-tauri`, commands, capabilities, IPC, updater, mobile layout | `rust-tauri-apps` |
-| HTTP APIs/services, Axum, Tower, Tokio server runtime, DB pools | `rust-web-services` |
-| Broad architecture review or multi-domain Rust planning explicitly requested | `rust-mega-eng` |
 
-If no specialist owns the task, stay in `rust-expert`.
+Everything else stays here. The Ratatui, Tauri, Axum-service and multi-crate
+architecture specialists were archived because no matching surface exists in
+this tree; `rust-expert` owns that work now. If one of those surfaces comes
+back, restore the skill from `archive/skills/` and add a row here.
 
 ## Reference Map
 

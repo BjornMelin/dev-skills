@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "taste-metaskill",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "source_path": "skills/taste-metaskill",
+  "archived_path": "archive/skills/taste-metaskill",
+  "reason": "A pure router into the design-taste skill set, which no longer exists: its targets design-taste-frontend and high-end-visual-design were removed for contradicting docs/design.md, leaving this skill dispatching to nothing. Superseded by `signr-design-review`, which lives outside this repository's skills/ tree.",
+  "restore": "Move this directory back to skills/taste-metaskill and relink it from the consuming agents' skill farms."
+}

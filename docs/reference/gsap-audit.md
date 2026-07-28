@@ -67,6 +67,9 @@ Options:
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`. When the cap is hit, the report sets `truncated: true`.
+- `--min-severity <low|medium|high>`: lowest severity that makes the exit
+  code non-zero. Default `medium`. Changes the exit code only; every
+  finding is still reported.
 
 ## doctor
 
@@ -109,7 +112,8 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
 - `core`: core GSAP API misuse, including obsolete `gsap-trial` imports and
   animating layout-affecting properties instead of transforms.
 - `react`: React/Next integration issues such as unregistered `useGSAP`,
-  running GSAP during SSR, unscoped selectors, and contexts that never revert.
+  running GSAP during SSR, unscoped selectors, contexts that never revert, and
+  React state driven from a continuous motion source.
 - `scrolltrigger`: ScrollTrigger configuration problems such as debug markers
   left in production and conflicting `scrub`/`toggleActions` settings.
 - `timeline`: timeline and sequencing issues such as GSAP-2 duration-as-second
@@ -122,6 +126,48 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
 This doc describes rules only at the category level on purpose: the per-rule id
 set is maintained in the crate and can change between builds. Run
 `gsap-audit doctor` for the authoritative current rule list.
+
+### react.state-in-continuous-motion
+
+One rule is worth calling out because it encodes a design rule rather than an
+API misuse. `react.state-in-continuous-motion` fires when a `useState` setter is
+called from a source that runs every frame:
+
+- an `onScroll`/`onWheel`/`onPointerMove`/`onMouseMove`/`onTouchMove`/`onDrag`
+  JSX handler,
+- a `scroll`/`wheel`/`pointermove`/`mousemove`/`touchmove`/`drag`
+  `addEventListener`,
+- an `onUpdate` callback **inside a GSAP call**,
+- a `requestAnimationFrame` callback **that schedules another frame**,
+- `gsap.ticker.add`.
+
+The qualifiers matter. `onUpdate` is an ordinary callback name, so
+`editor.configure({ onUpdate })` is not reported; only a GSAP or ScrollTrigger
+call puts a frame loop behind it. `onRefresh` is excluded entirely, because
+ScrollTrigger fires it on refresh rather than per frame. And a bare
+`requestAnimationFrame(() => setReady(true))` runs once, so it is a single
+deferred update rather than a loop.
+
+Setters are resolved through the symbol table, not by name, so a prop or helper
+that merely shares a name with a `useState` setter elsewhere in the file is not
+reported.
+
+Discrete handlers are deliberately excluded. A state update per click is
+ordinary React; the defect is a state update per *frame*. Writing to a ref from
+the same handler is the prescribed fix and is not reported either, since a rule
+that flagged the fix would push authors back toward the defect.
+
+The check is still a heuristic and reports at medium confidence. Two limits are
+worth knowing before treating a clean run as proof:
+
+- **Only inline callbacks are matched.** The setter must sit inside a function
+  written at the call site. A named callback (`const update = () => {...}` then
+  `requestAnimationFrame(update)`) is not matched, and that indirection is
+  common in real code. A clean scan is evidence, not a guarantee.
+- **A match is not automatically a defect.** Setting a *boolean* from a scroll
+  handler re-renders only when the value flips, because React bails out on an
+  unchanged value; the anti-pattern is storing a continuously varying number.
+  Treat a finding as a prompt to check which of the two it is.
 
 ## Output Formats
 
@@ -154,10 +200,15 @@ total finding count plus counts grouped by severity and by category.
 
 `gsap-audit scan` uses exit codes as a CI-friendly contract:
 
-- `0`: clean, or only low-severity findings were reported.
-- `2`: at least one medium- or high-severity finding is present.
+- `0`: no finding met `--min-severity`.
+- `2`: at least one finding met `--min-severity` (default `medium`).
 - `1`: a usage or IO error occurred (for example an unreadable root or invalid
   arguments).
+
+`--min-severity low|medium|high` sets where the gate trips. It changes the exit
+code only: the report always contains every finding, so raising the bar to get
+a repository green never hides the work still to do. A repository with a known
+backlog can gate on `high` today and tighten to `low` once clean.
 
 This lets a CI gate fail on actionable GSAP anti-patterns while still surfacing
 low-severity findings as advisory output.

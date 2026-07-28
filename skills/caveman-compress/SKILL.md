@@ -1,8 +1,6 @@
 ---
 name: caveman-compress
-description: >
-  Caveman-compress repo docs + prose for fewer tokens. Keep substance, code, URLs, structure.
-  Triggers: docs, memory file, repo note, dense markdown.
+description: Compress prose-heavy docs into caveman format while preserving technical substance, code, paths, URLs, and structure.
 ---
 
 # Caveman Compress
@@ -13,15 +11,15 @@ Compress docs and natural language files such as `AGENTS.md`, todos, preferences
 
 ## Trigger
 
-`/caveman:compress <filepath>` or user asks to compress memory file.
+`/caveman:compress <filepath>` or when the user asks to compress a memory file.
 
 ## Discovery
 
-- No files named → inspect current repo first.
-- `git status --porcelain`, `git diff --name-only` for changes.
-- `rg`, `find` for nearby docs; bounded semantic match for prose neighbors.
-- Prefer repo-owned docs + notes; outside-repo paths when user names them.
-- Ambiguous / low-confidence → `request_user_input` + scored recs.
+- Inspect current repo first when the user does not name files.
+- Use `git status --porcelain` and `git diff --name-only` to find changed files.
+- Use `rg` and `find` for nearby docs, plus bounded semantic matching for likely prose neighbors.
+- Prefer repo-owned docs and notes by default. Allow explicit outside-repo paths when named.
+- Use `request_user_input` for ambiguous or lower-confidence candidates and include scored recommendations.
 
 ## Process
 
@@ -49,7 +47,7 @@ Compress docs and natural language files such as `AGENTS.md`, todos, preferences
 
 - Code blocks (fenced ``` and indented)
 - Inline code (`backtick content`)
-- URLs + links (full URLs, markdown links)
+- URLs and links (full URLs, markdown links)
 - File paths (`/src/components/...`, `./config.yaml`)
 - Commands (`npm install`, `git commit`, `docker build`)
 - Technical terms (library names, API names, protocols, algorithms)
@@ -88,7 +86,7 @@ Do not modify anything inside backticks.
 
 If file contains code blocks:
 
-- Code blocks = read-only regions
+- Treat code blocks as read-only regions
 - Only compress text outside them
 - Do not merge sections around code
 

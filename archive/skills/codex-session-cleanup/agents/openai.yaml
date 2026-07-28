@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex Session Cleanup"
+  short_description: "Safely clean Codex artifacts"
+  default_prompt: "Use $codex-session-cleanup to scan Codex artifacts for this repo, explicit roots, subrepos, or all sessions; triage memory and propose copy-first quarantine cleanup."
+
+policy:
+  allow_implicit_invocation: false

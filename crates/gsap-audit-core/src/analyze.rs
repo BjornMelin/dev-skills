@@ -255,6 +255,485 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
     facts
 }
 
+/// Whether an identifier reference resolves to an import of `imported`,
+/// regardless of the local alias it was bound to.
+fn identifier_imports_name(
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+    semantic: &Semantic<'_>,
+    imported: &str,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let scoping = semantic.scoping();
+    let Some(reference_id) = identifier.reference_id.get() else {
+        return false;
+    };
+    let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id() else {
+        return false;
+    };
+    match semantic.nodes().kind(scoping.symbol_declaration(symbol_id)) {
+        AstKind::ImportSpecifier(specifier) => specifier.imported.name() == imported,
+        _ => false,
+    }
+}
+
+/// Whether an identifier reference resolves to the setter of a `useState`
+/// destructure, i.e. `setValue` in `const [value, setValue] = useState(...)`.
+///
+/// Resolved through the symbol table rather than by name. Two components in one
+/// file can each declare a `setProgress`, and an unrelated prop or helper may
+/// share the name; matching on text alone would report the wrong one.
+fn identifier_is_use_state_setter(
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+    semantic: &Semantic<'_>,
+) -> bool {
+    use oxc_ast::AstKind;
+    use oxc_ast::ast::{BindingPattern, Expression};
+
+    let scoping = semantic.scoping();
+    let Some(reference_id) = identifier.reference_id.get() else {
+        return false;
+    };
+    let Some(symbol_id) = scoping.get_reference(reference_id).symbol_id() else {
+        return false;
+    };
+    let declaration_node = scoping.symbol_declaration(symbol_id);
+    let AstKind::VariableDeclarator(declarator) = semantic.nodes().kind(declaration_node) else {
+        return false;
+    };
+    let Some(init) = &declarator.init else {
+        return false;
+    };
+    let Expression::CallExpression(call) = init.without_parentheses() else {
+        return false;
+    };
+    // Resolve the hook through its import so an alias still counts:
+    // `import { useState as useReactState } from "react"` binds the local name
+    // to an `ImportSpecifier` whose imported name is the real hook.
+    let is_use_state = match &call.callee {
+        Expression::Identifier(callee) => {
+            callee.name.as_str() == "useState"
+                || identifier_imports_name(callee, semantic, "useState")
+        }
+        Expression::StaticMemberExpression(member) => member.property.name.as_str() == "useState",
+        _ => false,
+    };
+    if !is_use_state {
+        return false;
+    }
+    // The setter is specifically the second element. `const [value] =
+    // useState()` declares no setter, and the value itself is not one.
+    let BindingPattern::ArrayPattern(pattern) = &declarator.id else {
+        return false;
+    };
+    pattern
+        .elements
+        .get(1)
+        .and_then(Option::as_ref)
+        .and_then(oxc_ast::ast::BindingPattern::get_binding_identifier)
+        .is_some_and(|binding| binding.symbol_id.get() == Some(symbol_id))
+}
+
+/// JSX handler props that fire continuously while the user scrolls or moves.
+///
+/// `onClick` and friends are deliberately absent: a state update per click is
+/// ordinary React. The defect is a state update per *frame*.
+const CONTINUOUS_JSX_HANDLERS: &[&str] = &[
+    "onScroll",
+    "onWheel",
+    "onPointerMove",
+    "onMouseMove",
+    "onTouchMove",
+    "onDrag",
+];
+
+/// DOM events that fire continuously, as passed to `addEventListener`.
+const CONTINUOUS_DOM_EVENTS: &[&str] = &[
+    "scroll",
+    "wheel",
+    "pointermove",
+    "mousemove",
+    "touchmove",
+    "drag",
+];
+
+/// Whether `node_id` sits inside a callback driven by a continuous motion
+/// source, and if so what to name it in the message.
+///
+/// Walks outward to the nearest enclosing function, then classifies that
+/// function by how it is passed. Bounded so a deeply nested expression cannot
+/// walk the whole file.
+fn continuous_motion_driver(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+    use oxc_ast::ast::{Expression, PropertyKey};
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+
+    // Find the nearest enclosing function expression.
+    let function_node = loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::ArrowFunctionExpression(_) | AstKind::Function(_) => break parent_id,
+            _ => current = parent_id,
+        }
+    };
+
+    // Classify by how that function is used.
+    let mut current = function_node;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            // <div onScroll={() => setX(...)} />
+            AstKind::JSXExpressionContainer(_) => {
+                let attribute_id = nodes.parent_id(parent_id);
+                if let AstKind::JSXAttribute(attribute) = nodes.kind(attribute_id)
+                    && let Some(name) = attribute.name.as_identifier()
+                    && CONTINUOUS_JSX_HANDLERS.contains(&name.name.as_str())
+                {
+                    return Some(format!("the `{}` handler", name.name));
+                }
+                return None;
+            }
+            // { onUpdate: () => setX(...) } inside a GSAP call.
+            //
+            // `onUpdate` alone is not enough: `editor.configure({ onUpdate })`
+            // is an ordinary callback with no frame loop behind it, so the
+            // enclosing call must be a GSAP one. `onRefresh` is deliberately
+            // excluded — ScrollTrigger fires it on refresh, not per frame.
+            AstKind::ObjectProperty(property) => {
+                if let PropertyKey::StaticIdentifier(key) = &property.key
+                    && key.name.as_str() == "onUpdate"
+                    && enclosing_call_is_gsap(semantic, parent_id, facts)
+                {
+                    return Some("a GSAP `onUpdate` callback".to_string());
+                }
+                return None;
+            }
+            AstKind::CallExpression(call) => {
+                match &call.callee {
+                    // A bare `requestAnimationFrame(() => ...)` runs once.
+                    // Only a callback that schedules another frame is a loop.
+                    Expression::Identifier(identifier)
+                        if identifier.name.as_str() == "requestAnimationFrame"
+                            && function_reschedules_animation_frame(semantic, function_node) =>
+                    {
+                        return Some("a requestAnimationFrame loop".to_string());
+                    }
+                    Expression::StaticMemberExpression(member) => {
+                        let property = member.property.name.as_str();
+                        // el.addEventListener("scroll", fn)
+                        if property == "addEventListener"
+                            && let Some(Expression::StringLiteral(event)) =
+                                call.arguments.first().and_then(|a| a.as_expression())
+                            && CONTINUOUS_DOM_EVENTS.contains(&event.value.as_str())
+                        {
+                            return Some(format!("a `{}` listener", event.value));
+                        }
+                        // gsap.ticker.add(fn). The receiver must resolve to a
+                        // known GSAP binding: `analytics.ticker.add(...)` is an
+                        // unrelated API that happens to share a property name.
+                        if property == "add"
+                            && member_expression_mentions(member, "ticker")
+                            && member_chain_roots_at_gsap(member, facts)
+                        {
+                            return Some("a gsap.ticker callback".to_string());
+                        }
+                        return None;
+                    }
+                    _ => return None,
+                }
+            }
+            _ => current = parent_id,
+        }
+    }
+    None
+}
+
+/// Rule: a `useState` setter called from a continuous motion source.
+///
+/// Driving scroll, pointer or ticker values through React state re-renders the
+/// component on every frame. The fix is to write to a ref or a
+/// `gsap.quickTo`/`quickSetter` and leave React out of the frame loop.
+fn check_state_in_continuous_motion<'a, F>(
+    call: &oxc_ast::ast::CallExpression<'a>,
+    node_id: oxc_semantic::NodeId,
+    semantic: &Semantic<'a>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    use oxc_ast::ast::Expression;
+
+    let Expression::Identifier(callee) = call.callee.without_parentheses() else {
+        return;
+    };
+    let setter = callee.name.as_str();
+    if !identifier_is_use_state_setter(callee, semantic) {
+        return;
+    }
+    let Some(driver) = continuous_motion_driver(semantic, node_id, facts) else {
+        return;
+    };
+
+    // React bails out of a render when the next state equals the current one,
+    // so a threshold like `setStuck(y > 100)` re-renders only when the boolean
+    // flips. That is the prescribed pattern, not a per-frame render, and
+    // failing the default gate on it would punish correct code. Report it as
+    // advisory instead of claiming a cost it does not have.
+    let stores_boolean = call
+        .arguments
+        .first()
+        .and_then(|argument| argument.as_expression())
+        .is_some_and(expression_is_boolean_valued);
+
+    if stores_boolean {
+        emit(
+            ids::REACT_STATE_IN_CONTINUOUS_MOTION,
+            Severity::Low,
+            Confidence::Low,
+            call.span,
+            format!(
+                "`{setter}` is called from {driver}, but stores a boolean, so React re-renders only when it flips."
+            ),
+            "Usually fine. Confirm the value is genuinely two-state; if it later stores a varying number, move it to a ref.",
+        );
+        return;
+    }
+
+    emit(
+        ids::REACT_STATE_IN_CONTINUOUS_MOTION,
+        Severity::High,
+        Confidence::Medium,
+        call.span,
+        format!("`{setter}` is called from {driver}, re-rendering on every frame."),
+        "Drive continuous motion outside React: write to a ref, or use gsap.quickTo/quickSetter and keep state for discrete changes only.",
+    );
+}
+
+/// Whether an expression provably evaluates to a boolean.
+///
+/// Comparisons, `!x`, boolean literals and `a && b` / `a || b` over booleans.
+/// Anything else is treated as potentially continuous.
+fn expression_is_boolean_valued(expression: &oxc_ast::ast::Expression<'_>) -> bool {
+    use oxc_ast::ast::{BinaryOperator, Expression, LogicalOperator, UnaryOperator};
+
+    match expression.without_parentheses() {
+        Expression::BooleanLiteral(_) => true,
+        Expression::UnaryExpression(unary) => unary.operator == UnaryOperator::LogicalNot,
+        Expression::BinaryExpression(binary) => matches!(
+            binary.operator,
+            BinaryOperator::GreaterThan
+                | BinaryOperator::GreaterEqualThan
+                | BinaryOperator::LessThan
+                | BinaryOperator::LessEqualThan
+                | BinaryOperator::Equality
+                | BinaryOperator::StrictEquality
+                | BinaryOperator::Inequality
+                | BinaryOperator::StrictInequality
+                | BinaryOperator::In
+                | BinaryOperator::Instanceof
+        ),
+        Expression::LogicalExpression(logical) => {
+            matches!(logical.operator, LogicalOperator::And | LogicalOperator::Or)
+                && expression_is_boolean_valued(&logical.left)
+                && expression_is_boolean_valued(&logical.right)
+        }
+        _ => false,
+    }
+}
+
+/// Whether the call enclosing an object literal is a GSAP one.
+///
+/// Walks out from the property to the nearest `CallExpression` and checks its
+/// callee against the file's known GSAP bindings, so a config object passed to
+/// an unrelated library is not mistaken for a tween.
+fn enclosing_call_is_gsap(
+    semantic: &Semantic<'_>,
+    property_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+    use oxc_ast::ast::Expression;
+
+    let nodes = semantic.nodes();
+    let mut current = property_id;
+    for _ in 0..8 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if let AstKind::CallExpression(call) = nodes.kind(parent_id) {
+            return match &call.callee {
+                // `ScrollTrigger.create({...})`, including an alias:
+                // `import { ScrollTrigger as ST }` then `ST.create(...)`.
+                // plugin_aliases already records the local binding, so resolve
+                // through it rather than matching the literal property chain.
+                Expression::StaticMemberExpression(member) => {
+                    member_object_is_gsap(member, facts)
+                        || member_object_resolves_to_plugin(member, facts)
+                }
+                Expression::Identifier(identifier) => {
+                    let name = identifier.name.as_str();
+                    facts.gsap_bindings.contains(name)
+                        || facts.configured_gsap_imports.contains(name)
+                        || plugin_name_for_identifier(name, facts).is_some()
+                }
+                _ => false,
+            };
+        }
+        current = parent_id;
+    }
+    false
+}
+
+/// Whether a function schedules another animation frame from inside itself.
+///
+/// A `requestAnimationFrame` callback runs exactly once unless it reschedules,
+/// so `requestAnimationFrame(() => setReady(true))` is a single state update,
+/// not a per-frame loop, and must not be reported as one.
+fn function_reschedules_animation_frame(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+    use oxc_ast::ast::Expression;
+
+    let nodes = semantic.nodes();
+    let Some(range) = node_span(semantic, function_id) else {
+        return false;
+    };
+    // The callback's own name, when it has one. `requestAnimationFrame(function
+    // tick() { ... requestAnimationFrame(tick) })` recurses; so does a named
+    // arrow assigned to a binding that the inner call references.
+    let self_name = match nodes.kind(function_id) {
+        AstKind::Function(function) => function.id.as_ref().map(|id| id.name.as_str().to_string()),
+        AstKind::ArrowFunctionExpression(_) => match nodes.kind(nodes.parent_id(function_id)) {
+            AstKind::VariableDeclarator(declarator) => declarator
+                .id
+                .get_binding_identifier()
+                .map(|binding| binding.name.as_str().to_string()),
+            _ => None,
+        },
+        _ => None,
+    };
+
+    nodes.iter().any(|node| {
+        let AstKind::CallExpression(call) = node.kind() else {
+            return false;
+        };
+        let Expression::Identifier(identifier) = &call.callee else {
+            return false;
+        };
+        if identifier.name.as_str() != "requestAnimationFrame" {
+            return false;
+        }
+        if call.span.start <= range.0 || call.span.end > range.1 {
+            return false;
+        }
+        // Presence of another frame request is not recurrence. A finite
+        // sequence such as `requestAnimationFrame(() => { setX(1);
+        // requestAnimationFrame(renderOnce) })` schedules exactly two frames.
+        // Only a call that reschedules THIS callback is a loop.
+        match call.arguments.first().and_then(|a| a.as_expression()) {
+            Some(Expression::Identifier(argument)) => {
+                self_name.as_deref() == Some(argument.name.as_str())
+            }
+            // An inline callback that itself contains a frame request is the
+            // recursive-arrow idiom; requiring a name would miss it.
+            Some(Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)) => {
+                false
+            }
+            _ => false,
+        }
+    })
+}
+
+/// The source span of a node, when it is one this rule cares about.
+fn node_span(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> Option<(u32, u32)> {
+    use oxc_ast::AstKind;
+    match semantic.nodes().kind(node_id) {
+        AstKind::ArrowFunctionExpression(function) => {
+            Some((function.span.start, function.span.end))
+        }
+        AstKind::Function(function) => Some((function.span.start, function.span.end)),
+        _ => None,
+    }
+}
+
+/// Whether a member expression's object is a known GSAP plugin, alias included.
+fn member_object_resolves_to_plugin(
+    member: &oxc_ast::ast::StaticMemberExpression<'_>,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::ast::Expression;
+    match member.object.without_parentheses() {
+        Expression::Identifier(identifier) => {
+            plugin_name_for_identifier(identifier.name.as_str(), facts).is_some()
+        }
+        _ => false,
+    }
+}
+
+/// Whether a member chain bottoms out in an identifier bound to GSAP.
+///
+/// `gsap.ticker.add(fn)` qualifies; `analytics.ticker.add(fn)` does not, even
+/// though both contain a `ticker` property.
+fn member_chain_roots_at_gsap(
+    member: &oxc_ast::ast::StaticMemberExpression<'_>,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::ast::Expression;
+    let mut current = member.object.without_parentheses();
+    for _ in 0..6 {
+        match current {
+            Expression::StaticMemberExpression(inner) => {
+                current = inner.object.without_parentheses();
+            }
+            Expression::Identifier(identifier) => {
+                let name = identifier.name.as_str();
+                return facts.gsap_bindings.contains(name)
+                    || facts.configured_gsap_imports.contains(name);
+            }
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// Whether a member expression chain mentions `name` anywhere in its object.
+fn member_expression_mentions(
+    member: &oxc_ast::ast::StaticMemberExpression<'_>,
+    name: &str,
+) -> bool {
+    use oxc_ast::ast::Expression;
+    let mut current = member.object.without_parentheses();
+    for _ in 0..4 {
+        match current {
+            Expression::StaticMemberExpression(inner) => {
+                if inner.property.name.as_str() == name {
+                    return true;
+                }
+                current = inner.object.without_parentheses();
+            }
+            Expression::Identifier(identifier) => return identifier.name.as_str() == name,
+            _ => return false,
+        }
+    }
+    false
+}
+
 fn record_configured_gsap_imports(
     import: &oxc_ast::ast::ImportDeclaration<'_>,
     facts: &mut FileFacts,
@@ -664,6 +1143,7 @@ fn check_node<'a, F>(
         }
         AstKind::CallExpression(call) => {
             check_call(call, semantic, facts, emit);
+            check_state_in_continuous_motion(call, node.id(), semantic, facts, emit);
         }
         // Rule 2: dev-only helpers referenced in non-test source. Skip TS
         // type-only positions (e.g. `let x: GSDevTools`), which are erased at build time.

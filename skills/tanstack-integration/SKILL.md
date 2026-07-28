@@ -1,6 +1,6 @@
 ---
 name: tanstack-integration
-description: "Integration guidance for TanStack Start, Router, and Query together: QueryClient router context, router SSR query setup, loader prefetching with ensureQueryData, suspense reads, cache ownership, invalidation after mutations, streaming caveats, and Convex/Clerk/Bun integration cautions."
+description: "Using TanStack Start, Router and Query together: QueryClient router context, SSR query setup, loader prefetching with ensureQueryData, cache ownership, invalidation after mutations, and streaming caveats."
 ---
 
 # TanStack Integration

@@ -72,6 +72,9 @@ Options:
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`. When the cap is hit, the report sets `truncated: true`.
+- `--min-severity <low|medium|high>`: lowest severity that makes the exit
+  code non-zero. Default `medium`. Changes the exit code only; every
+  finding is still reported.
 
 The walk includes `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
 source files plus the supported config files, and skips `node_modules`, `.git`,
@@ -196,10 +199,15 @@ grouped by severity and by category.
 
 `expo-motion-audit scan` uses exit codes as a CI-friendly contract:
 
-- `0`: clean, or only low-severity findings were reported.
-- `2`: at least one medium- or high-severity finding is present.
+- `0`: no finding met `--min-severity`.
+- `2`: at least one finding met `--min-severity` (default `medium`).
 - `1`: a usage or IO error occurred (for example an unreadable root or invalid
   arguments).
+
+`--min-severity low|medium|high` sets where the gate trips. It changes the exit
+code only: the report always contains every finding, so raising the bar to get
+a repository green never hides the work still to do. A repository with a known
+backlog can gate on `high` today and tighten to `low` once clean.
 
 This lets a CI gate fail on actionable motion anti-patterns while still
 surfacing low-severity (informational) findings as advisory output.

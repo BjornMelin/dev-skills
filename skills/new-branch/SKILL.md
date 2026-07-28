@@ -1,6 +1,6 @@
 ---
 name: new-branch
-description: Create and switch to a new conventional-commit and semver-compliant branch before doing any work, then present the full execution plan for that branch and its pull request. Use when the user wants a branch prepared first and a clear plan in chat before implementation.
+description: "Create and switch to a conventional-commit branch before any work starts, then present the branch and PR plan in chat before implementing. Use when the user wants the branch prepared first and the plan agreed up front."
 ---
 
 # New Branch

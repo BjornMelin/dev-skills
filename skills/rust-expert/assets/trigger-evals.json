@@ -21,17 +21,27 @@
   },
   {
     "query": "Build a Ratatui dashboard with keyboard navigation.",
-    "should_trigger": false,
-    "reason": "Owned by rust-tui-ratatui."
+    "should_trigger": true,
+    "reason": "The dedicated specialist was archived; rust-expert is the general Rust lane and now owns this work."
   },
   {
     "query": "Add Tauri v2 commands and capabilities for a desktop app.",
-    "should_trigger": false,
-    "reason": "Owned by rust-tauri-apps."
+    "should_trigger": true,
+    "reason": "The dedicated specialist was archived; rust-expert is the general Rust lane and now owns this work."
   },
   {
     "query": "Design an Axum API with middleware and sqlx pool handling.",
+    "should_trigger": true,
+    "reason": "The dedicated specialist was archived; rust-expert is the general Rust lane and now owns this work."
+  },
+  {
+    "query": "Add shell completions and a --json flag to our clap parser.",
     "should_trigger": false,
-    "reason": "Owned by rust-web-services."
+    "reason": "Command-line argument surface; owned by rust-cli-clap."
+  },
+  {
+    "query": "Write a Python script to parse these CSV exports.",
+    "should_trigger": false,
+    "reason": "Not Rust."
   }
 ]

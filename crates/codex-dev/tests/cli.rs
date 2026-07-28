@@ -3518,7 +3518,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
     let missing_manifest_message = missing_manifest_json["result"]["error"]["message"]
         .as_str()
         .expect("missing manifest error message");
-    assert!(missing_manifest_message.contains("repo root must contain Cargo.toml"));
+    assert!(missing_manifest_message.contains("repo root must contain .git or Cargo.toml"));
     assert!(missing_manifest_message.contains("--include-local-paths"));
     assert!(!missing_manifest_message.contains(missing_manifest_arg));
 
@@ -3577,6 +3577,7 @@ fn policy_manifest_and_dry_run_update_capsule() {
             "--json",
             "policy",
             "run",
+            "--dry-run",
             "--capsule",
             capsule,
             "--checked-at",
@@ -3594,6 +3595,11 @@ fn policy_manifest_and_dry_run_update_capsule() {
         .as_array()
         .expect("policy run gates");
     assert!(run_gates.iter().all(|gate| gate["status"] == "planned"));
+    // A plan satisfies `passed` vacuously, so it must not also claim to have
+    // verified anything. This is the distinction that made a bare `policy run`
+    // report success while executing nothing.
+    assert_eq!(run_json["result"]["passed"], true);
+    assert_eq!(run_json["result"]["verified"], false);
 }
 
 #[test]
@@ -8388,6 +8394,14 @@ fn evidence_append_records_typed_entries_and_status_counts() {
     let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
     let capsule = init_json["result"]["path"].as_str().expect("capsule path");
 
+    // A hand-authored record must cite an artifact that exists, so the test
+    // produces one rather than asserting a filename into being.
+    std::fs::write(
+        std::path::Path::new(capsule).join("decision-notes.md"),
+        "# Decision notes\n",
+    )
+    .expect("write artifact");
+
     let append_output = Command::cargo_bin("codex-dev")
         .expect("binary")
         .args([
@@ -8413,13 +8427,49 @@ fn evidence_append_records_typed_entries_and_status_counts() {
             "--residual-risk",
             "future PR normalizers still need fixtures",
             "--artifact",
-            "docs/reference/codex-dev-cli.md",
+            "decision-notes.md",
         ])
         .assert()
         .success()
         .get_output()
         .stdout
         .clone();
+
+    // The same append citing an artifact that was never produced must fail,
+    // and must fail *for that reason*. A bare `.failure()` would also pass if
+    // argument parsing broke, hiding a regression in artifact verification.
+    let missing_artifact_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "evidence",
+            "append",
+            "--capsule",
+            capsule,
+            "--kind",
+            "decision",
+            "--summary",
+            "Cite an artifact that does not exist",
+            "--at",
+            "2026-05-09T06:05:00Z",
+            "--artifact",
+            "never-produced.md",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let missing_artifact_json: Value =
+        serde_json::from_slice(&missing_artifact_output).expect("missing artifact json");
+    let message = missing_artifact_json["result"]["error"]["message"]
+        .as_str()
+        .expect("error message");
+    assert!(
+        message.contains("does not exist on disk") && message.contains("never-produced.md"),
+        "expected an artifact-existence failure, got: {message}"
+    );
+
     let append_json: Value = serde_json::from_slice(&append_output).expect("append json");
     assert_eq!(append_json["command"], "evidence append");
     assert_eq!(append_json["result"]["record"]["kind"], "decision");
@@ -9246,4 +9296,57 @@ fn evidence_append_json_errors_are_typed_and_do_not_write() {
         std::fs::read_to_string(&evidence_path).expect("evidence after"),
         evidence_before
     );
+}
+
+/// `--artifact` is documented as taking a `<path-or-id>`. Verifying that
+/// hand-authored artifacts exist must not turn an opaque identifier into an
+/// error, since the filesystem has nothing to say about `artifact:build-123`.
+#[test]
+fn evidence_append_accepts_an_opaque_artifact_id() {
+    let temp = tempdir().expect("tempdir");
+    let root = temp.path().join("tasks");
+    let init_output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "capsule",
+            "init",
+            "--title",
+            "Opaque artifact id",
+            "--root",
+            root.to_str().expect("utf8 temp path"),
+            "--id",
+            "opaque-artifact",
+            "--created-at",
+            "2026-05-09T04:00:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let init_json: Value = serde_json::from_slice(&init_output).expect("init json");
+    let capsule = init_json["result"]["path"].as_str().expect("capsule path");
+
+    for artifact in ["artifact:build-123", "issue:42"] {
+        Command::cargo_bin("codex-dev")
+            .expect("binary")
+            .args([
+                "--json",
+                "evidence",
+                "append",
+                "--capsule",
+                capsule,
+                "--kind",
+                "decision",
+                "--summary",
+                "Cite an opaque artifact id",
+                "--at",
+                "2026-05-09T06:06:00Z",
+                "--artifact",
+                artifact,
+            ])
+            .assert()
+            .success();
+    }
 }

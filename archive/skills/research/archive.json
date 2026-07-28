@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "research",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "deep-researcher",
+  "source_path": "skills/research",
+  "archived_path": "archive/skills/research",
+  "reason": "Twelve lines in total. deep-researcher owns the research lane with a citation and freshness contract, and firecrawl plus the codex-research CLI own retrieval. This skill was install-only and never tracked in skills/; the path is recorded in the canonical form the archive schema requires.",
+  "restore": "Move this directory back to skills/research and relink it from the consuming agents' skill farms."
+}

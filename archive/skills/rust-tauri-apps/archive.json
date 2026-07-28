@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "rust-tauri-apps",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "source_path": "skills/rust-tauri-apps",
+  "archived_path": "archive/skills/rust-tauri-apps",
+  "reason": "No Tauri project in the current tree. Restore alongside a Tauri surface.",
+  "restore": "Move this directory back to skills/rust-tauri-apps and relink it from the consuming agents' skill farms."
+}

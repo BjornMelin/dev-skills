@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "repo-context-builder",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "source_path": "skills/repo-context-builder",
+  "archived_path": "archive/skills/repo-context-builder",
+  "reason": "Builds REPO_CONTEXT.md and a REVIEW_BRIEF when onboarding an unfamiliar repository. Genuinely unduplicated, but no new repo is in flight and it costs listing budget on every request until one is.",
+  "restore": "Move this directory back to skills/repo-context-builder and relink it from the consuming agents' skill farms."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Complexity Optimizer"
+  short_description: "Find and reduce code complexity safely"
+  default_prompt: "Use $complexity-optimizer to analyze this codebase and give me a full complexity report."

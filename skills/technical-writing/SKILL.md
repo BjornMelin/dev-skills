@@ -33,12 +33,34 @@ Use this skill when the deliverable is **internal technical documentation for bu
 - A developer-facing internal guide needs to explain how a system works and how to work on it safely
 
 ## When not to use this skill
-- **Published API docs, SDK docs, OpenAPI reference, developer portal content** → `api-documentation`
-- **End-user onboarding, screenshots, tutorials, FAQs, help-center flows** → `user-guide-writing`
-- **Release notes, `CHANGELOG.md`, migration announcements for customers/devs** → `changelog-maintenance`
-- **Slides, pitch decks, roadmap presentations, architecture demos** → `presentation-builder`
-- **Product positioning, launch copy, GTM messaging, marketing automation** → `marketing-automation`
-- **The main job is deciding the feature or API itself before writing the doc** → `task-planning`, `api-design`, or the relevant planning skill first
+
+The lane is *internal* documentation. Say so and hand back when the real job is:
+
+- **Published API, SDK, OpenAPI or developer-portal content** — an external
+  reference surface with its own versioning and consumers.
+- **End-user onboarding, tutorials, FAQs or help-centre flows** — the audience
+  is a customer, not a builder or operator.
+- **Release notes, `CHANGELOG.md` or customer-facing migration announcements.**
+- **Slides, decks or roadmap presentations.**
+- **Product positioning, launch copy or GTM messaging.**
+- **Deciding the feature or API itself**, which has to happen before the
+  document describing it can be written.
+
+These boundaries are stated as *work*, not as skill names, so they stay true
+whichever documentation skills happen to be installed. Name a specific skill
+only if one is actually available in the current session.
+
+## Reference map
+
+Load on demand; do not read all of these up front.
+
+| File | Use it for |
+| --- | --- |
+| `references/document-modes-and-boundaries.md` | Choosing the primary mode and deciding what is out of scope |
+| `references/mode-structures.md` | The smallest fitting section layout for the chosen mode |
+| `references/prd.md` | PRD-specific structure: personas, stories, acceptance criteria, metrics |
+| `references/quality-checklists.md` | The Step 7 quality check in full |
+| `references/docs-as-code-and-maintenance.md` | Repo-friendly conventions and long-term doc maintenance |
 
 ## Instructions
 
@@ -70,16 +92,17 @@ Answer three questions before writing:
 2. What decision or action should it enable?
 3. Which neighboring skills must stay out of scope?
 
-Quick route-out table:
+Quick route-out table. Hand the work back with this reason; pick a named skill
+from the current session only if one genuinely covers it.
 
-| If the request sounds like... | Use |
+| If the request sounds like... | It is not this lane because... |
 |---|---|
-| Publish docs for an API, SDK, webhook, or developer portal | `api-documentation` |
-| Write a tutorial, onboarding guide, or FAQ | `user-guide-writing` |
-| Summarize shipped changes or maintain `CHANGELOG.md` | `changelog-maintenance` |
-| Make slides for a launch, roadmap, or architecture review | `presentation-builder` |
-| Write launch or product messaging | `marketing-automation` |
-| Decide the API or feature design before writing docs | `api-design`, `task-planning`, or another planning skill |
+| Publish docs for an API, SDK, webhook, or developer portal | The audience is external and the surface is versioned separately |
+| Write a tutorial, onboarding guide, or FAQ | The audience is an end user, not a builder or operator |
+| Summarize shipped changes or maintain `CHANGELOG.md` | It reports what shipped rather than enabling a decision or action |
+| Make slides for a launch, roadmap, or architecture review | The artifact is a presentation, not a reviewable document |
+| Write launch or product messaging | It is positioning, not internal technical record |
+| Decide the API or feature design before writing docs | The decision has to exist before it can be documented |
 
 ### Step 3: Gather the minimum technical evidence
 Do not draft from vibes alone. Pull the smallest credible evidence set first:
@@ -182,7 +205,7 @@ If the user already asked for the finished artifact, produce the chosen document
 > Refresh our public webhook quickstart and auth troubleshooting page for external developers.
 
 **Good output direction**
-- route to `api-documentation`
+- decline the request as outside the internal-documentation lane
 - explain that the main job is published developer-facing API docs, not internal technical documentation
 
 ## Best practices

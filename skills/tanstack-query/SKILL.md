@@ -1,6 +1,6 @@
 ---
 name: tanstack-query
-description: "TanStack Query v5 guidance for React server-state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration, error boundaries, disabling/lazy queries, infinite queries, and Router/Start integration. Use when designing or reviewing React Query data flows."
+description: "TanStack Query v5 for React server state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration and infinite queries. Use when designing or reviewing data flows."
 ---
 
 # TanStack Query

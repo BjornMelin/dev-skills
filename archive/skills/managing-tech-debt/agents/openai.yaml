@@ -1,0 +1,6 @@
+interface:
+  display_name: "Managing Tech Debt"
+  short_description: "Help users manage technical debt strategically. Use when someone is dealing wit..."
+  default_prompt: "Use $managing-tech-debt when the task clearly matches this skill's documented trigger."
+policy:
+  allow_implicit_invocation: false

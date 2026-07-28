@@ -1332,3 +1332,298 @@ function C() {
     );
     assert!(!fired(&clean_context, ids::REACT_UNSCOPED_SELECTOR));
 }
+
+#[test]
+fn rule_state_in_continuous_motion_fires_for_scroll_handler() {
+    let bad = analyze(
+        "src/Hero.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Hero() {
+  const [progress, setProgress] = useState(0);
+  return <div onScroll={(e) => setProgress(e.currentTarget.scrollTop)} />;
+}
+"#,
+    );
+    assert!(fired(&bad, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_fires_for_gsap_on_update_and_raf() {
+    let on_update = analyze(
+        "src/Panel.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import gsap from "gsap";
+export function Panel() {
+  const [y, setY] = useState(0);
+  gsap.to(".p", { scrollTrigger: { onUpdate: (self) => setY(self.progress) } });
+  return null;
+}
+"#,
+    );
+    assert!(fired(&on_update, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+
+    // A callback that schedules the next frame from inside itself is a loop.
+    let raf_loop = analyze(
+        "src/Ticker.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Ticker() {
+  const [t, setT] = useState(0);
+  requestAnimationFrame(function tick() {
+    setT(performance.now());
+    requestAnimationFrame(tick);
+  });
+  return null;
+}
+"#,
+    );
+    assert!(fired(&raf_loop, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_one_shot_animation_frame() {
+    // `requestAnimationFrame` runs its callback once unless something
+    // reschedules. A single deferred state update is not a per-frame render.
+    let findings = analyze(
+        "src/Ready.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Ready() {
+  const [ready, setReady] = useState(false);
+  requestAnimationFrame(() => setReady(true));
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_on_update_outside_gsap() {
+    // `onUpdate` is an ordinary callback name. Only a GSAP call puts a frame
+    // loop behind it, so an unrelated library's config must not be reported.
+    let findings = analyze(
+        "src/Editor.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { editor } from "some-editor";
+export function Editor() {
+  const [value, setValue] = useState("");
+  editor.configure({ onUpdate: () => setValue("x") });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_on_refresh() {
+    // ScrollTrigger fires onRefresh on refresh, not per frame.
+    let findings = analyze(
+        "src/Refresh.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import gsap from "gsap";
+export function Refresh() {
+  const [n, setN] = useState(0);
+  gsap.to(".p", { scrollTrigger: { onRefresh: () => setN(1) } });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_resolves_setters_by_symbol() {
+    // Two components, each with its own `setProgress`. Only the one actually
+    // bound to useState inside a continuous handler may be reported; a
+    // same-named prop must not be.
+    let findings = analyze(
+        "src/Two.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Passthrough({ setProgress }: { setProgress: (n: number) => void }) {
+  return <div onScroll={() => setProgress(1)} />;
+}
+export function Owner() {
+  const [progress, setProgress] = useState(0);
+  return <div onClick={() => setProgress(1)} />;
+}
+"#,
+    );
+    assert!(
+        !fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION),
+        "a prop named like a setter is not a useState setter: {findings:?}"
+    );
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_discrete_handlers() {
+    // A state update per click is ordinary React. The defect is a state update
+    // per frame, so a discrete handler in the same component must stay silent.
+    let findings = analyze(
+        "src/Toggle.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Toggle() {
+  const [open, setOpen] = useState(false);
+  return <button onClick={() => setOpen(true)} />;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_ref_write() {
+    // The prescribed fix must not itself be reported, or the rule pushes
+    // authors back toward the defect.
+    let findings = analyze(
+        "src/Fine.tsx",
+        "tsx",
+        r#"
+import { useRef } from "react";
+export function Fine() {
+  const ref = useRef(0);
+  return <div onScroll={(e) => { ref.current = e.currentTarget.scrollTop; }} />;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_is_catalogued_under_react() {
+    let bad = analyze(
+        "src/Hero.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Hero() {
+  const [p, setP] = useState(0);
+  return <div onPointerMove={() => setP(1)} />;
+}
+"#,
+    );
+    let finding = bad
+        .iter()
+        .find(|f| f.id == ids::REACT_STATE_IN_CONTINUOUS_MOTION)
+        .expect("finding");
+    assert_eq!(finding.category, Category::React);
+}
+
+#[test]
+fn rule_state_in_continuous_motion_resolves_aliased_use_state_imports() {
+    // `import { useState as useReactState }` binds a different local name; a
+    // text comparison would miss the setter entirely.
+    let findings = analyze(
+        "src/Aliased.tsx",
+        "tsx",
+        r#"
+import { useState as useReactState } from "react";
+export function Aliased() {
+  const [progress, setProgress] = useReactState(0);
+  return <div onScroll={(e) => setProgress(e.currentTarget.scrollTop)} />;
+}
+"#,
+    );
+    assert!(fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_non_gsap_ticker() {
+    // `analytics.ticker.add` shares a property name with gsap.ticker but has
+    // no frame loop behind it.
+    let findings = analyze(
+        "src/Analytics.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { analytics } from "./analytics";
+export function Analytics() {
+  const [n, setN] = useState(0);
+  analytics.ticker.add(() => setN(1));
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_ignores_a_finite_frame_sequence() {
+    // Two scheduled frames is not a loop: neither callback reschedules itself.
+    let findings = analyze(
+        "src/TwoFrames.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function TwoFrames() {
+  const [x, setX] = useState(0);
+  requestAnimationFrame(() => {
+    setX(1);
+    requestAnimationFrame(renderOnce);
+  });
+  return null;
+}
+"#,
+    );
+    assert!(!fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_recognises_aliased_scroll_trigger() {
+    let findings = analyze(
+        "src/Aliased.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+import { ScrollTrigger as ST } from "gsap/ScrollTrigger";
+export function Aliased() {
+  const [x, setX] = useState(0);
+  ST.create({ onUpdate: (self) => setX(self.progress) });
+  return null;
+}
+"#,
+    );
+    assert!(fired(&findings, ids::REACT_STATE_IN_CONTINUOUS_MOTION));
+}
+
+#[test]
+fn rule_state_in_continuous_motion_downgrades_a_boolean_threshold() {
+    // React bails out when the next state equals the current one, so a
+    // threshold boolean re-renders only on the flip. Report it, but do not
+    // fail a default-severity gate on the prescribed pattern.
+    let findings = analyze(
+        "src/Stuck.tsx",
+        "tsx",
+        r#"
+import { useState } from "react";
+export function Stuck() {
+  const [stuck, setStuck] = useState(false);
+  return <div onScroll={(e) => setStuck(e.currentTarget.scrollTop > 100)} />;
+}
+"#,
+    );
+    let finding = findings
+        .iter()
+        .find(|f| f.id == ids::REACT_STATE_IN_CONTINUOUS_MOTION)
+        .expect("still reported");
+    assert_eq!(
+        finding.severity,
+        gsap_audit_core::types::Severity::Low,
+        "a boolean threshold must not trip the default medium gate"
+    );
+}

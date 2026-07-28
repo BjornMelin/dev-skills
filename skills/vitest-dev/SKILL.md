@@ -2,7 +2,7 @@
 name: vitest-dev
 metadata:
   version: 0.1.0
-description: World-class Vitest QA/test engineer for TypeScript + Next.js (local + CI performance focused)
+description: "Vitest testing for TypeScript and Next.js. Use for writing or repairing tests, triaging flaky specs, sharding and monorepo test config, and cutting local or CI test time."
 ---
 
 # vitest-dev

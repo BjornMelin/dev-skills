@@ -1,6 +1,6 @@
 ---
 name: tanstack-router
-description: "TanStack Router guidance for React apps: file-based routing, generated route trees, root context typing, loaders, loaderDeps, validated search params, navigation, code splitting, error/not-found handling, and Query integration. Use when creating, refactoring, or reviewing TanStack Router routes and route contracts."
+description: "TanStack Router for React: file-based routing, generated route trees, root context typing, loaders and loaderDeps, validated search params, code splitting and error handling. Use when writing or reviewing routes."
 ---
 
 # TanStack Router

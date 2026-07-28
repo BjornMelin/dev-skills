@@ -1,6 +1,6 @@
 ---
 name: rust-cli-clap
-description: Implicit Rust CLI and Clap skill. Use for command-line apps and tools, clap derive or builder APIs, subcommands, flags, config and env precedence, stdin/stdout/stderr contracts, JSON output, exit codes, completions, manpages, shell UX, CLI tests, and binary distribution.
+description: "Rust command-line apps with clap: derive and builder APIs, subcommands, flags, config and env precedence, stdout, stderr and JSON contracts, exit codes, completions, and binary distribution."
 license: MIT
 metadata:
   category: rust

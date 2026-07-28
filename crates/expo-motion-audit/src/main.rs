@@ -16,7 +16,7 @@ use clap_complete::{Shell, generate};
 use expo_motion_audit_core::output::{format_catalog_json, format_catalog_markdown};
 use expo_motion_audit_core::{
     Category, ScanOptions, Severity, TOOL_NAME, TOOL_VERSION, format_json, format_markdown,
-    highest_severity, scan_root,
+    scan_root,
 };
 
 #[derive(Parser, Debug)]
@@ -37,7 +37,7 @@ struct Cli {
 enum Commands {
     #[command(
         about = "Scan a directory tree for Reanimated/Worklets and config anti-patterns.",
-        long_about = "Walk the given root, parse every supported source file plus babel/app config, and report findings. Exit code is 2 when any medium- or high-severity finding is present, otherwise 0.",
+        long_about = "Walk the given root, parse every supported source file plus babel/app config, and report findings. Exit code is 2 when any finding meets --min-severity (default medium), otherwise 0.",
         after_long_help = "Example:\n  expo-motion-audit scan --root . --format json --categories worklets-threading,reanimated-core"
     )]
     Scan {
@@ -69,6 +69,13 @@ enum Commands {
             help = "Maximum number of files to analyze before truncating."
         )]
         max_files: usize,
+        #[arg(
+            long = "min-severity",
+            value_enum,
+            default_value_t = MinSeverity::Medium,
+            help = "Lowest severity that makes the exit code non-zero."
+        )]
+        min_severity: MinSeverity,
     },
     #[command(
         about = "Print the tool version and the full rule catalog.",
@@ -88,6 +95,33 @@ enum Commands {
         #[arg(value_enum, help = "Shell to generate completions for.")]
         shell: Shell,
     },
+}
+
+/// `--min-severity` threshold. Mirrors the core `Severity` ordering; the core
+/// type is not a `ValueEnum`, and making it one would put a CLI concern in a
+/// library that has no other clap dependency.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, ValueEnum)]
+enum MinSeverity {
+    Low,
+    Medium,
+    High,
+}
+
+impl MinSeverity {
+    /// Whether a finding at `severity` meets this threshold.
+    fn is_met_by(self, severity: Severity) -> bool {
+        let rank = |value: MinSeverity| match value {
+            MinSeverity::Low => 0,
+            MinSeverity::Medium => 1,
+            MinSeverity::High => 2,
+        };
+        let found = match severity {
+            Severity::Low => 0,
+            Severity::Medium => 1,
+            Severity::High => 2,
+        };
+        found >= rank(self)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -116,7 +150,15 @@ fn run() -> Result<i32> {
             categories,
             output,
             max_files,
-        } => run_scan(root, format, categories.as_deref(), output, max_files),
+            min_severity,
+        } => run_scan(
+            root,
+            format,
+            categories.as_deref(),
+            output,
+            max_files,
+            min_severity,
+        ),
         Commands::Doctor { format } => {
             let text = match format {
                 OutputFormat::Markdown => format_catalog_markdown(TOOL_NAME, TOOL_VERSION),
@@ -143,6 +185,7 @@ fn run_scan(
     categories: Option<&str>,
     output: Option<PathBuf>,
     max_files: usize,
+    min_severity: MinSeverity,
 ) -> Result<i32> {
     let categories = parse_categories(categories)?;
     let options = ScanOptions::new(root, categories, max_files);
@@ -183,10 +226,17 @@ fn run_scan(
         None => print_line(&rendered)?,
     }
 
-    // Exit-code contract: 2 if any medium- or high-severity finding, else 0.
-    let code = match highest_severity(&outcome.findings) {
-        Some(Severity::High | Severity::Medium) => 2,
-        _ => 0,
+    // Exit-code contract: 2 when any finding meets --min-severity
+    // (default medium), else 0. Configurable so a repo can ratchet:
+    // block on `high` today and tighten to `low` once clean.
+    let code = if outcome
+        .findings
+        .iter()
+        .any(|finding| min_severity.is_met_by(finding.severity))
+    {
+        2
+    } else {
+        0
     };
     Ok(code)
 }
@@ -269,6 +319,7 @@ mod tests {
             Some("worklets-threading"),
             Some(root.join("out.json")),
             5000,
+            MinSeverity::Medium,
         )
         .unwrap();
 
@@ -287,6 +338,7 @@ mod tests {
             None,
             Some(root.join("out.json")),
             5000,
+            MinSeverity::Medium,
         )
         .unwrap();
 
@@ -305,5 +357,15 @@ mod tests {
         ));
         fs::create_dir_all(&root).unwrap();
         root
+    }
+
+    #[test]
+    fn min_severity_ordering_is_monotonic() {
+        assert!(MinSeverity::Low.is_met_by(Severity::Low));
+        assert!(MinSeverity::Low.is_met_by(Severity::High));
+        assert!(!MinSeverity::Medium.is_met_by(Severity::Low));
+        assert!(MinSeverity::Medium.is_met_by(Severity::Medium));
+        assert!(!MinSeverity::High.is_met_by(Severity::Medium));
+        assert!(MinSeverity::High.is_met_by(Severity::High));
     }
 }

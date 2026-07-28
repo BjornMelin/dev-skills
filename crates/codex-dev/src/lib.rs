@@ -652,6 +652,9 @@ impl EvidenceAppendArgs {
                 residual_risk: self.residual_risk,
                 artifacts: self.artifacts,
             },
+            // `evidence append` is the hand-authored path: nothing else
+            // corroborates what it claims, so its artifacts must exist.
+            verify_artifacts: true,
         }
     }
 }
@@ -1014,8 +1017,20 @@ pub struct PolicyRunArgs {
         help = "Policy profile: codex_dev, codex_dev_tui, codex_research, skills, bootstrap_install, docs, release, or full_local"
     )]
     pub profile: PolicyProfile,
-    #[arg(long, help = "Execute gates instead of recording a dry-run plan")]
-    pub execute: bool,
+    /// Record a plan without running anything.
+    ///
+    /// Planning used to be the default, so a bare `policy run` executed no
+    /// gate, reported every one of them as satisfied and exited 0. Running the
+    /// gates is what the command is named for, so that is now what it does.
+    #[arg(long, help = "Record a plan without executing any gate")]
+    pub dry_run: bool,
+    #[arg(
+        long,
+        value_name = "SECONDS",
+        default_value_t = 900,
+        help = "Per-gate wall-clock limit; a gate that exceeds it is killed and fails"
+    )]
+    pub timeout_secs: u64,
     #[arg(long, help = "Permit gates marked as network-using")]
     pub allow_network: bool,
     #[arg(long, help = "Permit gates marked as requiring secrets")]
@@ -4757,6 +4772,7 @@ pub fn run_pr_agent_state(
                 }),
             artifacts: vec!["pr.json".to_string(), "pr-agent-state.json".to_string()],
         },
+        verify_artifacts: false,
     })?;
 
     Ok(report)
@@ -4912,6 +4928,7 @@ pub fn run_pr_readiness_loop(
                 "pr-readiness.md".to_string(),
             ],
         },
+        verify_artifacts: false,
     })?;
 
     report.report_path = report_path.display().to_string();
@@ -6826,6 +6843,7 @@ fn append_pr_agent_action_evidence(
                 .then(|| "one or more hosted action diagnostics are errors".to_string()),
             artifacts: action_artifacts(report, report_path),
         },
+        verify_artifacts: false,
     })?;
     Ok(())
 }
@@ -7706,6 +7724,7 @@ pub fn import_research_bundle(
     let append_result = append_evidence(AppendEvidenceArgs {
         capsule: args.capsule.clone(),
         record,
+        verify_artifacts: false,
     })?;
 
     Ok(ResearchEvidenceImportReport {
@@ -8094,7 +8113,7 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
     }
 
     let manifest = policy_manifest(args.profile, checked_at);
-    let dry_run = !args.execute;
+    let dry_run = args.dry_run;
     let repo_root = if dry_run {
         args.repo_root
             .as_deref()
@@ -8112,12 +8131,10 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
         {
             skip_gate(gate, reason)
         } else {
-            execute_gate(gate, repo_root.as_deref())
+            execute_gate(gate, repo_root.as_deref(), args.timeout_secs)
         };
-        let should_stop = result.required
-            && result.status == GateStatus::Failed
-            && args.execute
-            && !args.keep_going;
+        let should_stop =
+            result.required && result.status == GateStatus::Failed && !dry_run && !args.keep_going;
         results.push(result);
         if should_stop {
             for remaining in &manifest.gates[index + 1..] {
@@ -8127,9 +8144,16 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
         }
     }
 
+    // `passed` means "no required gate failed", which a plan satisfies
+    // vacuously. `verified` is the stronger claim callers actually want before
+    // shipping: every required gate really ran and really succeeded.
     let passed = results.iter().all(|gate| {
         !gate.required || matches!(gate.status, GateStatus::Planned | GateStatus::Passed)
     });
+    let verified = !dry_run
+        && results
+            .iter()
+            .all(|gate| !gate.required || gate.status == GateStatus::Passed);
     record_policy_run(&args.capsule, &manifest, &results, checked_at)?;
 
     Ok(PolicyRunResult {
@@ -8140,6 +8164,7 @@ pub fn run_policy_gates(args: PolicyRunArgs, checked_at: DateTime<Utc>) -> Resul
         profile: args.profile,
         dry_run,
         passed,
+        verified,
         gates: results,
     })
 }
@@ -9603,15 +9628,48 @@ fn gate_working_directory(repo_root: &Path, gate: &PolicyGate) -> Result<PathBuf
     Ok(repo_root.join(relative))
 }
 
+/// Whether a directory looks like the root of a source repository.
+///
+/// Deliberately generic. An earlier version demanded `Cargo.toml` *and*
+/// `docs/runbooks/validation.md`, which are this repository's own conventions,
+/// so `policy run` could not execute anywhere else. Worse, `policy manifest`
+/// still succeeded and emitted this repo's gates while pointed at another
+/// project, which is a more damaging failure than refusing outright.
+fn is_repo_root(path: &Path) -> bool {
+    // `.git` is a directory in a normal clone and a file in a worktree or
+    // submodule, so test for existence rather than for a directory.
+    path.join(".git").exists() || path.join("Cargo.toml").is_file()
+}
+
+/// Whether a directory is a version-control root.
+///
+/// Preferred over [`is_repo_root`] when *discovering* a root by walking up:
+/// a Cargo workspace member carries its own `Cargo.toml`, so a nearest-match
+/// walk would stop at `crates/codex-dev` and run repo-relative gates from
+/// there, breaking every `tools/...` and `docs/...` path.
+fn is_vcs_root(path: &Path) -> bool {
+    path.join(".git").exists()
+}
+
 fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
     let root = fs::canonicalize(root)
         .with_context(|| format!("failed to canonicalize repo root {}", root.display()))?;
-    if !root.join("Cargo.toml").is_file() {
-        bail!("repo root must contain Cargo.toml: {}", root.display());
+    if !is_repo_root(&root) {
+        bail!(
+            "repo root must contain .git or Cargo.toml: {}",
+            root.display()
+        );
     }
+    Ok(root)
+}
+
+/// The documentation gates verify marker blocks inside this repository's own
+/// runbook, so they keep the stricter requirement the generic resolver dropped.
+fn canonicalize_policy_docs_root(root: &Path) -> Result<PathBuf> {
+    let root = canonicalize_repo_root(root)?;
     if !root.join("docs/runbooks/validation.md").is_file() {
         bail!(
-            "repo root must contain docs/runbooks/validation.md: {}",
+            "policy documentation gates require docs/runbooks/validation.md: {}",
             root.display()
         );
     }
@@ -9620,11 +9678,11 @@ fn canonicalize_repo_root(root: &Path) -> Result<PathBuf> {
 
 fn resolve_policy_docs_repo_root(explicit: Option<&Path>) -> Result<PathBuf> {
     if let Some(root) = explicit {
-        return canonicalize_repo_root(root);
+        return canonicalize_policy_docs_root(root);
     }
 
     let current_dir = env::current_dir().context("failed to read current directory")?;
-    find_repo_root(&current_dir).ok_or_else(|| {
+    find_policy_docs_root(&current_dir).ok_or_else(|| {
         anyhow::anyhow!(
             "failed to discover repository root from current directory; run from the repo or pass --repo-root"
         )
@@ -9632,6 +9690,18 @@ fn resolve_policy_docs_repo_root(explicit: Option<&Path>) -> Result<PathBuf> {
 }
 
 fn find_repo_root(start: &Path) -> Option<PathBuf> {
+    // Prefer the enclosing VCS root over the nearest Cargo package. Inside a
+    // workspace both match, but only the VCS root makes repo-relative gate
+    // paths resolve. Fall back to a package root only when there is no `.git`
+    // anywhere above, which is the non-VCS checkout case.
+    start
+        .ancestors()
+        .find(|path| is_vcs_root(path))
+        .or_else(|| start.ancestors().find(|path| is_repo_root(path)))
+        .and_then(|path| fs::canonicalize(path).ok())
+}
+
+fn find_policy_docs_root(start: &Path) -> Option<PathBuf> {
     start
         .ancestors()
         .find(|path| {
@@ -9685,7 +9755,97 @@ fn skip_gate(gate: &PolicyGate, reason: &str) -> PolicyGateResult {
     )
 }
 
-fn execute_gate(gate: &PolicyGate, repo_root: Option<&Path>) -> PolicyGateResult {
+/// Terminate an entire process group, first politely then not.
+///
+/// Killing only the immediate child is not enough: a gate is typically `cargo`
+/// or a test runner, and its descendants inherit the stdout/stderr pipes. Those
+/// survivors hold the write ends open, so the reader threads below never see
+/// EOF and a "timed out" gate hangs anyway, which is the exact failure
+/// `--timeout-secs` exists to prevent.
+#[cfg(unix)]
+fn kill_process_group(pid: u32) {
+    // Negative pid targets the group. The child is made a group leader at spawn
+    // time, so the group id equals its pid.
+    let group = -(pid as i32);
+    unsafe {
+        libc::kill(group, libc::SIGTERM);
+    }
+    // Give a well-behaved tree a moment to unwind before removing the choice.
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    unsafe {
+        libc::kill(group, libc::SIGKILL);
+    }
+}
+
+/// Windows has no process groups in the POSIX sense; bounding a gate's whole
+/// tree there needs a Job Object, which this crate does not create. The
+/// immediate child is still killed, so a self-contained gate times out
+/// correctly, but a gate that spawns descendants can still block the reader
+/// threads. This toolchain targets Linux and macOS, so the gap is recorded
+/// rather than half-implemented against something untestable here.
+#[cfg(not(unix))]
+fn kill_process_group(_pid: u32) {}
+
+/// Run a child to completion, or kill it once `timeout` elapses.
+///
+/// `Command::output()` waits forever, so a gate that hangs hangs the whole run
+/// with no diagnostic. stdout and stderr are drained on their own threads
+/// because a child that fills a pipe buffer blocks before it ever exits, which
+/// would deadlock a naive wait-with-timeout.
+fn wait_with_timeout(
+    mut child: std::process::Child,
+    timeout: std::time::Duration,
+) -> std::io::Result<Option<std::process::Output>> {
+    use std::io::Read;
+
+    let mut stdout = child.stdout.take();
+    let mut stderr = child.stderr.take();
+    let out_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(s) = stdout.as_mut() {
+            let _ = s.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let err_handle = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(s) = stderr.as_mut() {
+            let _ = s.read_to_end(&mut buf);
+        }
+        buf
+    });
+
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait()? {
+            Some(status) => break Some(status),
+            None if std::time::Instant::now() >= deadline => {
+                // Kill the whole tree, not just the child, or the reader
+                // threads joined below will block on pipes held open by
+                // surviving grandchildren.
+                kill_process_group(child.id());
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+            None => std::thread::sleep(std::time::Duration::from_millis(25)),
+        }
+    };
+
+    let stdout = out_handle.join().unwrap_or_default();
+    let stderr = err_handle.join().unwrap_or_default();
+    Ok(status.map(|status| std::process::Output {
+        status,
+        stdout,
+        stderr,
+    }))
+}
+
+fn execute_gate(
+    gate: &PolicyGate,
+    repo_root: Option<&Path>,
+    timeout_secs: u64,
+) -> PolicyGateResult {
     let Some((program, args)) = gate.command.split_first() else {
         return gate_result(
             gate,
@@ -9717,8 +9877,33 @@ fn execute_gate(gate: &PolicyGate, repo_root: Option<&Path>) -> PolicyGateResult
         }
     }
 
-    match command.output() {
-        Ok(output) => {
+    command.stdout(std::process::Stdio::piped());
+    command.stderr(std::process::Stdio::piped());
+    // Put the gate in its own process group so a timeout can terminate the
+    // whole tree. Without this the group id is the runner's own, and killing
+    // it would take down this process too.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
+
+    let child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return gate_result(
+                gate,
+                GateStatus::Failed,
+                None,
+                Some(format!("failed to start command: {error}")),
+                None,
+                None,
+            );
+        }
+    };
+
+    match wait_with_timeout(child, std::time::Duration::from_secs(timeout_secs)) {
+        Ok(Some(output)) => {
             let code = output.status.code();
             if output.status.success() {
                 gate_result(gate, GateStatus::Passed, code, None, None, None)
@@ -9736,11 +9921,21 @@ fn execute_gate(gate: &PolicyGate, repo_root: Option<&Path>) -> PolicyGateResult
                 )
             }
         }
+        Ok(None) => gate_result(
+            gate,
+            GateStatus::Failed,
+            None,
+            Some(format!(
+                "gate exceeded the {timeout_secs}s limit and was killed"
+            )),
+            None,
+            None,
+        ),
         Err(error) => gate_result(
             gate,
             GateStatus::Failed,
             None,
-            Some(format!("failed to start command: {error}")),
+            Some(format!("failed to wait for command: {error}")),
             None,
             None,
         ),
@@ -10279,7 +10474,8 @@ enabled = false
                 capsule: capsule.clone(),
                 repo_root: None,
                 profile: PolicyProfile::CodexDev,
-                execute: false,
+                dry_run: true,
+                timeout_secs: 900,
                 allow_network: false,
                 allow_secrets: false,
                 keep_going: false,
@@ -10318,7 +10514,8 @@ enabled = false
                 capsule: capsule.clone(),
                 repo_root: None,
                 profile: PolicyProfile::FullLocal,
-                execute: false,
+                dry_run: true,
+                timeout_secs: 900,
                 allow_network: false,
                 allow_secrets: false,
                 keep_going: false,
@@ -10495,7 +10692,7 @@ enabled = false
         )
         .expect_err("missing policy docs should fail");
         let message = format!("{error:#}");
-        assert!(message.contains("repo root must contain docs/runbooks/validation.md"));
+        assert!(message.contains("policy documentation gates require docs/runbooks/validation.md"));
         assert!(message.contains("<local-path>"));
         assert!(message.contains("--include-local-paths"));
         assert!(!message.contains("docs<local-path>"));
@@ -11205,7 +11402,8 @@ enabled = false
                 capsule: capsule.clone(),
                 repo_root: None,
                 profile: PolicyProfile::CodexDev,
-                execute: false,
+                dry_run: true,
+                timeout_secs: 900,
                 allow_network: false,
                 allow_secrets: false,
                 keep_going: false,
@@ -11240,7 +11438,8 @@ enabled = false
                 capsule: capsule.clone(),
                 repo_root: None,
                 profile: PolicyProfile::CodexDev,
-                execute: false,
+                dry_run: true,
+                timeout_secs: 900,
                 allow_network: false,
                 allow_secrets: false,
                 keep_going: false,
@@ -11275,7 +11474,7 @@ enabled = false
             failure_interpretation: "fixture failure".to_string(),
         };
 
-        let result = execute_gate(&missing, None);
+        let result = execute_gate(&missing, None, 900);
 
         assert_eq!(result.status, GateStatus::Failed);
         assert!(
@@ -11308,7 +11507,7 @@ enabled = false
             failure_interpretation: "fixture failure".to_string(),
         };
 
-        let result = execute_gate(&gate, Some(temp.path()));
+        let result = execute_gate(&gate, Some(temp.path()), 900);
 
         assert_eq!(result.status, GateStatus::Passed);
     }
@@ -11331,6 +11530,53 @@ enabled = false
         assert!(error.to_string().contains("pass --repo-root"), "{error:#}");
     }
 
+    /// Planning must not be the default again.
+    ///
+    /// Asserted at the argument layer on purpose. Driving the real binary would
+    /// either execute the whole gate suite or depend on what sits above the
+    /// temp directory for repo-root discovery, and an earlier version of this
+    /// test did both: it passed locally only because a stray `/tmp/.git` made
+    /// discovery fail, and in CI it ran every gate for real and then failed on
+    /// the wrong assertion.
+    #[test]
+    fn policy_run_executes_unless_dry_run_is_requested() {
+        use clap::Parser;
+
+        let bare = Cli::try_parse_from(["codex-dev", "policy", "run", "--capsule", "/tmp/x"])
+            .expect("parse bare policy run");
+        let Commands::Policy {
+            command: PolicyCommand::Run(args),
+        } = bare.command
+        else {
+            panic!("expected policy run");
+        };
+        assert!(
+            !args.dry_run,
+            "a bare `policy run` must execute; planning is opt-in"
+        );
+        assert_eq!(
+            args.timeout_secs, 900,
+            "gates must carry a wall-clock bound"
+        );
+
+        let planned = Cli::try_parse_from([
+            "codex-dev",
+            "policy",
+            "run",
+            "--dry-run",
+            "--capsule",
+            "/tmp/x",
+        ])
+        .expect("parse dry-run policy run");
+        let Commands::Policy {
+            command: PolicyCommand::Run(args),
+        } = planned.command
+        else {
+            panic!("expected policy run");
+        };
+        assert!(args.dry_run, "--dry-run must plan");
+    }
+
     #[test]
     fn policy_gate_skip_reason_requires_secret_opt_in() {
         let mut gate = cargo_fmt_gate();
@@ -11349,7 +11595,7 @@ enabled = false
         let mut gate = cargo_fmt_gate();
         gate.working_directory = "../outside".to_string();
 
-        let result = execute_gate(&gate, Some(temp.path()));
+        let result = execute_gate(&gate, Some(temp.path()), 900);
 
         assert_eq!(result.status, GateStatus::Failed);
         assert!(
@@ -11367,7 +11613,7 @@ enabled = false
         let mut gate = cargo_fmt_gate();
         gate.working_directory = " ".to_string();
 
-        let result = execute_gate(&gate, Some(temp.path()));
+        let result = execute_gate(&gate, Some(temp.path()), 900);
 
         assert_eq!(result.status, GateStatus::Failed);
         assert!(
@@ -11398,7 +11644,7 @@ enabled = false
             failure_interpretation: "fixture failure".to_string(),
         };
 
-        let result = execute_gate(&gate, None);
+        let result = execute_gate(&gate, None, 900);
 
         assert_eq!(result.status, GateStatus::Failed);
         assert_eq!(result.exit_code, Some(9));
@@ -11407,6 +11653,11 @@ enabled = false
 
     fn write_repo_fixture(root: &Path) {
         fs::create_dir_all(root.join("docs/runbooks")).expect("docs dir");
+        // A `.git` marker makes the fixture a self-contained VCS root. Without
+        // it, root discovery walks past the fixture to whatever repository
+        // happens to sit above the temp directory, which makes these tests
+        // depend on the machine they run on.
+        fs::create_dir_all(root.join(".git")).expect("git dir");
         fs::write(root.join("Cargo.toml"), "[workspace]\n").expect("cargo toml");
         fs::write(root.join("docs/runbooks/validation.md"), "# Validation\n")
             .expect("validation doc");

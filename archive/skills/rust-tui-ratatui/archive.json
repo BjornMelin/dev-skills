@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "rust-tui-ratatui",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "source_path": "skills/rust-tui-ratatui",
+  "archived_path": "archive/skills/rust-tui-ratatui",
+  "reason": "No ratatui TUI in the current tree beyond codex-dev-tui, which is maintained directly. Restore alongside a TUI surface.",
+  "restore": "Move this directory back to skills/rust-tui-ratatui and relink it from the consuming agents' skill farms."
+}
