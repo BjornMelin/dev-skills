@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "interaction-design",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "better-ui",
+  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "archived_path": "archive/skills/interaction-design",
+  "reason": "Contradicts the repository design SSOT: ships framer-motion imports and bg-blue-*/bg-gray-* Tailwind classes against a Sealing-Wax-plus-Frost token system, and installs a global `*, *::before, *::after` reduced-motion reset that conflicts with scripts/public-site-motion-contract.test.ts.",
+  "restore": "Move this directory back to skills/interaction-design and relink it from the consuming agents' skill farms."
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "technical-debt-assessment",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "signr-debt-audit",
+  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "archived_path": "archive/skills/technical-debt-assessment",
+  "reason": "Ranks debt by metrics, impact and remediation priority. signr-debt-audit already produces a ranked hard-cut plan for the repository this toolchain works in, and it does so against that repo's real contracts rather than generic metrics.",
+  "restore": "Move this directory back to skills/technical-debt-assessment and relink it from the consuming agents' skill farms."
+}

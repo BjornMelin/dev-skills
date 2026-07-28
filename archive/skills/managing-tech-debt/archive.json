@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "managing-tech-debt",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "improve",
+  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "archived_path": "archive/skills/managing-tech-debt",
+  "reason": "Strategic advice on legacy code and rewrite-versus-refactor. That judgment sits at root under MODELS.md rather than in a dispatched skill, and improve covers the advisory survey when one is wanted.",
+  "restore": "Move this directory back to skills/managing-tech-debt and relink it from the consuming agents' skill farms."
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "goal-to-release",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "signr-pr-closure-loop",
+  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "archived_path": "archive/skills/goal-to-release",
+  "reason": "Issue-to-release orchestration with ledgers and PR graphs, overlapping ship-branch, signr-pr-closure-loop and signr-ops-pr, which are the lanes actually used to ship this repo.",
+  "restore": "Move this directory back to skills/goal-to-release and relink it from the consuming agents' skill farms."
+}

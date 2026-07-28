@@ -1,0 +1,6 @@
+interface:
+  display_name: "Goal to Release"
+  short_description: "Ship issue-backed releases"
+  default_prompt: "Use $goal-to-release to preflight this goal, create an issue-backed release plan, execute reviewable branches and PRs, babysit CI/reviews, merge safely, and distill closeout evidence."
+policy:
+  allow_implicit_invocation: false

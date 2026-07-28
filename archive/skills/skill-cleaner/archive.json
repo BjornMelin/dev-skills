@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "skill-cleaner",
+  "status": "archived",
+  "archived_at": "2026-07-28T00:00:00Z",
+  "replacement": "claude-config-audit",
+  "source_path": "~/.agents/skills (install-only; never tracked)",
+  "archived_path": "archive/skills/skill-cleaner",
+  "reason": "Audited skill roots for duplicates, unused skills and prompt-budget cost. Both halves are now owned by maintained tools: claude-config-audit covers the Claude estate (broken links, stale overrides, listing-budget hogs, mirror drift) and `codex-dev skills audit` covers the Codex side.",
+  "restore": "Move this directory back to skills/skill-cleaner and relink it from the consuming agents' skill farms."
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Python Cleanup"
+  short_description: "Hard-cut Python branch cleanup"
+  default_prompt: "Use $cleanup-py to review and clean a Python branch with deletion-first refactors and Google-style docstrings."
+policy:
+  allow_implicit_invocation: false

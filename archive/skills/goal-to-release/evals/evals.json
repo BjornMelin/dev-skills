@@ -1,0 +1,38 @@
+{
+  "skill_name": "goal-to-release",
+  "evals": [
+    {
+      "id": "preflight-before-implementation",
+      "prompt": "Use $goal-to-release to implement a multi-package modernization goal in a dirty monorepo.",
+      "expected_output": "A durable goal ledger is created or selected, preflight is run before edits, dirty worktree state is handled explicitly, and the work is sequenced into issue-backed PR lanes with validation and closeout evidence.",
+      "assertions": [
+        "Creates or requests an isolated durable goal ledger before editing",
+        "Runs or records a preflight pass that includes repo state, gates, docs surfaces, and review lanes",
+        "Does not create a monolithic plan that skips issue or PR sequencing",
+        "Calls out dirty worktree handling and avoids unrelated changes"
+      ]
+    },
+    {
+      "id": "adaptive-branch-graph",
+      "prompt": "Use $goal-to-release to ship four related features where two are independent and two depend on schema changes.",
+      "expected_output": "The output separates independent and dependent lanes, records a branch/PR graph, defines stacked PR base/retarget/merge rules, and keeps validation scoped to each branch.",
+      "assertions": [
+        "Chooses independent parallel issues only when ownership and write scopes do not overlap",
+        "Defines stacked PR contracts for base branch, dependency, retarget plan, validation scope, and merge order",
+        "Uses one active implementation lane at a time unless parallelism is justified",
+        "States that each stacked PR must refresh hosted checks and reviews after the lower layer lands"
+      ]
+    },
+    {
+      "id": "closeout-distillation",
+      "prompt": "Use $goal-to-release to close an achieved release after all PRs are merged.",
+      "expected_output": "The output audits live issue, PR, review, docs, deploy, and branch state, then distills the goal workbench into summary.md and summary.json with follow-ups and residual risks.",
+      "assertions": [
+        "Audits issue, PR, docs, deploy, hosted review decision, and unresolved thread state before declaring completion",
+        "Distills the goal workbench into compact summary.md and summary.json artifacts",
+        "Separates shipped outcomes from follow-up issues and residual risks",
+        "Records validation evidence and either deploy evidence or an explicit not-applicable reason"
+      ]
+    }
+  ]
+}
