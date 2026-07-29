@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-29T16:42:28.270020387Z",
+  "generatedAt": "2026-07-29T20:10:42.220354159Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "f09782df49745d2f55e313f856ff5d59bfff7037",
+  "sourceCommit": "2226c7cf87585f023995f900f38dbe07bbc6137a",
   "sourceRef": "main",
   "skillsCount": 66,
   "totalSkillDirectories": 66,
@@ -932,7 +932,7 @@
     {
       "name": "convex-feature-spec",
       "slug": "convex-feature-spec",
-      "description": "Generate a complete Convex-first feature specification for a repo, including data model, API surface, rollout, and verification. Use when the user wants a new feature plan or architecture spec centered on Convex contracts. Do not use for audits of the existing implementation; use convex-audit for that.",
+      "description": "Convex-first specs--model, API, rollout, verify. New Convex plans. Not backend audit (convex-audit).",
       "path": "skills/convex-feature-spec",
       "skillMdPath": "skills/convex-feature-spec/SKILL.md",
       "sourceUrls": {
