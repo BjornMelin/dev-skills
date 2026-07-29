@@ -1,6 +1,7 @@
 ---
 name: rust-mega-eng
 description: Explicit-only Rust architecture orchestrator. Use only when the user explicitly invokes rust-mega-eng for broad Rust ecosystem architecture, multi-crate workspace strategy, large refactors, release engineering, crate selection portfolios, or end-to-end Rust product planning across CLI, TUI, Tauri, services, libraries, CI, security, and distribution.
+disable-model-invocation: true
 license: MIT
 metadata:
   category: rust
