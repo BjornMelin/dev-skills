@@ -56,6 +56,7 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 - `SKILL.md` frontmatter should only use allowed keys: `name`, `description`, `license`, `allowed-tools`, `metadata`, `disable-model-invocation` (set `true` to opt a skill out of implicit model invocation).
 - Keep `SKILL.md` concise; put large content in `references/`. Prefer scripts over massive inline code blocks.
 - When replacing or retiring a skill, move the old source to flat `archive/skills/<skill-name>/` or an applicable optional `archive/skills/{gsap,native,rust}/<skill-name>/` group, add `archive.json` with `skill_archive.v1`, set `archived_path` to that full path, remove active catalog links, and verify with `codex-dev --json skills audit`. The leaf directory remains the hyphen-case skill name; group directories are never skills.
+- Set `kind: "snapshot"` in `archive.json` when archiving a previously installed global copy (for example `~/.agents/skills/<name>`) whose active `skills/<name>/` remains canonical. Snapshots allow `source_path: "~/.agents/skills/<name>"` and let the leaf name match an active entrypoint, which the audit reports as a warning instead of an error. See `archive/skills/README.md` for the full contract.
 - Custom subagent TOML names must be **snake_case** and must not shadow Codex built-ins (`default`, `worker`, `explorer`) unless explicitly requested.
 - Keep generated Rust docs and `target/` out of git; document Rust APIs by updating the relevant docs under `docs/reference/`.
 

@@ -17,10 +17,21 @@ Required `archive.json` fields:
 - `name`: archived skill name matching the directory and retained `SKILL.md` frontmatter
 - `status`: `archived`
 - `archived_at`: RFC3339 timestamp
-- `source_path`: original active path, either `skills/<name>` or `plugins/<plugin>/skills/<name>`
+- `source_path`: original active path, either `skills/<name>` or `plugins/<plugin>/skills/<name>`. Snapshot archives may use `~/.agents/skills/<name>` to record a previously installed global copy.
 - `archived_path`: full retained leaf path, either `archive/skills/<name>` or `archive/skills/{gsap,native,rust}/<name>`
 - `reason`: why the skill was archived
 - `restore`: when and how it may be restored
 
 `replacement` is optional, but when present it must name an active skill. Skill
 names must be unique across all flat and grouped archive leaves.
+
+`kind` is optional and defaults to `retirement`. Set `kind: "snapshot"` for a
+historical copy of a previously installed global skill when the active
+`skills/<name>/` (if any) remains canonical. Snapshots allow:
+
+- `source_path` of `~/.agents/skills/<name>` to record the install that was archived.
+- The archive leaf name to match an active skill entrypoint (the audit logs a warning instead of an error in that case).
+
+Snapshot archives must still keep `archive.json`, the leaf `SKILL.md`, and the
+retired source tree intact. They are not active and must not be copied into
+installed skill farms unless intentionally restoring one.

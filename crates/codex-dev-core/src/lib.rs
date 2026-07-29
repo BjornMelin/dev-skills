@@ -894,12 +894,17 @@ struct SkillArchiveManifest {
     schema: Option<String>,
     name: Option<String>,
     status: Option<String>,
+    kind: Option<String>,
     archived_at: Option<String>,
     replacement: Option<String>,
     source_path: Option<String>,
     archived_path: Option<String>,
     reason: Option<String>,
     restore: Option<String>,
+}
+
+fn archive_manifest_is_snapshot(manifest: &SkillArchiveManifest) -> bool {
+    trimmed_optional(&manifest.kind) == Some("snapshot")
 }
 
 #[derive(Clone, Copy)]
@@ -2715,7 +2720,9 @@ fn audit_skill_archive(
         let mut archived_at = None;
         let mut replacement = None;
         let mut reason = None;
+        let mut is_snapshot = false;
         if let Some(manifest) = manifest {
+            is_snapshot = archive_manifest_is_snapshot(&manifest);
             entry_status = trimmed_optional(&manifest.status)
                 .unwrap_or("invalid")
                 .to_string();
@@ -2734,7 +2741,14 @@ fn audit_skill_archive(
         }
 
         validate_archived_skill_entrypoint(repo_root, &directory, &archive_name, &path, issues)?;
-        audit_archived_skill_catalog_exposure(repo_root, &archive_name, readme, docs_index, issues);
+        audit_archived_skill_catalog_exposure(
+            repo_root,
+            &archive_name,
+            readme,
+            docs_index,
+            is_snapshot,
+            issues,
+        );
 
         archived.push(SkillArchiveEntry {
             name: archive_name,
@@ -2954,7 +2968,9 @@ fn validate_skill_archive_manifest(
             "archive.json is missing archived_at",
         ),
     }
-    if let Some(active_path) = active_skill_entrypoints.get(directory) {
+    if let Some(active_path) = active_skill_entrypoints.get(directory)
+        && !archive_manifest_is_snapshot(manifest)
+    {
         push_archive_issue(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
@@ -2982,6 +2998,7 @@ fn validate_skill_archive_manifest(
         repo_root,
         directory,
         manifest_path,
+        archive_manifest_is_snapshot(manifest),
         issues,
     );
     validate_required_archive_manifest_field(
@@ -3017,10 +3034,11 @@ fn validate_archive_source_path(
     repo_root: &Path,
     archive_name: &str,
     manifest_path: &Path,
+    allow_global_install: bool,
     issues: &mut Vec<SkillAuditIssue>,
 ) {
     match trimmed_optional(value) {
-        Some(actual) if archive_source_path_matches(actual, directory) => {}
+        Some(actual) if archive_source_path_matches(actual, directory, allow_global_install) => {}
         Some(actual) => push_archive_issue(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
@@ -3028,7 +3046,12 @@ fn validate_archive_source_path(
             Some(archive_name.to_string()),
             Some(repo_relative_string(repo_root, manifest_path)),
             format!(
-                "archive.json source_path must be 'skills/{directory}' or 'plugins/<plugin>/skills/{directory}', found '{actual}'"
+                "archive.json source_path must be 'skills/{directory}' or 'plugins/<plugin>/skills/{directory}'{}, found '{actual}'",
+                if allow_global_install {
+                    format!(" or '~/.agents/skills/{directory}' for snapshots")
+                } else {
+                    String::new()
+                }
             ),
         ),
         None => push_archive_issue(
@@ -3042,8 +3065,11 @@ fn validate_archive_source_path(
     }
 }
 
-fn archive_source_path_matches(actual: &str, directory: &str) -> bool {
+fn archive_source_path_matches(actual: &str, directory: &str, allow_global_install: bool) -> bool {
     if actual == format!("skills/{directory}") {
+        return true;
+    }
+    if allow_global_install && actual == format!("~/.agents/skills/{directory}") {
         return true;
     }
     let parts = actual.split('/').collect::<Vec<_>>();
@@ -3169,6 +3195,7 @@ fn audit_archived_skill_catalog_exposure(
     archive_name: &str,
     readme: &CatalogInputText,
     docs_index: &CatalogInputText,
+    is_snapshot: bool,
     issues: &mut Vec<SkillAuditIssue>,
 ) {
     for (path, text) in [
@@ -3176,13 +3203,23 @@ fn audit_archived_skill_catalog_exposure(
         ("docs/index.md", docs_index.text.as_str()),
     ] {
         if skill_catalog_present(text, archive_name) {
+            let severity = if is_snapshot {
+                SkillInventoryDiagnosticSeverity::Warning
+            } else {
+                SkillInventoryDiagnosticSeverity::Error
+            };
+            let message = if is_snapshot {
+                "snapshot archive shares a name with an active catalog entry (expected for kind: \"snapshot\")"
+            } else {
+                "archived skill is still listed in the active catalog"
+            };
             push_archive_issue(
                 issues,
-                SkillInventoryDiagnosticSeverity::Error,
+                severity,
                 "archived_skill_cataloged_as_active",
                 Some(archive_name.to_string()),
                 Some(repo_relative_string(repo_root, &repo_root.join(path))),
-                "archived skill is still listed in the active catalog",
+                message,
             );
         }
     }
