@@ -1,6 +1,6 @@
 ---
 name: convex-feature-spec
-description: Generate a complete Convex-first feature specification for a repo, including data model, API surface, rollout, and verification. Use when the user wants a new feature plan or architecture spec centered on Convex contracts. Do not use for audits of the existing implementation; use convex-audit for that.
+description: Convex-first specs—model, API, rollout, verify. New Convex plans. Not backend audit (convex-audit).
 ---
 
 # Convex Feature Spec
