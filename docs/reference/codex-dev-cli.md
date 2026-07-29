@@ -455,18 +455,24 @@ cargo run -q -p codex-dev -- --json skills audit --skills-root ~/.agents/skills
 `skills audit` emits `result.schema: "skill_audit.v1"`. It checks validation
 diagnostics, missing `agents/openai.yaml`, oversized `SKILL.md` files, stale
 skill path patterns such as `~/.codex/skills`, and generated Python cache files
-under bundled scripts. It also validates `archive/skills/<skill>/archive.json`
-manifests without adding archived skills to the active inventory, flags archived
-skills that still exist under `skills/`, missing active replacements, name
-mismatches, invalid source/archive paths, missing archive reasons, missing
-restore guidance, and active-catalog references. Archive `source_path` accepts
-either `skills/<skill>` or plugin-origin paths shaped as
+under bundled scripts. It also validates flat
+`archive/skills/<skill>/archive.json` manifests and grouped leaves under the
+optional `archive/skills/{gsap,native,rust}/<skill>/` containers without adding
+archived skills or group containers to the active inventory. The leaf basename
+is the hyphen-case skill identity; `archived_path` must contain its full actual
+flat or grouped path. Flat archives remain supported. The audit flags duplicate
+archived names across layouts, archived skills that still exist under `skills/`,
+missing active replacements, name mismatches, invalid source/archive paths,
+missing archive reasons, missing restore guidance, and active-catalog
+references. Archive `source_path` accepts either `skills/<skill>` or
+plugin-origin paths shaped as
 `plugins/<plugin>/skills/<skill>`, where `<plugin>` must use the same
 hyphen-case skill-name syntax. `--max-skill-md-lines` defaults to `500`.
 
 The archive summary is reported at `result.archive` with schema
 `skill_archive.v1`, root, total archived skill count, and manifest-derived skill
-entries. `skills inventory` and `skills validate` remain active-skill only.
+entries sorted by full repository-relative path. `skills inventory` and
+`skills validate` remain active-skill only.
 
 ## skills sync-kimi
 

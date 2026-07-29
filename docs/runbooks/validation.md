@@ -21,9 +21,10 @@ The continuous integration (CI) workflow in `.github/workflows/ci.yml` runs two
 parallel, credential-free jobs on every pull request and push to `main`:
 
 - `Rust workspace and catalog` runs workspace formatting, Clippy, tests,
-  policy-doc and native Bun smokes, then regenerates and diffs the public
-  catalog through `tools/skill/check_catalog.sh`, which isolates the scan in a
-  detached worktree so ignored local artifacts cannot affect the result. Its
+  policy-doc and skill-archive validation, native Bun smokes, then regenerates
+  and diffs the public catalog through `tools/skill/check_catalog.sh`, which
+  isolates the scan in a detached worktree so ignored local artifacts cannot
+  affect the result. Its
   regression harness proves non-ignored untracked files fail validation and
   temporary worktrees are cleaned after success and failure.
 - `Skills, plugins, and docs` runs the strict offline eval, plugin and generated
@@ -187,6 +188,7 @@ cargo run -q -p codex-dev -- --json policy docs-check
 cargo run -q -p codex-dev -- --json local doctor
 cargo run -q -p codex-dev -- --json local status
 cargo run -q -p codex-dev -- --json skills inventory
+cargo run -q -p codex-dev -- --json skills audit
 cargo run -q -p codex-dev -- --json skills sync-kimi --dry-run --project-root "$PWD"
 cargo run -q -p codex-dev -- --json skills catalog --out /tmp/agent-skills-lab.json
 cargo run -q -p codex-dev -- --json bun doctor

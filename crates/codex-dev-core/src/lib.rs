@@ -53,6 +53,7 @@ const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 10_000;
 #[cfg(test)]
 const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 32;
 const SKILL_INVENTORY_MAX_RESOURCE_DEPTH: usize = 16;
+const SKILL_ARCHIVE_GROUPS: [&str; 3] = ["gsap", "native", "rust"];
 
 fn is_false(value: &bool) -> bool {
     !*value
@@ -2656,38 +2657,46 @@ fn audit_skill_archive(
         });
     }
 
-    let mut archive_dirs = Vec::new();
-    for entry in fs::read_dir(&archive_root).with_context(|| {
-        format!(
-            "failed to read skill archive root {}",
-            archive_root.display()
-        )
-    })? {
-        let entry =
-            entry.with_context(|| format!("failed to read entry in {}", archive_root.display()))?;
-        archive_dirs.push(entry);
-    }
-    archive_dirs.sort_by_key(|entry| entry.file_name());
+    let archive_dirs = discover_skill_archive_dirs(repo_root, &archive_root, issues)?;
 
     let mut archived = Vec::new();
-    for entry in archive_dirs {
-        let path = entry.path();
-        let directory = entry.file_name().to_string_lossy().to_string();
+    let mut archived_names = BTreeMap::new();
+    for path in archive_dirs {
+        let directory = path
+            .file_name()
+            .expect("archive discovery only returns child paths")
+            .to_string_lossy()
+            .to_string();
+        let relative_path = repo_relative_string(repo_root, &path);
         let metadata = fs::symlink_metadata(&path)
             .with_context(|| format!("failed to inspect archived skill {}", path.display()))?;
+        if metadata.file_type().is_symlink() || metadata.is_dir() {
+            if let Some(first_path) = archived_names.get(&directory) {
+                push_archive_issue(
+                    issues,
+                    SkillInventoryDiagnosticSeverity::Error,
+                    "archived_skill_duplicate_name",
+                    Some(directory.clone()),
+                    Some(relative_path.clone()),
+                    format!("archived skill name '{directory}' is also used at '{first_path}'"),
+                );
+            } else {
+                archived_names.insert(directory.clone(), relative_path.clone());
+            }
+        }
         if metadata.file_type().is_symlink() {
             push_archive_issue(
                 issues,
                 SkillInventoryDiagnosticSeverity::Error,
                 "archived_skill_invalid_manifest",
                 Some(directory.clone()),
-                Some(repo_relative_string(repo_root, &path)),
+                Some(relative_path.clone()),
                 "archived skill directory must not be a symlink",
             );
             archived.push(SkillArchiveEntry {
                 name: directory,
                 status: "invalid".to_string(),
-                path: repo_relative_string(repo_root, &path),
+                path: relative_path,
                 archived_at: None,
                 replacement: None,
                 reason: None,
@@ -2701,15 +2710,12 @@ fn audit_skill_archive(
         let manifest_path = path.join("archive.json");
         let (manifest, status) =
             read_skill_archive_manifest(repo_root, &directory, &manifest_path, issues)?;
-        let mut archive_name = directory.clone();
+        let archive_name = directory.clone();
         let mut entry_status = status;
         let mut archived_at = None;
         let mut replacement = None;
         let mut reason = None;
         if let Some(manifest) = manifest {
-            if let Some(name) = trimmed_optional(&manifest.name) {
-                archive_name = name.to_string();
-            }
             entry_status = trimmed_optional(&manifest.status)
                 .unwrap_or("invalid")
                 .to_string();
@@ -2719,7 +2725,7 @@ fn audit_skill_archive(
             validate_skill_archive_manifest(
                 repo_root,
                 &directory,
-                &archive_name,
+                &relative_path,
                 &manifest,
                 &manifest_path,
                 active_skill_entrypoints,
@@ -2733,7 +2739,7 @@ fn audit_skill_archive(
         archived.push(SkillArchiveEntry {
             name: archive_name,
             status: entry_status,
-            path: repo_relative_string(repo_root, &path),
+            path: relative_path,
             archived_at,
             replacement,
             reason,
@@ -2746,6 +2752,76 @@ fn audit_skill_archive(
         total: archived.len(),
         skills: archived,
     })
+}
+
+fn discover_skill_archive_dirs(
+    repo_root: &Path,
+    archive_root: &Path,
+    issues: &mut Vec<SkillAuditIssue>,
+) -> Result<Vec<PathBuf>> {
+    let mut root_entries = fs::read_dir(archive_root)
+        .with_context(|| {
+            format!(
+                "failed to read skill archive root {}",
+                archive_root.display()
+            )
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .with_context(|| format!("failed to read entry in {}", archive_root.display()))?;
+    root_entries.sort_by_key(|entry| entry.file_name());
+
+    let mut archive_dirs = Vec::new();
+    for entry in root_entries {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !SKILL_ARCHIVE_GROUPS.contains(&name.as_str()) {
+            archive_dirs.push(path);
+            continue;
+        }
+
+        let metadata = fs::symlink_metadata(&path)
+            .with_context(|| format!("failed to inspect archive group {}", path.display()))?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            push_archive_issue(
+                issues,
+                SkillInventoryDiagnosticSeverity::Error,
+                "archived_skill_invalid_manifest",
+                None,
+                Some(repo_relative_string(repo_root, &path)),
+                "archive group container must be a non-symlinked directory",
+            );
+            continue;
+        }
+
+        let mut group_entries = fs::read_dir(&path)
+            .with_context(|| format!("failed to read archive group {}", path.display()))?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .with_context(|| format!("failed to read entry in {}", path.display()))?;
+        group_entries.sort_by_key(|entry| entry.file_name());
+        for entry in group_entries {
+            let child_path = entry.path();
+            let child_metadata = fs::symlink_metadata(&child_path).with_context(|| {
+                format!(
+                    "failed to inspect archive group child {}",
+                    child_path.display()
+                )
+            })?;
+            if child_metadata.file_type().is_symlink() || child_metadata.is_dir() {
+                archive_dirs.push(child_path);
+            } else {
+                push_archive_issue(
+                    issues,
+                    SkillInventoryDiagnosticSeverity::Error,
+                    "archived_skill_invalid_manifest",
+                    None,
+                    Some(repo_relative_string(repo_root, &child_path)),
+                    "archive group child must be a skill directory",
+                );
+            }
+        }
+    }
+    archive_dirs.sort_by_key(|path| repo_relative_string(repo_root, path));
+    Ok(archive_dirs)
 }
 
 fn read_skill_archive_manifest(
@@ -2785,7 +2861,7 @@ fn read_skill_archive_manifest(
 fn validate_skill_archive_manifest(
     repo_root: &Path,
     directory: &str,
-    archive_name: &str,
+    archived_path: &str,
     manifest: &SkillArchiveManifest,
     manifest_path: &Path,
     active_skill_entrypoints: &BTreeMap<String, String>,
@@ -2798,7 +2874,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             format!("archive.json schema must be {SKILL_ARCHIVE_SCHEMA}, found {schema}"),
         ),
@@ -2806,7 +2882,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             format!("archive.json is missing schema {SKILL_ARCHIVE_SCHEMA}"),
         ),
@@ -2817,7 +2893,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             format!("archive.json status must be archived, found {status}"),
         ),
@@ -2825,7 +2901,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             "archive.json is missing archived status",
         ),
@@ -2835,7 +2911,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             format!("archive.json name '{name}' must be a valid skill name"),
         ),
@@ -2843,7 +2919,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_name_mismatch",
-            Some(name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             format!("archive.json name '{name}' must match archived directory '{directory}'"),
         ),
@@ -2863,7 +2939,7 @@ fn validate_skill_archive_manifest(
                 issues,
                 SkillInventoryDiagnosticSeverity::Error,
                 "archived_skill_invalid_manifest",
-                Some(archive_name.to_string()),
+                Some(directory.to_string()),
                 Some(manifest_rel.clone()),
                 format!("archive.json archived_at must be RFC3339, found {archived_at}"),
             );
@@ -2873,17 +2949,17 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_invalid_manifest",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel.clone()),
             "archive.json is missing archived_at",
         ),
     }
-    if let Some(active_path) = active_skill_entrypoints.get(archive_name) {
+    if let Some(active_path) = active_skill_entrypoints.get(directory) {
         push_archive_issue(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_still_active",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(active_path.clone()),
             "archived skill name is also present in an active skill entrypoint",
         );
@@ -2895,7 +2971,7 @@ fn validate_skill_archive_manifest(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
             "archived_skill_replacement_missing",
-            Some(archive_name.to_string()),
+            Some(directory.to_string()),
             Some(manifest_rel),
             format!("archive.json replacement skill '{replacement}' is not active"),
         );
@@ -2904,17 +2980,16 @@ fn validate_skill_archive_manifest(
         &manifest.source_path,
         directory,
         repo_root,
-        archive_name,
+        directory,
         manifest_path,
         issues,
     );
-    let expected_archived_path = format!("archive/skills/{directory}");
     validate_required_archive_manifest_field(
         &manifest.archived_path,
         "archived_path",
-        &expected_archived_path,
+        archived_path,
         repo_root,
-        archive_name,
+        directory,
         manifest_path,
         issues,
     );
@@ -2922,7 +2997,7 @@ fn validate_skill_archive_manifest(
         &manifest.reason,
         "reason",
         repo_root,
-        archive_name,
+        directory,
         manifest_path,
         issues,
     );
@@ -2930,7 +3005,7 @@ fn validate_skill_archive_manifest(
         &manifest.restore,
         "restore",
         repo_root,
-        archive_name,
+        directory,
         manifest_path,
         issues,
     );

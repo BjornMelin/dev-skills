@@ -5,7 +5,9 @@
 Runtime and tooling contract:
 
 - `skills/` is active-only. Direct `skills/<name>/SKILL.md` folders are eligible for cataloging, packaging, and installation.
-- `archive/skills/<name>/` is source history only. Do not copy or symlink this tree into installed skills unless intentionally restoring it.
+- Flat `archive/skills/<name>/` leaves remain supported. Related leaves may instead live under the optional `archive/skills/{gsap,native,rust}/<name>/` group containers.
+- Group containers are organization only and are never skills. Each leaf basename is the hyphen-case skill identity and must match its `archive.json` and retained `SKILL.md` frontmatter.
+- Archived leaves are source history only. Do not copy or symlink them into installed skills unless intentionally restoring one.
 - Each archived skill must include `archive.json`.
 - `codex-dev skills audit` validates archive manifests and flags active duplicates, missing replacements, and active-catalog references.
 
@@ -15,9 +17,10 @@ Required `archive.json` fields:
 - `name`: archived skill name matching the directory and retained `SKILL.md` frontmatter
 - `status`: `archived`
 - `archived_at`: RFC3339 timestamp
-- `source_path`: original active path, `skills/<name>`
-- `archived_path`: retained path, `archive/skills/<name>`
+- `source_path`: original active path, either `skills/<name>` or `plugins/<plugin>/skills/<name>`
+- `archived_path`: full retained leaf path, either `archive/skills/<name>` or `archive/skills/{gsap,native,rust}/<name>`
 - `reason`: why the skill was archived
 - `restore`: when and how it may be restored
 
-`replacement` is optional, but when present it must name an active skill.
+`replacement` is optional, but when present it must name an active skill. Skill
+names must be unique across all flat and grouped archive leaves.

@@ -12,7 +12,7 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
-- retired skill source history under `archive/skills/`;
+- retired skill source history under flat `archive/skills/<name>/` leaves or optional `gsap`, `native`, and `rust` group containers;
 - reusable local Codex plugin source under `plugins/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
@@ -74,6 +74,10 @@ archive/
     <skill-name>/
       archive.json        # required archive metadata
       SKILL.md            # retained source; not active
+    {gsap,native,rust}/   # optional organization-only group containers
+      <skill-name>/
+        archive.json      # full archived_path includes the group
+        SKILL.md          # leaf is the archived skill; group is not
 .claude-plugin/
   marketplace.json        # Claude Code marketplace catalog
 plugins/
@@ -241,7 +245,10 @@ through `codex-dev --json skills inventory`; the public Agent Skills Lab
 artifact is generated with
 `codex-dev --json skills catalog --source-ref main --out
 catalog/agent-skills-lab.json`. Retired
-skills belong in `archive/skills/` with an `archive.json` manifest and must not
+skills belong in flat `archive/skills/<name>/` leaves or under the optional
+`archive/skills/{gsap,native,rust}/<name>/` group containers. Each leaf keeps
+the skill's hyphen-case name and an `archive.json` whose `archived_path` is the
+full retained path; group containers are not skills. Archived skills must not
 remain linked from this active catalog. The table below remains the human-facing
 active catalog. For how the generated artifact reaches the public Agent Skills
 Lab at `bjornmelin.io/agent-skills`, see the
