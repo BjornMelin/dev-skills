@@ -467,7 +467,11 @@ missing archive reasons, missing restore guidance, and active-catalog
 references. Archive `source_path` accepts either `skills/<skill>` or
 plugin-origin paths shaped as
 `plugins/<plugin>/skills/<skill>`, where `<plugin>` must use the same
-hyphen-case skill-name syntax. `--max-skill-md-lines` defaults to `500`.
+hyphen-case skill-name syntax. A `kind: "snapshot"` manifest may instead use
+`~/.agents/skills/<skill>` for a captured global install. Catalog exposure is
+only downgraded to a warning when that snapshot has a same-named active
+repository skill; an archived-only snapshot listed as active remains an error.
+`--max-skill-md-lines` defaults to `500`.
 
 The archive summary is reported at `result.archive` with schema
 `skill_archive.v1`, root, total archived skill count, and manifest-derived skill

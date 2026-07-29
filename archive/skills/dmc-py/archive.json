@@ -4,7 +4,7 @@
   "status": "archived",
   "kind": "snapshot",
   "archived_at": "2026-07-29T13:12:00Z",
-  "source_path": "skills/dmc-py",
+  "source_path": "~/.agents/skills/dmc-py",
   "archived_path": "archive/skills/dmc-py",
   "replacement": "dmc-py",
   "reason": "Captured the older global install snapshot of dmc-py before global skill installs were paused. This snapshot predates the dmc-best-practices extraction and contains the bundled rules/ directory plus three reference files (best-practices.md, best-practices-expanded.md, common-tasks-and-troubleshooting.md, core-patterns-and-components.md) that are now redundant with the dmc-best-practices skill. The repo's skills/dmc-py/ remains the active canonical version, with cross-references to the separate dmc-best-practices skill.",

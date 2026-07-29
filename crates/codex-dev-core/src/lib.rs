@@ -2741,12 +2741,14 @@ fn audit_skill_archive(
         }
 
         validate_archived_skill_entrypoint(repo_root, &directory, &archive_name, &path, issues)?;
+        let snapshot_has_active_twin =
+            is_snapshot && active_skill_entrypoints.contains_key(&archive_name);
         audit_archived_skill_catalog_exposure(
             repo_root,
             &archive_name,
             readme,
             docs_index,
-            is_snapshot,
+            snapshot_has_active_twin,
             issues,
         );
 
@@ -3195,7 +3197,7 @@ fn audit_archived_skill_catalog_exposure(
     archive_name: &str,
     readme: &CatalogInputText,
     docs_index: &CatalogInputText,
-    is_snapshot: bool,
+    snapshot_has_active_twin: bool,
     issues: &mut Vec<SkillAuditIssue>,
 ) {
     for (path, text) in [
@@ -3203,12 +3205,12 @@ fn audit_archived_skill_catalog_exposure(
         ("docs/index.md", docs_index.text.as_str()),
     ] {
         if skill_catalog_present(text, archive_name) {
-            let severity = if is_snapshot {
+            let severity = if snapshot_has_active_twin {
                 SkillInventoryDiagnosticSeverity::Warning
             } else {
                 SkillInventoryDiagnosticSeverity::Error
             };
-            let message = if is_snapshot {
+            let message = if snapshot_has_active_twin {
                 "snapshot archive shares a name with an active catalog entry (expected for kind: \"snapshot\")"
             } else {
                 "archived skill is still listed in the active catalog"
