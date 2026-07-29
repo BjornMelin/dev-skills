@@ -3,4 +3,4 @@ interface:
   short_description: "Rank Sentry issues and plan PR fixes"
   default_prompt: "Use $sentry-triage-to-pr to rank unresolved Sentry issues, group them into GitHub issues and PR-sized fixes, plan branches/worktrees, and babysit PR closeout with verified evidence."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false

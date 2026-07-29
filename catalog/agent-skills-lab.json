@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-21T23:46:37.117979157Z",
+  "generatedAt": "2026-07-29T16:28:59.732451827Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "3aaa44b8fb70b904156213a2f16d8f8213eb7615",
+  "sourceCommit": "cb4957bebc6f6445694a4e00f81af774048411ec",
   "sourceRef": "main",
-  "skillsCount": 63,
-  "totalSkillDirectories": 63,
+  "skillsCount": 67,
+  "totalSkillDirectories": 67,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -513,22 +513,22 @@
         "Emerging"
       ],
       "qualitySignals": [
-        "readme_catalogued"
+        "readme_catalogued",
+        "has_agents"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_references",
-        "missing_scripts",
-        "no_assets_templates_or_agents"
+        "missing_scripts"
       ],
       "resources": {
         "references": 0,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
-        "agents": 0,
-        "total": 0
+        "agents": 1,
+        "total": 1
       },
       "exposure": {
         "readme_catalog": true,
@@ -557,25 +557,27 @@
       },
       "readinessLabels": [
         "Valid",
+        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
-        "has_references"
+        "has_references",
+        "has_agents",
+        "resource_rich"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
         "missing_dist_package",
-        "missing_scripts",
-        "no_assets_templates_or_agents"
+        "missing_scripts"
       ],
       "resources": {
         "references": 4,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
-        "agents": 0,
-        "total": 4
+        "agents": 1,
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,
@@ -1688,21 +1690,21 @@
       ],
       "qualitySignals": [
         "readme_catalogued",
-        "has_references"
+        "has_references",
+        "has_agents"
       ],
       "improvementSignals": [
         "missing_docs_index_exposure",
         "missing_dist_package",
-        "missing_scripts",
-        "no_assets_templates_or_agents"
+        "missing_scripts"
       ],
       "resources": {
         "references": 3,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
-        "agents": 0,
-        "total": 3
+        "agents": 1,
+        "total": 4
       },
       "exposure": {
         "readme_catalog": true,
@@ -2253,7 +2255,7 @@
     {
       "name": "rust-expert",
       "slug": "rust-expert",
-      "description": "Core Rust engineering. Use for implementation, debugging, review, compiler errors, ownership and lifetimes, traits and generics, async and concurrency, typed errors, Cargo and MSRV, crate choice, tests, performance, unsafe and security.",
+      "description": "Core Rust engineering. Use for implementation, debugging, review, compiler errors, ownership and lifetimes, traits and generics, async and concurrency, typed errors, Cargo and MSRV, crate choice, tests, performance, unsafe and security. Excludes focused product surfaces owned by narrower Rust skills.",
       "path": "skills/rust-expert",
       "skillMdPath": "skills/rust-expert/SKILL.md",
       "sourceUrls": {
@@ -2296,6 +2298,208 @@
       },
       "package": {
         "path": "skills/dist/rust-expert.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "rust-mega-eng",
+      "slug": "rust-mega-eng",
+      "description": "Explicit-only Rust architecture orchestrator. Use only when the user explicitly invokes rust-mega-eng for broad Rust ecosystem architecture, multi-crate workspace strategy, large refactors, release engineering, crate selection portfolios, or end-to-end Rust product planning across CLI, TUI, Tauri, services, libraries, CI, security, and distribution.",
+      "license": "MIT",
+      "path": "skills/rust-mega-eng",
+      "skillMdPath": "skills/rust-mega-eng/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-mega-eng",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-mega-eng/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-mega-eng -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-mega-eng -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-mega-eng"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_assets",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 1,
+        "templates": 0,
+        "agents": 1,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/rust-mega-eng.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "rust-tauri-apps",
+      "slug": "rust-tauri-apps",
+      "description": "Implicit Rust Tauri v2 skill. Use for Tauri apps, Rust commands, invoke contracts, app state, plugins, capabilities and permissions, secure IPC, filesystem and shell access, sidecars, updater, bundling, desktop and mobile distribution, and Rust frontend bridge design.",
+      "license": "MIT",
+      "path": "skills/rust-tauri-apps",
+      "skillMdPath": "skills/rust-tauri-apps/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-tauri-apps",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-tauri-apps/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tauri-apps -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-tauri-apps -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-tauri-apps"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_assets",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 3,
+        "scripts": 0,
+        "assets": 1,
+        "templates": 0,
+        "agents": 1,
+        "total": 5
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/rust-tauri-apps.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "rust-tui-ratatui",
+      "slug": "rust-tui-ratatui",
+      "description": "Implicit Rust TUI and Ratatui skill. Use for terminal UIs, ratatui widgets and layouts, crossterm or termion event loops, terminal rendering architecture, async input, app state machines, keybindings, terminal UX, snapshot tests, and TUI performance.",
+      "license": "MIT",
+      "path": "skills/rust-tui-ratatui",
+      "skillMdPath": "skills/rust-tui-ratatui/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-tui-ratatui",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-tui-ratatui/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-tui-ratatui -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-tui-ratatui -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-tui-ratatui"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_assets",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 3,
+        "scripts": 0,
+        "assets": 1,
+        "templates": 0,
+        "agents": 1,
+        "total": 5
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/rust-tui-ratatui.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "rust-web-services",
+      "slug": "rust-web-services",
+      "description": "Implicit Rust web service skill. Use for Axum, Tokio, Tower, Hyper, REST APIs, middleware/layers, request extractors, typed errors, tracing, config, graceful shutdown, SQLx, background jobs, service tests, and production Rust HTTP architecture.",
+      "license": "MIT",
+      "path": "skills/rust-web-services",
+      "skillMdPath": "skills/rust-web-services/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/rust-web-services",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/rust-web-services/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill rust-web-services -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill rust-web-services -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill rust-web-services"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_assets",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 3,
+        "scripts": 0,
+        "assets": 1,
+        "templates": 0,
+        "agents": 1,
+        "total": 5
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/rust-web-services.skill",
         "present": false,
         "rejected": false
       }

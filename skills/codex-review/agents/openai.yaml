@@ -1,0 +1,6 @@
+interface:
+  display_name: "Codex Review"
+  short_description: "Run an independent read-only Codex diff review"
+  default_prompt: "Use $codex-review to run an independent read-only Codex review of these changes."
+policy:
+  allow_implicit_invocation: false

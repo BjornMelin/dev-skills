@@ -1,0 +1,6 @@
+interface:
+  display_name: "Codex Delegate"
+  short_description: "Delegate bounded implementation and investigation to Codex"
+  default_prompt: "Use $codex-delegate to delegate this bounded task through a pinned Codex CLI model and effort tier."
+policy:
+  allow_implicit_invocation: false
