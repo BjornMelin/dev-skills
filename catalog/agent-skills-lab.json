@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-29T16:28:59.732451827Z",
+  "generatedAt": "2026-07-29T16:42:28.270020387Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "cb4957bebc6f6445694a4e00f81af774048411ec",
+  "sourceCommit": "f09782df49745d2f55e313f856ff5d59bfff7037",
   "sourceRef": "main",
-  "skillsCount": 67,
-  "totalSkillDirectories": 67,
+  "skillsCount": 66,
+  "totalSkillDirectories": 66,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -2551,56 +2551,6 @@
       },
       "package": {
         "path": "skills/dist/sentry-cli-fix-issues.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "sentry-triage-to-pr",
-      "slug": "sentry-triage-to-pr",
-      "description": "Triage unresolved Sentry issues into ranked groups, GitHub issue plans, branches, subspawn worktree assignments, PRs, and closeout loops using the sentry CLI, GitHub CLI, and local verification. Use when asked to prioritize Sentry backlogs, group production issues, create GitHub issues or PRs from Sentry evidence, or parallelize Sentry fixes.",
-      "path": "skills/sentry-triage-to-pr",
-      "skillMdPath": "skills/sentry-triage-to-pr/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/sentry-triage-to-pr",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/sentry-triage-to-pr/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill sentry-triage-to-pr -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill sentry-triage-to-pr -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill sentry-triage-to-pr"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Documented",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "docs_indexed",
-        "has_references",
-        "has_scripts",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_dist_package"
-      ],
-      "resources": {
-        "references": 3,
-        "scripts": 2,
-        "assets": 0,
-        "templates": 0,
-        "agents": 1,
-        "total": 6
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": true
-      },
-      "package": {
-        "path": "skills/dist/sentry-triage-to-pr.skill",
         "present": false,
         "rejected": false
       }
