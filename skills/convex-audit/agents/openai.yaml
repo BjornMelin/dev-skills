@@ -3,7 +3,7 @@ interface:
   short_description: "Audit Convex schemas, security, functions, and migrations"
   default_prompt: "Use $convex-audit to inventory the Convex surface, identify risks, and produce a remediation plan with repo-native verification."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false
 dependencies:
   tools:
     - type: "mcp"
@@ -12,4 +12,3 @@ dependencies:
     - type: "mcp"
       value: "exa"
       description: "Supplemental current research when needed"
-

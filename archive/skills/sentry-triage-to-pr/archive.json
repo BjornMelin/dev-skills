@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "sentry-triage-to-pr",
+  "status": "archived",
+  "archived_at": "2026-07-29T00:00:00Z",
+  "source_path": "skills/sentry-triage-to-pr",
+  "archived_path": "archive/skills/sentry-triage-to-pr",
+  "reason": "Removed from the core active catalog because backlog-to-PR orchestration is no longer a globally dispatched skill. Its portable operator and references are retained for source history and possible restoration.",
+  "restore": "Move this directory back to skills/sentry-triage-to-pr and relink it from the consuming agents' skill farms."
+}

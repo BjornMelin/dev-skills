@@ -12,7 +12,7 @@ A versioned collection of reusable **Agent Skills** (per the AgentSkills specifi
 This repo now contains skill packages and supporting tooling:
 
 - reusable skills under `skills/`;
-- retired skill source history under `archive/skills/`;
+- retired skill source history under flat `archive/skills/<name>/` leaves or optional `gsap`, `native`, and `rust` group containers;
 - reusable local Codex plugin source under `plugins/`;
 - repo bootstrap pack manifests and templates under `bootstrap/`;
 - a Rust shared development contract crate, `codex-dev-core`, under `crates/`;
@@ -74,6 +74,10 @@ archive/
     <skill-name>/
       archive.json        # required archive metadata
       SKILL.md            # retained source; not active
+    {gsap,native,rust}/   # optional organization-only group containers
+      <skill-name>/
+        archive.json      # full archived_path includes the group
+        SKILL.md          # leaf is the archived skill; group is not
 .claude-plugin/
   marketplace.json        # Claude Code marketplace catalog
 plugins/
@@ -241,7 +245,10 @@ through `codex-dev --json skills inventory`; the public Agent Skills Lab
 artifact is generated with
 `codex-dev --json skills catalog --source-ref main --out
 catalog/agent-skills-lab.json`. Retired
-skills belong in `archive/skills/` with an `archive.json` manifest and must not
+skills belong in flat `archive/skills/<name>/` leaves or under the optional
+`archive/skills/{gsap,native,rust}/<name>/` group containers. Each leaf keeps
+the skill's hyphen-case name and an `archive.json` whose `archived_path` is the
+full retained path; group containers are not skills. Archived skills must not
 remain linked from this active catalog. The table below remains the human-facing
 active catalog. For how the generated artifact reaches the public Agent Skills
 Lab at `bjornmelin.io/agent-skills`, see the
@@ -325,9 +332,12 @@ for local development and validation commands.
 | `review-remediation` | Fix local review notes with verify-first triage; excludes hosted GitHub PR review loops. | [skills/review-remediation/SKILL.md](skills/review-remediation/SKILL.md) |
 | `rust-cli-clap` | Rust CLI and Clap command design: parsers, output contracts, tests, packaging. | [skills/rust-cli-clap/SKILL.md](skills/rust-cli-clap/SKILL.md) |
 | `rust-expert` | Core Rust engineering router for ownership, async, crates, tests, performance, and security. | [skills/rust-expert/SKILL.md](skills/rust-expert/SKILL.md) |
+| `rust-mega-eng` | Explicit Rust architecture orchestrator for broad multi-crate strategy and release planning. | [skills/rust-mega-eng/SKILL.md](skills/rust-mega-eng/SKILL.md) |
+| `rust-tauri-apps` | Tauri v2 Rust app backends: commands, secure IPC, capabilities, bundling, distribution. | [skills/rust-tauri-apps/SKILL.md](skills/rust-tauri-apps/SKILL.md) |
+| `rust-tui-ratatui` | Rust terminal UI architecture with Ratatui, crossterm event loops, snapshots, and UX. | [skills/rust-tui-ratatui/SKILL.md](skills/rust-tui-ratatui/SKILL.md) |
+| `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `sentry-cli-fix-issues` | Fix Sentry issues from CLI evidence: issues, events, traces, logs, replays, Seer, privacy, and verification. | [skills/sentry-cli-fix-issues/SKILL.md](skills/sentry-cli-fix-issues/SKILL.md) |
-| `sentry-triage-to-pr` | Rank unresolved Sentry issues, group PR-sized fixes, render GitHub issue plans, and plan subspawn worktrees. | [skills/sentry-triage-to-pr/SKILL.md](skills/sentry-triage-to-pr/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit: reruns/state, caching/fragments, AppTest, components v2, security, Playwright E2E. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |
 | `subagent-creator` | Create, validate, install, diff, sync, and smoke-test Codex custom subagent TOML role packs. | [skills/subagent-creator/SKILL.md](skills/subagent-creator/SKILL.md) |
@@ -402,8 +412,8 @@ the subagent template authority model and duplicate-role expectations.
 Rust skill suite validation:
 
 ```bash
-node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap
-node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap
+node skills/rust-expert/scripts/check-reference-links.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
+node skills/rust-expert/scripts/check-trigger-evals.mjs skills/rust-expert skills/rust-cli-clap skills/rust-tui-ratatui skills/rust-tauri-apps skills/rust-web-services skills/rust-mega-eng
 ```
 
 Notes:

@@ -36,6 +36,8 @@ jobs:
         run: cargo test --locked --workspace --all-targets
       - name: Verify policy documentation
         run: cargo run -q -p codex-dev -- --json policy docs-check
+      - name: Audit skill archive
+        run: cargo run -q -p codex-dev -- --json skills audit
       - name: Smoke native Bun platform
         run: cargo run -q -p codex-dev -- --json bun doctor
       - name: Smoke claude-config-audit

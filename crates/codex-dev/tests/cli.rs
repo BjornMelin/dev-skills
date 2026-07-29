@@ -1061,6 +1061,386 @@ fn skills_archive_is_audited_without_active_inventory() {
 }
 
 #[test]
+fn skills_archive_discovers_grouped_leaves_and_excludes_containers() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    std::fs::create_dir_all(repo.join("archive/skills/rust")).expect("empty rust archive group");
+    for (directory, skill_name, archived_path) in [
+        (
+            "native/alpha-retired",
+            "alpha-retired",
+            "archive/skills/native/alpha-retired",
+        ),
+        (
+            "gsap/zeta-retired",
+            "zeta-retired",
+            "archive/skills/gsap/zeta-retired",
+        ),
+    ] {
+        write_archived_skill(
+            &repo,
+            directory,
+            skill_name,
+            Some(json!({
+                "schema": "skill_archive.v1",
+                "name": skill_name,
+                "status": "archived",
+                "archived_at": "2026-05-13T00:00:00Z",
+                "replacement": "alpha-skill",
+                "source_path": format!("skills/{skill_name}"),
+                "archived_path": archived_path,
+                "reason": "Grouped archive fixture.",
+                "restore": format!("Move back to skills/{skill_name} if needed.")
+            })),
+        );
+    }
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:00Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    let archived = json["result"]["archive"]["skills"]
+        .as_array()
+        .expect("archived skills");
+    assert_eq!(archived.len(), 2);
+    assert_eq!(archived[0]["name"], "zeta-retired");
+    assert_eq!(archived[0]["path"], "archive/skills/gsap/zeta-retired");
+    assert_eq!(archived[1]["name"], "alpha-retired");
+    assert_eq!(archived[1]["path"], "archive/skills/native/alpha-retired");
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .all(|issue| issue["skill"] != "gsap" && issue["skill"] != "native")
+    );
+}
+
+#[test]
+fn skills_archive_validates_grouped_leaf_identity_and_full_path() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "gsap/leaf-skill",
+        "leaf-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "different-skill",
+            "status": "archived",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "replacement": "alpha-skill",
+            "source_path": "skills/leaf-skill",
+            "archived_path": "archive/skills/leaf-skill",
+            "reason": "Nested path mismatch fixture.",
+            "restore": "Fix the manifest before restoring."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:30Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert_eq!(json["result"]["archive"]["skills"][0]["name"], "leaf-skill");
+    let issues = json["result"]["issues"].as_array().expect("issues");
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "leaf-skill" && issue["code"] == "archived_skill_name_mismatch"
+    }));
+    assert!(issues.iter().any(|issue| {
+        issue["skill"] == "leaf-skill"
+            && issue["code"] == "archived_skill_invalid_manifest"
+            && issue["message"]
+                .as_str()
+                .expect("message")
+                .contains("archive/skills/gsap/leaf-skill")
+    }));
+    assert!(!issues.iter().any(|issue| {
+        issue["skill"] == "leaf-skill"
+            && issue["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("source_path"))
+    }));
+}
+
+#[test]
+fn skills_archive_rejects_duplicate_leaf_names_across_layouts() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    for (directory, archived_path) in [
+        ("duplicate-skill", "archive/skills/duplicate-skill"),
+        (
+            "native/duplicate-skill",
+            "archive/skills/native/duplicate-skill",
+        ),
+    ] {
+        write_archived_skill(
+            &repo,
+            directory,
+            "duplicate-skill",
+            Some(json!({
+                "schema": "skill_archive.v1",
+                "name": "duplicate-skill",
+                "status": "archived",
+                "archived_at": "2026-05-13T00:00:00Z",
+                "source_path": "skills/duplicate-skill",
+                "archived_path": archived_path,
+                "reason": "Duplicate archive fixture.",
+                "restore": "Keep only one archived copy before restoring."
+            })),
+        );
+    }
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:45Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert_eq!(json["result"]["archive"]["total"], 2);
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .any(|issue| {
+                issue["skill"] == "duplicate-skill"
+                    && issue["code"] == "archived_skill_duplicate_name"
+                    && issue["path"] == "archive/skills/native/duplicate-skill"
+            })
+    );
+}
+
+#[test]
+fn skills_archive_rejects_regular_file_group_children() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let group = repo.join("archive/skills/gsap");
+    std::fs::create_dir_all(&group).expect("archive group");
+    std::fs::write(group.join("stray.txt"), "not a skill\n").expect("stray group file");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:50Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .any(|issue| {
+                issue["code"] == "archived_skill_invalid_manifest"
+                    && issue["path"] == "archive/skills/gsap/stray.txt"
+                    && issue["message"]
+                        .as_str()
+                        .expect("message")
+                        .contains("must be a skill directory")
+            })
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn skills_archive_rejects_symlink_group_children() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let group = repo.join("archive/skills/native");
+    std::fs::create_dir_all(&group).expect("archive group");
+    let target = temp.path().join("outside-skill");
+    std::fs::create_dir_all(&target).expect("outside skill");
+    symlink(&target, group.join("linked-skill")).expect("archive child symlink");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:55Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .any(|issue| {
+                issue["skill"] == "linked-skill"
+                    && issue["code"] == "archived_skill_invalid_manifest"
+                    && issue["path"] == "archive/skills/native/linked-skill"
+                    && issue["message"] == "archived skill directory must not be a symlink"
+            })
+    );
+}
+
+#[test]
+fn skills_archive_allows_cataloged_snapshot_with_active_twin() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    write_archived_skill(
+        &repo,
+        "alpha-skill",
+        "alpha-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "alpha-skill",
+            "status": "archived",
+            "kind": "snapshot",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "source_path": "~/.agents/skills/alpha-skill",
+            "archived_path": "archive/skills/alpha-skill",
+            "replacement": "alpha-skill",
+            "reason": "Global install snapshot fixture.",
+            "restore": "Keep the active repository skill canonical."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:57Z",
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .any(|issue| {
+                issue["skill"] == "alpha-skill"
+                    && issue["code"] == "archived_skill_cataloged_as_active"
+                    && issue["severity"] == "warning"
+            })
+    );
+}
+
+#[test]
+fn skills_archive_rejects_cataloged_snapshot_without_active_twin() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    std::fs::write(
+        repo.join("README.md"),
+        "| Skill | Description | Source |\n| --- | --- | --- |\n| `orphan-skill` | Orphan. | [archive](archive/skills/orphan-skill/SKILL.md) |\n",
+    )
+    .expect("readme");
+    write_archived_skill(
+        &repo,
+        "orphan-skill",
+        "orphan-skill",
+        Some(json!({
+            "schema": "skill_archive.v1",
+            "name": "orphan-skill",
+            "status": "archived",
+            "kind": "snapshot",
+            "archived_at": "2026-05-13T00:00:00Z",
+            "source_path": "~/.agents/skills/orphan-skill",
+            "archived_path": "archive/skills/orphan-skill",
+            "reason": "Archived-only snapshot fixture.",
+            "restore": "Restore only from the archived source."
+        })),
+    );
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "audit",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--checked-at",
+            "2026-05-12T09:06:58Z",
+        ])
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
+    let json: Value = serde_json::from_slice(&output).expect("skills audit json");
+    assert!(
+        json["result"]["issues"]
+            .as_array()
+            .expect("issues")
+            .iter()
+            .any(|issue| {
+                issue["skill"] == "orphan-skill"
+                    && issue["code"] == "archived_skill_cataloged_as_active"
+                    && issue["severity"] == "error"
+            })
+    );
+}
+
+#[test]
 fn skills_archive_accepts_plugin_source_paths() {
     let temp = tempdir().expect("tempdir");
     let repo = write_skill_inventory_repo(temp.path());

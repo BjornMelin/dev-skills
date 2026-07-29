@@ -1,7 +1,0 @@
-interface:
-  display_name: "Caveman Review"
-  short_description: "Terse paste-ready code review comments"
-  default_prompt: "Use $caveman-review to produce terse, paste-ready review comments for this diff."
-
-policy:
-  allow_implicit_invocation: false
