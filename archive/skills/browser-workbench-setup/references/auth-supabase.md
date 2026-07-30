@@ -58,6 +58,10 @@ Preferred formal path:
 
 If the repo already exposes server utilities for seeding users, prefer those over writing one-off scripts.
 
+### Server-only boundary for `supabase.auth.admin.createUser()`
+
+`supabase.auth.admin.createUser()` is restricted to trusted server or CI code. It requires the project's service-role/secret key, which must never be exposed to browser code: a leaked service-role key grants full administrative access to the database and auth system and bypasses all Row Level Security. Run admin calls only from server-side seeding utilities, edge functions, or CI; never from page scripts or Playwright fixtures that run in a browser context.
+
 ## SSR Caution
 
 For Next.js repos using `@supabase/ssr`, do not disturb the existing middleware/session-refresh path while adding browser automation.

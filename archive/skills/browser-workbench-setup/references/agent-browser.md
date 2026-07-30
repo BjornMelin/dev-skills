@@ -69,14 +69,25 @@ output/agent-browser/
 Choose one of these:
 
 - `--profile <path>` when you want full browser persistence including cookies, local storage, IndexedDB, and service workers
-- `--session-name <name>` when you want lighter automatic session restore through agent-browser’s saved state
+- `--session <name> --restore` when you want lighter automatic session restore through agent-browser's saved state
 
 Preferred defaults for repo work:
 
 - quick repeated local UI checks: `--profile ./output/agent-browser/profile`
-- lightweight smoke path reuse: `--session-name <repo-name>`
+- lightweight smoke path reuse: `--session <repo-name> --restore`
+
+> Compatibility: the legacy `--session-name <name>` flag is accepted as an alias for `--session <name> --restore` but is deprecated; prefer the canonical form.
 
 Use profiles when auth flows are complex or rely on richer browser state.
+
+## Retention and rotation
+
+Rotate or delete saved agent-browser state when switching users, rotating credentials, after a security incident, or on a regular schedule:
+
+- set `AGENT_BROWSER_ENCRYPTION_KEY` (a 64-character hex value) to enable AES-256-GCM at-rest encryption of state files
+- set `AGENT_BROWSER_STATE_EXPIRE_DAYS` (default `30`) to auto-purge state older than the window
+- run the `close` command (or `--session <name> close`) to terminate a session explicitly when finished
+- delete profiles and `storageState` artifacts you no longer need; they are gitignored for a reason
 
 ## Auth Handling
 

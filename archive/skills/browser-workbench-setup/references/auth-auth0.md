@@ -91,3 +91,7 @@ When automating setup in an Auth0 repo:
 - create artifact directories and ignore rules
 - prefer real UI login plus saved browser state
 - add Auth0 test-user provisioning only if the user asked for formal repeatable provisioning
+
+## Retention and rotation
+
+Auth0 app flows often involve redirect chains and cookie state that justify profile persistence over session-name persistence, but the same persistence also means the profile carries live session material. Rotate or delete the saved profile when switching test users, rotating client secrets, after a security incident, or on a regular schedule. For agent-browser, set `AGENT_BROWSER_ENCRYPTION_KEY` to encrypt state at rest, set `AGENT_BROWSER_STATE_EXPIRE_DAYS` to auto-purge old state, and run the `close` command when a session is finished.

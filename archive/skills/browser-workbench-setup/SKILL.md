@@ -91,6 +91,8 @@ For a normal web repository, finish with:
    - Prefer provider-supported test helpers when they exist.
    - If the provider has no first-party Playwright helper, prefer seeded test users plus saved browser state.
    - Avoid MFA in automated browser runs unless the provider explicitly supports it in test helpers.
+   - Rotate or delete saved auth state (profiles, `storageState`) when switching users, rotating credentials, after a security incident, or on a regular schedule.
+   - Enable the tool's encryption and expiry controls when available — for example, `AGENT_BROWSER_ENCRYPTION_KEY` for at-rest encryption and `AGENT_BROWSER_STATE_EXPIRE_DAYS` for auto-purging old state.
 
 6. Keep the responsibility split explicit.
    - Use `playwright-interactive` for:
