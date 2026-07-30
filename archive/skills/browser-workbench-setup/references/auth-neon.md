@@ -7,8 +7,8 @@ Use this file when the repository uses Neon Auth directly or uses Neon as the JW
 - Neon API reference: https://api-docs.neon.tech/
 - Add JWKS URL: https://api-docs.neon.tech/reference/addprojectjwks
 - Create Auth Provider SDK keys: https://api-docs.neon.tech/reference/createneonauthprovidersdkkeys
-- Create Neon Auth integration: https://api-docs.neon.tech/reference/createneonauthintegration
-- Create auth user: https://api-docs.neon.tech/reference/createneonauthnewuser
+- Enable Neon Auth for a branch (branch-scoped): `POST /projects/{project_id}/branches/{branch_id}/auth` — provisions the `neon_auth` schema in the branch
+- Create auth user (branch-scoped): `POST /projects/{project_id}/branches/{branch_id}/auth/users`
 - Branch auth OAuth provider endpoint: https://api-docs.neon.tech/reference/addbranchneonauthoauthprovider
 
 ## Important Model

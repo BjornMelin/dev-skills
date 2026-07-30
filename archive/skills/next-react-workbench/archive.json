@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "next-react-workbench",
+  "status": "archived",
+  "archived_at": "2026-07-29T21:36:58Z",
+  "source_path": "skills/next-react-workbench",
+  "archived_path": "archive/skills/next-react-workbench",
+  "reason": "Next.js + React router into vercel:nextjs, vercel:react-best-practices, build-web-apps, dogfood, playwright-interactive, browser-workbench, and browser-workbench-setup. It was install-only and never tracked in this repo's skills/, and two of its browser-runtime targets (browser-workbench and browser-workbench-setup) are archived in the same pass. The path is recorded in the canonical form the archive schema requires.",
+  "restore": "Move this directory back to skills/next-react-workbench and relink it from the consuming agents' skill farms, only if a dedicated Next/React routing entrypoint is needed again and its downstream browser toolchain is available to consumers."
+}

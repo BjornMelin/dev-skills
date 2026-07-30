@@ -19,7 +19,7 @@ Key points from the docs:
 - use `setupClerkTestingToken()` at the start of tests that touch auth pages
 - `clerk.signIn()` supports `password`, `phone_code`, and `email_code`
 - navigate to an unprotected page that loads Clerk before calling the helper
-- MFA is not supported by `clerk.signIn()`
+- MFA is handled only by the `emailAddress` parameter, which creates a server-side token and bypasses email verification and MFA. The `signInParams` path completes first-factor verification only and does not support MFA; use `emailAddress` when the instance has MFA enabled.
 
 ## Repo Detection
 

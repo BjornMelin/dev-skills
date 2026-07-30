@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-29T20:10:42.220354159Z",
+  "generatedAt": "2026-07-29T21:36:58Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "2226c7cf87585f023995f900f38dbe07bbc6137a",
+  "sourceCommit": "9411fdc2c3e8705cc50149281ef1a55f7fcd5545",
   "sourceRef": "main",
-  "skillsCount": 66,
-  "totalSkillDirectories": 66,
+  "skillsCount": 65,
+  "totalSkillDirectories": 65,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -343,55 +343,6 @@
       },
       "package": {
         "path": "skills/dist/batch-grill-with-docs.skill",
-        "present": false,
-        "rejected": false
-      }
-    },
-    {
-      "name": "browser-workbench-setup",
-      "slug": "browser-workbench-setup",
-      "description": "Set up browser automation and UI QA for a new repository using playwright-interactive as the primary interactive tool and agent-browser as the secondary CLI smoke-check tool. Use when a user wants to bootstrap browser testing, screenshots, auth-state reuse, or local UI debugging conventions in a fresh repo.",
-      "path": "skills/browser-workbench-setup",
-      "skillMdPath": "skills/browser-workbench-setup/SKILL.md",
-      "sourceUrls": {
-        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/browser-workbench-setup",
-        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/browser-workbench-setup/SKILL.md"
-      },
-      "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill browser-workbench-setup -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill browser-workbench-setup -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill browser-workbench-setup"
-      },
-      "readinessLabels": [
-        "Valid",
-        "Resource-rich",
-        "Emerging"
-      ],
-      "qualitySignals": [
-        "readme_catalogued",
-        "has_references",
-        "has_agents",
-        "resource_rich"
-      ],
-      "improvementSignals": [
-        "missing_docs_index_exposure",
-        "missing_dist_package",
-        "missing_scripts"
-      ],
-      "resources": {
-        "references": 6,
-        "scripts": 0,
-        "assets": 0,
-        "templates": 0,
-        "agents": 1,
-        "total": 7
-      },
-      "exposure": {
-        "readme_catalog": true,
-        "docs_index": false
-      },
-      "package": {
-        "path": "skills/dist/browser-workbench-setup.skill",
         "present": false,
         "rejected": false
       }

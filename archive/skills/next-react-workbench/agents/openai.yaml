@@ -1,0 +1,14 @@
+interface:
+  display_name: "Next React Workbench"
+  short_description: "Route Next and React app work to the right skill chain"
+  default_prompt: "Use $next-react-workbench to choose the best implementation and verification path for this Next.js or React web UI task."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current official Next.js, React, and browser-tool documentation when needed"
+    - type: "mcp"
+      value: "exa"
+      description: "Supplemental latest research when a framework behavior may have changed"

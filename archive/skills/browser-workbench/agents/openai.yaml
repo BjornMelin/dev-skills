@@ -1,0 +1,14 @@
+interface:
+  display_name: "Browser Workbench"
+  short_description: "Route browser work to setup, Playwright, or agent-browser"
+  default_prompt: "Use $browser-workbench to choose the right browser-work path for this repo, set up any missing prerequisites, and then run the correct UI/debugging workflow."
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "context7"
+      description: "Current official browser, framework, and auth-provider docs when setup is incomplete"
+    - type: "mcp"
+      value: "exa"
+      description: "Supplemental latest research for changing browser-tool and auth guidance"
