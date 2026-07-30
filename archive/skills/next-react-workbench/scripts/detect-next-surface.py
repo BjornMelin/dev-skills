@@ -9,10 +9,29 @@ from pathlib import Path
 
 
 def read_text(path: Path) -> str:
+    """Read a file as text, returning an empty string if the file is missing.
+
+    Args:
+        path: The file path to read.
+
+    Returns:
+        The file contents decoded as text, or an empty string if the file
+        does not exist. Decoding errors are ignored.
+    """
     return path.read_text(errors="ignore") if path.exists() else ""
 
 
 def main() -> int:
+    """Detect Next.js/React surface markers and recommend a workbench path.
+
+    Scans the root ``package.json`` and an optional ``apps/web/package.json``
+    for Next.js and React markers, then checks for App Router and shadcn
+    component configuration files. Prints a JSON payload when ``--json`` is
+    passed, or a human-readable summary otherwise.
+
+    Returns:
+        int: Exit code (0 on success).
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", action="store_true")
     parser.add_argument("path", nargs="?", default=".")
@@ -25,12 +44,16 @@ def main() -> int:
 
     has_next = '"next"' in text
     has_react = '"react"' in text
-    has_app_router = (root / "apps/web/app").exists() or (root / "app").exists()
+    has_app_router = (
+        (root / "apps/web/app").exists() or (root / "app").exists()
+    )
     has_components_json = (root / "apps/web/components.json").exists() or (
         root / "components.json"
     ).exists()
 
-    recommended = "next-route" if has_next and has_app_router else "react-surface"
+    recommended = (
+        "next-route" if has_next and has_app_router else "react-surface"
+    )
     if has_components_json:
         recommended = f"{recommended}+shadcn"
 

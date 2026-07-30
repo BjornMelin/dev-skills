@@ -1,6 +1,7 @@
 ---
 name: browser-workbench
-description: Browser/UI router—playwright-interactive, agent-browser, workbench-setup. Triggers—UI debug, QA, screens, auth, web test.
+description: Browser/UI router--playwright-interactive, agent-browser, workbench-setup. Triggers--UI debug, QA, screens, auth, web test.
+disable-model-invocation: true
 ---
 
 # Browser Workbench

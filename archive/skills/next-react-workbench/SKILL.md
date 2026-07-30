@@ -1,6 +1,6 @@
 ---
 name: next-react-workbench
-description: Router—Next + React. Picks implement + verify skills. Triggers—routes, shell, server/client, forms, loading, theme, UI polish.
+description: Router--Next + React. Picks implement + verify skills. Triggers--routes, shell, server/client, forms, loading, theme, UI polish.
 ---
 
 # Next React Workbench
