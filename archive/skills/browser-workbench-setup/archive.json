@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "browser-workbench-setup",
+  "status": "archived",
+  "archived_at": "2026-07-29T21:36:58Z",
+  "source_path": "skills/browser-workbench-setup",
+  "archived_path": "archive/skills/browser-workbench-setup",
+  "reason": "Browser/UI QA bootstrap router for playwright-interactive (primary) and agent-browser (secondary) plus Clerk/Supabase/Auth0/Neon auth-state persistence. Its runtime targets (playwright-interactive, agent-browser, ui-workbench) are not tracked in this repo's skills/ catalog, so the skill carried an external-toolchain dependency set into a catalog that does not ship those tools. Retired from the active catalog; the install-only global copy in ~/.agents/skills/browser-workbench-setup is removed in the same pass, and the active ui_audit.v1 schema doc drops the browser-workbench framework value.",
+  "restore": "Move this directory back to skills/browser-workbench-setup and relink it from consuming skill farms only if browser setup guidance is needed in this catalog and the external toolchain (playwright-interactive, agent-browser, ui-workbench) is available to consumers."
+}

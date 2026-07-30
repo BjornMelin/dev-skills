@@ -1,0 +1,10 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "browser-workbench",
+  "status": "archived",
+  "archived_at": "2026-07-29T21:36:58Z",
+  "source_path": "skills/browser-workbench",
+  "archived_path": "archive/skills/browser-workbench",
+  "reason": "Pure router over browser-workbench-setup, playwright-interactive, and agent-browser. It was install-only and never tracked in this repo's skills/; its setup target (browser-workbench-setup) is archived in the same pass, and neither playwright-interactive nor agent-browser is tracked here. The path is recorded in the canonical form the archive schema requires.",
+  "restore": "Move this directory back to skills/browser-workbench and relink it from the consuming agents' skill farms, only if the browser toolchain router is needed again."
+}

@@ -13,8 +13,8 @@ Current producers and adapters:
   `ui_audit.v1` with `--format ui-audit-json`.
 - `skills/dash-audit/scripts/dash_ui_audit_adapter.py` converts
   `ui-audit-preflight dash-callback-map` output into `ui_audit.v1`.
-- `dash-audit`, `dmc-best-practices`, and `browser-workbench-setup` describe
-  manual audit output using this schema when they do not have a native scanner.
+- `dash-audit` and `dmc-best-practices` describe manual audit output using this
+  schema when they do not have a native scanner.
 
 ## Top-Level Contract
 
@@ -52,8 +52,8 @@ Required fields:
 - `schema`: always `ui_audit.v1`.
 - `producer`: skill, tool or workflow, and version/date for the emitting rule
   set.
-- `target.framework`: framework or audit surface such as `dash`, `dmc`,
-  `streamlit`, or `browser-workbench`.
+- `target.framework`: framework or audit surface such as `dash`, `dmc`, or
+  `streamlit`.
 - `target.root`: `<scan-root>` unless the producer explicitly documents an
   opt-in to expose absolute paths.
 - `summary.status`: `fail` when any `error` finding exists, `warning` when any
@@ -115,8 +115,6 @@ Framework-native terms map into this scale:
 - Streamlit `high` -> `error`, `medium` -> `warning`, `low` -> `info`.
 - DMC `CRITICAL` or `HIGH` -> `error`, `MEDIUM-HIGH` or `MEDIUM` ->
   `warning`, `LOW` -> `info`.
-- Browser workflow setup gaps that block repeatable verification -> `warning`
-  or `error` depending on whether a release gate is blocked.
 
 ## Privacy
 

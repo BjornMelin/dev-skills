@@ -81,7 +81,7 @@ out of version control.
   scanner for AI SDK, Streamdown, Zod v4, and Supabase TypeScript migration and
   safety signals.
 - [UI Audit Schema](reference/ui-audit-schema.md): shared `ui_audit.v1`
-  contract for Dash, DMC, Streamlit, and browser-workbench audit evidence.
+  contract for Dash, DMC, and Streamlit audit evidence.
 - [`kimi-ui-agent`](reference/kimi-ui-agent.md): explicit Kimi-powered frontend/UI
   repo profiling, adapter setup, and plan-first worktree orchestration skill and
   CLI.
