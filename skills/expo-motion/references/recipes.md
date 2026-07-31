@@ -195,10 +195,10 @@ Pair with `<RefreshControl onRefresh={...} />` for the data fetch; the Reanimate
 Custom canvas animation — shared values pass directly into Skia props. Use `useClock`/`useDerivedValue`; for color use Skia's own interpolation.
 
 ```tsx
-import { Canvas, Circle, Group } from "@shopify/react-native-skia";
-import { useClock, useDerivedValue } from "@shopify/react-native-skia";
+import { Canvas, Circle, Group, useClock } from "@shopify/react-native-skia";
+import { useDerivedValue } from "react-native-reanimated";
 
-function Loader() {
+export default function Loader() {
   const clock = useClock();                          // ms since mount, frame-driven
   const rotation = useDerivedValue(() => (clock.value / 1000) % (Math.PI * 2));
   const transform = useDerivedValue(() => [{ rotate: rotation.value }]);
@@ -213,6 +213,28 @@ function Loader() {
 ```
 
 Reduced motion: render a static frame (e.g. a non-animated spinner or a text status) when `useReducedMotion()` is true — a perpetually spinning loader is exactly what reduced-motion users want suppressed. Wrap the opaque canvas with an accessible label/role. See [skia](./skia.md) for memory + shader details.
+
+On web, CanvasKit loads asynchronously. Keep the `Loader` module outside Expo
+Router's `app/` directory and load it through the official code-splitting
+boundary before importing Skia components:
+
+```tsx
+import { Text } from 'react-native';
+import { WithSkiaWeb } from '@shopify/react-native-skia/lib/module/web';
+
+export function LoaderScreen() {
+  return (
+    <WithSkiaWeb
+      getComponent={() => import('./Loader')}
+      fallback={<Text>Loading graphics…</Text>}
+    />
+  );
+}
+```
+
+For deferred root registration instead, call `LoadSkiaWeb()` from the web entry
+before registering the app. Do not statically import the Skia component before
+CanvasKit is ready.
 
 ## Related references
 

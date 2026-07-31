@@ -116,6 +116,7 @@ module.exports = config;
 ```tsx
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import {
   Fit,
   RiveView,
@@ -126,35 +127,49 @@ import {
 
 export function LikeButton() {
   const [liked, setLiked] = useState(false);
+  const reduce = useReducedMotion();
   const { riveFile } = useRiveFile(require('../assets/like.riv'));
   const { instance } = useViewModelInstance(riveFile, { async: true });
   const { setValue: setRiveLiked } = useRiveBoolean('liked', instance);
 
   const toggle = () => {
-    if (!instance) return;
+    if (!reduce && !instance) return;
     const next = !liked;
     setLiked(next);
-    setRiveLiked(next);
+    if (!reduce && instance) setRiveLiked(next);
   };
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={liked ? 'Unlike' : 'Like'}
-      accessibilityState={{ checked: liked, disabled: !instance }}
-      disabled={!instance}
+      accessibilityState={{ checked: liked, disabled: !reduce && !instance }}
+      disabled={!reduce && !instance}
       onPress={toggle}
     >
-      <View pointerEvents="none">
-        {riveFile && instance ? (
-          <RiveView
-            file={riveFile}
-            dataBind={instance}
-            fit={Fit.Layout}
-            style={{ width: 56, height: 56 }}
-          />
-        ) : null}
-      </View>
+      {reduce ? (
+        <View
+          style={{
+            width: 56,
+            height: 56,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text>{liked ? '♥' : '♡'}</Text>
+        </View>
+      ) : (
+        <View pointerEvents="none">
+          {riveFile && instance ? (
+            <RiveView
+              file={riveFile}
+              dataBind={instance}
+              fit={Fit.Layout}
+              style={{ width: 56, height: 56 }}
+            />
+          ) : null}
+        </View>
+      )}
       <Text>{liked ? 'Unlike' : 'Like'}</Text>
     </Pressable>
   );
@@ -166,6 +181,9 @@ property named `liked`; replace that contract with the names defined by the
 `.riv` file. `useViewModelInstance(..., { async: true })` and the typed
 `useRiveBoolean` hook are the current data-binding path. The outer `Pressable`
 owns the button semantics and keeps the native canvas out of the touch target.
+`useReducedMotion()` is a snapshot for this example; when it is enabled, the
+button keeps the React/accessibility state and renders a static glyph instead of
+updating the animated Rive state machine.
 
 **Legacy migration lane:** `rive-react-native` exposes `Rive`/`RiveRef` and
 methods such as `setInputState`; keep that API only while following the
@@ -176,8 +194,8 @@ binding contract.
 **Cleanup + reduced motion / accessibility:** reset inputs and let the component
 tear down on unmount; the rendered surface is canvas-like and exposes no
 semantics, so supply surrounding accessible roles/labels and a non-animated
-fallback for the state it represents. Under reduced motion, set inputs to their
-resting state rather than triggering elaborate transitions.
+fallback for the state it represents. Under reduced motion, keep the functional
+state update but do not trigger an animated state-machine transition.
 
 **Depth:** [Rive React Native](https://rive.app/docs/runtimes/react-native/react-native),
 [Rive ref methods](https://rive.app/docs/runtimes/react-native/rive-ref-methods),
