@@ -31,12 +31,13 @@ not use a web-style URL. Let the owning component hold the `ref` and control
 play/pause/reset; never expose a globally reachable animation handle.
 
 ```tsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, View } from 'react-native';
 import LottieView from 'lottie-react-native';
 
 export function SuccessCheck() {
   const ref = useRef<LottieView>(null);
+  const [progress, setProgress] = useState<number>();
 
   useEffect(() => {
     let active = true;
@@ -44,8 +45,12 @@ export function SuccessCheck() {
       if (!active) return;
       // Under reduced motion, keep a stable frame; choose an asset-specific
       // completion frame only when that frame is part of the asset contract.
-      if (reduce) ref.current?.reset();
-      else ref.current?.play();
+      if (reduce) {
+        setProgress(1); // Lottie progress is normalized; this asset ends in success.
+      } else {
+        setProgress(undefined);
+        ref.current?.play();
+      }
     });
     return () => {
       active = false;
@@ -60,6 +65,7 @@ export function SuccessCheck() {
         source={require('../assets/success.json')}
         autoPlay={false}
         loop={false}
+        progress={progress}
         style={{ width: 160, height: 160 }}
       />
     </View>
@@ -95,31 +101,71 @@ contract** — they must match exactly. Use the installed runtime's data-binding
 hooks to drive boolean / number / trigger inputs from app state and let the view
 reset when it unmounts.
 
+For a local `.riv` `require(...)`, add `riv` to Metro's `resolver.assetExts`
+before using the hook (or verify the target repo's existing asset pipeline):
+
+```js
+const { getDefaultConfig } = require('expo/metro-config');
+
+const config = getDefaultConfig(__dirname);
+config.resolver.assetExts.push('riv');
+
+module.exports = config;
+```
+
 ```tsx
-import { View } from 'react-native';
-import { Fit, RiveView, useRive, useRiveFile } from '@rive-app/react-native';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import {
+  Fit,
+  RiveView,
+  useRiveBoolean,
+  useRiveFile,
+  useViewModelInstance,
+} from '@rive-app/react-native';
 
 export function LikeButton() {
+  const [liked, setLiked] = useState(false);
   const { riveFile } = useRiveFile(require('../assets/like.riv'));
-  const { setHybridRef } = useRive();
+  const { instance } = useViewModelInstance(riveFile, { async: true });
+  const { setValue: setRiveLiked } = useRiveBoolean('liked', instance);
 
-  // Apply app state through the installed runtime's data-binding hooks, then
-  // call the view ref's playIfNeeded() when an update needs a tick.
+  const toggle = () => {
+    if (!instance) return;
+    const next = !liked;
+    setLiked(next);
+    setRiveLiked(next);
+  };
 
   return (
-    <View accessible accessibilityRole="image" accessibilityLabel="Like">
-      {riveFile && (
-        <RiveView
-          hybridRef={setHybridRef}
-          file={riveFile}
-          fit={Fit.Layout}
-          style={{ width: 56, height: 56 }}
-        />
-      )}
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={liked ? 'Unlike' : 'Like'}
+      accessibilityState={{ checked: liked, disabled: !instance }}
+      disabled={!instance}
+      onPress={toggle}
+    >
+      <View pointerEvents="none">
+        {riveFile && instance ? (
+          <RiveView
+            file={riveFile}
+            dataBind={instance}
+            fit={Fit.Layout}
+            style={{ width: 56, height: 56 }}
+          />
+        ) : null}
+      </View>
+      <Text>{liked ? 'Unlike' : 'Like'}</Text>
+    </Pressable>
   );
 }
 ```
+
+This sample assumes the asset's default state machine binds a boolean view-model
+property named `liked`; replace that contract with the names defined by the
+`.riv` file. `useViewModelInstance(..., { async: true })` and the typed
+`useRiveBoolean` hook are the current data-binding path. The outer `Pressable`
+owns the button semantics and keeps the native canvas out of the touch target.
 
 **Legacy migration lane:** `rive-react-native` exposes `Rive`/`RiveRef` and
 methods such as `setInputState`; keep that API only while following the
