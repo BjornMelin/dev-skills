@@ -234,9 +234,11 @@ Device proof:
 - Pixel 7 (Android 15): same flow confirmed; screenshot/recording attached.
 ```
 
-A closeout with no device proof for a native-module change is incomplete. State
-the devices and OS versions, and attach a recording or screenshot for the
-user-visible motion.
+A closeout must state the proof tier and any device/build evidence. Tier 1 and
+Tier 2 changes may use local tests, Expo Go, or a simulator when the target
+package is supported. Tier 3+ and release-proof changes require real iOS and
+Android hardware; native-module changes should name the development build and
+devices used, with a recording or screenshot for user-visible motion.
 
 ## Pitfalls / Do-not
 
@@ -245,8 +247,9 @@ user-visible motion.
 - **Do not treat Expo Go as universal native proof.** Its bundled package list is
   target-SDK/platform-specific; unsupported or custom native modules need a
   development build.
-- **Do not skip device proof.** `tsc`, lint, and Jest never exercise the native
-  animation path. A native motion change is unvalidated until it has run on real
+- **Do not skip the required proof tier.** `tsc`, lint, and Jest never exercise
+  the native animation path. Supported Tier 2 Expo Go or simulator changes can
+  close without physical devices; Tier 3+ or release-proof changes require real
   iOS *and* Android hardware.
 - **Do not assume the New Architecture is on.** Reanimated 4 requires it; read the
   config and confirm at runtime rather than inferring it from the SDK version.

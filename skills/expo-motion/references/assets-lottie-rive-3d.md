@@ -89,10 +89,12 @@ and Expo's [asset guidance](https://docs.expo.dev/versions/latest/sdk/asset/).
 a reactive mascot, a progress widget — where app state drives the visual through
 a **state machine**, not a fixed timeline.
 
-**Preferred current runtime:** `@rive-app/react-native` (Nitro runtime) with
-`react-native-nitro-modules`. The new runtime uses `RiveView`, `useRiveFile`,
+**Stable lane:** `@rive-app/react-native` v0.4.19+ with
+`react-native-nitro-modules`. Its async API uses `RiveView`, `useRiveFile`,
 `useRive`, and data-binding hooks; it is a different API from the legacy
-`rive-react-native` package. Rive needs native modules, so check the target Expo
+`rive-react-native` package. The Nitro-based v0.5 runtime is currently a beta;
+follow the [Rive migration guide](https://rive.app/docs/runtimes/react-native/migration-guide)
+before opting into it. Rive needs native modules, so check the target Expo
 SDK's Expo Go list and use a **development build** when it is not bundled or
 native configuration is required.
 
