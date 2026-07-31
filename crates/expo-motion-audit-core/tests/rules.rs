@@ -791,7 +791,6 @@ fn app_config_new_arch_enabled_is_clean() {
         "app.json",
         r#"{ "expo": { "name": "demo", "newArchEnabled": true } }"#,
         true,
-        None,
     );
     assert!(!fired(&clean, ids::CONFIG_NEW_ARCH_DISABLED));
 }
@@ -802,28 +801,11 @@ fn app_config_new_arch_disabled_fires_when_reanimated_used() {
         "app.json",
         r#"{ "expo": { "name": "demo", "newArchEnabled": false } }"#,
         true,
-        None,
     );
     assert!(fired(&disabled, ids::CONFIG_NEW_ARCH_DISABLED));
 
-    let absent = analyze_app_config("app.json", r#"{ "expo": { "name": "demo" } }"#, true, None);
-    assert!(fired(&absent, ids::CONFIG_NEW_ARCH_DISABLED));
-
-    let sdk52_absent = analyze_app_config(
-        "app.json",
-        r#"{ "expo": { "name": "demo" } }"#,
-        true,
-        Some(52),
-    );
-    assert!(fired(&sdk52_absent, ids::CONFIG_NEW_ARCH_DISABLED));
-
-    let sdk53_absent = analyze_app_config(
-        "app.json",
-        r#"{ "expo": { "name": "demo" } }"#,
-        true,
-        Some(53),
-    );
-    assert!(!fired(&sdk53_absent, ids::CONFIG_NEW_ARCH_DISABLED));
+    let absent = analyze_app_config("app.json", r#"{ "expo": { "name": "demo" } }"#, true);
+    assert!(!fired(&absent, ids::CONFIG_NEW_ARCH_DISABLED));
 }
 
 #[test]
@@ -833,45 +815,8 @@ fn app_config_new_arch_absent_clean_when_reanimated_unused() {
         "app.json",
         r#"{ "expo": { "name": "demo", "newArchEnabled": false } }"#,
         false,
-        None,
     );
     assert!(!fired(&clean, ids::CONFIG_NEW_ARCH_DISABLED));
-}
-
-#[test]
-fn scan_uses_package_json_expo_sdk_for_new_arch_default() {
-    let mut dir = std::env::temp_dir();
-    dir.push(format!(
-        "expo-motion-audit-sdk-test-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or(0)
-    ));
-    std::fs::create_dir_all(dir.join("src")).expect("create temp scan dir");
-    std::fs::write(
-        dir.join("package.json"),
-        r#"{ "dependencies": { "expo": "~53.0.0" } }"#,
-    )
-    .expect("write package.json");
-    std::fs::write(dir.join("app.json"), r#"{ "expo": { "name": "demo" } }"#)
-        .expect("write app.json");
-    std::fs::write(
-        dir.join("src/App.tsx"),
-        r#"import "react-native-reanimated";"#,
-    )
-    .expect("write source");
-
-    let options = ScanOptions::new(dir.clone(), BTreeSet::new(), 1000);
-    let outcome = scan_root(&options).expect("scan succeeds");
-    let _ = std::fs::remove_dir_all(&dir);
-
-    assert!(
-        !fired(&outcome.findings, ids::CONFIG_NEW_ARCH_DISABLED),
-        "expected SDK 53 absent newArchEnabled to be clean, got: {:#?}",
-        outcome.findings
-    );
 }
 
 // ---------------------------------------------------------------------------

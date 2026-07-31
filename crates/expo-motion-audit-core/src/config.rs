@@ -217,13 +217,14 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
 /// Architecture.
 ///
 /// Emits [`ids::CONFIG_NEW_ARCH_DISABLED`] (medium) when `expo.newArchEnabled`
-/// is `false`, or is absent before Expo SDK 53, and the project uses Reanimated.
+/// is explicitly `false` and the project uses Reanimated. An omitted value is
+/// left to the target Expo SDK/app-config default and must be verified by the
+/// caller rather than inferred from a hardcoded SDK threshold.
 #[must_use]
 pub fn analyze_app_config(
     relative_path: &str,
     source: &str,
     project_uses_reanimated: bool,
-    expo_sdk_major: Option<u64>,
 ) -> Vec<Finding> {
     let line_index = LineIndex::new(source);
     let Ok(value) = serde_json::from_str::<serde_json::Value>(source) else {
@@ -241,13 +242,7 @@ pub fn analyze_app_config(
     let new_arch = value
         .get("expo")
         .and_then(|expo| expo.get("newArchEnabled"));
-    let disabled = match new_arch {
-        Some(serde_json::Value::Bool(true)) => false,
-        None if matches!(expo_sdk_major, Some(major) if major >= 53) => false,
-        // false, null, or absent before Expo SDK 53 all count as "not enabled".
-        _ => true,
-    };
-    if !disabled {
+    if !matches!(new_arch, Some(serde_json::Value::Bool(false))) {
         return Vec::new();
     }
 
@@ -259,7 +254,7 @@ pub fn analyze_app_config(
         file: relative_path.to_string(),
         line: 1,
         column: 1,
-        message: "expo.newArchEnabled is disabled or absent while the project uses Reanimated."
+        message: "expo.newArchEnabled is explicitly disabled while the project uses Reanimated."
             .to_string(),
         suggestion:
             "Set `expo.newArchEnabled` to true; Reanimated 4 requires the New Architecture."

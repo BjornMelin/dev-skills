@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep the public expo-motion skill generic and catalog-synchronized."""
+"""Keep the public expo-motion skill and audit contract generic and aligned."""
 
 from __future__ import annotations
 
@@ -22,6 +22,21 @@ REQUIRED = (
     "scheduleOnRN",
     "useReducedMotion",
 )
+
+
+def _public_contract_files(root: Path, skill: Path) -> list[Path]:
+    """Return the skill and its canonical public audit surfaces."""
+    files = [path for path in skill.rglob("*") if path.is_file()]
+    for path in (
+        root / "docs" / "reference" / "expo-motion-audit.md",
+        root / "crates" / "expo-motion-audit-core",
+        root / "crates" / "expo-motion-audit",
+    ):
+        if path.is_file():
+            files.append(path)
+        elif path.is_dir():
+            files.extend(child for child in path.rglob("*") if child.is_file())
+    return files
 
 
 def _frontmatter_description(skill_path: Path) -> str:
@@ -65,9 +80,9 @@ def check(root: Path) -> list[str]:
     if not skill_entrypoint.is_file():
         return [f"missing {skill_entrypoint}"]
 
-    files = [path for path in skill.rglob("*") if path.is_file()]
-    for path in files:
-        if path.suffix.lower() not in {".md", ".json", ".yaml", ".yml"}:
+    skill_files = [path for path in skill.rglob("*") if path.is_file()]
+    for path in _public_contract_files(root, skill):
+        if path.suffix.lower() not in {".md", ".json", ".yaml", ".yml", ".rs"}:
             continue
         text = path.read_text(encoding="utf-8")
         relative = path.relative_to(root)
@@ -75,7 +90,9 @@ def check(root: Path) -> list[str]:
             if pattern.search(text):
                 errors.append(f"forbidden public-contract text in {relative}: {pattern.pattern}")
 
-    body = "\n".join(path.read_text(encoding="utf-8") for path in files if path.suffix == ".md")
+    body = "\n".join(
+        path.read_text(encoding="utf-8") for path in skill_files if path.suffix == ".md"
+    )
     for required in REQUIRED:
         if required not in body:
             errors.append(f"missing manifest/API contract marker: {required}")
