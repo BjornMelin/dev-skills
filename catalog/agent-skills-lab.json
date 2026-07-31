@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-31T01:43:57.890791284Z",
+  "generatedAt": "2026-07-31T23:39:09.734611044Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "da338fd61413e2ec6d41bd7b7ff0f4ad36b4b139",
+  "sourceCommit": "0f93d9ae5ac552ba73164162152d08518feb57f0",
   "sourceRef": "main",
   "skillsCount": 65,
   "totalSkillDirectories": 65,
@@ -1291,17 +1291,18 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents",
         "resource_rich"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -1315,7 +1316,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/expo-motion.skill",
