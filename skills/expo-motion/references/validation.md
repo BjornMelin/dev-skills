@@ -1,23 +1,23 @@
 # Validation
 
-Motion work in Expo/React Native is mostly *native* work: Reanimated worklets,
-Gesture Handler, Skia, Rive, and native navigation transitions all run in native
-code that a typecheck, a lint pass, or an Expo Go session cannot exercise. This
-reference is the validation contract for motion changes: how to check project
-health, pin Expo-compatible package versions, confirm the New Architecture is on,
-choose between Expo Go and a development build, scale proof to the blast radius
-of the change with a risk-tier ladder, write Reanimated-aware Jest tests, and
-write a closeout report. The governing rule: **device proof is required for
-native motion — an Expo Go session is not sufficient proof for native modules.**
+Motion work in Expo/React Native crosses JavaScript, native, GPU, and navigation
+boundaries. A typecheck or lint pass cannot exercise every boundary, and Expo Go
+only contains the native modules supported by the target Expo SDK. This reference
+is the validation contract for motion changes: check project health, resolve
+Expo-compatible package versions, confirm the target architecture, choose between
+Expo Go and a development build from the target package list, scale proof to the
+blast radius, write Reanimated-aware tests, and record a closeout.
 
-## Project health: `npx expo-doctor`
+## Project health: Expo Doctor
 
 Run Expo Doctor first. It surfaces dependency-version mismatches, New
 Architecture issues, and config problems before you spend time chasing a runtime
 symptom that is really a setup problem.
 
 ```bash
-npx expo-doctor
+# Replace <repo-expo-doctor> with the target repo's package-manager wrapper for
+# the Expo Doctor command used by that project.
+<repo-expo-doctor>
 ```
 
 Treat every warning as a lead, not a verdict. Fix the ones that touch your motion
@@ -27,33 +27,31 @@ with a reason in your closeout.
 
 ## Expo-compatible package versions
 
-Each Expo SDK pins a known-good version of every native package it manages.
-**These Expo-pinned versions lag npm `latest`** — a copy-pasted `npm install
-react-native-reanimated@latest` will frequently install a version that does not
-match your SDK and breaks the build or the runtime. Always resolve motion package
-versions through Expo, not through npm-latest.
+Each Expo SDK publishes a compatible version range for the native packages it
+manages. Do not resolve native motion packages from an arbitrary registry
+`latest`; use the target repo's Expo version resolver and lockfile.
 
 Check what is drifting:
 
 ```bash
-npx expo install --check
+<repo-expo> install --check
 ```
 
 Then let Expo fix or add packages at the SDK-correct version:
 
 ```bash
-# Reconcile existing packages to SDK-compatible versions
-npx expo install --fix
+# Reconcile existing packages to target-SDK-compatible versions
+<repo-expo> install --fix
 
-# Add a motion package at the version Expo blesses for this SDK
-npx expo install react-native-reanimated react-native-worklets
-npx expo install react-native-gesture-handler
-npx expo install @shopify/react-native-skia
+# Add motion packages through the target SDK's resolver
+<repo-expo> install react-native-reanimated react-native-worklets
+<repo-expo> install react-native-gesture-handler
+<repo-expo> install @shopify/react-native-skia
 ```
 
 When a doc, changelog, or this skill's examples show a version number, treat it
-as illustrative. The authority for *your* repo is what `expo install` resolves
-against your installed SDK.
+as illustrative. The authority for *your* repo is what the wrapper resolves
+against the installed Expo SDK and lockfile.
 
 ## New Architecture verification
 
@@ -62,7 +60,7 @@ running the legacy architecture cannot run Reanimated 4; it must either enable
 the New Architecture or stay on the Reanimated 3 line. Confirm before you write
 or review Reanimated 4 code.
 
-The flag lives in `app.json` / `app.config.js`:
+The flag lives in `app.json` / `app.config.*`:
 
 ```jsonc
 {
@@ -72,41 +70,38 @@ The flag lives in `app.json` / `app.config.js`:
 }
 ```
 
-Expo SDK 52+ defaults the New Architecture on, but never assume — read the config
-and confirm at runtime. `npx expo-doctor` flags New Architecture compatibility
-problems, and a development build will fail fast if a native module is
-incompatible. If the project is intentionally on the old architecture, that is a
-hard constraint on which Reanimated major you can use; record it rather than
-silently upgrading.
+The default for `newArchEnabled` varies by target SDK and app configuration, so
+never infer it from a version number — read the config and confirm at runtime.
+`<repo-expo-doctor>` flags compatibility problems, and a development build will
+fail fast if a native module is incompatible. If the project is intentionally on
+the old architecture, that is a hard constraint on which Reanimated major you
+can use; record it rather than silently upgrading.
 
 ## Development build vs Expo Go
 
-Expo Go ships a fixed set of native modules. It can run plain React Native and
-JS-only animation, but it **cannot load custom native code**. The motion
-libraries in this skill are native:
+Expo Go ships a fixed set of native modules for each target SDK. It may include
+Reanimated, Gesture Handler, Skia, or `@expo/ui`, but support is target-version
+and platform-specific. Custom/unsupported native packages still require a
+development build. Check the target Expo SDK's supported-package list before
+choosing the proof path.
 
-- Reanimated worklets and the Worklets runtime
-- `react-native-gesture-handler`
-- `@shopify/react-native-skia`
-- Rive (`rive-react-native`)
-- `lottie-react-native`
-
-Any change touching these needs a **development build** — a custom dev client
-compiled with your native dependencies — not Expo Go.
+Use a development build — a custom dev client compiled with the target native
+dependencies — when the package is not in that list, native configuration changes,
+or production-quality device proof is required.
 
 ```bash
 # Build and run a local development build on a connected device/simulator
-npx expo run:ios
-npx expo run:android
+<repo-expo> run:ios
+<repo-expo> run:android
 
 # Or produce a development-client build via EAS
-eas build --profile development --platform ios
-eas build --profile development --platform android
+<repo-eas> build --profile development --platform ios
+<repo-eas> build --profile development --platform android
 ```
 
-If a teammate says "it works in Expo Go," that proves nothing about native motion
-behavior — Expo Go may be silently falling back or running a different code path.
-**Expo Go is never acceptable proof for a native-module motion change.**
+An Expo Go smoke run proves only the code path covered by that SDK's bundled
+modules. It does not prove a custom native module, native configuration, or
+production build; record the exact SDK, platform, and package support used.
 
 ### EAS Build risk
 
@@ -125,9 +120,9 @@ requires, but never skip the rung the change actually lives on.
 | Tier | Change surface | Minimum proof |
 | --- | --- | --- |
 | 1. Static / local test | Pure JS view motion, timing/interpolation math, reduced-motion branching | `tsc` + lint + Jest unit tests |
-| 2. Simulator | JS-driven layout/opacity/transform motion, no new native module | Tier 1 + simulator smoke run |
+| 2. Expo Go or simulator | JS-driven motion, or a package listed as supported by the target Expo SDK | Tier 1 + target-platform smoke run |
 | 3. Physical device | Gesture feel, frame pacing, haptics, scroll-linked motion | Tier 2 + iOS **and** Android device run |
-| 4. Development build | New/changed native module (Reanimated, Skia, Rive, Lottie, Gesture Handler) | Tier 3 on a **development build**, not Expo Go |
+| 4. Development build | Unsupported/custom native module, native config, or production-quality proof | Tier 3 on a **development build** |
 | 5. EAS | New native dependency, config plugin, SDK/arch change, release gating | Tier 4 + `eas build` for the affected platforms |
 
 Classify each touched file (JS-only, package/config, native module, GPU/canvas,
@@ -213,14 +208,14 @@ proven and what risk remains:
 ## Validation closeout
 
 Commands run:
-- npx expo-doctor
-- npx expo install --check
+- <repo-expo-doctor>
+- <repo-expo> install --check
 - tsc --noEmit && <lint>
 - <jest command>
-- npx expo run:ios  (development build)
+- <repo-expo> run:ios  (development build, when required)
 
 Findings fixed:
-- Bumped react-native-reanimated to the SDK-pinned version via expo install --fix.
+- Resolved react-native-reanimated and Worklets through the target SDK wrapper.
 
 Findings skipped (with reason):
 - expo-doctor warning on <unrelated package>: outside motion surface, no behavior change.
@@ -239,12 +234,11 @@ user-visible motion.
 
 ## Pitfalls / Do-not
 
-- **Do not trust npm `latest` over `expo install --check`.** Expo-pinned versions
-  lag npm, and a `@latest` install routinely breaks the build or runtime for your
-  SDK. Resolve every motion package through `expo install`.
-- **Do not use Expo Go as proof for a native-module change.** Reanimated worklets,
-  Skia, Rive, Lottie, and Gesture Handler need a development build. Expo Go cannot
-  load them, so "it works in Expo Go" proves nothing about native motion.
+- **Do not trust registry `latest` over the target SDK resolver.** Resolve every
+  Expo-managed motion package through the repo's wrapper and lockfile.
+- **Do not treat Expo Go as universal native proof.** Its bundled package list is
+  target-SDK/platform-specific; unsupported or custom native modules need a
+  development build.
 - **Do not skip device proof.** `tsc`, lint, and Jest never exercise the native
   animation path. A native motion change is unvalidated until it has run on real
   iOS *and* Android hardware.

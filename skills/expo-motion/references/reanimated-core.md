@@ -1,6 +1,6 @@
 # Reanimated 4 Core
 
-The core mental model and API for `react-native-reanimated` 4.x in Expo (SDK 56+) / React Native motion. Reanimated 4 **requires the New Architecture (Fabric, RN 0.76+)**; everything below assumes it. Worklets ship in a separate package, `react-native-worklets` — threading mechanics live in the sibling reference, not here.
+The core mental model and API for the **Reanimated 4/New Architecture lane** in Expo and React Native. Reanimated 4 **requires the New Architecture**; confirm the target app's Expo, React Native, and Reanimated versions plus `newArchEnabled` before applying this reference. Legacy/Reanimated 3 apps need a deliberate migration and must not mix lanes. Worklets ship in a separate package, `react-native-worklets` — threading mechanics live in the sibling reference, not here.
 
 ## Contents
 

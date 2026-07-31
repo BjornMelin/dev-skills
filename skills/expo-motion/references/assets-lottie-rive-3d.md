@@ -7,9 +7,9 @@ on the UI thread. Reach for the libraries below **only** for the asset and 3D
 cases they exist to handle: a designer-authored vector animation (Lottie), an
 interactive stateful illustration (Rive), or a 3D scene that is itself the
 product surface (R3F). Each is a separate native dependency with its own asset
-contract and lifecycle, so add it deliberately. **Moti is inactive** — it is a
-legacy Reanimated-3 wrapper and is **not recommended for new code**; use the
-Reanimated 4 API directly.
+contract and lifecycle, so add it deliberately. Do not add a wrapper solely for
+declarative syntax; if an app already uses Moti or another wrapper, follow the
+installed package's migration guidance before changing ownership.
 
 For every library: inspect the target repo's installed versions before applying
 any snippet here, and route deep work to the official docs / context7 rather than
@@ -18,11 +18,13 @@ this brief.
 ## Lottie
 
 **When:** a designer hands you an After Effects vector animation (loaders,
-success checks, onboarding illustrations) exported as Lottie JSON or `.lottie`.
+success checks, onboarding illustrations) exported as Lottie JSON.
 Playback is timeline-driven, not interactive.
 
-**Package:** `lottie-react-native` (renders `LottieView`); `.lottie`
-(dotLottie) is the compact, multi-animation container format.
+**Package:** `lottie-react-native` (renders `LottieView`). Use the source format
+documented by the installed package; this example uses JSON. **UNVERIFIED for
+the renderer:** do not assume that a `.lottie`/dotLottie asset is accepted
+without checking the installed `lottie-react-native` release.
 
 Bundle the asset through the app's asset pipeline with a static `require` — do
 not use a web-style URL. Let the owning component hold the `ref` and control
@@ -40,13 +42,14 @@ export function SuccessCheck() {
     let active = true;
     AccessibilityInfo.isReduceMotionEnabled().then((reduce) => {
       if (!active) return;
-      // Under reduced motion, jump to the final frame instead of looping.
-      if (reduce) ref.current?.play(150, 150);
+      // Under reduced motion, keep a stable frame; choose an asset-specific
+      // completion frame only when that frame is part of the asset contract.
+      if (reduce) ref.current?.reset();
       else ref.current?.play();
     });
     return () => {
       active = false;
-      ref.current?.reset(); // stop + free the timeline on unmount
+      ref.current?.reset(); // stop playback and return to the initial frame
     };
   }, []);
 
@@ -54,7 +57,7 @@ export function SuccessCheck() {
     <View accessible accessibilityLabel="Payment confirmed" accessibilityRole="image">
       <LottieView
         ref={ref}
-        source={require('../assets/success.lottie')}
+        source={require('../assets/success.json')}
         autoPlay={false}
         loop={false}
         style={{ width: 160, height: 160 }}
@@ -66,13 +69,13 @@ export function SuccessCheck() {
 
 **Cleanup + reduced motion:** pause/reset on unmount and on screen blur so a
 loop does not keep running behind a hidden route; under reduced motion, skip the
-loop or jump to the end frame. Large JSON animations hurt startup and memory —
-prefer `.lottie` and trim unused layers. The animation view is not accessible on
+loop or jump to the end frame. Large animation assets hurt startup and memory —
+trim unused layers. The animation view is not accessible on
 its own, so wrap it with a labelled `accessible` container, and never use
 animation progress as the only signal of completion.
 
-**Depth:** Expo Lottie docs (`docs.expo.dev/versions/latest/sdk/lottie`) and the
-`lottie-react-native` README via context7.
+**Depth:** the [`lottie-react-native` API reference](https://github.com/lottie-react-native/lottie-react-native/blob/master/docs/api.md)
+and Expo's [asset guidance](https://docs.expo.dev/versions/latest/sdk/asset/).
 
 ## Rive
 
@@ -80,41 +83,49 @@ animation progress as the only signal of completion.
 a reactive mascot, a progress widget — where app state drives the visual through
 a **state machine**, not a fixed timeline.
 
-**Package:** `@rive-app/react-native` (Nitro runtime). Rive needs native modules,
-so it requires a **development build** and will not run in Expo Go.
+**Preferred current runtime:** `@rive-app/react-native` (Nitro runtime) with
+`react-native-nitro-modules`. The new runtime uses `RiveView`, `useRiveFile`,
+`useRive`, and data-binding hooks; it is a different API from the legacy
+`rive-react-native` package. Rive needs native modules, so check the target Expo
+SDK's Expo Go list and use a **development build** when it is not bundled or
+native configuration is required.
 
-The `.riv` file's **state machine name and input names are the asset contract** —
-they must match exactly. Drive boolean / number / trigger inputs from app state
-and reset them on unmount.
+The `.riv` file's **state machine, view-model, and property names are the asset
+contract** — they must match exactly. Use the installed runtime's data-binding
+hooks to drive boolean / number / trigger inputs from app state and let the view
+reset when it unmounts.
 
 ```tsx
-import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
-import Rive, { RiveRef } from 'rive-react-native';
+import { Fit, RiveView, useRive, useRiveFile } from '@rive-app/react-native';
 
-export function LikeButton({ liked }: { liked: boolean }) {
-  const ref = useRef<RiveRef>(null);
+export function LikeButton() {
+  const { riveFile } = useRiveFile(require('../assets/like.riv'));
+  const { setHybridRef } = useRive();
 
-  useEffect(() => {
-    // Map app state onto a named boolean input in the named state machine.
-    ref.current?.setInputState('LikeMachine', 'isLiked', liked);
-  }, [liked]);
-
-  useEffect(() => () => ref.current?.reset(), []); // reset on unmount
+  // Apply app state through the installed runtime's data-binding hooks, then
+  // call the view ref's playIfNeeded() when an update needs a tick.
 
   return (
-    <View accessible accessibilityRole="button" accessibilityLabel="Like">
-      <Rive
-        ref={ref}
-        resourceName="like" // bundled .riv (no extension)
-        stateMachineName="LikeMachine"
-        autoplay
-        style={{ width: 56, height: 56 }}
-      />
+    <View accessible accessibilityRole="image" accessibilityLabel="Like">
+      {riveFile && (
+        <RiveView
+          hybridRef={setHybridRef}
+          file={riveFile}
+          fit={Fit.Layout}
+          style={{ width: 56, height: 56 }}
+        />
+      )}
     </View>
   );
 }
 ```
+
+**Legacy migration lane:** `rive-react-native` exposes `Rive`/`RiveRef` and
+methods such as `setInputState`; keep that API only while following the
+[Rive migration guide](https://rive.app/docs/runtimes/react-native/migration-guide)
+for an existing app. New work should use the current runtime and its data
+binding contract.
 
 **Cleanup + reduced motion / accessibility:** reset inputs and let the component
 tear down on unmount; the rendered surface is canvas-like and exposes no
@@ -122,8 +133,10 @@ semantics, so supply surrounding accessible roles/labels and a non-animated
 fallback for the state it represents. Under reduced motion, set inputs to their
 resting state rather than triggering elaborate transitions.
 
-**Depth:** Rive React Native docs (`rive.app/docs`) and `@rive-app/react-native`
-via context7; confirm input/state-machine names against the actual `.riv`.
+**Depth:** [Rive React Native](https://rive.app/docs/runtimes/react-native/react-native),
+[Rive ref methods](https://rive.app/docs/runtimes/react-native/rive-ref-methods),
+and the migration guide above; confirm input/state-machine names against the
+actual `.riv`.
 
 ## R3F native
 

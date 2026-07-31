@@ -74,8 +74,9 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 
 Predefined transitions: `LinearTransition`, `SequencedTransition`,
 `FadingTransition`, `JumpingTransition`, `CurvedTransition`,
-`EntryExitTransition`. The old generic `Layout` transition is deprecated — use
-`LinearTransition`.
+`EntryExitTransition`. Prefer these named transitions. If the installed types
+still expose a generic `Layout` alias, its deprecation status is **UNVERIFIED**;
+check that release's docs before using it.
 
 Spring config for a transition uses **either** physics (`damping`/`stiffness`)
 **or** duration (`duration`/`dampingRatio`), never both; if both are given the

@@ -459,6 +459,13 @@ Validate one skill:
 python3 tools/skill/quick_validate.py skills/<skill-name>
 ```
 
+Validate the public Expo motion contract (generic wording, local references,
+and catalog/frontmatter parity):
+
+```bash
+python3 tools/skill/check_expo_motion_public_contract.py
+```
+
 Validate the `kimi-ui-agent` skill-local Bun CLI:
 
 ```bash

@@ -1,12 +1,18 @@
-# Expo / React Native Motion Recipes (Reanimated 4, TSX)
+# Expo / React Native Motion Recipes (Reanimated 4 lane, TSX)
 
-Copy-paste, production-minded recipes for iOS + Android. All assume Reanimated 4 + the New Architecture, `react-native-gesture-handler` (app wrapped in `GestureHandlerRootView`), and `react-native-worklets` (babel plugin last).
+Copy-paste, production-minded recipes for iOS, Android, and web. Confirm the
+target manifest supports Reanimated 4 + the New Architecture before applying
+them; all examples use `react-native-gesture-handler` (app wrapped in
+`GestureHandlerRootView`) and `react-native-worklets` (Babel plugin last).
 
 Conventions used throughout:
 - Transient motion lives in **shared values**; product state stays in React/store.
 - Animate **`transform`/`opacity`**, never layout props.
-- Every recipe has a **reduced-motion** path via `useReducedMotion()` (or `.reduceMotion(ReduceMotion.System)` on layout animations) — reduced motion keeps the functional outcome, it just removes the movement.
-- Clean up with `cancelAnimation` on unmount; cross to JS with `scheduleOnRN` (not the deprecated `runOnJS`).
+- Every recipe has a **reduced-motion** path via the initial `useReducedMotion()`
+  snapshot (or `.reduceMotion(ReduceMotion.System)` on layout animations) —
+  reduced motion keeps the functional outcome, it just removes the movement.
+- Cancel infinite or route-scoped animations on unmount; cross to JS with
+  `scheduleOnRN` (not the deprecated `runOnJS`).
 
 ## Table of contents
 1. [Swipe-to-dismiss card](#1-swipe-to-dismiss-card)
@@ -26,14 +32,17 @@ Pan to dismiss; spring back if the throw is small. `scheduleOnRN` calls the JS `
 
 ```tsx
 "use client";
-import { useReducedMotion, useSharedValue, useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
+import { cancelAnimation, useReducedMotion, useSharedValue, useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import Animated from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
+import { useEffect } from "react";
 
 export function SwipeCard({ onDismiss }: { onDismiss: () => void }) {
   const x = useSharedValue(0);
   const reduce = useReducedMotion();
+
+  useEffect(() => () => cancelAnimation(x), [x]);
 
   const pan = Gesture.Pan()
     .onUpdate((e) => { x.value = e.translationX; })

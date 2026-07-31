@@ -42,13 +42,13 @@
     {
       "id": 4,
       "prompt": "My Reanimated animations aren't running at all in my Expo project after install. How do I set it up correctly?",
-      "expected_output": "Guidance: Reanimated 4 requires the New Architecture (newArchEnabled); install react-native-reanimated + react-native-worklets; the react-native-worklets/plugin babel plugin must be last (auto via babel-preset-expo); use expo install --check; use a development build (not Expo Go).",
+      "expected_output": "Guidance: inspect the target manifest and confirm Reanimated 4's New Architecture requirement; install react-native-reanimated + react-native-worklets through the repo's Expo/package-manager wrapper; the react-native-worklets/plugin Babel plugin must be last for bare React Native and is configured by Expo's preset; run the wrapper's install --check; use Expo Go only when the target SDK lists the package, otherwise use a development build.",
       "files": [],
       "assertions": [
         "States Reanimated 4 requires the New Architecture (Fabric) enabled",
         "Says the react-native-worklets/plugin babel plugin must be listed last (and is auto-included by babel-preset-expo)",
         "Mentions installing react-native-worklets alongside react-native-reanimated and using expo install / --check for compatible versions",
-        "Notes native modules need a development build, not Expo Go"
+        "Gates Expo Go use on the target SDK's supported-package list and recommends a development build for unsupported or custom native modules"
       ]
     },
     {

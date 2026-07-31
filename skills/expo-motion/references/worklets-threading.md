@@ -80,13 +80,14 @@ friends) are imported from `react-native-worklets`, not from
 
 Workletization is performed by the Babel plugin `react-native-worklets/plugin`.
 
-- **On Expo SDK 50+**, `babel-preset-expo` includes the Worklets Babel plugin
-  automatically when Reanimated is installed. You do not add it manually.
+- **On Expo**, the target `babel-preset-expo` configures the Worklets Babel
+  plugin when the supported Reanimated/Worklets packages are installed. Verify
+  the target manifest and preset before adding anything manually.
 - **On bare React Native CLI apps**, you must add `react-native-worklets/plugin`
   to `babel.config.js` yourself, and it **MUST be listed last**:
 
 ```js
-// babel.config.js (RN CLI only — Expo SDK 50+ handles this for you)
+// babel.config.js (bare RN CLI only — Expo's preset handles this)
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
@@ -170,8 +171,9 @@ async function measure() {
 
 ### Deprecated: `runOnJS` / `runOnUI`
 
-`runOnJS` and `runOnUI` are **deprecated in Reanimated 4**. They still work
-(re-exported for compatibility) but are slated for removal. Migrate them:
+`runOnJS` and `runOnUI` are **deprecated compatibility re-exports** in the
+Reanimated 4/Worklets lane. They still work in supported versions, but new code
+should use the Worklets APIs. Migrate them:
 
 - `runOnJS(fn)(...args)` becomes `scheduleOnRN(fn, ...args)` — note the loss of
   currying; arguments move into the single call.
@@ -249,8 +251,8 @@ const pan = Gesture.Pan()
   consume on the UI runtime; pull across explicitly with `runOnUIAsync` if needed.
 - **Do not let the Babel plugin fall out of last place.** `react-native-worklets/plugin`
   must be the final entry in `babel.config.js` on RN CLI apps. Out of order or
-  missing, workletization silently fails. (Expo SDK 50+ wires this for you — do
-  not add it twice.)
+  missing, workletization silently fails. (Expo's preset wires this for you when
+  supported — do not add it twice.)
 
 ## Related references
 

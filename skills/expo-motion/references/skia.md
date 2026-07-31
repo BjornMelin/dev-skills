@@ -1,8 +1,17 @@
 # React Native Skia
 
-`@shopify/react-native-skia` exposes the Skia 2D graphics engine — the renderer behind Chrome, Android, and Flutter — as a declarative React component tree backed by a single GPU-accelerated `Canvas`. On Expo and React Native (Reanimated 4 on the New Architecture), Skia is the right surface when ordinary animated views run out of road: custom vector graphics, charts, particles, generative art, per-pixel shaders, and high-frequency batch drawing of hundreds of elements rendered in a single draw pass.
+`@shopify/react-native-skia` exposes the Skia 2D graphics engine as a declarative
+React component tree backed by a GPU-accelerated `Canvas`. In the Reanimated 4 /
+New Architecture lane, Skia is the right surface when ordinary animated views
+run out of road: custom vector graphics, charts, particles, generative art,
+per-pixel shaders, and high-frequency batch drawing.
 
-Skia is a **native module shipped as prebuilt binaries**, not a JS library, so it needs a development build (or the Expo SDK that bundles a compatible version) and does not run in bare Expo Go. This reference covers the component model, direct interop with Reanimated shared values, resource lifecycle/memory, web/CanvasKit boundaries, and accessibility. It does **not** re-explain shared values, worklets, or threading — those live in sibling references and are cross-linked, not duplicated.
+Skia is a **native module**, not a JS-only library. Use Expo Go only when the
+target SDK explicitly bundles the compatible package; otherwise use a development
+build. This reference covers the component model, direct interop with Reanimated
+shared values, resource lifecycle/memory, web/CanvasKit boundaries, and
+accessibility. It does **not** re-explain shared values, worklets, or threading —
+those live in sibling references and are cross-linked, not duplicated.
 
 ## Contents
 
@@ -26,7 +35,8 @@ Skia is a **native module shipped as prebuilt binaries**, not a JS library, so i
 Reanimated animating native views is the default for product motion. Reach for Skia only when the scene exceeds what views handle well:
 
 - **Custom vector graphics** — shapes, gradients, masks, clips, and path effects that would be awkward or impossible with RN `View`s and `react-native-svg`.
-- **Many animated elements** — past roughly 100 animated views on low-end Android (~500 on iOS), per-view overhead dominates. Skia renders everything to one canvas, so all elements share one draw-call pipeline.
+- **Many animated elements** — when per-view overhead dominates, Skia can render
+  the scene to one canvas and batch related drawing work.
 - **Charts and data visualization** — axes, lines, areas, and labels redrawn together on a single surface.
 - **Particles, generative art, sprite sheets** — entities created and destroyed per frame.
 - **Per-pixel effects** — blurs, color grading, displacement, and procedural patterns via SKSL runtime shaders.
@@ -36,10 +46,14 @@ If the task is ordinary view motion, route to [Reanimated core](./reanimated-cor
 
 ## Setup and assumptions
 
-- **Reanimated 4 + New Architecture (Fabric, RN 0.76+).** Reanimated 3 / old-architecture guidance does not apply.
-- **Development build required.** Skia runs a `postinstall` script that copies prebuilt binaries into the native projects. Package managers that block lifecycle scripts (Bun `trustedDependencies`, Yarn Berry `enableScripts`) fail with missing-native-binary errors. Install through the repo's package policy; with Expo, use `expo install` so the version resolves to the SDK-bundled native module — do not hand-bump it without a native rebuild.
-- **Version pinning.** Current Skia requires `react-native@>=0.79` and `react@>=19`; for `react-native@<=0.78` / React 18 stacks, pin `@shopify/react-native-skia@1.12.4` or below. Confirm the version the target repo's Expo SDK bundles before editing — do not assume.
-- **Platform minimums.** iOS 14+, Android API 21+ for basic rendering; video/experimental Graphite need Android API 26+. Bundle cost ~+6 MB iOS, +4 MB Android, +2.9 MB web.
+- **Architecture gate.** Reanimated 4 requires the New Architecture. Confirm the
+  target Expo/RN/Reanimated versions and `newArchEnabled` before combining them.
+- **Native build/lifecycle.** Native binaries and lifecycle scripts must be
+  available in the target repo. Resolve the package with its Expo/package-manager
+  wrapper and rebuild native projects after changing it; do not hand-bump a
+  version outside the target SDK's compatibility range.
+- **Platform support.** Read the installed Skia release notes and Expo SDK
+  reference for platform minimums, web/CanvasKit setup, and optional features.
 
 ## Canvas and core primitives
 
@@ -74,7 +88,7 @@ The scene is declared as a React element tree (**retained mode**). Skia compiles
 - **`Atlas`** — batched instanced drawing of one texture (see below).
 - **`Shader` / `RuntimeShader`** — per-pixel SKSL effects compiled with `Skia.RuntimeEffect.Make()`.
 
-Paint effects (`LinearGradient`, `BlurMask`, color filters) are declared as children of the element they apply to. `Picture` and `SVG` do **not** inherit `Group` paint — apply effects via a parent `Group`'s `layer` prop. For canvas measurement use the `onSize` prop (shared value, updates on resize) or `useCanvasSize()` (JS-thread state); `onLayout` is deprecated on Fabric. Use `makeImageSnapshotAsync()` for snapshots that include textures.
+Paint effects (`LinearGradient`, `BlurMask`, color filters) are declared as children of the element they apply to. `Picture` and `SVG` do **not** inherit `Group` paint — apply effects via a parent `Group`'s `layer` prop. For canvas measurement use the `onSize` prop (shared value, updates on resize) or `useCanvasSize()` (JS-thread state); confirm measurement API deprecations against the installed Skia docs. Use `makeImageSnapshotAsync()` for snapshots that include textures.
 
 ## Skia ↔ Reanimated interop
 
@@ -302,7 +316,7 @@ A `RuntimeShader` used as an **image filter** receives the filtered drawing as a
 
 Images, fonts, paths, shaders, and runtime effects are **resources with load/cache/invalidation cost** — the single biggest source of Skia bugs is recreating them per render or per frame.
 
-- **`useImage()` is async** — returns `null` until the decode finishes, accepts an error handler. Render explicit loading/error/fallback states; never assume the image is ready. Sources can be `require(...)`, native bundle names, network URLs, or encoded bytes. **Skia's image cache evicts at roughly 10 MB** — large or many decoded images get evicted and re-decoded, causing churn; budget decode size deliberately on low-end devices. Never fetch or decode inside a worklet/frame callback — load on a supported path, then pass a stable handle into the scene.
+- **`useImage()` is async** — returns `null` until the decode finishes, accepts an error handler. Render explicit loading/error/fallback states; never assume the image is ready. Sources can be `require(...)`, native bundle names, network URLs, or encoded bytes. Large or many decoded images can be evicted and re-decoded, causing churn; budget decode size deliberately on low-end devices. Never fetch or decode inside a worklet/frame callback — load on a supported path, then pass a stable handle into the scene.
 - **Fonts** — create one `Skia.Font()` (or one `useFont(...)` per family/size) and reuse it across all `Text`. Allocating a font per render leaks and stutters.
 - **Paths** — build `Skia.Path` instances outside render (module scope) or wrap in `useMemo`. For per-frame reuse in immediate mode, `rewind()` an existing path instead of allocating a new one.
 - **Shaders** — compile `Skia.RuntimeEffect.Make()` once (module scope or `useMemo`); recompiling per frame is a severe stall.
@@ -334,13 +348,15 @@ Full reduced-motion, haptics, frame-budget, and device-proof guidance lives in [
 
 ## Pitfalls / Do-not
 
-- **Do not recreate Images, Fonts, Paths, or shaders per render or per frame.** Load `useImage()` once and handle its `null`/error states; reuse a single `Skia.Font()`; build `Skia.Path` in module scope or `useMemo` (`rewind()` to reuse); compile `Skia.RuntimeEffect.Make()` once and check for `null`. Recreating them stalls frames and leaks native memory (the image cache evicts ~10 MB).
+- **Do not recreate Images, Fonts, Paths, or shaders per render or per frame.** Load `useImage()` once and handle its `null`/error states; reuse a single `Skia.Font()`; build `Skia.Path` in module scope or `useMemo` (`rewind()` to reuse); compile `Skia.RuntimeEffect.Make()` once and check for `null`. Recreating them stalls frames and increases native-memory churn.
 - **Do not use Reanimated's `interpolateColor` inside Skia.** Skia's color format differs; use `interpolateColors` from `@shopify/react-native-skia`. The reverse is also wrong — don't use Skia's color interp on RN views.
 - **Do not ship an opaque canvas without accessibility.** Wrap it in accessible RN semantics and overlay real controls for interactive elements; the canvas has no semantic nodes of its own.
 - **Do not assume web == native.** CanvasKit (WASM, async-loaded) is a separate path with its own setup, memory, and WebGL-context limits. Validate each platform; one is not proof of the other.
 - **Do not push per-frame Skia values through React `setState`.** Drive them with shared values consumed directly by Skia props on the UI thread.
 - **Do not allocate inside frame worklets** (`useDerivedValue`, `usePathValue`, `useRSXformBuffer`, immediate-mode `Picture`). Precompute constants, mutate buffers in place, and `rewind()` reused paths.
-- **Do not forget Skia is a native module.** It needs a development build and lifecycle scripts; it is not pure JS and does not work in bare Expo Go without the bundled version.
+- **Do not forget Skia is a native module.** It needs the target SDK's Expo Go
+  support or a development build plus working lifecycle scripts; it is not pure
+  JS and is not proof of custom native configuration by itself.
 - **Do not assume RN view conventions.** Skia `Group` transform origin is top-left (use `origin`), and all rotations are in radians.
 
 ## Related references

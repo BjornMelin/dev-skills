@@ -1,7 +1,7 @@
 # Accessibility & Performance
 
-Motion is a feature, not decoration. On Expo and React Native (Reanimated 4 on the
-New Architecture), the same animation that delights most users can disorient,
+Motion is a feature, not decoration. In the Reanimated 4/New Architecture lane,
+the same animation that delights most users can disorient,
 nauseate, or simply drop frames for others. This reference covers two tightly
 coupled concerns: honoring the system reduced-motion preference (a WCAG
 accessibility requirement, not a nicety) and keeping animations cheap enough to
@@ -23,19 +23,19 @@ telling you that large or unexpected movement causes them discomfort. Respect it
 
 Two complementary APIs:
 
-- `useReducedMotion()` from `react-native-reanimated` — a reactive hook usable
-  directly inside components and worklet-adjacent logic. It returns a boolean and
-  re-renders when the setting changes.
+- `useReducedMotion()` from `react-native-reanimated` — a synchronous initial
+  preference snapshot usable inside components and worklet-adjacent logic. A
+  system-setting change does **not** rerender components through this hook.
 - `AccessibilityInfo.isReduceMotionEnabled()` from `react-native` — a one-shot
   promise, plus a `reduceMotionChanged` subscription for live changes. Use this
-  for non-render contexts (effects, services, imperative code).
+  when a live setting change must update React or imperative code.
 
 ```tsx
 import { useReducedMotion } from "react-native-reanimated";
 import { AccessibilityInfo } from "react-native";
 import { useEffect, useState } from "react";
 
-// Component-level: prefer the Reanimated hook.
+// Component-level: use the initial snapshot for render-time branching.
 function useMotionPreference() {
   return useReducedMotion();
 }

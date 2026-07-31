@@ -70,6 +70,8 @@ jobs:
           bun-version: 1.3.14
       - name: Validate skill and subagent contracts
         run: python3 tools/eval/skill_subagent_eval.py --json --strict
+      - name: Check public Expo motion contract
+        run: python3 tools/skill/check_expo_motion_public_contract.py
       - name: Validate plugin skills and manifests
         run: |
           set -euo pipefail
