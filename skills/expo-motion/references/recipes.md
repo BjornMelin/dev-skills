@@ -198,6 +198,7 @@ Custom canvas animation — shared values pass directly into Skia props. Use `us
 
 ```tsx
 import { Canvas, Circle, Group, useClock } from "@shopify/react-native-skia";
+import { View } from "react-native";
 import { useDerivedValue, useReducedMotion } from "react-native-reanimated";
 
 export default function Loader() {
@@ -206,9 +207,16 @@ export default function Loader() {
 
 function StaticLoader() {
   return (
-    <Canvas style={{ width: 64, height: 64 }} accessibilityLabel="Loading">
-      <Circle cx={32} cy={8} r={5} color="#6cf" />
-    </Canvas>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={{ width: 64, height: 64 }}
+    >
+      <Canvas style={{ width: 64, height: 64 }}>
+        <Circle cx={32} cy={8} r={5} color="#6cf" />
+      </Canvas>
+    </View>
   );
 }
 
@@ -217,11 +225,18 @@ function AnimatedLoader() {
   const rotation = useDerivedValue(() => (clock.value / 1000) % (Math.PI * 2));
   const transform = useDerivedValue(() => [{ rotate: rotation.value }]);
   return (
-    <Canvas style={{ width: 64, height: 64 }} accessibilityLabel="Loading">
-      <Group origin={{ x: 32, y: 32 }} transform={transform}>
-        <Circle cx={32} cy={8} r={5} color="#6cf" />
-      </Group>
-    </Canvas>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={{ width: 64, height: 64 }}
+    >
+      <Canvas style={{ width: 64, height: 64 }}>
+        <Group origin={{ x: 32, y: 32 }} transform={transform}>
+          <Circle cx={32} cy={8} r={5} color="#6cf" />
+        </Group>
+      </Canvas>
+    </View>
   );
 }
 ```

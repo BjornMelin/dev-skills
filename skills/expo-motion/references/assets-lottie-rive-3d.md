@@ -116,7 +116,7 @@ module.exports = config;
 ```
 
 ```tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import {
@@ -145,6 +145,10 @@ export function LikeButton() {
   const loading = isFileLoading || isInstanceLoading;
   const errorMessage =
     riveError ?? fileError?.message ?? instanceError?.message ?? null;
+
+  useEffect(() => {
+    if (!reduce && instance && !errorMessage) setRiveLiked(liked);
+  }, [errorMessage, instance, liked, reduce, setRiveLiked]);
 
   const toggle = () => {
     const next = !liked;
