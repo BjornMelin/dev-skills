@@ -10,7 +10,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 FORBIDDEN = (
     re.compile(r"\bnpx\b|\bnpm\b", re.IGNORECASE),
     re.compile(r"\bSDK\s*5\d\b|\bRN\s*0\.\d+", re.IGNORECASE),
@@ -21,6 +20,14 @@ REQUIRED = (
     "packageManager",
     "scheduleOnRN",
     "useReducedMotion",
+)
+SUPPORTED_DOCTOR_FORMATS = frozenset({"markdown", "json"})
+DOCTOR_COMMAND_RE = re.compile(
+    r"(?m)^\s*expo-motion-audit\s+doctor"
+    r"(?:\s+--format\s+(?P<format>[a-z]+))?\s*$"
+)
+MARKDOWN_LINK_RE = re.compile(
+    r"\]\((?![a-z][a-z0-9+.-]*:|//|#)([^)#\s]+)(?:#[^)]+)?\)"
 )
 
 
@@ -44,7 +51,9 @@ def _frontmatter_description(skill_path: Path) -> str:
     match = re.match(r"^---\n(.*?)\n---\n", text, re.DOTALL)
     if not match:
         raise ValueError("SKILL.md is missing YAML frontmatter")
-    description = re.search(r"^description:\s*(.+)$", match.group(1), re.MULTILINE)
+    description = re.search(
+        r"^description:\s*(.+)$", match.group(1), re.MULTILINE
+    )
     if not description:
         raise ValueError("SKILL.md frontmatter is missing description")
     value = description.group(1).strip()
@@ -72,6 +81,14 @@ def _catalog_skill(value: Any) -> dict[str, Any] | None:
 
 
 def check(root: Path) -> list[str]:
+    """Validate the public expo-motion skill and audit contracts.
+
+    Args:
+        root: Repository root containing the skill, catalog, and audit docs.
+
+    Returns:
+        A list of validation errors, empty when all public contracts pass.
+    """
     skill = root / "skills" / "expo-motion"
     skill_entrypoint = skill / "SKILL.md"
     catalog = root / "catalog" / "agent-skills-lab.json"
@@ -88,10 +105,15 @@ def check(root: Path) -> list[str]:
         relative = path.relative_to(root)
         for pattern in FORBIDDEN:
             if pattern.search(text):
-                errors.append(f"forbidden public-contract text in {relative}: {pattern.pattern}")
+                errors.append(
+                    "forbidden public-contract text in "
+                    f"{relative}: {pattern.pattern}"
+                )
 
     body = "\n".join(
-        path.read_text(encoding="utf-8") for path in skill_files if path.suffix == ".md"
+        path.read_text(encoding="utf-8")
+        for path in skill_files
+        if path.suffix == ".md"
     )
     for required in REQUIRED:
         if required not in body:
@@ -99,9 +121,31 @@ def check(root: Path) -> list[str]:
 
     for path in skill.rglob("*.md"):
         text = path.read_text(encoding="utf-8")
-        for target in re.findall(r"\]\((\./[^)#]+)(?:#[^)]+)?\)", text):
-            if not (path.parent / target.removeprefix("./")).is_file():
-                errors.append(f"broken local reference in {path.relative_to(root)}: {target}")
+        for target in MARKDOWN_LINK_RE.findall(text):
+            if not (path.parent / target).is_file():
+                errors.append(
+                    "broken local reference in "
+                    f"{path.relative_to(root)}: {target}"
+                )
+
+    audit_reference = root / "docs" / "reference" / "expo-motion-audit.md"
+    if audit_reference.is_file():
+        doctor_formats = {
+            match.group("format") or "markdown"
+            for match in DOCTOR_COMMAND_RE.finditer(
+                audit_reference.read_text(encoding="utf-8")
+            )
+        }
+        for unsupported in sorted(doctor_formats - SUPPORTED_DOCTOR_FORMATS):
+            errors.append(
+                f"unsupported expo-motion-audit doctor format in "
+                f"{audit_reference.relative_to(root)}: {unsupported}"
+            )
+        for missing in sorted(SUPPORTED_DOCTOR_FORMATS - doctor_formats):
+            errors.append(
+                f"missing expo-motion-audit doctor format in "
+                f"{audit_reference.relative_to(root)}: {missing}"
+            )
 
     if catalog.is_file():
         try:
@@ -111,7 +155,9 @@ def check(root: Path) -> list[str]:
             if not catalog_entry:
                 errors.append("catalog is missing expo-motion")
             elif catalog_entry.get("description") != description:
-                errors.append("catalog description does not match SKILL.md frontmatter")
+                errors.append(
+                    "catalog description does not match SKILL.md frontmatter"
+                )
         except (OSError, ValueError, json.JSONDecodeError) as error:
             errors.append(f"catalog/frontmatter parse failed: {error}")
     else:
@@ -121,8 +167,15 @@ def check(root: Path) -> list[str]:
 
 
 def main() -> int:
+    """Run the public-contract checker from the command line.
+
+    Returns:
+        Zero when the contract passes; otherwise one.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument(
+        "--root", type=Path, default=Path(__file__).resolve().parents[2]
+    )
     args = parser.parse_args()
     errors = check(args.root.resolve())
     if errors:

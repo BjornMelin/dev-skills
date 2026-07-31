@@ -43,8 +43,11 @@ Then let Expo fix or add packages at the SDK-correct version:
 # Reconcile existing packages to target-SDK-compatible versions
 <repo-expo> install --fix
 
-# Add motion packages through the target SDK's resolver
+# Add motion packages through the target SDK's resolver. Choose one lane:
+# Reanimated 4 + New Architecture
 <repo-expo> install react-native-reanimated react-native-worklets
+# Reanimated 3 / legacy architecture (do not add react-native-worklets)
+<repo-expo> install react-native-reanimated
 <repo-expo> install react-native-gesture-handler
 <repo-expo> install @shopify/react-native-skia
 ```
@@ -70,12 +73,15 @@ The flag lives in `app.json` / `app.config.*`:
 }
 ```
 
-The default for `newArchEnabled` varies by target SDK and app configuration, so
-never infer it from a version number — read the config and confirm at runtime.
-`<repo-expo-doctor>` flags compatibility problems, and a development build will
-fail fast if a native module is incompatible. If the project is intentionally on
-the old architecture, that is a hard constraint on which Reanimated major you
-can use; record it rather than silently upgrading.
+Expo's [New Architecture guide](https://docs.expo.dev/guides/new-architecture/)
+is the authority for the target release. When the target release mandates the
+New Architecture, `newArchEnabled: false` is ignored: use the Reanimated 4 and
+Worklets lane. When the target release still supports the legacy architecture,
+inspect `newArchEnabled` in the app config and computed manifest; a legacy target
+must stay on a compatible Reanimated 3 lane until migrated. Never infer the
+architecture from a package version alone. `<repo-expo-doctor>` flags
+compatibility problems, and a development build will fail fast if a native
+module is incompatible.
 
 ## Development build vs Expo Go
 

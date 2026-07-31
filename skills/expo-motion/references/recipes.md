@@ -1,9 +1,11 @@
 # Expo / React Native Motion Recipes (Reanimated 4 lane, TSX)
 
 Copy-paste, production-minded recipes for iOS, Android, and web. Confirm the
-target manifest supports Reanimated 4 + the New Architecture before applying
-them; all examples use `react-native-gesture-handler` (app wrapped in
-`GestureHandlerRootView`) and `react-native-worklets` (Babel plugin last).
+target manifest supports the selected Reanimated/architecture lane before
+applying them. Recipes that use `react-native-gesture-handler` require an app
+root wrapped in `GestureHandlerRootView`; recipes without gestures do not.
+For bare React Native CLI, keep `react-native-worklets/plugin` last. Expo's
+`babel-preset-expo` configures that plugin when the installed lane supports it.
 
 Conventions used throughout:
 - Transient motion lives in **shared values**; product state stays in React/store.
@@ -196,9 +198,21 @@ Custom canvas animation — shared values pass directly into Skia props. Use `us
 
 ```tsx
 import { Canvas, Circle, Group, useClock } from "@shopify/react-native-skia";
-import { useDerivedValue } from "react-native-reanimated";
+import { useDerivedValue, useReducedMotion } from "react-native-reanimated";
 
 export default function Loader() {
+  return useReducedMotion() ? <StaticLoader /> : <AnimatedLoader />;
+}
+
+function StaticLoader() {
+  return (
+    <Canvas style={{ width: 64, height: 64 }} accessibilityLabel="Loading">
+      <Circle cx={32} cy={8} r={5} color="#6cf" />
+    </Canvas>
+  );
+}
+
+function AnimatedLoader() {
   const clock = useClock();                          // ms since mount, frame-driven
   const rotation = useDerivedValue(() => (clock.value / 1000) % (Math.PI * 2));
   const transform = useDerivedValue(() => [{ rotate: rotation.value }]);
@@ -212,7 +226,9 @@ export default function Loader() {
 }
 ```
 
-Reduced motion: render a static frame (e.g. a non-animated spinner or a text status) when `useReducedMotion()` is true — a perpetually spinning loader is exactly what reduced-motion users want suppressed. Wrap the opaque canvas with an accessible label/role. See [skia](./skia.md) for memory + shader details.
+The reduced-motion branch never mounts the clock-driven component, so it renders a
+static frame rather than allocating a perpetual animation. Wrap the opaque canvas
+with an accessible label/role. See [skia](./skia.md) for memory + shader details.
 
 On web, CanvasKit loads asynchronously. Keep the `Loader` module outside Expo
 Router's `app/` directory and load it through the official code-splitting

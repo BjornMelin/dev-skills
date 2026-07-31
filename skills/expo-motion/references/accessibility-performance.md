@@ -42,10 +42,13 @@ function useMotionPreference() {
 
 // Imperative / effect context: use AccessibilityInfo + listener.
 function useReduceMotionListener() {
-  const [reduced, setReduced] = useState(false);
+  const initial = useReducedMotion();
+  const [reduced, setReduced] = useState(initial ?? true);
 
   useEffect(() => {
-    AccessibilityInfo.isReduceMotionEnabled().then(setReduced);
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then(setReduced)
+      .catch(() => setReduced(true));
     const sub = AccessibilityInfo.addEventListener(
       "reduceMotionChanged",
       setReduced,

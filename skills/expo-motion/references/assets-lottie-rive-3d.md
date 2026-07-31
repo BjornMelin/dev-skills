@@ -128,26 +128,36 @@ import {
 export function LikeButton() {
   const [liked, setLiked] = useState(false);
   const reduce = useReducedMotion();
-  const { riveFile } = useRiveFile(require('../assets/like.riv'));
-  const { instance } = useViewModelInstance(riveFile, { async: true });
+  const {
+    riveFile,
+    isLoading: isFileLoading,
+    error: fileError,
+  } = useRiveFile(require('../assets/like.riv'));
+  const {
+    instance,
+    isLoading: isInstanceLoading,
+    error: instanceError,
+  } = useViewModelInstance(riveFile, { async: true });
+  const [riveError, setRiveError] = useState<string | null>(null);
   const { setValue: setRiveLiked } = useRiveBoolean('liked', instance);
+  const loading = isFileLoading || isInstanceLoading;
+  const errorMessage =
+    riveError ?? fileError?.message ?? instanceError?.message ?? null;
 
   const toggle = () => {
-    if (!reduce && !instance) return;
     const next = !liked;
     setLiked(next);
-    if (!reduce && instance) setRiveLiked(next);
+    if (!reduce && instance && !errorMessage) setRiveLiked(next);
   };
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={liked ? 'Unlike' : 'Like'}
-      accessibilityState={{ checked: liked, disabled: !reduce && !instance }}
-      disabled={!reduce && !instance}
+      accessibilityState={{ checked: liked }}
       onPress={toggle}
     >
-      {reduce ? (
+      {reduce || loading || errorMessage || !riveFile || !instance ? (
         <View
           style={{
             width: 56,
@@ -160,16 +170,21 @@ export function LikeButton() {
         </View>
       ) : (
         <View pointerEvents="none">
-          {riveFile && instance ? (
-            <RiveView
-              file={riveFile}
-              dataBind={instance}
-              fit={Fit.Layout}
-              style={{ width: 56, height: 56 }}
-            />
-          ) : null}
+          <RiveView
+            file={riveFile}
+            dataBind={instance}
+            fit={Fit.Layout}
+            style={{ width: 56, height: 56 }}
+            onError={(error) => setRiveError(error.message)}
+          />
         </View>
       )}
+      {loading ? (
+        <Text accessibilityLiveRegion="polite">Loading animation…</Text>
+      ) : null}
+      {errorMessage ? (
+        <Text accessibilityLiveRegion="polite">Animation unavailable</Text>
+      ) : null}
       <Text>{liked ? 'Unlike' : 'Like'}</Text>
     </Pressable>
   );
@@ -184,6 +199,9 @@ owns the button semantics and keeps the native canvas out of the touch target.
 `useReducedMotion()` is a snapshot for this example; when it is enabled, the
 button keeps the React/accessibility state and renders a static glyph instead of
 updating the animated Rive state machine.
+The file and view-model hooks expose loading/error state, so the example gates
+`RiveView`, keeps the button functional with a static fallback while assets load
+or fail, and records runtime failures through `RiveView`'s `onError` callback.
 
 **Legacy migration lane:** `rive-react-native` exposes `Rive`/`RiveRef` and
 methods such as `setInputState`; keep that API only while following the

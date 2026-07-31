@@ -26,14 +26,18 @@ Use this when building or reviewing motion in an Expo/RN app, **and** when the u
 ## Install & setup
 
 ```bash
-# Use the target repo's documented Expo CLI/package-manager wrapper.
+# Use the target repo's documented Expo CLI/package-manager wrapper. Choose one
+# dependency lane after reading the target manifest.
+# Reanimated 4 + New Architecture:
 <repo-expo> install react-native-reanimated react-native-worklets react-native-gesture-handler
+# Reanimated 3 / legacy architecture:
+<repo-expo> install react-native-reanimated react-native-gesture-handler
 # Skia (optional): <repo-expo> install @shopify/react-native-skia
 <repo-expo> install --check
 ```
 
 - Resolve `<repo-expo>` from the target repo's `packageManager` field, lockfile, and scripts; do not copy a package-manager command from another project. Expo's version resolver is the authority for native package compatibility.
-- **Reanimated 4 requires the New Architecture** (`app.json`/`app.config.*` `newArchEnabled`, with the target SDK's default verified rather than assumed). Legacy apps should stay on their installed compatible line until migrated.
+- **Reanimated 4 requires the New Architecture** (`app.json`/`app.config.*` `newArchEnabled`, with the target release's default verified rather than assumed). Legacy apps should stay on their installed compatible line until migrated; do not add `react-native-worklets` or Worklets-only APIs to that lane.
 - `babel.config.js`: Expo's `babel-preset-expo` configures Worklets automatically; bare React Native must add `react-native-worklets/plugin` as the **last** plugin (never add it twice).
 - Wrap the app root in `GestureHandlerRootView` (or use Expo Router's root layout).
 - Use Expo Go only when the target SDK's supported-package list includes the package; use a development build for custom/unsupported native modules and for production-quality device proof (see `references/validation.md`).
@@ -92,7 +96,7 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 
 - Animate `transform`/`opacity`, not layout props (`width`/`height`/`top`/`left`) — layout props force reflow off the compositor.
 - Keep transient motion in shared values; never `setState` per frame. Read `.value` only in worklets.
-- Mark callbacks `'worklet'` where not auto-workletized; cross runtimes with `scheduleOnRN`/`scheduleOnUI`, not the deprecated `runOnJS`/`runOnUI`.
+- Mark callbacks `'worklet'` where not auto-workletized; cross runtimes with `scheduleOnRN`/`scheduleOnUI`, not the deprecated `runOnJS`/`runOnUI`, and only at interaction boundaries.
 - `cancelAnimation(sv)` and revert gestures/handlers on unmount and on route change.
 - Honor `.reduceMotion(ReduceMotion.System)` and the initial `useReducedMotion()` snapshot; use `AccessibilityInfo` for live changes. Reduced motion must preserve functional feedback, not just delete it.
 - Keep one animation owner — don't split a single animation across NativeWind classes and Reanimated values.
@@ -102,7 +106,7 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 
 - Don't read/write `sharedValue.value` during render or on the JS thread.
 - Don't animate layout properties when a transform achieves it.
-- Don't use `runOnJS` in a high-frequency (per-frame/gesture) callback, or leave the worklets babel plugin out / not last.
+- Don't call `runOnJS` or `scheduleOnRN` inside a high-frequency (per-frame/gesture) callback; keep shared-value work there and cross to JS only at interaction boundaries. Never leave the worklets babel plugin out / not last.
 - Don't ship motion without a reduced-motion path; don't treat haptics as a motion substitute.
 - Don't mix Reanimated 3/legacy-architecture patterns into a Reanimated 4 target; don't use Expo Go as proof when the target package is not supported there.
 - Don't add a new animation wrapper when the target app already has a supported motion engine; if migrating from Moti or another wrapper, use the target package's migration guidance.
