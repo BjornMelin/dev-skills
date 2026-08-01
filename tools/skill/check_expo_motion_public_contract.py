@@ -12,7 +12,10 @@ from typing import Any
 
 FORBIDDEN = (
     re.compile(r"\bnpx\b|\bnpm\b", re.IGNORECASE),
-    re.compile(r"\bSDK\s*5\d\b|\bRN\s*0\.\d+", re.IGNORECASE),
+    re.compile(
+        r"\bSDK\s*\d+(?:\.\d+)*\b|\bRN\s*\d+(?:\.\d+)*\b",
+        re.IGNORECASE,
+    ),
     re.compile(r"signr|career-os|tripsage|/home/bjorn", re.IGNORECASE),
 )
 REQUIRED = (
