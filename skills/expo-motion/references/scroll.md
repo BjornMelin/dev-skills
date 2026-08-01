@@ -2,11 +2,12 @@
 
 Scroll position is one of the most useful animation drivers on mobile:
 collapsing headers, parallax hero images, sticky toolbars, and progress
-indicators all read from a single scroll offset. In Reanimated 4 the offset
+indicators all read from a single scroll offset. In the Reanimated 4 lane the offset
 lives in a shared value on the UI thread, so the animation tracks scrolling
 frame-for-frame without crossing to JS. This page covers the two scroll hooks,
 the animated scroll components, interpolation patterns, and reduced-motion
-handling. Examples assume Reanimated 4 on the New Architecture.
+handling. Confirm the target manifest supports Reanimated 4/New Architecture
+before applying the examples.
 
 You must scroll with `Animated.ScrollView` / `Animated.FlatList`, not the plain
 RN components — the animated wrappers forward the scroll event to the UI thread.
@@ -215,8 +216,9 @@ can trigger discomfort. When the OS reduced-motion setting is on:
   carries no functional meaning to lose.
 - Keep functional behavior (the header can still collapse) but remove decorative
   travel and bounce.
-- Read the preference with `useReducedMotion()` and branch your interpolation
-  ranges. Details and the haptics/AccessibilityInfo story live in
+- Read the initial preference snapshot with `useReducedMotion()` and branch your
+  interpolation ranges. Use `AccessibilityInfo` when a live setting change must
+  rerender. Details and the haptics story live in
   [Accessibility & performance](./accessibility-performance.md).
 
 ## Pitfalls / Do-not

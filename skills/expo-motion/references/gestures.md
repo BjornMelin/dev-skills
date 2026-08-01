@@ -5,7 +5,8 @@ Touch and pointer interaction in Expo / React Native is built on
 gesture objects, attach them to a `GestureDetector`, and let their worklet
 callbacks drive Reanimated shared values directly on the UI thread. This page
 covers the gesture types, composition, the worklet callback contract, app setup,
-and cleanup. It assumes **Reanimated 4 on the New Architecture (Fabric)**.
+and cleanup. The examples use the **Reanimated 4/New Architecture lane**;
+confirm the target manifest before applying them to a legacy app.
 
 Keep transient interaction state (translation, scale, velocity) in shared values
 on the UI thread, and cross to React/JS only when a durable product state change
@@ -115,7 +116,6 @@ export function DraggableCard() {
 
 ```tsx
 import Animated, {
-  runOnJS, // alias of scheduleOnRN in older code; prefer scheduleOnRN
   useAnimatedStyle,
   useSharedValue,
   withTiming,

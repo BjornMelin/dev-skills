@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-29T21:36:58Z",
+  "generatedAt": "2026-07-31T23:39:09.734611044Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "9411fdc2c3e8705cc50149281ef1a55f7fcd5545",
+  "sourceCommit": "0f93d9ae5ac552ba73164162152d08518feb57f0",
   "sourceRef": "main",
   "skillsCount": 65,
   "totalSkillDirectories": 65,
@@ -1276,7 +1276,7 @@
     {
       "name": "expo-motion",
       "slug": "expo-motion",
-      "description": "Expo and React Native motion for iOS and Android: animation, gestures, transitions, scroll effects and Skia. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animation and reduced motion.",
+      "description": "Expo and React Native motion for iOS, Android, and web: Reanimated 4, worklets, gestures, transitions, Skia, accessibility, and manifest-driven validation.",
       "license": "MIT",
       "path": "skills/expo-motion",
       "skillMdPath": "skills/expo-motion/SKILL.md",
@@ -1291,17 +1291,18 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents",
         "resource_rich"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -1315,7 +1316,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/expo-motion.skill",

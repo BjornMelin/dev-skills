@@ -1,12 +1,20 @@
-# Expo / React Native Motion Recipes (Reanimated 4, TSX)
+# Expo / React Native Motion Recipes (Reanimated 4 lane, TSX)
 
-Copy-paste, production-minded recipes for iOS + Android. All assume Reanimated 4 + the New Architecture, `react-native-gesture-handler` (app wrapped in `GestureHandlerRootView`), and `react-native-worklets` (babel plugin last).
+Copy-paste, production-minded recipes for iOS, Android, and web. Confirm the
+target manifest supports the selected Reanimated/architecture lane before
+applying them. Recipes that use `react-native-gesture-handler` require an app
+root wrapped in `GestureHandlerRootView`; recipes without gestures do not.
+For bare React Native CLI, keep `react-native-worklets/plugin` last. Expo's
+`babel-preset-expo` configures that plugin when the installed lane supports it.
 
 Conventions used throughout:
 - Transient motion lives in **shared values**; product state stays in React/store.
 - Animate **`transform`/`opacity`**, never layout props.
-- Every recipe has a **reduced-motion** path via `useReducedMotion()` (or `.reduceMotion(ReduceMotion.System)` on layout animations) — reduced motion keeps the functional outcome, it just removes the movement.
-- Clean up with `cancelAnimation` on unmount; cross to JS with `scheduleOnRN` (not the deprecated `runOnJS`).
+- Every recipe has a **reduced-motion** path via the initial `useReducedMotion()`
+  snapshot (or `.reduceMotion(ReduceMotion.System)` on layout animations) —
+  reduced motion keeps the functional outcome, it just removes the movement.
+- Cancel infinite or route-scoped animations on unmount; cross to JS with
+  `scheduleOnRN` (not the deprecated `runOnJS`).
 
 ## Table of contents
 1. [Swipe-to-dismiss card](#1-swipe-to-dismiss-card)
@@ -26,14 +34,17 @@ Pan to dismiss; spring back if the throw is small. `scheduleOnRN` calls the JS `
 
 ```tsx
 "use client";
-import { useReducedMotion, useSharedValue, useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
+import { cancelAnimation, useReducedMotion, useSharedValue, useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import Animated from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { scheduleOnRN } from "react-native-worklets";
+import { useEffect } from "react";
 
 export function SwipeCard({ onDismiss }: { onDismiss: () => void }) {
   const x = useSharedValue(0);
   const reduce = useReducedMotion();
+
+  useEffect(() => () => cancelAnimation(x), [x]);
 
   const pan = Gesture.Pan()
     .onUpdate((e) => { x.value = e.translationX; })
@@ -186,24 +197,75 @@ Pair with `<RefreshControl onRefresh={...} />` for the data fetch; the Reanimate
 Custom canvas animation — shared values pass directly into Skia props. Use `useClock`/`useDerivedValue`; for color use Skia's own interpolation.
 
 ```tsx
-import { Canvas, Circle, Group } from "@shopify/react-native-skia";
-import { useClock, useDerivedValue } from "@shopify/react-native-skia";
+import { Canvas, Circle, Group, useClock } from "@shopify/react-native-skia";
+import { View } from "react-native";
+import { useDerivedValue, useReducedMotion } from "react-native-reanimated";
 
-function Loader() {
+export default function Loader() {
+  return useReducedMotion() ? <StaticLoader /> : <AnimatedLoader />;
+}
+
+function StaticLoader() {
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={{ width: 64, height: 64 }}
+    >
+      <Canvas style={{ width: 64, height: 64 }}>
+        <Circle cx={32} cy={8} r={5} color="#6cf" />
+      </Canvas>
+    </View>
+  );
+}
+
+function AnimatedLoader() {
   const clock = useClock();                          // ms since mount, frame-driven
   const rotation = useDerivedValue(() => (clock.value / 1000) % (Math.PI * 2));
   const transform = useDerivedValue(() => [{ rotate: rotation.value }]);
   return (
-    <Canvas style={{ width: 64, height: 64 }} accessibilityLabel="Loading">
-      <Group origin={{ x: 32, y: 32 }} transform={transform}>
-        <Circle cx={32} cy={8} r={5} color="#6cf" />
-      </Group>
-    </Canvas>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      style={{ width: 64, height: 64 }}
+    >
+      <Canvas style={{ width: 64, height: 64 }}>
+        <Group origin={{ x: 32, y: 32 }} transform={transform}>
+          <Circle cx={32} cy={8} r={5} color="#6cf" />
+        </Group>
+      </Canvas>
+    </View>
   );
 }
 ```
 
-Reduced motion: render a static frame (e.g. a non-animated spinner or a text status) when `useReducedMotion()` is true — a perpetually spinning loader is exactly what reduced-motion users want suppressed. Wrap the opaque canvas with an accessible label/role. See [skia](./skia.md) for memory + shader details.
+The reduced-motion branch never mounts the clock-driven component, so it renders a
+static frame rather than allocating a perpetual animation. Wrap the opaque canvas
+with an accessible label/role. See [skia](./skia.md) for memory + shader details.
+
+On web, CanvasKit loads asynchronously. Keep the `Loader` module outside Expo
+Router's `app/` directory and load it through the official code-splitting
+boundary before importing Skia components:
+
+```tsx
+import { Text } from 'react-native';
+import { WithSkiaWeb } from '@shopify/react-native-skia/lib/module/web';
+
+export function LoaderScreen() {
+  return (
+    <WithSkiaWeb
+      getComponent={() => import('./Loader')}
+      fallback={<Text>Loading graphics…</Text>}
+    />
+  );
+}
+```
+
+For deferred root registration instead, call `LoadSkiaWeb()` from the web entry
+before registering the app. Do not statically import the Skia component before
+CanvasKit is ready.
 
 ## Related references
 

@@ -8,12 +8,14 @@ project's babel and app config, and reports anti-patterns such as deprecated
 missing `'worklet'` directives, layout-property animation, infinite repeats with
 no reduced-motion guard, missing `cancelAnimation`, missing reduced-motion
 handling, a missing or misordered worklets babel plugin, the deprecated
-reanimated babel plugin, and the New Architecture being disabled.
+reanimated babel plugin, and an explicitly disabled New Architecture.
 
 The tool parses each supported source file with [oxc](https://oxc.rs/) and runs
 semantic analysis, so source findings are based on real AST and scope
-information rather than text matching. Config files are parsed structurally
-(babel config via oxc as CommonJS, app config via JSON). It performs no network
+information rather than text matching. Babel config is parsed structurally via
+oxc as CommonJS. Static `app.json`/`app.config.json` is parsed as JSON; dynamic
+`app.config.js`/`.ts`/`.cjs`/`.mjs` forms are reported as informational because
+their runtime result cannot be resolved statically. It performs no network
 calls and does not modify files.
 
 ## Crates
@@ -54,8 +56,8 @@ Top-level commands:
 
 ## scan
 
-Walk the given root, parse every supported source file plus `babel.config.js`,
-`app.json`, and `app.config.json`, and report findings:
+Walk the given root, parse every supported source file plus `babel.config.js`/
+`.cjs` and the supported static or dynamic app-config forms, and report findings:
 
 ```bash
 expo-motion-audit scan --root . --format markdown
@@ -105,9 +107,9 @@ severities your installed build ships rather than relying on a hardcoded table
 in this doc.
 
 Markdown output is a `# expo-motion-audit rule catalog (v<version>)` heading
-followed by an `id | category | severity` table. JSON output is a
-`{ "rules": [...] }` object where each rule carries `id`, `category`,
-`severity`, `confidence`, and `summary`.
+followed by an `id | category | severity` table. JSON output is an object with
+`tool`, `version`, and `rules`; each rule carries `id`, `category`, `severity`,
+`confidence`, and `summary`.
 
 ## completions
 
@@ -146,8 +148,11 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
   without ever calling `cancelAnimation` for teardown.
 - `config`: project configuration issues — a missing or misordered
   `react-native-worklets/plugin` in `babel.config.js`, the deprecated
-  `react-native-reanimated/plugin`, and the New Architecture being disabled
-  (or omitted before Expo SDK 53) while the project uses Reanimated 4.
+  `react-native-reanimated/plugin`, and an explicit
+  `expo.newArchEnabled: false` while the project uses Reanimated 4. An omitted
+  `newArchEnabled` value is not inferred: its default depends on the target
+  Expo SDK and app configuration, so verify it in the target manifest and
+  current Expo guidance.
 
 This doc describes rules only at the category level on purpose: the per-rule id
 set is maintained in the crate and can change between builds. Run
@@ -172,9 +177,11 @@ analyses, and report at medium confidence:
 - Babel config analysis is structural: a `plugins` array assembled dynamically
   (spread, conditional, computed) or a non-object/dynamic `module.exports`
   yields an informational low `config.unable-to-analyze` finding rather than a
-  false high-severity one. A dynamic `app.config.js`/`.ts` is likewise reported
-  as informational because only the static `app.json`/`app.config.json` forms
-  are parsed.
+  false high-severity one. A dynamic `app.config.js`/`.ts`/`.cjs`/`.mjs` is
+  likewise reported as informational because only static app-config forms are
+  parsed. Missing `expo.newArchEnabled` is intentionally left for
+  target-manifest validation;
+  the CLI does not encode an SDK-version threshold.
 
 ## Output Formats
 

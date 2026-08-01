@@ -1,35 +1,38 @@
 # NativeWind & styling boundaries
 
-NativeWind brings Tailwind-style `className` styling to React Native, but in an
-Expo (SDK 56+) New Architecture app it sits next to Reanimated 4, not on top of
-it. This reference covers the v4 stable and v5 preview lanes, how NativeWind's
+NativeWind brings Tailwind-style `className` styling to React Native. In a
+Reanimated 4/New Architecture app it sits next to Reanimated, not on top of it.
+This reference covers the installed NativeWind major's stable/preview lanes, how NativeWind's
 motion/transition utilities relate to Reanimated, the **static class-safety
 policy** (no runtime string concatenation), design tokens, the single-owner rule
 for animation, and which web-Tailwind props don't map to RN. For the animation
 engine itself see [Reanimated core](./reanimated-core.md); for content
 enter/exit see [Layout animations](./layout-animations.md).
 
-## Version lanes: v4 stable vs v5 preview
+## Version lanes
 
-Pick one lane deliberately and confirm installed versions before editing.
+Pick one lane deliberately and confirm the installed NativeWind, Tailwind,
+React Native, and Metro versions before editing. The names below are examples of
+the current documentation lanes, not a universal upgrade recommendation.
 
 ### NativeWind v4 (stable / Tailwind v3)
 
-- Stable lane: `nativewind@latest` resolves to the 4.2.x line. Use this unless
-  the repo explicitly opts into `preview`.
+- Stable lane: use the stable major already recorded in the target manifest unless
+  the repo explicitly opts into a preview lane. Do not use a registry `latest`
+  tag as a compatibility strategy.
 - Tailwind 3.4-era `tailwind.config.js`, `@tailwind base/components/utilities`
   directives, and NativeWind Babel + Metro wiring.
 - Type lane: `nativewind-env.d.ts` / `nativewind/types`.
 
 ### NativeWind v5 (preview)
 
-- Pre-release (`nativewind@preview`, the 5.0.0-preview line). The official v5
-  docs say it is **not intended for production yet** — do not present it as the
-  default upgrade.
+- A preview lane is **not a production default**. Follow the installed major's
+  official documentation and migration notes before changing it.
 - Tailwind v4.1+ CSS-first config: `@import`, `@theme`, `@utility`,
   `@custom-variant`, `@source`, `@plugin`, `@apply`. Expects `react-native-css`,
   `@tailwindcss/postcss`, Reanimated 4+, `react-native-safe-area-context`,
-  Lightning CSS, and React Native 0.81+ / New Architecture behavior.
+  Lightning CSS, and the React Native/New Architecture behavior documented for
+  that installed release.
 - Metro: prefer `withNativewind(config)` from `nativewind/metro` (lowercase `w`
   is the v5 spelling; `withNativeWind` survives for compat). Do **not** add the
   old NativeWind Babel preset to a v5 app.
@@ -102,8 +105,9 @@ const toneClass = {
   (e.g. `--color-brand: #2563eb;`). Keep token names semantic and shared across
   platforms; use platform media queries for platform-specific values, not
   divergent token meanings.
-- For runtime themes in v5, prefer `VariableContextProvider` with CSS-variable
-  defaults. `vars()` is still exported but deprecated in current v5 docs.
+- For runtime themes in a preview/new-major lane, prefer the provider and
+  variable APIs documented for that installed release. The deprecation status of
+  `vars()` is release-specific; verify it before migrating existing code.
 - If dynamic variables don't update with `react-native-css`, check Metro
   options — inlining can conflict with runtime variable contexts; use
   `inlineVariables: false` only when validation confirms it is needed.

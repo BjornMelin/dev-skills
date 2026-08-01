@@ -1,10 +1,10 @@
 # Expo Router & screen transitions
 
-Navigation transitions in Expo (SDK 56+) are a platform contract, not a place
-for ad-hoc product animation. Expo Router renders a **native stack** powered by
+Navigation transitions in Expo are a platform contract, not a place for ad-hoc
+product animation. Expo Router renders a **native stack** powered by
 `react-native-screens`, so route push/pop, modal presentation, back gestures,
-and header transitions are driven by UIKit/Android navigators on the New
-Architecture. This reference covers what navigation owns, how to configure it
+and header transitions are driven by UIKit/Android navigators. This reference
+covers what navigation owns, how to configure it
 through screen options, when to stay out of its way with Reanimated 4, how to
 clean up route-scoped animations, and how `@expo/ui` native controls fit as
 leaf nodes. For shared-value mechanics and threading, see
@@ -19,7 +19,8 @@ movement as native-screens behavior unless the app explicitly opts into a custom
 navigator.
 
 - Confirm `react-native-screens` is installed at the Expo-compatible version
-  before changing stack assumptions (use `expo install --check`).
+  before changing stack assumptions (use the target repo's `<repo-expo> install
+  --check` wrapper).
 - The native stack owns the **full screen shell**: push/pop, modal dismissal,
   edge-swipe back, hardware back. Do not replace those gestures with a
   full-screen Reanimated gesture just to customize back navigation.
@@ -55,10 +56,11 @@ export default function RootLayout() {
 
 ### `animation`
 
-Controls native-stack screen movement. Common values: `default`, `fade`,
-`fade_from_bottom`, `fade_from_right`, `reveal_from_bottom`,
-`scale_from_center`, `slide_from_right`, `slide_from_left`,
-`slide_from_bottom`, `flip`, `simple_push`, and `none`.
+Controls native-stack screen movement. Current native-stack values include
+`default`, `fade`, `fade_from_bottom`, `flip`, `simple_push`,
+`slide_from_bottom`, `slide_from_right`, `slide_from_left`, `ios_from_right`,
+`ios_from_left`, and `none`. Confirm the installed Expo Router/native-stack
+types before using a platform-specific value.
 
 - Use `animation: 'none'` to disable transitions. Treat the older
   `animationEnabled: false` as stale unless installed types prove otherwise.
@@ -80,8 +82,9 @@ options and surfaced through events like `sheetDetentChange`.
   accessibility escape/back, and deep-link restoration.
 - Header options (`headerShown`, `title`, `headerTransparent`, large titles)
   drive native header transitions. `Stack.SearchBar` integrates with the native
-  header and forces it visible; `Stack.Toolbar` is alpha (iOS SDK 55+, Android
-  SDK 56+), renders only on iOS/Android, and needs an app-owned web fallback.
+  header and forces it visible; newer header primitives such as
+  `Stack.Toolbar` are platform- and release-dependent, so check the installed
+  Expo Router docs/types and provide an app-owned web fallback.
 - `Stack.Header`, `Stack.Title`, and related primitives are composition helpers
   that write native-stack options; if multiple instances configure the same
   screen, the last rendered one wins.
@@ -178,7 +181,8 @@ function Settings() {
 
 - Every native subtree needs a `Host`. Use one obvious `Host` owner per native
   UI subtree; do not wrap a whole screen when only a leaf control needs it.
-- Use universal `@expo/ui` for one tree across iOS/Android/web; drop to
+- Use universal `@expo/ui` for one tree across iOS/Android/web when the target
+  Expo SDK lists the component as supported; drop to
   `@expo/ui/swift-ui` or `@expo/ui/jetpack-compose` (with their `/modifiers`)
   only when the universal API lacks a control.
 - `matchContents` suits intrinsic controls — do **not** use it on the same axis

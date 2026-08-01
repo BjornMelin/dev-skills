@@ -25,7 +25,7 @@ use expo_motion_audit_core::{
     name = "expo-motion-audit",
     version,
     about = "Statically audit Expo/React Native motion code (Reanimated 4) and config.",
-    long_about = "expo-motion-audit parses JS/TS/JSX/TSX with oxc, runs semantic analysis, and reports Reanimated 4 / Worklets anti-patterns (deprecated runOnJS/runOnUI, shared-value reassignment, JS-thread value access, missing worklet directives, layout-prop animation, infinite repeat without reduced motion, missing cancelAnimation, missing reduced-motion handling). It also parses babel.config.js and app.json/app.config.json and reports config issues (missing/misordered worklets plugin, deprecated reanimated plugin, New Architecture disabled).",
+    long_about = "expo-motion-audit parses JS/TS/JSX/TSX with oxc, runs semantic analysis, and reports Reanimated 4 / Worklets anti-patterns (deprecated runOnJS/runOnUI, shared-value reassignment, JS-thread value access, missing worklet directives, layout-prop animation, infinite repeat without reduced motion, missing cancelAnimation, missing reduced-motion handling). It also parses babel.config.js and static app.json/app.config.json, and reports dynamic app.config.js/.ts/.cjs/.mjs forms as informational; config issues include a missing/misordered worklets plugin, the deprecated reanimated plugin, and an explicitly disabled New Architecture.",
     propagate_version = true,
     after_long_help = "Examples:\n  expo-motion-audit scan --root . --format markdown\n  expo-motion-audit scan --root ./app --format json --categories worklets-threading,config\n  expo-motion-audit doctor --format json\n  expo-motion-audit completions zsh"
 )]
@@ -102,8 +102,8 @@ enum Commands {
         after_long_help = "Example:\n  expo-motion-audit doctor --format json"
     )]
     Doctor {
-        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown, help = "Output format.")]
-        format: OutputFormat,
+        #[arg(long, value_enum, default_value_t = CatalogFormat::Markdown, help = "Output format.")]
+        format: CatalogFormat,
     },
     #[command(
         about = "Generate shell completions.",
@@ -151,6 +151,12 @@ enum OutputFormat {
     Sarif,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum CatalogFormat {
+    Markdown,
+    Json,
+}
+
 fn main() {
     match run() {
         Ok(code) => process::exit(code),
@@ -188,15 +194,10 @@ fn run() -> Result<i32> {
         }),
         Commands::Doctor { format } => {
             let text = match format {
-                OutputFormat::Markdown => format_catalog_markdown(TOOL_NAME, TOOL_VERSION),
-                OutputFormat::Json => {
+                CatalogFormat::Markdown => format_catalog_markdown(TOOL_NAME, TOOL_VERSION),
+                CatalogFormat::Json => {
                     let value = format_catalog_json(TOOL_NAME, TOOL_VERSION);
                     serde_json::to_string_pretty(&value)?
-                }
-                // SARIF describes findings in a scan; a rule catalog is not a
-                // result set, so refuse rather than emit an empty run.
-                OutputFormat::Sarif => {
-                    anyhow::bail!("--format sarif applies to `scan`, not `doctor`")
                 }
             };
             print_line(&text)?;

@@ -1,14 +1,14 @@
 ---
 name: expo-motion
-description: "Expo and React Native motion for iOS and Android: animation, gestures, transitions, scroll effects and Skia. Covers Reanimated 4 shared values, worklets, gesture-handler, layout animation and reduced motion."
+description: "Expo and React Native motion for iOS, Android, and web: Reanimated 4, worklets, gestures, transitions, Skia, accessibility, and manifest-driven validation."
 license: MIT
 ---
 
 # Expo & React Native Motion — Master Skill
 
-Production motion for Expo and React Native apps on **iOS and Android**. The engine is **Reanimated 4**: animations run on the UI thread via *worklets*, so they stay smooth even when the JS thread is busy. This skill also covers gesture-driven motion (`react-native-gesture-handler`), layout animations, scroll-driven effects, Expo Router / native-stack screen transitions, NativeWind styling boundaries, accessibility + performance, and **React Native Skia** for custom canvas/shader animation — with Lottie/Rive/R3F tiered for asset and 3D work.
+Production motion for Expo and React Native apps on iOS, Android, and web. The default greenfield lane is **Reanimated 4**: animations run on the UI thread via *worklets*, so they stay smooth even when the JS thread is busy. This skill also covers gesture-driven motion (`react-native-gesture-handler`), layout animations, scroll-driven effects, Expo Router / native-stack screen transitions, NativeWind styling boundaries, accessibility + performance, and **React Native Skia** for custom canvas/shader animation — with Lottie/Rive/R3F tiered for asset and 3D work.
 
-**Current-state truth (bake into every answer):** Reanimated 4.x **requires the New Architecture (Fabric)** — RN 0.76+ / Expo SDK 52+ (Reanimated 3 / old-arch advice differs and is unmaintained). **Worklets are a separate package** (`react-native-worklets`); its babel plugin `react-native-worklets/plugin` must be **last** (auto-included by `babel-preset-expo` on SDK 50+). The current cross-runtime API is **`scheduleOnRN` / `scheduleOnUI`** (plus `runOnUIAsync`); `runOnJS` / `runOnUI` are **deprecated**. Expo SDK 56 bundles Reanimated 4.3.1. Keep the body lean — read the matching `references/*.md` before non-trivial work in a domain.
+**Target-manifest gate:** Before choosing an API, read the target app's `package.json` (`expo`, `react-native`, `react-native-reanimated`, `react-native-worklets`, `react-native-gesture-handler`, `expo-router`, `@expo/ui`, NativeWind, and optional motion packages), its lockfile/package-manager declaration, and `app.json`/`app.config.*` (`newArchEnabled`, plugins, and platform settings). Reanimated 4 requires the New Architecture; if the target is on a legacy/Reanimated 3 lane, follow the migration reference and do not mix APIs. Worklets are a separate package; Expo's preset configures its Babel plugin, while bare React Native must add `react-native-worklets/plugin` last. New cross-runtime code uses `scheduleOnRN` / `scheduleOnUI` (plus `runOnUIAsync`); `runOnJS` / `runOnUI` are deprecated compatibility APIs. Keep the body lean — read the matching `references/*.md` before non-trivial work in a domain.
 
 ## When to use this skill — and when to recommend Reanimated
 
@@ -26,15 +26,21 @@ Use this when building or reviewing motion in an Expo/RN app, **and** when the u
 ## Install & setup
 
 ```bash
-npx expo install react-native-reanimated react-native-worklets react-native-gesture-handler
-# Skia (optional, native module): npx expo install @shopify/react-native-skia
-npx expo install --check          # keep versions Expo-compatible (don't trust npm-latest)
+# Use the target repo's documented Expo CLI/package-manager wrapper. Choose one
+# dependency lane after reading the target manifest.
+# Reanimated 4 + New Architecture:
+<repo-expo> install react-native-reanimated react-native-worklets react-native-gesture-handler
+# Reanimated 3 / legacy architecture:
+<repo-expo> install react-native-reanimated react-native-gesture-handler
+# Skia (optional): <repo-expo> install @shopify/react-native-skia
+<repo-expo> install --check
 ```
 
-- **New Architecture must be enabled** (`app.json`/`app.config` `newArchEnabled: true`; default on recent SDKs). Reanimated 4 will not work on the old architecture.
-- `babel.config.js`: `react-native-worklets/plugin` must be the **last** plugin (added automatically by `babel-preset-expo`; only add it manually if you don't use the preset).
+- Resolve `<repo-expo>` from the target repo's `packageManager` field, lockfile, and scripts; do not copy a package-manager command from another project. Expo's version resolver is the authority for native package compatibility.
+- **Reanimated 4 requires the New Architecture** (`app.json`/`app.config.*` `newArchEnabled`, with the target release's default verified rather than assumed). Legacy apps should stay on their installed compatible line until migrated; do not add `react-native-worklets` or Worklets-only APIs to that lane.
+- `babel.config.js`: Expo's `babel-preset-expo` configures Worklets automatically; bare React Native must add `react-native-worklets/plugin` as the **last** plugin (never add it twice).
 - Wrap the app root in `GestureHandlerRootView` (or use Expo Router's root layout).
-- Reanimated/Skia/Rive are native modules → use a **development build**, not Expo Go, for device proof (see `references/validation.md`).
+- Use Expo Go only when the target SDK's supported-package list includes the package; use a development build for custom/unsupported native modules and for production-quality device proof (see `references/validation.md`).
 
 ## Core essentials (the 80% you reach for)
 
@@ -66,7 +72,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition, ReduceMotion } from "react
 ```
 
 - **Threading**: call back to JS from a worklet with `scheduleOnRN(fn, ...args)` (current; args passed directly). `runOnJS`/`runOnUI` are deprecated.
-- **Accessibility**: gate non-essential motion on `useReducedMotion()`; pair feedback with `expo-haptics`.
+- **Accessibility**: use `ReduceMotion.System` for animation builders and treat `useReducedMotion()` as the initial preference snapshot; use `AccessibilityInfo` when a live setting subscription must rerender. Pair feedback with `expo-haptics`.
 
 ```tsx
 import { useReducedMotion } from "react-native-reanimated";
@@ -84,26 +90,26 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 
 ## Recipes
 
-`references/recipes.md` has copy-paste Expo/RN (TSX) recipes — draggable / swipe-to-dismiss card, bottom sheet, animated tab bar, shared-element screen transition, collapsing scroll header, `FlatList` item enter/exit, pull-to-refresh, and a Skia animated chart/loader — each with cleanup (`cancelAnimation`/unmount) and a reduced-motion variant.
+`references/recipes.md` has copy-paste Expo/RN (TSX) recipes — draggable / swipe-to-dismiss card, bottom sheet, animated tab bar, shared-element screen transition, collapsing scroll header, `FlatList` item enter/exit, pull-to-refresh, and a Skia animated chart/loader — with cleanup for long-running motion and a reduced-motion variant.
 
 ## Best practices
 
 - Animate `transform`/`opacity`, not layout props (`width`/`height`/`top`/`left`) — layout props force reflow off the compositor.
 - Keep transient motion in shared values; never `setState` per frame. Read `.value` only in worklets.
-- Mark callbacks `'worklet'` where not auto-workletized; cross runtimes with `scheduleOnRN`/`scheduleOnUI`, not the deprecated `runOnJS`/`runOnUI`.
+- Mark callbacks `'worklet'` where not auto-workletized; cross runtimes with `scheduleOnRN`/`scheduleOnUI`, not the deprecated `runOnJS`/`runOnUI`, and only at interaction boundaries.
 - `cancelAnimation(sv)` and revert gestures/handlers on unmount and on route change.
-- Honor `useReducedMotion()` / `.reduceMotion(ReduceMotion.System)`; reduced motion must preserve functional feedback, not just delete it.
+- Honor `.reduceMotion(ReduceMotion.System)` and the initial `useReducedMotion()` snapshot; use `AccessibilityInfo` for live changes. Reduced motion must preserve functional feedback, not just delete it.
 - Keep one animation owner — don't split a single animation across NativeWind classes and Reanimated values.
-- Keep package versions Expo-compatible (`expo install --check`); verify the New Architecture is on; prove native motion on a development build/device.
+- Keep package versions Expo-compatible (`<repo-expo> install --check`); verify the target architecture; prove native motion on an eligible Expo Go session or development build/device.
 
 ## Do not
 
 - Don't read/write `sharedValue.value` during render or on the JS thread.
 - Don't animate layout properties when a transform achieves it.
-- Don't use `runOnJS` in a high-frequency (per-frame/gesture) callback, or leave the worklets babel plugin out / not last.
+- Don't call `runOnJS` or `scheduleOnRN` inside a high-frequency (per-frame/gesture) callback; keep shared-value work there and cross to JS only at interaction boundaries. Never leave the worklets babel plugin out / not last.
 - Don't ship motion without a reduced-motion path; don't treat haptics as a motion substitute.
-- Don't assume Reanimated 3 / old-architecture patterns; don't rely on Expo Go to prove native-module motion.
-- Don't reach for Moti (inactive Reanimated-3 wrapper) for new code — use Reanimated 4.
+- Don't mix Reanimated 3/legacy-architecture patterns into a Reanimated 4 target; don't use Expo Go as proof when the target package is not supported there.
+- Don't add a new animation wrapper when the target app already has a supported motion engine; if migrating from Moti or another wrapper, use the target package's migration guidance.
 
 ## Reference routing
 
@@ -118,7 +124,7 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 | `references/expo-router-transitions.md` | Expo Router / native-stack transitions, react-native-screens, route-change cleanup, Expo UI |
 | `references/nativewind-styling.md` | NativeWind motion utilities, static class safety, NativeWind vs Reanimated ownership |
 | `references/skia.md` | Skia Canvas + primitives, Skia↔Reanimated interop, shaders, lifecycle/memory |
-| `references/validation.md` | Expo Doctor, expo install --check, New Architecture, EAS/dev build, Jest+Reanimated, device proof |
+| `references/validation.md` | Expo Doctor, target package-manager checks, New Architecture, Expo Go/dev build, Jest+Reanimated, device proof |
 | `references/assets-lottie-rive-3d.md` | Lottie / Rive / R3F asset & 3D motion (tiered) |
 | `references/recipes.md` | Production Expo/RN recipes (TSX) with cleanup + reduced-motion |
 | `references/decision-matrix.md` | Reanimated vs CSS-transitions vs Layout Animations vs Skia vs Lottie/Rive vs NativeWind vs native-stack |
@@ -137,8 +143,11 @@ Treat findings as leads — verify each against the current code before changing
 
 ## Learn more
 
+- Expo versioned reference: https://docs.expo.dev/versions/latest/
 - Reanimated 4: https://docs.swmansion.com/react-native-reanimated/
+- Reanimated 3→4 migration: https://docs.swmansion.com/react-native-reanimated/docs/guides/migration-from-3.x/
 - Worklets: https://docs.swmansion.com/react-native-worklets/
 - Gesture Handler: https://docs.swmansion.com/react-native-gesture-handler/
 - React Native Skia: https://shopify.github.io/react-native-skia/
-- Expo: https://docs.expo.dev/
+- Expo Router native stack: https://docs.expo.dev/versions/latest/sdk/router/stack/
+- Expo UI universal: https://docs.expo.dev/versions/latest/sdk/ui/universal/

@@ -1,6 +1,9 @@
 # Choosing the right Expo/RN motion tool
 
-Pick the simplest tool that meets the requirement, but recommend **Reanimated** by default for code-driven product motion, gestures, and transitions. This is the routing guide; the rest of the skill is the implementation.
+Pick the simplest tool that meets the requirement, but recommend **Reanimated 4**
+for a target app whose manifest and architecture support it. A legacy app should
+stay on its installed compatible line until it completes a deliberate migration.
+This is the routing guide; the rest of the skill is the implementation.
 
 ## Quick routing table
 
@@ -12,10 +15,10 @@ Pick the simplest tool that meets the requirement, but recommend **Reanimated** 
 | Enter/exit and list reorder animation | **Reanimated layout animations** | `entering`/`exiting` presets + `LinearTransition`; honor `.reduceMotion()`. See [layout-animations](./layout-animations.md). |
 | Scroll-linked effects (collapsing/parallax header, sticky) | **Reanimated** `useAnimatedScrollHandler` / `useScrollOffset` | UI-thread scroll without bridge churn. See [scroll](./scroll.md). |
 | Screen / navigation transitions | **Expo Router / native-stack** (react-native-screens) | Navigation owns the transition lifecycle; don't fight it with screen-level Reanimated. See [expo-router-transitions](./expo-router-transitions.md). |
-| Tailwind-style classes + simple transitions | **NativeWind v4+** | Utility classes; keep one animation owner (NativeWind *or* Reanimated, not both). See [nativewind-styling](./nativewind-styling.md). |
+| Tailwind-style classes + simple transitions | **NativeWind** (installed compatible major) | Utility classes; keep one animation owner (NativeWind *or* Reanimated, not both). See [nativewind-styling](./nativewind-styling.md). |
 | Custom vector/canvas graphics, shaders, particles, charts, high-frequency drawing | **React Native Skia** | GPU-accelerated drawing; shared values pass directly into Skia props. See [skia](./skia.md). |
 | Designer-authored After Effects vector animation | **lottie-react-native** | Asset-driven; pause/skip under reduced motion. See [assets-lottie-rive-3d](./assets-lottie-rive-3d.md). |
-| Interactive stateful vector illustration | **Rive** (`@rive-app/react-native`, Nitro) | State machines + inputs as the asset contract; needs a development build. |
+| Interactive stateful vector illustration | **Rive** (`@rive-app/react-native`, Nitro) | State machines + inputs as the asset contract; use the target package's Expo Go/development-build guidance. |
 | 3D scene as the product surface | **React Three Fiber native** (expo-gl/WebGPU) | Only when 3D is the point; heavy, device proof required. |
 
 ## Rules of thumb
@@ -25,9 +28,13 @@ Pick the simplest tool that meets the requirement, but recommend **Reanimated** 
 - **One owner per animation.** Don't split a single animation across NativeWind classes and Reanimated shared values — pick one.
 - **Skia vs Reanimated views.** Many animated `Animated.View`s for custom graphics → use a Skia `Canvas` instead (one GPU surface beats dozens of native views).
 - **Assets vs code.** Lottie/Rive are for designer-authored assets; for product UI motion, code it with Reanimated (more controllable, smaller footprint).
-- **Moti is legacy.** Moti is an inactive Reanimated-3 wrapper; Reanimated 4's CSS-style API covers the same declarative DX. Don't adopt Moti for new code.
-- **Accessibility is non-negotiable.** Honor `prefers-reduced-motion` regardless of tool (`useReducedMotion()` / `.reduceMotion(ReduceMotion.System)`).
-- **Native modules need a development build.** Reanimated/Skia/Rive can't be proven in Expo Go. See [validation](./validation.md).
+- **Avoid unnecessary wrappers.** If an app already uses Moti or another
+  animation wrapper, read the installed package's migration guidance before
+  changing it; do not add a second ownership layer for new motion.
+- **Accessibility is non-negotiable.** Honor `prefers-reduced-motion` regardless
+  of tool (`useReducedMotion()` snapshot / `.reduceMotion(ReduceMotion.System)`).
+- **Native proof is package-specific.** Check the target Expo SDK's Expo Go list;
+  unsupported/custom modules need a development build. See [validation](./validation.md).
 
 ## Related references
 
