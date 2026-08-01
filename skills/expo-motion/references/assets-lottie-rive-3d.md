@@ -122,6 +122,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import {
   Fit,
   RiveView,
+  useRive,
   useRiveBoolean,
   useRiveFile,
   useViewModelInstance,
@@ -130,6 +131,7 @@ import {
 export function LikeButton() {
   const [liked, setLiked] = useState(false);
   const reduce = useReducedMotion();
+  const { riveViewRef, setHybridRef } = useRive();
   const {
     riveFile,
     isLoading: isFileLoading,
@@ -147,13 +149,14 @@ export function LikeButton() {
     riveError ?? fileError?.message ?? instanceError?.message ?? null;
 
   useEffect(() => {
-    if (!reduce && instance && !errorMessage) setRiveLiked(liked);
-  }, [errorMessage, instance, liked, reduce, setRiveLiked]);
+    if (!reduce && instance && !errorMessage) {
+      setRiveLiked(liked);
+      riveViewRef?.playIfNeeded();
+    }
+  }, [errorMessage, instance, liked, reduce, riveViewRef, setRiveLiked]);
 
   const toggle = () => {
-    const next = !liked;
-    setLiked(next);
-    if (!reduce && instance && !errorMessage) setRiveLiked(next);
+    setLiked((current) => !current);
   };
 
   return (
@@ -179,6 +182,7 @@ export function LikeButton() {
           <RiveView
             file={riveFile}
             dataBind={instance}
+            hybridRef={setHybridRef}
             fit={Fit.Layout}
             style={{ width: 56, height: 56 }}
             onError={(error) => setRiveError(error.message)}
@@ -208,6 +212,9 @@ updating the animated Rive state machine.
 The file and view-model hooks expose loading/error state, so the example gates
 `RiveView`, keeps the button functional with a static fallback while assets load
 or fail, and records runtime failures through `RiveView`'s `onError` callback.
+The hybrid ref wakes a settled state machine after each binding update via
+[`playIfNeeded()`](https://rive.app/docs/runtimes/react-native/rive-ref-methods),
+so the bound visual does not depend on a continuously running asset machine.
 
 **Legacy migration lane:** `rive-react-native` exposes `Rive`/`RiveRef` and
 methods such as `setInputState`; keep that API only while following the
