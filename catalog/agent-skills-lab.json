@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-07-31T23:39:09.734611044Z",
+  "generatedAt": "2026-08-03T19:18:14.560209440Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "0f93d9ae5ac552ba73164162152d08518feb57f0",
+  "sourceCommit": "413fdb11e868156722c32baa8017700794805c06",
   "sourceRef": "main",
-  "skillsCount": 65,
-  "totalSkillDirectories": 65,
+  "skillsCount": 66,
+  "totalSkillDirectories": 66,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -2452,6 +2452,55 @@
       },
       "package": {
         "path": "skills/dist/rust-web-services.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "sentry-cli",
+      "slug": "sentry-cli",
+      "description": "Sentry CLI atoms for safe issues, traces, releases, projects, sourcemaps, and deliberate mutations.",
+      "license": "MIT",
+      "path": "skills/sentry-cli",
+      "skillMdPath": "skills/sentry-cli/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/sentry-cli",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/sentry-cli/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill sentry-cli -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill sentry-cli -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill sentry-cli"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Documented",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "docs_indexed",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": true
+      },
+      "package": {
+        "path": "skills/dist/sentry-cli.skill",
         "present": false,
         "rejected": false
       }
