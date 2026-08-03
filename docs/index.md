@@ -115,6 +115,7 @@ out of version control.
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
 - [Subspawn Skill](reference/subspawn.md)
+- [Sentry CLI Skill](../skills/sentry-cli/SKILL.md)
 - [Sentry CLI Fix Issues Skill](../skills/sentry-cli-fix-issues/SKILL.md)
 - [Subagent Templates](reference/subagent-templates.md): authority model for
   reusable templates, packaged fallback copies, duplicate-role validation, and
