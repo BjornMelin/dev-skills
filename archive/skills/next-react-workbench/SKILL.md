@@ -30,7 +30,6 @@ Primary downstream skills to leverage through the skill chain:
 - [references/routing-matrix.md](references/routing-matrix.md)
 - [references/next-app-router.md](references/next-app-router.md)
 - [references/react-surface-refactors.md](references/react-surface-refactors.md)
-- [references/signr-next.md](references/signr-next.md)
 
 Use the helper scripts when routing is unclear:
 
@@ -91,9 +90,9 @@ After meaningful React changes, run `react-doctor` when practical.
 
 State `Path: react-doctor`.
 
-## Signr Defaults
+## Repo Defaults
 
-Use Signr as the reference case:
+Use the target repo as the reference case:
 
 - Next App Router web runtime under `apps/web`
 - shadcn local component source under `apps/web/components.json`

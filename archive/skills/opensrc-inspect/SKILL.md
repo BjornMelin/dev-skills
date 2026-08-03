@@ -27,7 +27,7 @@ or internal implementation details matter.
    recommendation.
 6. Use web/docs sources for release notes, API references, and changelogs;
    use opensrc for implementation internals and source diffs.
-7. If `/home/bjorn/.codex/skill-support/bin/deps-workbench` exists and the task
+7. If `~/.codex/skill-support/bin/deps-workbench` exists and the task
    is an npm/Bun dependency upgrade, use it as the fast prep layer before the
    deeper source reasoning:
    - `deps-workbench upgrade-prep --cwd <repo-root> --package <pkg> --out <tmp.json>`

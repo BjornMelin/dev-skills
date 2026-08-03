@@ -3390,7 +3390,7 @@ fn audit_stale_skill_references(
 ) {
     let placeholder_skill_path = format!("/path/to/{skill}/");
     let stale_patterns = [
-        "/home/bjorn/.codex/skills/",
+        "/.codex/skills/",
         "~/.codex/skills/",
         ".codex/skills/",
         placeholder_skill_path.as_str(),

@@ -16,9 +16,9 @@ Use this as the canonical dependency-upgrade workflow skill. The shared `deps-wo
 ## Tool Routing (MUST FOLLOW)
 
 1. If you need a cheap preflight, run the shared helpers first:
-   - `/home/bjorn/.codex/skill-support/bin/deps-workbench inventory --cwd <repo> --out <json>`
-   - `/home/bjorn/.codex/skill-support/bin/deps-workbench classify --input <json> --out <json>`
-   - `/home/bjorn/.codex/skill-support/bin/deps-workbench usage-scan --cwd <repo> --packages <pkg...> --out <json>`
+   - `~/.codex/skill-support/bin/deps-workbench inventory --cwd <repo> --out <json>`
+   - `~/.codex/skill-support/bin/deps-workbench classify --input <json> --out <json>`
+   - `~/.codex/skill-support/bin/deps-workbench usage-scan --cwd <repo> --packages <pkg...> --out <json>`
 2. If the user explicitly requests `gh api`/CLI only, use `scripts/gh_release_diff.py`, `scripts/gh_compare_notes.py`, or `scripts/gh_rate_limit_diag.py` directly.
 3. For single-package requests ("fully upgrade X package"), use `scripts/gh_deps_intel.py package --dependency <name>`.
 4. Otherwise, use `scripts/gh_deps_intel.py full` as the single orchestrator path (REST-first with GraphQL fallback for release retrieval).
@@ -39,7 +39,7 @@ Use this as the canonical dependency-upgrade workflow skill. The shared `deps-wo
 
 1. From repo root:
 
-- `python /home/bjorn/.agents/skills/gh-deps-intel/scripts/gh_deps_intel.py full --repo . --out reports --mode safe`
+- `python ~/.agents/skills/gh-deps-intel/scripts/gh_deps_intel.py full --repo . --out reports --mode safe`
 
 1. Outputs:
 
@@ -113,6 +113,6 @@ For `package` mode, include:
 
 ## Shared Support Alignment
 
-- Preflight + classify: `/home/bjorn/.codex/skill-support/bin/deps-workbench`.
+- Preflight + classify: `~/.codex/skill-support/bin/deps-workbench`.
 - Long GitHub release intel: here.
 - Both used: Markdown + JSON from this skill = final contract.

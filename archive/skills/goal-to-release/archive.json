@@ -5,6 +5,6 @@
   "archived_at": "2026-07-28T00:00:00Z",
   "source_path": "skills/goal-to-release",
   "archived_path": "archive/skills/goal-to-release",
-  "reason": "Issue-to-release orchestration with ledgers and PR graphs, overlapping ship-branch, signr-pr-closure-loop and signr-ops-pr, which are the lanes actually used to ship this repo. This skill was install-only and never tracked in skills/; the path is recorded in the canonical form the archive schema requires. Superseded by `signr-pr-closure-loop`, which lives outside this repository's skills/ tree.",
+  "reason": "Issue-to-release orchestration with ledgers and PR graphs, overlapping ship-branch and the private repo-specific PR-closure lanes actually used to ship this repo. This skill was install-only and never tracked in skills/; the path is recorded in the canonical form the archive schema requires. Superseded by a private repo-specific closure skill, which lives outside this repository's skills/ tree.",
   "restore": "Move this directory back to skills/goal-to-release and relink it from the consuming agents' skill farms."
 }
