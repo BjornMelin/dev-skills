@@ -1,0 +1,6 @@
+interface:
+  display_name: Sentry CLI
+  short_description: Safe Sentry CLI inspection and mutations
+  default_prompt: Use $sentry-cli for current Sentry command discovery, bounded inspection, or deliberate mutations.
+policy:
+  allow_implicit_invocation: false

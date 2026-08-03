@@ -335,8 +335,9 @@ for local development and validation commands.
 | `rust-tauri-apps` | Tauri v2 Rust app backends: commands, secure IPC, capabilities, bundling, distribution. | [skills/rust-tauri-apps/SKILL.md](skills/rust-tauri-apps/SKILL.md) |
 | `rust-tui-ratatui` | Rust terminal UI architecture with Ratatui, crossterm event loops, snapshots, and UX. | [skills/rust-tui-ratatui/SKILL.md](skills/rust-tui-ratatui/SKILL.md) |
 | `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
-| `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
+| `sentry-cli` | Safe Sentry command atoms: issues, traces, releases, projects, sourcemaps, and deliberate mutations. | [skills/sentry-cli/SKILL.md](skills/sentry-cli/SKILL.md) |
 | `sentry-cli-fix-issues` | Fix Sentry issues from CLI evidence: issues, events, traces, logs, replays, Seer, privacy, and verification. | [skills/sentry-cli-fix-issues/SKILL.md](skills/sentry-cli-fix-issues/SKILL.md) |
+| `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit: reruns/state, caching/fragments, AppTest, components v2, security, Playwright E2E. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |
 | `subagent-creator` | Create, validate, install, diff, sync, and smoke-test Codex custom subagent TOML role packs. | [skills/subagent-creator/SKILL.md](skills/subagent-creator/SKILL.md) |
