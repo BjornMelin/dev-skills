@@ -18,8 +18,10 @@ investigation and repository fix.
 
 | Need | Use | Do not substitute |
 | --- | --- | --- |
-| Issues, events, traces, logs, orgs, projects, releases, API schema | `sentry` | `sentry-cli` subcommand syntax |
-| Sourcemaps, debug files, ProGuard, React Native artifacts | repo wrapper or `sentry-cli` | `sentry` subcommand syntax |
+| Issues, events, traces, logs, orgs, projects, release reads, API schema | `sentry` | `sentry-cli` subcommand syntax |
+| Sourcemap inject, upload, or resolve when the installed `sentry` supports them | `sentry sourcemap <verb>` | `sentry-cli sourcemaps` plural syntax |
+| Release mutations and artifact uploads | repository wrapper or pinned `sentry-cli` | ad-hoc global `sentry` writes |
+| Legacy debug files, ProGuard, React Native artifacts | repository wrapper or `sentry-cli` | `sentry` subcommand syntax |
 
 The local `sentry` and legacy `sentry-cli` executables are different CLIs.
 Confirm the installed command and verb before acting:
@@ -69,6 +71,7 @@ first. Use dry runs where available.
 | Projects, alerts, monitors | `create`, `delete`, `update`, `start` |
 | Raw API | `sentry api` with non-GET method or request body |
 | Artifact upload | `sentry-cli sourcemaps`, `debug-files`, `react-native`, `proguard` |
+| Local artifact rewrites | `sentry sourcemap inject` / `sentry-cli sourcemaps inject` — dry-run first, review the diff, then apply with explicit approval |
 | Authentication | `auth login`, `logout`, `refresh` |
 
 Never pass an auth token on the command line or print it. Use the CLI's normal
@@ -81,6 +84,11 @@ Use the owning repository's package script first; it pins the right
 `@sentry/cli` version and release/build inputs. If no wrapper exists, inspect
 the exact legacy verb with `sentry-cli <noun> --help` before proposing a write.
 Do not replace a repository's upload integration with an ad-hoc global command.
+
+`sourcemap inject` rewrites local JavaScript and source-map files: run
+`--dry-run` first, review the resulting diff, and apply only after explicit
+approval. Report changed paths and diff verification in closeout, and run
+`git diff --check` as the final whitespace validation.
 
 ## Closeout
 
