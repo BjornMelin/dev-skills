@@ -10,8 +10,8 @@ Use this skill to route broad platform work into the correct web, native, backen
 ## Workflow
 
 1. Read the repo `AGENTS.md` first for local constraints and canonical commands.
-2. Run `/home/bjorn/.codex/skill-support/bin/repo-inventory detect --cwd <repo> --out <json>`.
-3. Run `/home/bjorn/.codex/skill-support/bin/repo-inventory matrix --input <json> --format md`.
+2. Run `~/.codex/skill-support/bin/repo-inventory detect --cwd <repo> --out <json>`.
+3. Run `~/.codex/skill-support/bin/repo-inventory matrix --input <json> --format md`.
 4. Choose the active lane:
    - Next.js / React web -> read `references/next-web.md`
    - Expo / React Native -> read `references/expo-native.md`

@@ -15,7 +15,7 @@ Use this reference when a TanStack API, package version, or example matters to t
 
 - TanStack CLI: `tanstack --version` -> `0.69.5`; use JSON commands for deterministic docs lookup.
 - CLI MCP migration: `tanstack mcp` has been removed; use direct CLI commands.
-- Installed packages observed in `career-os`: `@tanstack/react-query@5.101.1`, `@tanstack/react-router@1.170.16`, `@tanstack/react-router-ssr-query@1.167.1`, `@tanstack/react-start@1.168.26`, `@tanstack/router-plugin@1.168.18`, `@tanstack/router-cli@1.167.17`.
+- Installed packages observed in a production TanStack app: `@tanstack/react-query@5.101.1`, `@tanstack/react-router@1.170.16`, `@tanstack/react-router-ssr-query@1.167.1`, `@tanstack/react-start@1.168.26`, `@tanstack/router-plugin@1.168.18`, `@tanstack/router-cli@1.167.17`.
 - Start is documented as RC/stable API posture; pin versions for production and treat upgrades as planned work.
 - Official package-shipped skills can lag exact package manifests; verify source before copying examples.
 - TanStack Intent is the official package-shipped skill mechanism, but these custom skills remain curated dev-skills guidance.

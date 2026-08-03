@@ -18,7 +18,7 @@ native package capabilities should replace repo-owned code.
 
 ## Workflow
 
-If `/home/bjorn/.codex/skill-support/bin/deps-workbench` exists and the package
+If `~/.codex/skill-support/bin/deps-workbench` exists and the package
 is in the Bun/npm lane, start with:
 
 ```bash

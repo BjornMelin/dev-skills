@@ -12,7 +12,7 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
     cmd = [
-        "/home/bjorn/.codex/skill-support/bin/repo-inventory",
+        str(Path.home() / ".codex/skill-support/bin/repo-inventory"),
         "detect",
         "--cwd",
         str(Path(args.cwd).resolve()),

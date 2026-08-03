@@ -22,6 +22,8 @@ parallel, credential-free jobs on every pull request and push to `main`:
 
 - `Rust workspace and catalog` runs workspace formatting, Clippy, tests,
   policy-doc and skill-archive validation, native Bun smokes, then regenerates
+python3 tools/policy/check_public_leaks.py
+python3 tools/policy/test_check_public_leaks.py
   and diffs the public catalog through `tools/skill/check_catalog.sh`, which
   isolates the scan in a detached worktree so ignored local artifacts cannot
   affect the result. Its

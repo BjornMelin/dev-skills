@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Public repo guard: block commits that stage private-project references.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+python3 tools/policy/check_public_leaks.py --staged

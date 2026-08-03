@@ -46,7 +46,7 @@ The full sweep, as run against this estate:
 
 ```bash
 claude-config-audit scan \
-  --home ~/.claude --project ~/repos/signr \
+  --home ~/.claude --project /path/to/repo \
   --mirror ~/repos/agents/dev-skills/skills \
   --farm ~/.cursor/skills
 ```

@@ -350,7 +350,7 @@
     {
       "name": "bun-dev",
       "slug": "bun-dev",
-      "description": "Bun development, build and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, fixing lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build.",
+      "description": "Bun development/runtime: adoption, Node migration, lockfiles/package-manager drift, bunfig, test, build, and command policy.",
       "path": "skills/bun-dev",
       "skillMdPath": "skills/bun-dev/SKILL.md",
       "sourceUrls": {
@@ -1768,7 +1768,7 @@
     {
       "name": "opensrc",
       "slug": "opensrc",
-      "description": "Inspect dependency and upstream source with the opensrc CLI. Use for package internals, exact source paths, version diffs and upgrade audits across npm, PyPI, crates and git repos. Not for general web search or release notes alone.",
+      "description": "Inspect package/upstream source with opensrc: internals, exact paths, version diffs, and upgrade audits across npm, PyPI, crates, and Git repos; not general web search.",
       "path": "skills/opensrc",
       "skillMdPath": "skills/opensrc/SKILL.md",
       "sourceUrls": {
@@ -1864,7 +1864,7 @@
     {
       "name": "pre-mortem",
       "slug": "pre-mortem",
-      "description": "Assume the plan already failed, then work backwards to surface risky assumptions and irreversible bets. Offer it before a one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions.",
+      "description": "Stress-test one-way-door plans by surfacing risky assumptions, irreversible bets, and unvalidated dependencies.",
       "path": "skills/pre-mortem",
       "skillMdPath": "skills/pre-mortem/SKILL.md",
       "sourceUrls": {
@@ -2809,7 +2809,7 @@
     {
       "name": "tanstack-integration",
       "slug": "tanstack-integration",
-      "description": "Using TanStack Start, Router and Query together: QueryClient router context, SSR query setup, loader prefetching with ensureQueryData, cache ownership, invalidation after mutations, and streaming caveats.",
+      "description": "TanStack Start/Router/Query integration: QueryClient context, SSR/prefetch, cache ownership, invalidation, and streaming.",
       "path": "skills/tanstack-integration",
       "skillMdPath": "skills/tanstack-integration/SKILL.md",
       "sourceUrls": {
@@ -2856,7 +2856,7 @@
     {
       "name": "tanstack-query",
       "slug": "tanstack-query",
-      "description": "TanStack Query v5 for React server state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration and infinite queries. Use when designing or reviewing data flows.",
+      "description": "TanStack Query v5: queryOptions/keys, caching, mutations, invalidation, optimistic updates, SSR hydration, and infinite queries.",
       "path": "skills/tanstack-query",
       "skillMdPath": "skills/tanstack-query/SKILL.md",
       "sourceUrls": {
@@ -2903,7 +2903,7 @@
     {
       "name": "tanstack-router",
       "slug": "tanstack-router",
-      "description": "TanStack Router for React: file-based routing, generated route trees, root context typing, loaders and loaderDeps, validated search params, code splitting and error handling. Use when writing or reviewing routes.",
+      "description": "TanStack Router: file routes, generated trees, typed root context, loaders/deps, validated search params, code splitting, and errors.",
       "path": "skills/tanstack-router",
       "skillMdPath": "skills/tanstack-router/SKILL.md",
       "sourceUrls": {
@@ -2950,7 +2950,7 @@
     {
       "name": "tanstack-start",
       "slug": "tanstack-start",
-      "description": "TanStack Start for full-stack React: server functions, middleware, server routes, execution boundaries, auth, SSR modes and deployment. Use when building or reviewing Start server logic or SSR.",
+      "description": "TanStack Start: server functions/routes, middleware, SSR, auth, execution boundaries, and deployment for full-stack React apps.",
       "path": "skills/tanstack-start",
       "skillMdPath": "skills/tanstack-start/SKILL.md",
       "sourceUrls": {
@@ -3097,7 +3097,7 @@
     {
       "name": "vitest-dev",
       "slug": "vitest-dev",
-      "description": "Vitest testing for TypeScript and Next.js. Use for writing or repairing tests, triaging flaky specs, sharding and monorepo test config, and cutting local or CI test time.",
+      "description": "Generic Vitest/TypeScript testing: write or repair tests, triage flakes, tune monorepo config, and reduce local/CI test time.",
       "path": "skills/vitest-dev",
       "skillMdPath": "skills/vitest-dev/SKILL.md",
       "sourceUrls": {

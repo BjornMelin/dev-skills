@@ -10,7 +10,7 @@ Use this skill for green-field or breaking-change-tolerant feature planning wher
 ## Workflow
 
 1. Read the repo `AGENTS.md`.
-2. Run `/home/bjorn/.codex/skill-support/bin/convex-scan inventory --cwd <repo> --out <json>` to ground the current backend surface.
+2. Run `~/.codex/skill-support/bin/convex-scan inventory --cwd <repo> --out <json>` to ground the current backend surface.
 3. Read `references/feature-spec.md`.
 4. Read `references/components.md` if the feature may use existing Convex components or reusable backend patterns.
 5. Read `references/rollout-and-migration.md` before finalizing any spec that changes schema, auth, or rollout order.

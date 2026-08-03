@@ -1615,14 +1615,14 @@ def render_markdown(manifest: dict[str, Any]) -> str:
     memory_count = len(manifest["memory"]["rollout_summaries"])
     automation = manifest.get("automation", {})
     apply_command = (
-        "python3 /home/bjorn/.agents/skills/codex-session-cleanup/scripts/codex_session_cleanup.py apply "
+        "python3 ~/.agents/skills/codex-session-cleanup/scripts/codex_session_cleanup.py apply "
         f"--manifest {manifest.get('manifest_path', '/path/to/manifest.json')} "
         f"--confirm {manifest['manifest_id']} --memory-policy copy --execute"
     )
     if selected_artifact_candidates(manifest):
         apply_command = apply_command.replace(" --execute", " --artifact-policy quarantine --execute")
     restore_command = (
-        "python3 /home/bjorn/.agents/skills/codex-session-cleanup/scripts/codex_session_cleanup.py restore "
+        "python3 ~/.agents/skills/codex-session-cleanup/scripts/codex_session_cleanup.py restore "
         f"--quarantine {manifest.get('quarantine_hint', '/path/to/quarantine')} --restore-db --execute"
     )
     lines = [

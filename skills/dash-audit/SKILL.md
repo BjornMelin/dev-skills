@@ -10,7 +10,7 @@ Use this skill for read-first Dash audits. It owns Dash callback review, Dash UI
 ## Workflow
 
 1. Read the repo `AGENTS.md`.
-2. Run `/home/bjorn/.codex/skill-support/bin/ui-audit-preflight dash-callback-map --cwd <repo> --out <json>`.
+2. Run `~/.codex/skill-support/bin/ui-audit-preflight dash-callback-map --cwd <repo> --out <json>`.
 3. When machine-readable evidence is useful, adapt the callback map into the
    shared contract:
    `python3 <skill_root>/scripts/dash_ui_audit_adapter.py --input <json> --pretty`.
