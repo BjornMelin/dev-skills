@@ -2,7 +2,7 @@
 name: vitest-dev
 metadata:
   version: 0.1.0
-description: "Vitest testing for TypeScript and Next.js. Use for writing or repairing tests, triaging flaky specs, sharding and monorepo test config, and cutting local or CI test time."
+description: "Generic Vitest/TypeScript testing: write or repair tests, triage flakes, tune monorepo config, and reduce local/CI test time."
 ---
 
 # vitest-dev

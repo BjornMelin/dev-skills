@@ -1,6 +1,6 @@
 ---
 name: pre-mortem
-description: "Assume the plan already failed, then work backwards to surface risky assumptions and irreversible bets. Offer it before a one-way-door call (API, schema, framework, a hire), an all-upside plan, or unvalidated assumptions."
+description: "Stress-test one-way-door plans by surfacing risky assumptions, irreversible bets, and unvalidated dependencies."
 ---
 
 Stress-test this plan before reality does. Not to kill it, but to make it survive contact with reality.

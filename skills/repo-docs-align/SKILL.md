@@ -123,7 +123,7 @@ Examples:
 - `$technical-writing` when drafting/rewriting ADRs, specs, runbooks, migration docs, internal guides.
 - `$caveman-compress` only when surface fits `references/adaptive-compression.md`.
 - `$hard-cut` when simplifying stale doc structure or removing superseded guidance.
-- Stack/platform skills/plugins (`$github`, `$vercel`, `$expo`, `$sentry`, Context7, built-in web search) only when repo context or user request makes them relevant.
+- Stack/platform skills/plugins (for example `$github:github`, `$cloudflare:*`, `$expo:*`, `$sentry-cli`, Context7, or built-in web search) only when repo context or user request makes them relevant and the capability is installed.
 
 Named skill/plugin unavailable → note briefly; closest valid fallback.
 

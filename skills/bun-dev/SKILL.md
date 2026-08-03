@@ -1,6 +1,6 @@
 ---
 name: bun-dev
-description: "Bun development, build and runtime. Use when adopting or migrating to Bun, choosing Bun versus Node, fixing lockfile or mixed-package-manager drift, configuring bunfig.toml, or running bun test and bun build."
+description: "Bun development/runtime: adoption, Node migration, lockfiles/package-manager drift, bunfig, test, build, and command policy."
 metadata:
   version: "2.0"
 ---

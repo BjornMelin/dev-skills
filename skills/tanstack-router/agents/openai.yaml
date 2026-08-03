@@ -3,4 +3,4 @@ interface:
   short_description: "Type-safe TanStack Router route patterns"
   default_prompt: "Use $tanstack-router to design or review TanStack Router file routes, typed route context, search params, loaders, navigation, and code splitting."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false
