@@ -108,17 +108,17 @@ When adding a new major doc:
 When the tracked skill copy should replace the installed copy:
 
 ```bash
-rsync -a --delete skills/deep-researcher/ /home/bjorn/.agents/skills/deep-researcher/
-rsync -a --delete skills/subagent-creator/ /home/bjorn/.agents/skills/subagent-creator/
-rsync -a --delete skills/subspawn/ /home/bjorn/.agents/skills/subspawn/
+rsync -a --delete skills/deep-researcher/ ~/.agents/skills/deep-researcher/
+rsync -a --delete skills/subagent-creator/ ~/.agents/skills/subagent-creator/
+rsync -a --delete skills/subspawn/ ~/.agents/skills/subspawn/
 ```
 
 Then validate installed copies:
 
 ```bash
-python3 tools/skill/quick_validate.py /home/bjorn/.agents/skills/deep-researcher
-python3 tools/skill/quick_validate.py /home/bjorn/.agents/skills/subagent-creator
-python3 tools/skill/quick_validate.py /home/bjorn/.agents/skills/subspawn
+python3 tools/skill/quick_validate.py ~/.agents/skills/deep-researcher
+python3 tools/skill/quick_validate.py ~/.agents/skills/subagent-creator
+python3 tools/skill/quick_validate.py ~/.agents/skills/subspawn
 ```
 
 ## Version-Control Policy

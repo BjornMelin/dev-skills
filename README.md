@@ -431,3 +431,10 @@ Notes:
 ## License
 
 This repository may contain skills under different licenses. Check each skill directory for license files (for example `skills/vitest-dev/LICENSE`) and follow the terms for that specific skill.
+
+## Public-repo guard
+
+This repository is public. `tools/policy/check_public_leaks.py` blocks
+private-project references (it runs in CI and as the `.githooks/pre-commit`
+hook; enable locally with `git config core.hooksPath .githooks`). Private
+skills and flavored variants belong in their own private repos.

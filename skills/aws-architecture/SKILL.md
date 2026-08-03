@@ -10,7 +10,7 @@ Use this skill for reusable AWS architecture work, not repo-specific policy.
 ## Workflow
 
 1. Read the repo `AGENTS.md`.
-2. Run `/home/bjorn/.codex/skill-support/bin/repo-inventory detect --cwd <repo> --out <json>` if the repo context matters.
+2. Run `~/.codex/skill-support/bin/repo-inventory detect --cwd <repo> --out <json>` if the repo context matters.
 3. Read the relevant AWS references before finalizing service choices.
 4. Prefer managed services and the simplest correct topology.
 5. Output the architecture, tradeoffs, rollout notes, and verification plan.

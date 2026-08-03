@@ -42,6 +42,8 @@ jobs:
         run: cargo run -q -p codex-dev -- --json bun doctor
       - name: Smoke claude-config-audit
         run: cargo run -q -p claude-config-audit -- doctor
+      - name: Public leak check (no private-project references)
+        run: python3 tools/policy/check_public_leaks.py
       - name: Verify Agent Skills Lab catalog
         run: bash tools/skill/check_catalog.sh "$GITHUB_SHA"
       - name: Test catalog checker isolation

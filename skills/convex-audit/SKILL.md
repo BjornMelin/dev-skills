@@ -10,9 +10,9 @@ Use this skill for read-first Convex audits that produce a clear remediation pla
 ## Workflow
 
 1. Read the repo `AGENTS.md`.
-2. Run `/home/bjorn/.codex/skill-support/bin/convex-scan inventory --cwd <repo> --out <json>`.
-3. Run `/home/bjorn/.codex/skill-support/bin/convex-scan surface --cwd <repo> --out <json>`.
-4. Run `/home/bjorn/.codex/skill-support/bin/convex-scan gaps --inventory <json> --out <json>`.
+2. Run `~/.codex/skill-support/bin/convex-scan inventory --cwd <repo> --out <json>`.
+3. Run `~/.codex/skill-support/bin/convex-scan surface --cwd <repo> --out <json>`.
+4. Run `~/.codex/skill-support/bin/convex-scan gaps --inventory <json> --out <json>`.
 5. Read only the references needed for the active findings:
    - `references/security.md`
    - `references/schema.md`
@@ -39,7 +39,7 @@ Use this skill for read-first Convex audits that produce a clear remediation pla
 
 ## Resources
 
-- Inventory helpers via `/home/bjorn/.codex/skill-support/bin/convex-scan`
+- Inventory helpers via `~/.codex/skill-support/bin/convex-scan`
 - `references/security.md`
 - `references/schema.md`
 - `references/runtime-boundaries.md`
