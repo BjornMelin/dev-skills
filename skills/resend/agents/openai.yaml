@@ -1,0 +1,6 @@
+interface:
+  display_name: Resend SDK
+  short_description: Resend SDK, API, and webhook guidance
+  default_prompt: Use $resend for Resend SDK, API, delivery, or webhook work.
+policy:
+  allow_implicit_invocation: true

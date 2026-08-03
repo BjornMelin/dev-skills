@@ -1,6 +1,6 @@
 ---
 name: tanstack-start
-description: "TanStack Start for full-stack React: server functions, middleware, server routes, execution boundaries, auth, SSR modes and deployment. Use when building or reviewing Start server logic or SSR."
+description: "TanStack Start: server functions/routes, middleware, SSR, auth, execution boundaries, and deployment for full-stack React apps."
 ---
 
 # TanStack Start

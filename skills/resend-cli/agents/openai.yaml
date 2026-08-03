@@ -1,0 +1,6 @@
+interface:
+  display_name: Resend CLI
+  short_description: Run Resend CLI commands safely.
+  default_prompt: Use $resend-cli before running Resend CLI commands.
+policy:
+  allow_implicit_invocation: false

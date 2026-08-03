@@ -1,0 +1,6 @@
+interface:
+  display_name: Signr Email Safety
+  short_description: Signr email deliverability and safety
+  default_prompt: Use $email-best-practices for Signr email design, delivery, or webhook work.
+policy:
+  allow_implicit_invocation: true

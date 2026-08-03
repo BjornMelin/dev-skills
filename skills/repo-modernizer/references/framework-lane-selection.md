@@ -80,7 +80,7 @@ Verification bias:
 Activate when Convex is the backend or data-contract authority.
 
 Use:
-- `$convex-audit`
+- `$convex:convex-reviewer`
 - official Convex docs and current guidance
 
 Priorities:

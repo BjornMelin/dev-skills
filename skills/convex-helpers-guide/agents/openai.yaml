@@ -1,0 +1,6 @@
+interface:
+  display_name: Convex Helpers Guide
+  short_description: Signr convex-helpers selection and audits
+  default_prompt: Use $convex-helpers-guide to choose a source-backed Convex helper.
+policy:
+  allow_implicit_invocation: true

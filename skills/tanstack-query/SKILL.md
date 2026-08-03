@@ -1,6 +1,6 @@
 ---
 name: tanstack-query
-description: "TanStack Query v5 for React server state: queryOptions, query keys, caching, mutations, invalidation, optimistic updates, SSR hydration and infinite queries. Use when designing or reviewing data flows."
+description: "TanStack Query v5: queryOptions/keys, caching, mutations, invalidation, optimistic updates, SSR hydration, and infinite queries."
 ---
 
 # TanStack Query
@@ -43,5 +43,4 @@ Use this skill to apply current, source-backed TanStack guidance. Keep answers a
 - Use `tanstack search-docs ... --json` or `tanstack doc ... --json` for official docs lookup when the CLI is installed.
 - Run the repo's typecheck, route generation, and relevant tests after implementing guidance.
 - For skill maintenance, run `python3 tools/skill/quick_validate.py skills/tanstack-query` and `python3 tools/skill/check_tanstack_skills.py --root .` from `dev-skills`.
-
 

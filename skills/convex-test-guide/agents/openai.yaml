@@ -1,0 +1,6 @@
+interface:
+  display_name: Convex Test Guide
+  short_description: Signr convex-test and Vitest integration tests
+  default_prompt: Use $convex-test-guide to add or review Signr Convex tests.
+policy:
+  allow_implicit_invocation: true

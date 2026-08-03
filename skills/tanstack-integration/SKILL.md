@@ -1,6 +1,6 @@
 ---
 name: tanstack-integration
-description: "Using TanStack Start, Router and Query together: QueryClient router context, SSR query setup, loader prefetching with ensureQueryData, cache ownership, invalidation after mutations, and streaming caveats."
+description: "TanStack Start/Router/Query integration: QueryClient context, SSR/prefetch, cache ownership, invalidation, and streaming."
 ---
 
 # TanStack Integration
@@ -39,5 +39,4 @@ Use this skill to apply current, source-backed TanStack guidance. Keep answers a
 - Use `tanstack search-docs ... --json` or `tanstack doc ... --json` for official docs lookup when the CLI is installed.
 - Run the repo's typecheck, route generation, and relevant tests after implementing guidance.
 - For skill maintenance, run `python3 tools/skill/quick_validate.py skills/tanstack-integration` and `python3 tools/skill/check_tanstack_skills.py --root .` from `dev-skills`.
-
 
