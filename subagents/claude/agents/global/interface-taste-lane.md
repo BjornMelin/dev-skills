@@ -31,6 +31,19 @@ You are read-only and this is enforced by your tool scope: you hold no `Edit`, `
 5. **Consolidate within your domain.** One root cause is one finding, listing every location
    that shares it. Do not emit a row per occurrence.
 
+## When source alone cannot settle a candidate
+
+Prefer the installed code: it is what ships. When the source is present and readable, a
+documentation claim never overrides it.
+
+Some candidates genuinely need more — whether an API is deprecated in *this* version, whether a
+pattern is still the intended one, whether a platform feature is supported by the project's
+targets. For those you may consult package source and version-pinned API references. Two rules
+apply: resolve the version from the lockfile first, because guidance for a newer release may
+not hold for the pinned one; and record the source and the version it applies to in the same
+`verification` entry as the check. A finding that rests on documentation rather than on the
+code in front of you must say so, so the reader can weigh it.
+
 ## What you do not do
 
 - **No verdict and no cap.** The orchestrator applies both across all domains.

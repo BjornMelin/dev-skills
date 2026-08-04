@@ -4,7 +4,16 @@ Transition specificity and GPU compositing hints.
 
 ## Transition Only What Changes
 
-Never use `transition: all` or Tailwind's `transition-all`. Always specify the exact properties that change. (Tailwind's bare `transition` maps to a curated default list of colors, opacity, shadow and transforms, not to `all`; still prefer naming exactly what changes.)
+Never use `transition: all` or Tailwind's `transition-all`. Always specify the exact properties that change.
+
+Tailwind's bare `transition` is **not** `all` — it maps to a curated list. In v4 that list is
+`color`, `background-color`, `border-color`, `outline-color`, `text-decoration-color`, `fill`,
+`stroke`, the gradient custom properties, `opacity`, `box-shadow`, `transform`, `translate`,
+`scale`, `rotate`, `filter`, `backdrop-filter`, `display`, `content-visibility`, `overlay`, and
+`pointer-events`. Note that `filter` **is** included, so bare `transition` already covers a
+`blur()` change; and `display`/`content-visibility`/`overlay` are the entries that make
+discrete transitions work with `@starting-style`. Still prefer naming exactly what changes —
+the curated list is broad enough to animate properties you did not intend.
 
 ### Why
 

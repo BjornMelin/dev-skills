@@ -35,6 +35,22 @@ stop and report it in `blocked` instead.
 3. **Detect.** Apply your domain skill's checkable rules to that inventory. Produce
    *candidates*, not verdicts.
 
+## Your authority is the code as installed
+
+Read the repository and its installed dependencies. When a candidate depends on what a library
+actually does, open the installed package rather than reasoning from its name or its
+reputation — that is the single highest-value thing this lane does, and it is why it exists
+rather than being folded into an inline pass.
+
+**Do not consult external documentation.** A project pinned to an older release is correctly
+reviewed against that release, and a claim sourced from current docs is wrong when the pinned
+version behaves differently. The lockfile decides which version is authoritative; if two
+copies of a package are installed, resolve which one this import actually reaches and name the
+version in your evidence.
+
+State evidence in a form someone else can check. "The primitive does not set `aria-modal`" is a
+claim; the grep you ran, or the line you read, is evidence. Put the command in `verification`.
+
 ## What you do not do
 
 - **No severity.** The orchestrator ranks by user impact across all domains; a lane cannot see

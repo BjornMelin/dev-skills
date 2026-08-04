@@ -122,20 +122,42 @@ There are three distinct payloads, and using the wrong one is the most common wa
 
 Every payload also carries `Domain`, `Evidence` (what was actually inspected), `Rejected` (candidates deliberately not raised, with the reason), `Verification`, and `Blocked` (anything in scope it could not inspect, or `None`). A detect or judge lane emits no verdict and applies no cap — six lanes each emitting `Block` is six reports, not one.
 
-`Rejected` is part of every contract because restraint cannot survive a lane boundary otherwise: a lane that discards its rejected candidates makes Principle 10 impossible to satisfy honestly. `Verification` is carried through consolidation for the same reason — the report mandates that section, so it cannot be dropped at the last hop.
+`Rejected` is part of every contract because restraint cannot survive a lane boundary otherwise: a lane that discards its rejected candidates makes Principle 11 impossible to satisfy honestly. `Verification` is carried through consolidation for the same reason — the report mandates that section, so it cannot be dropped at the last hop.
 
-### 6. Lane Failure Is Reported, Never Absorbed
+**Evidence must be quotable, not merely asserted.** "The primitive does not set `aria-modal`" is a
+claim; the grep or the quoted line that shows it is evidence. When a candidate rests on what a
+dependency does, name the resolved version — a lockfile can install two copies of the same
+package, and "the inspected implementation" is meaningless when there are two.
+
+### 6. What Each Lane May Consult
+
+The authority for a review is **the code as installed**, not the latest documentation. A
+project pinned to an older version is correctly reviewed against that version; a finding
+sourced from current docs is wrong if the pinned release behaves differently. So access is
+asymmetric by stage:
+
+| Stage | May consult | Must not |
+| --- | --- | --- |
+| Inventory, Detect | The repository and its installed dependencies, including reading inside `node_modules`. The lockfile decides which version is authoritative | External docs. Local source already settles these questions, and fetching adds latency to the stage that can least afford it |
+| Judge | The above, plus package source and version-pinned API references to resolve a candidate the source alone cannot settle — is this deprecated in *this* version, is this the intended API | Substituting a docs claim for source evidence when the source is present and readable |
+| `build` | Everything, and it should. Writing new code is where currency matters most: current APIs, current Baseline support, whether a pattern is still recommended | Introducing a feature the project's targets do not support without saying so |
+
+When a lane does consult an external source, it cites the source and the version it applies to,
+in the same `Verification` entry as the check. A judged finding that rests on documentation
+rather than on the code in front of it must say so, so the reader can weigh it.
+
+### 7. Lane Failure Is Reported, Never Absorbed
 
 - A lane that errored or returned unusable output is **degraded coverage**. Say so explicitly; the remaining lanes' findings stand alone.
 - **`Approve` requires complete coverage.** If any domain is `Degraded`, `Not reviewed`, or `Detected only`, the verdict is `Inconclusive` even when every live lane came back clean — the unreviewed domain is exactly where the unfound problem would be. Name the missing domains and what it would take to close them.
 - If every lane failed, there is **no verdict**. Report the failure and stop.
 - Zero candidates across *all six* domains, with none degraded, is a real result: report `Approve` with no findings.
 
-### 7. Require Evidence
+### 8. Require Evidence
 
 Every finding cites `path/to/file:line` and shows the current implementation. If the review artifact has no source files, cite the exact screen and component. Do not report a code-level finding from visual appearance alone or a visual finding from source code alone when runtime behavior determines the result.
 
-### 8. Rank by User Impact
+### 9. Rank by User Impact
 
 Use one shared severity scale, calibrated per domain by that domain skill's own `## Severity` section:
 
@@ -145,33 +167,90 @@ Use one shared severity scale, calibrated per domain by that domain skill's own 
 
 Within a severity, rank by reach and leverage. A token or shared-component fix outranks the same symptom in one leaf component.
 
-### 9. Consolidate Systemic Findings
+### 10. Consolidate Systemic Findings
 
 One root cause is one finding. List every confirmed location in the same row rather than producing a row per occurrence. Do not pad the report to reach the finding cap; a short review or no findings is a valid result.
 
-### 10. Make Restraint Visible
+### 11. Make Restraint Visible
 
 Record candidates considered but deliberately rejected. A candidate is rejected when the owning skill permits the current implementation, evidence is insufficient, the project convention is intentional, or the proposed change would add complexity without user benefit.
 
-### 11. Verify What Can Be Verified
+### 12. Verify What Can Be Verified
 
 Run safe, relevant checks available in the project. Inspect the rendered interface when runtime behavior or visual judgment matters. Report the exact command or interaction and observed result. If a check cannot be run, label it **Not verified** and state what remains; never convert a verification gap into a finding.
 
-### 12. Review Without Mutating by Default
+### 13. Review Without Mutating by Default
 
 Treat a review request as read-only. Do not edit source code unless the user also asks to implement the findings, or the mode is `build`. When implementation is requested, preserve the consolidated report as the change scope and re-run the relevant verification afterward.
 
-### 13. Build With the Same Owners
+### 14. Build With the Same Owners
 
-`build` mode runs the ownership table forward instead of backward.
+`build` mode runs the ownership table forward instead of backward. Review asks "what is wrong
+with this"; build asks "what would make this right the first time". Same owners, same severity
+scale, opposite direction.
 
-1. **Recon** per Principle 2, and identify which domains the change actually touches. A form touches accessibility and writing; a marketing section touches typography, layout, and color. Name them before writing code.
-2. **Consult** each owner in play *before* implementing, not after. Their principles are the spec: the type scale, the hit-area floor, the token system, the copy voice. Building first and auditing second produces rework.
-3. **Implement** in the project's existing styling system and component library. Never introduce a second styling approach.
-4. **Self-review the diff** against every domain you named, using the same severity scale. Fix what you can fix immediately; report what you deliberately leave as `Considered but Rejected` with the reason.
-5. **Verify** per Principle 11 and report what you ran.
+#### 1. Recon, then name the domains in play
 
-Output the consolidated report after the change, scoped to the diff rather than the whole surface, and end with the same verdict ladder.
+Principle 2's recon output is the input here, unchanged: framework, styling system, component
+library, tokens, viewports, available checks. Then decide which domains the change actually
+touches and say so before writing code.
+
+Most changes touch three or four, not six. A form touches accessibility (labels, errors, focus
+order) and writing (labels, error text), and layout only if it introduces structure. A
+marketing section touches typography, layout, and color, and rarely accessibility beyond
+headings and contrast. An icon button touches accessibility (accessible name, hit area) and
+`better-ui` (stroke weight, states). Naming them is what makes step 4 checkable — an unnamed
+domain is one you will not review.
+
+#### 2. Consult the owners before implementing
+
+Load each named owner and extract the constraints that bind *this* change **before** the first
+line of code. Their principles are the spec, not a rubric to be graded against afterwards:
+the type scale and its steps, the hit-area floor and which exception applies, the token names
+for the roles you need, the copy voice and capitalisation policy, the reduced-motion rule.
+
+Write those constraints down as the acceptance criteria for the change. Building first and
+auditing second produces rework, and it biases the audit — you will not find a problem in code
+you just wrote unless you decided in advance what "correct" meant.
+
+#### 3. Implement inside the project's system
+
+Use the existing styling system, component library, and tokens. Never introduce a second
+styling approach, a second icon set, or a raw value that duplicates a mapped token.
+
+Prefer extending a shared component over styling a leaf: a fix at the token or component level
+applies everywhere the defect exists, which is the same reach-and-leverage rule Principle 9
+uses for ranking findings.
+
+This is the one mode that consults current documentation freely (Principle 6). New code should
+use current APIs, and a pattern that was best practice three years ago often is not — but
+check the feature against the project's stated browser targets before relying on it, and say
+so when a choice depends on that.
+
+#### 4. Self-review the diff
+
+Review `git diff` against every domain named in step 1, using the same severity scale and the
+same evidence standard. Scope is the diff, not the surrounding file: a pre-existing defect you
+did not touch is out of scope, and reporting it as if you introduced it obscures what changed.
+
+Fix anything you can fix immediately. Anything you deliberately leave becomes a
+`Considered but Rejected` row with the reason — "the existing component has this defect
+throughout and fixing it belongs in its own change" is a legitimate entry, and a far more
+honest one than silence.
+
+Self-review has a known weakness: you are checking your own work against criteria you chose.
+The acceptance criteria from step 2 are the mitigation, because they were written before the
+code existed. If a domain in play has no criteria from step 2, that is the gap to close first.
+
+#### 5. Verify, then report
+
+Run the checks per Principle 12 and report the exact commands and results. A build that
+type-checks but was never rendered is `Not verified` on anything visual, and should say so.
+
+Output the consolidated report scoped to the diff, with all named domains in the coverage
+table and the same verdict ladder. `Approve` still requires complete coverage of the domains
+you named — a build whose accessibility criteria were never checked is `Inconclusive`, not
+`Approve`.
 
 ## Common Mistakes
 

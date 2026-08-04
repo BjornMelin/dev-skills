@@ -208,11 +208,15 @@ img {
 
 ```tsx
 <img
-  className="outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
+  className="outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
   src={src}
   alt={alt}
 />
 ```
+
+In Tailwind v4 a width utility already implies the style: `outline-1` emits both
+`outline-style: solid` and `outline-width: 1px`, so the bare `outline` the v3 idiom paired it
+with is redundant. It still compiles — this is a tidiness fix, not a breakage.
 
 Use `outline-black/10` and `outline-white/10` specifically, not `outline-slate-*`, `outline-zinc-*`, `outline-neutral-*`, or any tinted scale.
 
