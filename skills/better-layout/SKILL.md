@@ -55,6 +55,8 @@ In content layouts, keep full-width buttons inside the layout margins (start nea
 
 Backgrounds and media extend to the viewport edges; controls and text stay inside the layout margins and safe areas (`env(safe-area-inset-*)`). Sticky chrome floats above the content layer, it doesn't dam it.
 
+Sticky chrome has a keyboard cost this skill must not create and leave for someone else: a focused control that scrolls underneath it is a WCAG 2.2 SC 2.4.11 failure. Whenever you add fixed or sticky chrome, set `scroll-padding-block` on the scroll container to at least its height. The requirement itself belongs to `better-accessibility`; reserving the space is layout's job.
+
 ### 9. Hold Structure Until It Breaks
 
 Breakpoints come from the content, not device presets. Keep the expanded layout as long as it genuinely fits and collapse late; prefer container queries for component-level adaptation. Test the smallest and largest sizes first.
@@ -62,6 +64,20 @@ Breakpoints come from the content, not device presets. Keep the expanded layout 
 ### 10. Plan for Growth and Clipping
 
 Plan for substantial and language-dependent string growth rather than relying on a universal percentage: no fixed widths or heights on text containers, and let rows wrap. Never park critical actions where resizing or scrolling clips them; keep them reachable in the normal flow or stable chrome appropriate to the product.
+
+### 11. Let Flex and Grid Children Shrink
+
+A flex or grid item's default minimum size is its content, not zero — so a long unbroken string, a wide table, or a `<pre>` block pushes its parent wider instead of wrapping or truncating, and the overflow surfaces somewhere else entirely. Set `min-inline-size: 0` (or `min-width: 0`) on the shrinking child, or `overflow: hidden`, which has the same effect.
+
+This is the mechanical cause of most "the layout blows out at narrow widths" bugs, and of truncation that silently does nothing: `text-overflow: ellipsis` cannot engage on a child that never gets smaller than its content. Truncation mechanics belong to `better-typography`; making room for them is this skill's job.
+
+Grid has a second form of the same trap: `1fr` means `minmax(auto, 1fr)`, so a `1fr` column will not shrink below its content either. Use `minmax(0, 1fr)` when the column holds text that must wrap or clip.
+
+### 12. Use Dynamic Viewport Units for Full-Height Regions
+
+`100vh` is the *largest* viewport height, so on mobile it includes the space under browser chrome that retracts on scroll — a `100vh` hero is taller than the visible viewport and its bottom content sits under the URL bar. Use `100dvh` for a region that should track the visible viewport as chrome shows and hides, `100svh` when it must fit the smallest state without ever being clipped, and `100lvh` only when you deliberately want the largest.
+
+The units are widely available (Chrome 108, Firefox 101, Safari 15.4). Prefer `min-block-size` over a fixed height so content taller than the viewport still scrolls.
 
 ## Common Mistakes
 
@@ -71,6 +87,9 @@ Plan for substantial and language-dependent string growth rather than relying on
 | `margin-left` / `padding-right` in a localizable layout | `margin-inline-start` / `padding-inline-end` |
 | Content-layout button accidentally touches the viewport | Inset within the project margins; preserve intentional platform chrome |
 | Carousel/scroller that looks complete | Let the next item peek `16–32px` past the edge |
+| Long string or wide table blows out the layout | `min-inline-size: 0` on the flex child, or `minmax(0, 1fr)` on the grid column |
+| `text-overflow: ellipsis` has no effect | The child never shrinks below its content; give it `min-inline-size: 0` |
+| `100vh` region taller than the visible viewport on mobile | `100dvh` to track visible chrome, `100svh` to never clip |
 | Adjacent controls merge or expanded hit areas overlap | Increase the gap using the project scale; use `12px`/`24px` as starting points |
 | Breakpoints at 768/1024 because they're the defaults | Break where the content actually stops fitting |
 | Fixed-width text container sized to one language | `max-width` + wrapping; test pseudo-localization and representative locales |

@@ -88,9 +88,21 @@ This particularly helps when an element is changing `scale`, `rotation`, or movi
 | `transform` | Yes | Yes |
 | `opacity` | Yes | Yes |
 | `filter` (blur, brightness) | Yes | Yes |
-| `clip-path` | Newer Chromium only | Rarely; not reliable cross-browser |
+| `clip-path` | Engine-, value- and version-dependent — not a cross-browser guarantee | Only after profiling shows a benefit |
 | `top`, `left`, `width`, `height` | No | No |
 | `background`, `border`, `color` | No | No |
+
+`clip-path` needs care because animation support and compositor promotion are different
+questions. Animating it works cross-browser for interpolable `<basic-shape>` values (Chrome 55,
+Firefox 49, Safari 12.1) — non-interpolable value combinations still will not animate. Whether
+that animation runs off the main thread is another matter: Chromium enabled composited
+`clip-path` animations in 2026, while the equivalent Gecko and WebKit bugs are still open. So
+treat a clip-path animation as paint-bound unless you have profiled the specific browser,
+shape, and version.
+
+`will-change` is a hint, not a promotion switch. Browsers already treat a currently-animating
+property as if it were declared in `will-change`, so adding it rarely changes anything; overuse
+costs memory. Add it only when profiling shows a measurable win, and remove it after.
 
 ### When to Skip
 

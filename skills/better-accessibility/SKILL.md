@@ -45,7 +45,7 @@ Modals set `inert` on the background content, move focus inside on open, and ret
 
 ### 5. Minimum Hit Area
 
-WCAG 2.5.8's Level AA baseline is a 24×24 CSS-pixel target or one of its defined spacing, equivalent-control, inline, user-agent, or essential exceptions. For easier activation, aim for 44×44px in touch contexts and 40×40px in desktop interfaces when density permits. Extend with a pseudo-element if the visible element should stay smaller. Never let extended hit areas overlap.
+WCAG 2.5.8's Level AA baseline is a 24×24 CSS-pixel target or one of its five defined exceptions: `Spacing`, `Equivalent`, `Inline`, `User Agent Control`, and `Essential`. For easier activation, aim for 44×44px in touch contexts and 40×40px in desktop interfaces when density permits. Extend with a pseudo-element if the visible element should stay smaller. Never let extended hit areas overlap.
 
 ### 6. Label and Type Every Control
 
@@ -83,6 +83,24 @@ Use headings that describe their sections and form a coherent outline; one page-
 
 The page must work at 200% zoom and reflow at 320px width without horizontal scrolling. Use `min-height` instead of fixed `height` on text containers, prefer `rem` breakpoints where they fit the codebase's conventions, and never use `user-scalable=no` or `maximum-scale=1`.
 
+### 15. Keep the Focused Element Visible
+
+WCAG 2.2 SC 2.4.11 (AA): when a component receives keyboard focus, it must not be *entirely* hidden by author-created content. Sticky headers, fixed footers, cookie banners, and floating action bars are the usual culprits — Tab into a control that scrolls under a sticky header and the focus ring is invisible even though focus is correct.
+
+Set `scroll-padding-block` on the scroll container to at least the height of the fixed chrome so programmatic scrolling stops short of it, and check the first and last focusable element of every long form, which is where this fails first. Note the criterion says *entirely* hidden: partial obscuring passes AA and fails the stricter 2.4.12 (AAA).
+
+### 16. Give Dragging a Single-Pointer Alternative
+
+WCAG 2.2 SC 2.5.7 (AA): any functionality operated by dragging must also be achievable with a single pointer without dragging — unless dragging is essential or the behaviour belongs to the user agent. Reorderable lists, sliders, kanban boards, drag-to-resize panes, and map panning are the common cases.
+
+Keyboard support alone does not satisfy this: the criterion is about pointer input, so a sortable list with arrow-key reordering still needs a tap-reachable alternative such as move-up/move-down buttons or a menu. Dragging may remain the primary interaction; it just cannot be the only one.
+
+### 17. Make Hover and Focus Content Dismissible, Hoverable, Persistent
+
+WCAG 2.2 SC 1.4.13 (AA): content revealed on hover or focus — tooltips, popovers, hover cards — must satisfy three things. **Dismissible**: it can be dismissed without moving pointer or focus, which in practice means Escape. **Hoverable**: the pointer can travel from the trigger into the content without it vanishing, so no gap between them and no `pointer-events: none` on the panel. **Persistent**: it stays until the trigger is released, the user dismisses it, or the information stops being valid — never on a timeout.
+
+The frequent failure is a tooltip bound to `mouseleave` on the trigger alone: moving toward the tooltip crosses a dead zone and it disappears before it can be read. The exception is narrow — it covers only presentation the user agent controls, such as a native `title` tooltip.
+
 ## Common Mistakes
 
 | Mistake | Fix |
@@ -98,6 +116,12 @@ The page must work at 200% zoom and reflow at 320px width without horizontal scr
 | Functional icon alt describes the picture | Describe the action: `alt="Search"`, not `alt="magnifying glass"` |
 | `maximum-scale=1` to stop iOS input zoom | 16px input font on mobile (see `better-typography`); never block zoom |
 | Submit disabled until the form is valid | Keep it enabled; validate on submit and focus the first error |
+
+| Focused control scrolls under a sticky header | `scroll-padding-block` on the scroller at least the height of the fixed chrome (SC 2.4.11) |
+| Reorder, resize, or slider works only by dragging | Add a single-pointer path: move buttons, a menu, or tap-to-place (SC 2.5.7) |
+| Tooltip vanishes when the pointer moves toward it | No gap between trigger and panel, no `pointer-events: none`; dismiss on Escape (SC 1.4.13) |
+| Tooltip auto-hides on a timer | Keep it until the trigger is released or the user dismisses it |
+| `focusable="false"` carried on modern decorative SVG | `aria-hidden="true"` and no focusable descendant; drop the legacy attribute |
 
 ## Severity
 

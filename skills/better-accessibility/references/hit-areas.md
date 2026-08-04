@@ -13,7 +13,17 @@ Separate the conformance baseline from larger usability targets:
 | Apple HIG | 44×44pt |
 | Material Design | 48×48dp |
 
-WCAG 2.5.8 Level AA requires a 24×24 CSS-pixel target or one of its defined exceptions. Treat 44px as a recommended touch target for primary controls and 40px as a useful desktop target when the product's density permits. Smaller controls are not automatically failures: check the spacing, equivalent-control, inline, user-agent, and essential exceptions before reporting one.
+WCAG 2.5.8 Level AA requires a 24×24 CSS-pixel target or one of its defined exceptions. Treat 44px as a recommended touch target for primary controls and 40px as a useful desktop target when the product's density permits. Smaller controls are not automatically failures — check the exceptions before reporting one. The five, by their normative names:
+
+| Exception | What it means |
+| --- | --- |
+| `Spacing` | An imaginary 24 CSS-pixel-diameter circle centered on the undersized target's bounding box does not intersect another target, or another undersized target's circle. The target itself need not be circular |
+| `Equivalent` | The same function is reachable through another control on the same page that does meet the size floor |
+| `Inline` | The target sits in a sentence, or its size is otherwise constrained by the line-height of surrounding non-target text |
+| `User Agent Control` | The size is determined by the user agent and not modified by the author |
+| `Essential` | A particular presentation is essential, or legally required, for the information conveyed |
+
+`Spacing` is the one that most often applies to a small icon button in a toolbar, and the one most often claimed without checking: measure the circle against neighbouring targets rather than assuming adjacent controls are far enough apart.
 
 Under the spacing exception, an undersized target passes if a 24px circle centered on its bounding box does not intersect another target or another undersized target's circle; in the simple case, 20px targets need at least a 4px gap.
 

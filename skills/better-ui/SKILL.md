@@ -85,7 +85,25 @@ An icon next to text carries the text's optical weight: `1.5px` stroke beside re
 
 Icons use `currentColor` and get their states (hover, selected, disabled) from CSS color and opacity, never from separate assets. Outline variant is the default; fill variant marks the active state.
 
-### 15. Motion Restraint
+### 15. Hover Is a Hint, Not a Channel
+
+Hover exists on pointer devices only, so it can reinforce an affordance but never carry information or an action that has no other path. A control revealed only on hover is unreachable by touch and by keyboard.
+
+Make the hovered state a small, fast change — `background-color`, `border-color`, or opacity at ≤150ms — not an entrance animation, because hover fires constantly. Give every hover state a `:focus-visible` equivalent so keyboard users get the same affordance, and gate hover styling on `@media (hover: hover)` so touch devices don't get a sticky hover stuck after a tap.
+
+Row and card actions that appear on hover are the common trap: keep them present but muted, or reveal them on `:focus-within` as well, so they exist for every input method.
+
+### 16. Reach for Modern CSS Only Where It Is Supported
+
+Three primitives replace long-standing workarounds, but they are not one uniformly safe category. Check the project's browser targets before relying on any of them, and say which you assumed.
+
+- `@starting-style` with `transition-behavior: allow-discrete` animates an element entering from `display: none` or the top layer, which previously needed JS. Baseline 2024 (Chrome 117, Firefox 129, Safari 17.4–17.5). Support for individual discrete properties such as `display` is narrower than the feature itself.
+- **Same-document** View Transitions are Baseline 2025 (Chrome 111, Firefox 144, Safari 18). **Cross-document** transitions are not Baseline — treat them as progressive enhancement.
+- `interpolate-size: allow-keywords` and `calc-size()` finally animate to and from `auto` height. Both are **Chromium-only** as of Chrome 129, with no shipped Firefox or Safari support, so they do not yet replace the fixed `translateY` approach in Principle 6. Use them behind `@supports` with a working fallback.
+
+The rule for all three: enhancement, never the only path. If the interaction breaks without the feature, it isn't an enhancement.
+
+### 17. Motion Restraint
 
 No custom animation on high-frequency interactions: the attention cost repeats on every trigger. Motion is never the only feedback channel; every animated state change also needs a static cue (color, icon, label).
 
@@ -103,6 +121,10 @@ No custom animation on high-frequency interactions: the attention cost repeats o
 | Hairline icon beside bold text | Match the stroke width to the text weight |
 | Separate icon assets per state | One `currentColor` SVG, states via CSS |
 | Filled icons everywhere | Outline as default, fill only for the active state |
+| Action visible only on hover | Keep it present but muted, or also reveal on `:focus-within` |
+| Hover state with no `:focus-visible` equivalent | Mirror every hover affordance for keyboard |
+| Hover styles applied on touch devices | Gate them behind `@media (hover: hover)` |
+| `interpolate-size` or `calc-size()` used as the only path | Chromium-only today; put it behind `@supports` with a fallback |
 | Entrance animation on every hover or keystroke | Instant feedback or ≤150ms opacity/color transition |
 
 ## Severity
