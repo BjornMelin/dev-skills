@@ -16,7 +16,7 @@ This skill owns orchestration only. Accessibility rules belong to `better-access
 
 ### 1. Resolve Scope and Mode First
 
-Infer the screen, flow, feature, or repository scope from the request and current workspace. State the resolved scope in the output. Use `full` when no mode is supplied and the request is a review; use `build` when the request is to implement something.
+Infer the screen, flow, feature, or repository scope from the request and current workspace. State the resolved scope in the output. Use `core` when no mode is supplied and the request is a review; use `build` when the request is to implement something. `full` is opt-in — it dispatches a judge lane per domain with candidates and costs accordingly.
 
 | Mode | Coverage | Finding cap |
 | --- | --- | --- |
@@ -63,12 +63,30 @@ Split the work by task type, not by domain. Every domain decomposes the same way
 
 | Tier | Nature | Where it runs |
 | --- | --- | --- |
-| **Inventory** | Enumerate artifacts — interactive elements and their accessible names, rendered color pairs, type declarations, user-facing strings, breakpoints. Every claim carries `path/to/file:line`. No judgment. | Cheapest available runtime |
-| **Detect** | Apply a written, checkable rule to the inventory. Produces candidates, not findings: no severity, no rewrite. | A cheap reasoning lane |
+| **Inventory** | Enumerate artifacts — interactive elements and their accessible names, rendered color pairs, type declarations, user-facing strings, breakpoints. Every claim carries `path/to/file:line`. No judgment. | The cheapest runtime that can read the tree |
+| **Detect** | Apply a written, checkable rule to the inventory. Produces candidates, not findings: no severity, no rewrite. | A dispatched lane, or inline |
 | **Judge** | Kill false positives against the source, assign severity, write the Before → After. | An `opus` lane, or this skill inline |
 | **Consolidate** | Dedupe by root cause, rank, cap, record restraint, emit the verdict. | Always this skill, inline |
 
-Detection is cheap and judgment is expensive, so **detect across all six domains every time and gate only the judge lanes on evidence**. A domain that produced no candidates costs nothing beyond its detection pass, and coverage is never silently narrowed. `full` judges every domain that produced candidates. `core` judges at most two and must mark the rest `Detected only` in the coverage table — never `Clear`, because an unjudged candidate is not the same as no candidate.
+**Dispatching a lane is not cheap. Measure before you assume.** A single detect lane over one
+484-line component — reading the component, its four UI primitives, and the installed Radix
+source — cost roughly **150k tokens and 14 minutes** at maximum reasoning effort. Six of those
+is most of a million tokens. What a lane buys is *depth and a clean context*, not savings:
+that run traced into `node_modules` to check what the dialog primitive actually renders, which
+an inline pass sharing context with five other rule sets will not do.
+
+So dispatch is a deliberate spend, and the mode ladder is a cost ladder:
+
+- `quick` and `core` are cheap because they **dispatch little or nothing**, not because
+  detection is inherently cheap. `quick` runs inline. `core` judges at most two domains and
+  must mark the rest `Detected only` in the coverage table — never `Clear`, because an
+  unjudged candidate is not the same as no candidate.
+- `full` judges every domain that produced candidates and is expensive by design. Reach for it
+  on a surface that matters, not as a default sweep.
+
+Use maximum reasoning effort only where the judgment is genuinely hard. Detection is
+rule-application against evidence; a lower tier usually resolves it for a fraction of the
+tokens, and the reasoning overhead at max effort dominates the actual work.
 
 Never send interface copy, visual design, motion, or naming decisions to a non-Claude model for judgment: those are taste calls. Detection of mechanical copy defects — terminology drift, inconsistent capitalization, non-verb-first labels, a placeholder restating its label — is a lint and may run anywhere.
 
