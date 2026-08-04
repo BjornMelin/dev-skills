@@ -21,12 +21,32 @@ Infer the screen, flow, feature, or repository scope from the request and curren
 | Mode | Coverage | Finding cap |
 | --- | --- | --- |
 | `quick` | Primary user path and highest-traffic states. Detect across all six domains; judge inline, no lanes. Report only `HIGH` and `MEDIUM` | 5 |
-| `core` | Detect across all six domains, then judge **at most two** — the domains whose candidates look most severe. Unjudged domains are reported `Detected only` | 8 |
+| `core` | Detect across all six domains, then judge **at most two**, selected by the rule below. Unjudged domains are reported `Detected only` | 8 |
 | `full` | Entire requested scope, including empty, loading, error, and narrow-width states when present. Detect across all six domains and judge **every domain that produced candidates** — no cap | 15 |
 | `build` | Implement the requested change, then self-review the diff against the domains it touches. Selected-domain, not a six-domain sweep | 15, scoped to the diff |
 
 `core` is the deliberately cheap tier and is the only mode that leaves candidates unjudged.
 `full` means fully reviewed: if a domain produced candidates, it gets a judge lane.
+
+**Which two domains `core` judges.** Candidates carry no severity — assigning it is the judge's
+job — so the selection cannot use one. Rank domains by, in order:
+
+1. **Blocking potential.** Does the domain's `## Severity` ladder define `HIGH` as blocking a
+   task or hiding content? `better-accessibility`, `better-layout`, and `better-writing` do;
+   the other three define `HIGH` as unreadable or misleading output, which is serious but
+   rarely blocks. Prefer a domain that can block.
+2. **Candidate count at `high` confidence.** More high-confidence candidates means more for a
+   judge to confirm or kill.
+3. **The review order in Principle 3**, as the tie-breaker, so two runs on the same input pick
+   the same two domains.
+
+Say in **Scope and Coverage** which two you judged and why the others were left `Detected only`.
+If the user named a concern, that domain is always one of the two.
+
+**Which path `quick` inspects.** Use the project's own signal if one exists — an analytics
+route list, a documented primary flow, the route the task names. Absent any signal, take the
+entry point the change or the request touches and follow it to its first terminal state, and
+say in the report that traffic evidence was unavailable.
 
 If the requested scope is too large to inspect credibly, narrow it to the highest-traffic complete flow and state the boundary. Never imply uninspected surfaces were reviewed.
 
@@ -125,7 +145,9 @@ If the host cannot run lanes, do the same passes inline in the review order abov
 
 ### 5. Contract Every Lane
 
-Each lane prompt states: the resolved scope, the recon results from Principle 2, the one domain skill it must load, whether it is read-only, and the exact shape it must return. Lanes gather evidence; this skill decides.
+Each lane prompt states: the resolved scope, the recon results from Principle 2, the one domain skill it must load **and the absolute path to that skill's `SKILL.md`**, whether it is read-only, and the exact shape it must return. Lanes gather evidence; this skill decides.
+
+The path is not redundant. A lane loads its rubric with the Skill tool, but a dispatched agent may not have that skill available under its host, and a lane that judges from memory is worse than one that reports it could not run. Give it both routes and require it to say which it used. Before dispatching, confirm the lane roles are actually installed; if they are not, run the passes inline rather than dispatching to a generic agent that has no rubric at all.
 
 There are three distinct payloads, and using the wrong one is the most common way this breaks:
 

@@ -53,8 +53,14 @@ The gap is **traversal depth, not polish**: the fast lane never entered
 `node_modules`, so it missed everything that depended on what an installed
 dependency actually does — including a high-confidence defect. Treat `high` as a
 genuinely shallower read, not a cheaper version of the same read. Use it for
-exploration and location, where a fast partial answer is the point. Use `max`
-whenever the answer must be complete.
+exploration and location, where a fast partial answer is the point, and `max`
+for depth-sensitive work where the answer turns on what a dependency or a
+distant file actually does.
+
+Effort is a depth signal, not a completeness guarantee. Nothing about a
+reasoning tier establishes that the scope was covered or the claims verified -
+only explicit scope, coverage, and verification evidence does that. Do not
+report a `max` lane as complete merely because it ran at `max`.
 
 Escalation ladder: **Luna high → Luna max → Terra max → Root finishes the hard
 part inline** (or an Opus high worker when a delegation shape holds). Sol max

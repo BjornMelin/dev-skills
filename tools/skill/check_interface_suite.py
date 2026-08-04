@@ -108,11 +108,19 @@ def check_domain_enums(root: pathlib.Path, errors: list[str]) -> None:
         if sorted(enum) != sorted(DOMAINS):
             errors.append(f"{rel}: domain enum {sorted(enum)} != {sorted(DOMAINS)}")
     coverage = json.loads(read(root, VERIFIED_SCHEMA))["properties"]["coverage"]
-    enum = coverage["items"]["properties"]["domain"].get("enum")
-    if enum is None or sorted(enum) != sorted(DOMAINS):
-        errors.append(f"{VERIFIED_SCHEMA}: coverage domain enum missing or wrong")
-    if coverage.get("minItems") != 6 or coverage.get("maxItems") != 6:
-        errors.append(f"{VERIFIED_SCHEMA}: coverage must require exactly six entries")
+    # Keyed by domain rather than an array: six required keys make "exactly six, none
+    # duplicated" structural. An array of six enum-bearing items admits six duplicates.
+    if coverage.get("type") != "object":
+        errors.append(f"{VERIFIED_SCHEMA}: coverage must be an object keyed by domain")
+        return
+    if sorted(coverage.get("required", [])) != sorted(DOMAINS):
+        errors.append(f"{VERIFIED_SCHEMA}: coverage must require all six domain keys")
+    if sorted(coverage.get("properties", {})) != sorted(DOMAINS):
+        errors.append(f"{VERIFIED_SCHEMA}: coverage keys != the six domains")
+    for domain, entry in coverage.get("properties", {}).items():
+        states = entry.get("properties", {}).get("state", {}).get("enum", [])
+        if "not-in-scope" not in states:
+            errors.append(f"{VERIFIED_SCHEMA}: coverage.{domain} state enum lacks not-in-scope")
 
 
 def main(argv: list[str]) -> int:

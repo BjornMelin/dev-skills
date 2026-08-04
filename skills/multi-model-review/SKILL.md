@@ -24,12 +24,13 @@ Shared review contract (put in BOTH lane prompts):
 
 ## Phase 1 - launch both lanes in parallel (same message)
 
-**Opus lane** - dispatch a role whose tool scope is actually read-only rather than a generic
-agent: `Agent(subagent_type: 'interface-taste-lane', run_in_background: true)` if the
-`subagents/claude` pack is installed (it holds no `Edit`, `Write`, or `Bash`), otherwise
-`Agent(model: 'opus', effort: 'high', run_in_background: true)` **with the caveat that a
-generic agent's read-only-ness is prompt compliance, not tool scope** - say so in the report
-rather than claiming an enforced read-only review.
+**Opus lane** - `Agent(model: 'opus', effort: 'high', run_in_background: true)`.
+
+This lane needs shell access to collect the diff, so its read-only-ness is **prompt compliance,
+not tool scope**: the shared contract forbids edits, nothing enforces it. Say so in the report
+rather than claiming an enforced read-only review. Do not substitute one of the
+`subagents/claude` interface roles here - they require a named interface domain, evidence-lane
+candidates, and `better-interface`'s schema, none of which a generic diff review supplies.
 Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
 \"opus-5\". Return ONLY a JSON object matching
 `<skill-dir>/references/findings-schema.json`

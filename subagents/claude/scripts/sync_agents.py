@@ -14,7 +14,12 @@ Safety properties this installer guarantees:
   position, so an interrupted run never leaves a partially written agent. ``shutil.copy2``
   truncates the live destination and has no rollback.
 * **Fail before the first write.** Validation and safety checks run over the whole catalog up
-  front; a single failure aborts the run rather than leaving a half-installed set.
+  front, so a bad definition or an unsafe path aborts before anything is touched.
+
+Note what is *not* guaranteed: installation is per-file, not transactional. Once writing
+begins, an I/O failure partway through leaves the earlier agents installed and the rest not.
+Each individual file is replaced atomically and the previous version is in the backup
+directory, so recovery is re-running the install; there is no catalog-level rollback.
 
 Home is always resolved at runtime via ``Path.home()``. This repository is public and
 ``tools/policy/check_public_leaks.py`` rejects a literal home path in any tracked file.

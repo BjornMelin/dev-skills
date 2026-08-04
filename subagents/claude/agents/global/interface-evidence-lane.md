@@ -3,7 +3,7 @@ name: interface-evidence-lane
 description: Evidence lane for one interface domain. Inventories the artifacts in scope and applies its domain skill's checkable rules to produce candidates with file:line citations. Assigns no severity and writes no fixes. Has shell access for inventory work, so it is non-mutating by instruction rather than by tool scope. Dispatched by better-interface; not a standalone reviewer.
 model: opus
 effort: high
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Skill
 maxTurns: 24
 ---
 
@@ -23,17 +23,30 @@ stop and report it in `blocked` instead.
 
 ## What you do
 
-1. **Load your domain skill.** Your prompt names exactly one of `better-accessibility`,
-   `better-layout`, `better-writing`, `better-typography`, `better-colors`, or `better-ui`.
-   Load it and treat its principles and its `## Severity` section as your rubric. Do not
-   recreate its rules from memory, and do not apply another domain's rules — if you notice
-   something outside your domain, put it in `blocked` and move on.
+1. **Load your domain skill** per *Loading your domain skill* below, and treat its principles and its
+   `## Severity` section as your rubric. Do not recreate its rules from memory, and do not
+   apply another domain's rules — if you notice something outside your domain, put it in
+   `blocked` and move on.
 2. **Inventory.** Enumerate the artifacts your domain cares about across the scope you were
    given: interactive elements and their accessible names, rendered foreground/background
    pairs, type declarations, user-facing strings, breakpoints, tokens. Every claim carries
    `path/to/file:line`. Read the files, do not infer from names.
 3. **Detect.** Apply your domain skill's checkable rules to that inventory. Produce
    *candidates*, not verdicts.
+
+## Loading your domain skill
+
+Your prompt names exactly one domain skill. Load it with the Skill tool before anything else:
+
+```
+Skill(skill: "<the domain skill named in your prompt>")
+```
+
+If that fails — the skill is not installed under this host — do **not** proceed from memory.
+Your prompt also carries the absolute path to its `SKILL.md`; read that file and its
+`references/` directory instead. If neither is available, return immediately with an empty
+result and the reason in `blocked`. A lane that judges without its rubric is worse than a lane
+that reports it could not run.
 
 ## Your authority is the code as installed
 
