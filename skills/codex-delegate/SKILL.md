@@ -35,11 +35,20 @@ limits are effectively unlimited, so it is the default at max effort. Terra came
 down ~20% and earns its premium over Luna max only when the last few points of
 capability are load-bearing. The Sol medium/high worker tiers are retired.
 
-**Quota is no longer the binding constraint on Luna; wall-clock is.** A Luna max
-lane over one component and its imports measured ~150k tokens and ~14 minutes.
-The tokens are close to free, the fourteen minutes are not. Choose `high` when
-latency matters more than the last few points of depth, and reserve `max` for
-work whose answer you will act on directly.
+**Quota is no longer the binding constraint on Luna; wall-clock is.** Measured on
+one read-only analysis lane over a single component and its imports:
+
+| effort | wall clock | tokens | findings |
+|---|---|---|---|
+| `high` | ~4 min | ~75k | 2 of 6 |
+| `max` | ~14 min | ~153k | 6 of 6 |
+
+The gap is **traversal depth, not polish**: the fast lane never entered
+`node_modules`, so it missed everything that depended on what an installed
+dependency actually does — including a high-confidence defect. Treat `high` as a
+genuinely shallower read, not a cheaper version of the same read. Use it for
+exploration and location, where a fast partial answer is the point. Use `max`
+whenever the answer must be complete.
 
 Escalation ladder: **Luna high → Luna max → Terra max → Root finishes the hard
 part inline** (or an Opus high worker when a delegation shape holds). Sol max

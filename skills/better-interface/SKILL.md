@@ -84,9 +84,25 @@ So dispatch is a deliberate spend, and the mode ladder is a cost ladder:
 - `full` judges every domain that produced candidates and is expensive by design. Reach for it
   on a surface that matters, not as a default sweep.
 
-Use maximum reasoning effort only where the judgment is genuinely hard. Detection is
-rule-application against evidence; a lower tier usually resolves it for a fraction of the
-tokens, and the reasoning overhead at max effort dominates the actual work.
+**Effort buys traversal depth, not polish.** The same lane, same file, measured at both tiers:
+
+| Reasoning effort | Wall clock | Tokens | Candidates |
+| --- | --- | --- | --- |
+| `high` | ~4 min | ~75k | 2 of 6 |
+| `max` | ~14 min | ~153k | 6 of 6 |
+
+The four the fast lane missed were not tail noise. It never entered `node_modules`, so it
+missed both findings that required reading what the dialog primitive actually renders —
+including a high-confidence one, that focus never returns to the trigger because the ref the
+library restores through is unset. It also missed a 16×16 hit area inside a file it had
+already read.
+
+So match effort to mode rather than trying to economise inside a mode. `full` dispatches at
+maximum effort because tracing into a dependency is the thing that justifies dispatching at
+all. `quick` and `core` accept a shallower read by design and can run at a lower tier — a lane
+that only reads the component and its direct imports still catches the obvious failures at a
+third of the wall clock. What you must not do is run `full` at a fast tier and report it as
+full coverage.
 
 Never send interface copy, visual design, motion, or naming decisions to a non-Claude model for judgment: those are taste calls. Detection of mechanical copy defects — terminology drift, inconsistent capitalization, non-verb-first labels, a placeholder restating its label — is a lint and may run anywhere.
 
