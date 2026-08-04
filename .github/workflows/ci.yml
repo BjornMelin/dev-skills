@@ -82,6 +82,8 @@ jobs:
         run: |
           python3 -m compileall -q subagents/claude/scripts
           python3 subagents/claude/scripts/sync_agents.py --validate
+      - name: Check structured-output schemas
+        run: python3 tools/skill/check_output_schemas.py .
       - name: Validate plugin skills and manifests
         run: |
           set -euo pipefail

@@ -1,11 +1,24 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "confirmed", "rejected", "coverage", "verification"],
+  "required": [
+    "verdict",
+    "verification",
+    "coverage",
+    "confirmed",
+    "rejected",
+    "degradedCoverage"
+  ],
   "properties": {
     "verdict": {
       "type": "string",
-      "enum": ["Block", "Needs changes", "Approve", "Inconclusive", "No verdict"],
+      "enum": [
+        "Block",
+        "Needs changes",
+        "Approve",
+        "Inconclusive",
+        "No verdict"
+      ],
       "description": "\"Approve\" requires every domain to be Clear or judged; use \"Inconclusive\" when any domain is Degraded or Not reviewed. \"No verdict\" only when every lane failed."
     },
     "verification": {
@@ -14,11 +27,25 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["check", "result"],
+        "required": [
+          "check",
+          "result",
+          "verified"
+        ],
         "properties": {
-          "check": { "type": "string", "description": "The exact command or interaction steps." },
-          "result": { "type": "string" },
-          "verified": { "type": "boolean" }
+          "check": {
+            "type": "string",
+            "description": "The exact command or interaction steps."
+          },
+          "result": {
+            "type": "string"
+          },
+          "verified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
         }
       }
     },
@@ -28,10 +55,18 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["domain", "evidence", "result"],
+        "required": [
+          "domain",
+          "evidence",
+          "result"
+        ],
         "properties": {
-          "domain": { "type": "string" },
-          "evidence": { "type": "string" },
+          "domain": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
           "result": {
             "type": "string",
             "description": "Findings count, \"Clear\", \"Detected only\", \"Not reviewed\", or \"Degraded\"."
@@ -45,14 +80,41 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "domain", "locations", "before", "after", "why"],
+        "required": [
+          "severity",
+          "domain",
+          "locations",
+          "before",
+          "after",
+          "why"
+        ],
         "properties": {
-          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
-          "domain": { "type": "string" },
-          "locations": { "type": "array", "items": { "type": "string" } },
-          "before": { "type": "string" },
-          "after": { "type": "string" },
-          "why": { "type": "string" }
+          "severity": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "domain": {
+            "type": "string"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          }
         }
       }
     },
@@ -61,16 +123,29 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["location", "candidate", "rejectedBecause"],
+        "required": [
+          "location",
+          "candidate",
+          "rejectedBecause"
+        ],
         "properties": {
-          "location": { "type": "string" },
-          "candidate": { "type": "string" },
-          "rejectedBecause": { "type": "string" }
+          "location": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "rejectedBecause": {
+            "type": "string"
+          }
         }
       }
     },
     "degradedCoverage": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Named lanes that errored or returned unusable output, or omit when none did."
     }
   }

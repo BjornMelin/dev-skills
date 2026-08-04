@@ -1,7 +1,14 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["domain", "evidence", "findings", "rejected", "verification", "blocked"],
+  "required": [
+    "domain",
+    "evidence",
+    "findings",
+    "rejected",
+    "verification",
+    "blocked"
+  ],
   "description": "Taste-lane output: candidates from candidate-schema.json, verified against source and judged. Every finding carries a severity and an actionable fix. Evidence lanes must not use this schema; they emit candidate-schema.json.",
   "properties": {
     "domain": {
@@ -25,19 +32,44 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "locations", "before", "after", "why"],
+        "required": [
+          "severity",
+          "locations",
+          "before",
+          "after",
+          "why",
+          "principle"
+        ],
         "properties": {
-          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
           "locations": {
             "type": "array",
             "description": "Every path:line sharing this root cause.",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "before": { "type": "string" },
-          "after": { "type": "string" },
-          "why": { "type": "string" },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
           "principle": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "The owning skill's principle this violates."
           }
         }
@@ -49,11 +81,21 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["location", "candidate", "rejectedBecause"],
+        "required": [
+          "location",
+          "candidate",
+          "rejectedBecause"
+        ],
         "properties": {
-          "location": { "type": "string" },
-          "candidate": { "type": "string" },
-          "rejectedBecause": { "type": "string" }
+          "location": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "rejectedBecause": {
+            "type": "string"
+          }
         }
       }
     },
@@ -62,11 +104,25 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["check", "result"],
+        "required": [
+          "check",
+          "result",
+          "verified"
+        ],
         "properties": {
-          "check": { "type": "string", "description": "The exact command or interaction steps." },
-          "result": { "type": "string" },
-          "verified": { "type": "boolean" }
+          "check": {
+            "type": "string",
+            "description": "The exact command or interaction steps."
+          },
+          "result": {
+            "type": "string"
+          },
+          "verified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
         }
       }
     },
