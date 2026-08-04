@@ -89,6 +89,29 @@ Reserve physical properties for things that genuinely refer to physical screen s
 
 When the arrangement of elements encodes progression (star ratings, step indicators, progress bars), the sequence mirrors in RTL: stars fill from the trailing side. Flexbox and grid with logical properties mirror automatically; hand-positioned elements don't. Digit order inside numbers never reverses; that and other bidi text rules live in the `better-typography` skill.
 
+Icons are the most common hand-positioned case. Under `dir="rtl"`, flip the ones whose meaning is tied to reading direction and leave the rest alone:
+
+| Flip | Don't flip |
+| --- | --- |
+| Back/forward arrows, chevrons in navigation | Logos and brand marks |
+| Text-block glyphs (alignment, lists, indent) | Checkmarks |
+| Speaker/volume waves (emanate in reading direction) | Physical objects: clocks, cups, pencils |
+| "Send" style directional glyphs | Media playback (play/rewind refer to tape direction, convention keeps them LTR) |
+
+```css
+/* Good: mirror only direction-dependent icons */
+[dir="rtl"] .icon-directional {
+  scale: -1 1;
+}
+```
+
+```html
+<!-- Tailwind -->
+<ChevronRightIcon class="icon-directional rtl:-scale-x-100" />
+```
+
+Analyze composite icons part by part: a badge or slash overlay may keep its position even when the base glyph flips. Icon stroke weight, sizing, and state colors belong to the `better-ui` skill.
+
 ## Order by Importance
 
 Readers scan top-to-bottom and leading-to-trailing. Place content accordingly:

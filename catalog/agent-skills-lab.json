@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-08-03T19:31:52.646168912Z",
+  "generatedAt": "2026-08-04T05:18:04.774138506Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "e3e149b02c5ca1deb8d504b054a4a21f4581cb6d",
+  "sourceCommit": "f282ca9b2c2fc2464d0611aaf688b26013d36bbe",
   "sourceRef": "main",
-  "skillsCount": 66,
-  "totalSkillDirectories": 66,
+  "skillsCount": 74,
+  "totalSkillDirectories": 74,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -343,6 +343,350 @@
       },
       "package": {
         "path": "skills/dist/batch-grill-with-docs.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-accessibility",
+      "slug": "better-accessibility",
+      "description": "Accessibility (a11y) engineering for product interfaces. Use when building or reviewing UI components, modals, menus, forms, and custom widgets, or when keyboard, focus, or screen-reader behavior breaks. Covers WCAG, aria, aria-label, aria-live, focus-visible, focus trap, tabindex, keyboard navigation, screen reader, sr-only, alt text, hit area, touch target, semantic HTML, form errors, disabled buttons, skip link, and prefers-reduced-motion.",
+      "license": "MIT",
+      "path": "skills/better-accessibility",
+      "skillMdPath": "skills/better-accessibility/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-accessibility",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-accessibility/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-accessibility -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-accessibility -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-accessibility"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 6,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 7
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-accessibility.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-colors",
+      "slug": "better-colors",
+      "description": "OKLCH color space and color usage for web projects: convert hex, rgb, or hsl to oklch, generate palettes, and theme with Tailwind v4. Use for color systems, contrast checks, and applying color with meaning. Covers oklch, chroma, hue drift, gamut, display p3, APCA and WCAG contrast, semantic color tokens, dark mode colors, accent color, and increased contrast.",
+      "license": "MIT",
+      "path": "skills/better-colors",
+      "skillMdPath": "skills/better-colors/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-colors",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-colors/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-colors -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-colors -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-colors"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 5,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 6
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-colors.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-interface",
+      "slug": "better-interface",
+      "description": "Cross-discipline interface review and build across better-accessibility, better-layout, better-writing, better-typography, better-colors and better-ui. Use for a holistic UI audit or cross-discipline design review of a screen, flow, or feature, or to build one with the same rules applied forward. Modes: quick, core, full, build.",
+      "license": "MIT",
+      "path": "skills/better-interface",
+      "skillMdPath": "skills/better-interface/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-interface",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-interface/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-interface -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-interface -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-interface"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 2,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-interface.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-layout",
+      "slug": "better-layout",
+      "description": "Layout structure for web interfaces: grouping, alignment, spacing, and reading order. Use when structuring a page or component, deciding what collapses at small sizes, or reviewing frontend code for layout. Covers breakpoints, container queries, progressive disclosure, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, and logical properties.",
+      "license": "MIT",
+      "path": "skills/better-layout",
+      "skillMdPath": "skills/better-layout/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-layout",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-layout/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-layout -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-layout -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-layout"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 2,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-layout.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-typography",
+      "slug": "better-typography",
+      "description": "Web typography from choosing fonts to spacing, wrapping, and truncation. Use when picking or pairing typefaces, setting up a type scale, styling text in components, or reviewing a frontend for typography. Covers woff2, variable fonts, font-feature-settings, letter-spacing, line-height, type scale, heading hierarchy, tabular numbers, text-wrap, line clamp, measure, text-box, underlines, text-decoration, text selection, smart punctuation, drop cap, font smoothing, and iOS input zoom.",
+      "license": "MIT",
+      "path": "skills/better-typography",
+      "skillMdPath": "skills/better-typography/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-typography",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-typography/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-typography -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-typography -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-typography"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 6,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 7
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-typography.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-ui",
+      "slug": "better-ui",
+      "description": "Design engineering details that make interfaces feel polished. Use when building UI components, implementing animations, hover states and micro-interactions, choosing icons, or any visual detail work -- including when something feels off or should feel better. Covers UI polish, design details, border radius, optical alignment, box shadows, image outlines, icons, icon stroke weight, icon states, stagger animations, and motion restraint.",
+      "license": "MIT",
+      "path": "skills/better-ui",
+      "skillMdPath": "skills/better-ui/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-ui",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-ui/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-ui -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-ui -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-ui"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 4,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 5
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-ui.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "better-writing",
+      "slug": "better-writing",
+      "description": "Interface copy and UX microcopy. Use when writing or reviewing any user-facing product text; docs and marketing prose belong to writing-guidelines. Covers microcopy, button labels, link text, error messages, empty states, placeholder text, settings labels, onboarding, notifications, capitalization, title case, and sentence case.",
+      "license": "MIT",
+      "path": "skills/better-writing",
+      "skillMdPath": "skills/better-writing/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/better-writing",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-writing/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-writing -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-writing -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-writing"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/better-writing.skill",
         "present": false,
         "rejected": false
       }
@@ -1617,6 +1961,54 @@
       },
       "package": {
         "path": "skills/dist/langgraph-multiagent.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "motion",
+      "slug": "motion",
+      "description": "Motion/CSS animation for React, Vue, Base UI, and vanilla JS via the Motion AI Kit: transitions, springs, easing curves, CSS spring generation, Motion API docs search, and MotionScore performance audits. Use to implement web animation or to grade and fix animation jank. Covers motion mcp, MotionScore, spring bounce, easing curve, linear() easing, transition preview, jank audit, will-change, and compositor cost.",
+      "license": "MIT",
+      "path": "skills/motion",
+      "skillMdPath": "skills/motion/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/motion",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/motion/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill motion -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill motion -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill motion"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/motion.skill",
         "present": false,
         "rejected": false
       }

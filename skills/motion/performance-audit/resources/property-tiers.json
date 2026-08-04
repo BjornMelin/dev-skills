@@ -1,0 +1,299 @@
+{
+    "compositorProperties": {
+        "tier": "S",
+        "note": "S-tier only when animated via CSS, WAAPI, or Motion. A-tier when driven by JS/rAF.",
+        "properties": ["transform", "opacity", "filter", "clip-path"]
+    },
+    "paintProperties": {
+        "tier": "C",
+        "properties": [
+            "background-color",
+            "color",
+            "border-color",
+            "border-radius",
+            "box-shadow",
+            "text-shadow",
+            "outline-color",
+            "mask-image",
+            "background-image",
+            "text-decoration-color",
+            "caret-color",
+            "column-rule-color"
+        ]
+    },
+    "layoutProperties": {
+        "tier": "D",
+        "properties": [
+            "width",
+            "height",
+            "min-width",
+            "max-width",
+            "min-height",
+            "max-height",
+            "margin",
+            "margin-top",
+            "margin-right",
+            "margin-bottom",
+            "margin-left",
+            "padding",
+            "padding-top",
+            "padding-right",
+            "padding-bottom",
+            "padding-left",
+            "border-width",
+            "border-top-width",
+            "border-right-width",
+            "border-bottom-width",
+            "border-left-width",
+            "top",
+            "right",
+            "bottom",
+            "left",
+            "font-size",
+            "line-height",
+            "display",
+            "flex",
+            "flex-grow",
+            "flex-shrink",
+            "flex-basis",
+            "grid-template-columns",
+            "grid-template-rows",
+            "grid-gap",
+            "gap",
+            "row-gap",
+            "column-gap",
+            "justify-content",
+            "align-items",
+            "align-self",
+            "position",
+            "float",
+            "clear",
+            "text-align",
+            "vertical-align",
+            "white-space",
+            "word-spacing",
+            "letter-spacing",
+            "overflow"
+        ]
+    },
+    "svgAttributes": {
+        "tier": "C",
+        "note": "SVG shape attributes trigger repaint every frame. Use transform for position/scale instead.",
+        "attributes": [
+            "d",
+            "cx",
+            "cy",
+            "r",
+            "rx",
+            "ry",
+            "x",
+            "y",
+            "x1",
+            "y1",
+            "x2",
+            "y2",
+            "points",
+            "viewBox",
+            "stroke-dashoffset",
+            "stroke-dasharray"
+        ]
+    },
+    "layoutTriggeringReads": {
+        "note": "DOM APIs that force synchronous layout when called after a pending style write. Reading these in a loop with writes = F-tier thrashing.",
+        "elementProperties": [
+            "offsetWidth",
+            "offsetHeight",
+            "offsetTop",
+            "offsetLeft",
+            "clientWidth",
+            "clientHeight",
+            "clientTop",
+            "clientLeft",
+            "scrollWidth",
+            "scrollHeight",
+            "scrollTop",
+            "scrollLeft"
+        ],
+        "elementMethods": [
+            "getBoundingClientRect",
+            "getClientRects",
+            "focus",
+            "scrollTo",
+            "scrollIntoView"
+        ],
+        "windowProperties": [
+            "innerWidth",
+            "innerHeight",
+            "scrollX",
+            "scrollY",
+            "pageXOffset",
+            "pageYOffset"
+        ],
+        "windowMethods": ["getComputedStyle", "getMatchedCSSRules"]
+    },
+    "motionPropertyMap": {
+        "note": "Motion shorthand props and their CSS equivalents. All map to compositor properties but cannot be hardware accelerated (A-tier via rAF).",
+        "props": {
+            "x": "translateX",
+            "y": "translateY",
+            "z": "translateZ",
+            "rotateX": "rotateX",
+            "rotateY": "rotateY",
+            "rotateZ": "rotateZ",
+            "rotate": "rotate",
+            "scale": "scale",
+            "scaleX": "scaleX",
+            "scaleY": "scaleY",
+            "opacity": "opacity"
+        },
+        "layoutProps": {
+            "note": "These Motion props trigger A-tier transform animations but require upfront measurements, making them B-tier.",
+            "props": ["layout", "layoutId"]
+        }
+    },
+    "libraryDetection": {
+        "motion": {
+            "imports": ["framer-motion", "motion", "motion/react"],
+            "identifiers": [
+                "animate",
+                "motion.",
+                "useAnimate",
+                "useSpring",
+                "useMotionValue",
+                "useTransform",
+                "useScroll",
+                "whileInView",
+                "whileHover",
+                "whileTap",
+                "whileDrag",
+                "layoutId",
+                "AnimatePresence",
+                "scroll(",
+                "inView(",
+                "frame.read",
+                "frame.update"
+            ],
+            "defaultTier": "S",
+            "note": "Uses WAAPI for compositor properties. layout/layoutId = B-tier."
+        },
+        "gsap": {
+            "imports": ["gsap", "gsap/ScrollTrigger", "gsap/Flip"],
+            "identifiers": [
+                "gsap.to",
+                "gsap.from",
+                "gsap.fromTo",
+                "gsap.timeline",
+                "gsap.set",
+                "ScrollTrigger",
+                "Flip."
+            ],
+            "defaultTier": "A",
+            "note": "Uses requestAnimationFrame, not WAAPI. A-tier ceiling for compositor properties. GSAP's Flip is B-tier."
+        },
+        "reactSpring": {
+            "imports": [
+                "@react-spring/web",
+                "@react-spring/core",
+                "react-spring"
+            ],
+            "identifiers": [
+                "useSpring",
+                "useSprings",
+                "useTrail",
+                "useTransition",
+                "useChain",
+                "animated."
+            ],
+            "defaultTier": "A",
+            "note": "Uses requestAnimationFrame. A-tier ceiling."
+        },
+        "animejs": {
+            "imports": ["animejs", "anime"],
+            "identifiers": ["anime("],
+            "defaultTier": "A",
+            "note": "Uses requestAnimationFrame. A-tier ceiling."
+        },
+        "lottie": {
+            "imports": [
+                "lottie-web",
+                "lottie-react",
+                "@lottiefiles/react-lottie-player",
+                "react-lottie"
+            ],
+            "identifiers": [
+                "lottie.loadAnimation",
+                "<Lottie",
+                "<Player",
+                "useLottie"
+            ],
+            "defaultTier": "C",
+            "note": "Canvas/SVG rendering. Canvas = C-tier (paint). SVG = C-tier (repaint per frame)."
+        }
+    },
+    "antiPatterns": [
+        {
+            "name": "Layout thrashing",
+            "tier": "F",
+            "severity": "critical",
+            "detection": "Interleaved DOM reads (offset*, client*, scroll*, getBoundingClientRect, getComputedStyle) and writes (style.*, className, classList, setAttribute) in loops or rAF callbacks",
+            "fix": "Batch all reads before writes. Use requestAnimationFrame or Motion frame.read()/frame.update()."
+        },
+        {
+            "name": "CSS variable inheritance bomb",
+            "tier": "F",
+            "severity": "critical",
+            "detection": "Animating CSS custom properties on :root, html, or body elements (document.documentElement.style.setProperty, document.body.style.setProperty with '--')",
+            "fix": "Scope variable to smallest subtree. Use @property with inherits: false. Animate target property directly."
+        },
+        {
+            "name": "scrollTop animation driver",
+            "tier": "D",
+            "severity": "high",
+            "detection": "Reading scrollTop, scrollLeft, scrollY, pageYOffset inside scroll event listener or rAF loop to drive animation values",
+            "fix": "Use CSS scroll-timeline, position: sticky/fixed, or Motion scroll() which uses native ScrollTimeline."
+        },
+        {
+            "name": "CSS variable in compositor value",
+            "tier": "C",
+            "severity": "high",
+            "detection": "CSS variable (var(--*)) used as or within value for transform, opacity, filter, or clip-path",
+            "fix": "Animate the property directly for S or A-tier animation. At least register with @property { inherits: false } to reduce repaint cascade."
+        },
+        {
+            "name": "Excessive will-change",
+            "severity": "medium",
+            "detection": "will-change with >10 properties, or will-change applied to >10 elements simultaneously, or will-change: auto on animated elements",
+            "fix": "Limit will-change to 1-2 properties on elements currently animating. Remove after animation completes."
+        },
+        {
+            "name": "Large blur layer",
+            "severity": "medium",
+            "detection": "filter: blur() with value >10px on elements wider/taller than 500px or full-viewport elements",
+            "fix": "Reduce blur radius. Apply blur to a smaller element. Use a pre-blurred image instead."
+        },
+        {
+            "name": "Off-screen animation running",
+            "severity": "medium",
+            "detection": "Continuous animations (infinite, long duration >5s) without IntersectionObserver or whileInView to pause when off-screen",
+            "fix": "Use IntersectionObserver or Motion inView/whileInView to deactivate off-screen animations."
+        },
+        {
+            "name": "Missing prefers-reduced-motion",
+            "severity": "medium",
+            "detection": "Movement (top/left etc or transform) code present but no @media (prefers-reduced-motion) in stylesheets and no matchMedia('prefers-reduced-motion') in JS, or useReducedMotion hook used without fallback",
+            "fix": "Wrap tree in <MotionConfig reducedMotion='user'> or use @media (prefers-reduced-motion: reduce) with meaningful alternatives (not just animation: none)."
+        },
+        {
+            "name": "Multiple DOM-reading libraries",
+            "severity": "medium",
+            "detection": "Two or more animation libraries imported that independently schedule DOM reads/writes (e.g., GSAP + react-spring, or any two non-Motion libraries)",
+            "fix": "Use Motion frame.read()/frame.update() as shared scheduler, or consolidate to one library."
+        },
+        {
+            "name": "View Transition instant interruption",
+            "severity": "low",
+            "detection": "document.startViewTransition without handling concurrent navigation or state changes",
+            "fix": "Queue or batch view transitions. Motion's animateView handles interruption automatically."
+        }
+    ]
+}

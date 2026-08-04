@@ -1,7 +1,9 @@
 ---
 name: better-writing
-description: >-
-  UX writing and interface copy, from voice and button labels to error messages and empty states. Use when writing or reviewing any user-facing text: button and link labels, form errors, placeholders, settings labels, onboarding flows, notifications, or empty states. Triggers on UX writing, microcopy, interface copy, product copy, copywriting, button labels, link text, error messages, empty states, placeholder text, settings labels, capitalization, title case, sentence case, voice and tone.
+description: "Interface copy and UX microcopy. Use when writing or reviewing any user-facing product text; docs and marketing prose belong to writing-guidelines. Covers microcopy, button labels, link text, error messages, empty states, placeholder text, settings labels, onboarding, notifications, capitalization, title case, and sentence case."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # Writing that disappears into the interface
@@ -85,7 +87,7 @@ Search and filter empty states name the query and offer an exit: "No results for
 
 ### 12. Placeholders Are Examples, Not Labels
 
-Placeholders show the expected format (`name@example.com`, `DD/MM/YYYY`). A placeholder is never the field's only label: it vanishes on input, and every field keeps a visible label.
+Placeholders show the expected format (`name@example.com`, `DD/MM/YYYY`), so write them as examples rather than as restated field names. Whether a field must carry a visible label is an accessibility requirement owned by `better-accessibility`.
 
 ## Common Mistakes
 
@@ -101,8 +103,14 @@ Placeholders show the expected format (`name@example.com`, `DD/MM/YYYY`). A plac
 | "Don't send read receipts" toggle | Label the ON state: "Send read receipts" |
 | "Oops! Something went wrong." | Say what to do, next to the failing field |
 | "No results." as the whole empty state | Orient and point forward with a next action |
-| Placeholder doing the label's job | Visible label; placeholder shows the format |
+| Placeholder restates the field name | Show the expected format instead (`name@example.com`) |
 | `"You have " + n + " messages"` | Full templated strings with pluralization |
+
+## Severity
+
+- `HIGH` misleads users, obscures a consequence, or prevents recovery.
+- `MEDIUM` makes a task harder to understand.
+- `LOW` is isolated voice or consistency polish.
 
 ## Review Output Format
 
@@ -114,7 +122,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` misleads users, obscures a consequence, or prevents recovery; `MEDIUM` makes a task harder to understand; `LOW` is isolated voice or consistency polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: quote the current copy and its complete replacement.
 - **Why**: name the violated principle and explain the comprehension or trust cost.

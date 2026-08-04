@@ -84,27 +84,6 @@ An icon that looks great at 48px can collapse into mush at 16px. Details that re
 - Keep icons on the pixel grid at their render size: a 16px icon drawn on a 24px grid with fractional scaling renders soft. Use the icon set's native grid sizes (`16`, `20`, `24`) rather than arbitrary scales.
 - Always SVG, never raster, so the same asset stays crisp at every density.
 
-## Icons in RTL
+## Hand-offs
 
-Under `dir="rtl"`, flip icons whose meaning is tied to reading direction, and leave the rest alone:
-
-| Flip | Don't flip |
-| --- | --- |
-| Back/forward arrows, chevrons in navigation | Logos and brand marks |
-| Text-block glyphs (alignment, lists, indent) | Checkmarks |
-| Speaker/volume waves (emanate in reading direction) | Physical objects: clocks, cups, pencils |
-| "Send" style directional glyphs | Media playback (play/rewind refer to tape direction, convention keeps them LTR) |
-
-```css
-/* Good: mirror only direction-dependent icons */
-[dir="rtl"] .icon-directional {
-  scale: -1 1;
-}
-```
-
-```html
-<!-- Tailwind -->
-<ChevronRightIcon class="icon-directional rtl:-scale-x-100" />
-```
-
-Analyze composite icons part by part: a badge or slash overlay may keep its position even when the base glyph flips. Accessible names for icon-only buttons are covered by the `better-accessibility` skill.
+Mirroring icons under `dir="rtl"` is spatial behavior and belongs to the `better-layout` skill. Accessible names for icon-only buttons belong to the `better-accessibility` skill.

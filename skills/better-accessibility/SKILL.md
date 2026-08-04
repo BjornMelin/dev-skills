@@ -1,6 +1,9 @@
 ---
 name: better-accessibility
-description: Accessibility engineering for product interfaces, from focus states and keyboard support to ARIA, forms, and screen readers. Use when building or reviewing UI components, modals, menus, forms, custom widgets, or when the user says "make this accessible" or reports keyboard or screen-reader issues. Triggers on accessibility, a11y, WCAG, aria, focus ring, focus-visible, focus trap, keyboard navigation, tab order, tabindex, screen reader, sr-only, aria-live, alt text, hit area, touch target, prefers-reduced-motion, autoplay, toast duration, skip link, semantic HTML, aria-label, form errors, disabled buttons, "not keyboard accessible".
+description: "Accessibility (a11y) engineering for product interfaces. Use when building or reviewing UI components, modals, menus, forms, and custom widgets, or when keyboard, focus, or screen-reader behavior breaks. Covers WCAG, aria, aria-label, aria-live, focus-visible, focus trap, tabindex, keyboard navigation, screen reader, sr-only, alt text, hit area, touch target, semantic HTML, form errors, disabled buttons, skip link, and prefers-reduced-motion."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # Accessibility that comes with the craft
@@ -15,12 +18,12 @@ Rendered-pair contrast measurement and color remediation are covered by the `bet
 
 | Category | When to Use |
 | --- | --- |
-| [Focus & Keyboard](focus-and-keyboard.md) | Focus rings, skip links, tabindex, focus trapping, APG keyboard patterns |
-| [Semantics & ARIA](semantics-and-aria.md) | Native elements first, button vs link, landmarks, accessible names, disabled states |
-| [Forms](forms.md) | Labels, autocomplete, error messaging, input types |
-| [Screen Readers](screen-readers.md) | Visually hidden content, live regions, toasts, alt text, SVG |
-| [Hit Areas](hit-areas.md) | Target sizes, expanding hit areas, collision rules |
-| [Motion & Zoom](motion-and-zoom.md) | `prefers-reduced-motion`, autoplay and timed UI, 200% zoom, reflow, rem vs px |
+| [Focus & Keyboard](references/focus-and-keyboard.md) | Focus rings, skip links, tabindex, focus trapping, APG keyboard patterns |
+| [Semantics & ARIA](references/semantics-and-aria.md) | Native elements first, button vs link, landmarks, accessible names, disabled states |
+| [Forms](references/forms.md) | Labels, autocomplete, error messaging, input types |
+| [Screen Readers](references/screen-readers.md) | Visually hidden content, live regions, toasts, alt text, SVG |
+| [Hit Areas](references/hit-areas.md) | Target sizes, expanding hit areas, collision rules |
+| [Motion & Zoom](references/motion-and-zoom.md) | `prefers-reduced-motion`, autoplay and timed UI, 200% zoom, reflow, rem vs px |
 
 ## Core Principles
 
@@ -58,7 +61,7 @@ Icon-only buttons need a descriptive `aria-label`. Visible label text must appea
 
 ### 9. Don't Rely on Color Alone
 
-Status needs a redundant cue: icon, text, or underline alongside the color. Determine which WCAG contrast requirement applies from the content and state, then use `better-colors` to measure the rendered foreground/background pair. When contrast fails, report the pair and requirement it misses; do not change the project's colors unless asked.
+Status needs a redundant cue: icon, text, or underline alongside the color. Determine which contrast requirement applies from the content and state, then use `better-colors` to measure the rendered foreground/background pair; that skill decides which algorithm settles the verdict and will answer in WCAG ratios whenever a conformance level is named. When contrast fails, report the pair and the requirement it misses; do not change the project's colors unless asked.
 
 ### 10. Honor prefers-reduced-motion
 
@@ -96,6 +99,12 @@ The page must work at 200% zoom and reflow at 320px width without horizontal scr
 | `maximum-scale=1` to stop iOS input zoom | 16px input font on mobile (see `better-typography`); never block zoom |
 | Submit disabled until the form is valid | Keep it enabled; validate on submit and focus the first error |
 
+## Severity
+
+- `HIGH` prevents a task, hides content from assistive technology, or creates a systemic accessibility failure.
+- `MEDIUM` makes an interaction meaningfully harder.
+- `LOW` is isolated polish.
+
 ## Review Output Format
 
 Use this format only when the user asks for a standalone accessibility review. When `better-interface` orchestrates the review, provide domain evidence and findings to that skill and let its output format, severity scale, consolidation rules, cap, and verdict take precedence.
@@ -106,7 +115,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` prevents a task, hides content from assistive technology, or creates a systemic accessibility failure; `MEDIUM` makes an interaction meaningfully harder; `LOW` is isolated polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: show the current implementation and an actionable replacement.
 - **Why**: name the violated principle and its user impact.

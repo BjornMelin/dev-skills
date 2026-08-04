@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["domain", "evidence", "findings", "rejected", "verification", "blocked"],
+  "properties": {
+    "domain": {
+      "type": "string",
+      "enum": [
+        "better-accessibility",
+        "better-layout",
+        "better-writing",
+        "better-typography",
+        "better-colors",
+        "better-ui"
+      ]
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Files, components, and states actually inspected. Not what was in scope."
+    },
+    "findings": {
+      "type": "array",
+      "description": "One entry per root cause. No verdict, no cap; the orchestrator applies both.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "locations", "before", "after", "why"],
+        "properties": {
+          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
+          "locations": {
+            "type": "array",
+            "description": "Every path:line sharing this root cause.",
+            "items": { "type": "string" }
+          },
+          "before": { "type": "string" },
+          "after": { "type": "string" },
+          "why": { "type": "string" },
+          "principle": {
+            "type": "string",
+            "description": "The owning skill's principle this violates."
+          }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "description": "Candidates inspected and deliberately not reported. Required so restraint survives the lane boundary.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["location", "candidate", "rejectedBecause"],
+        "properties": {
+          "location": { "type": "string" },
+          "candidate": { "type": "string" },
+          "rejectedBecause": { "type": "string" }
+        }
+      }
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "result"],
+        "properties": {
+          "check": { "type": "string", "description": "The exact command or interaction steps." },
+          "result": { "type": "string" },
+          "verified": { "type": "boolean" }
+        }
+      }
+    },
+    "blocked": {
+      "type": "string",
+      "description": "Anything in scope this lane could not inspect, or \"None\"."
+    }
+  }
+}

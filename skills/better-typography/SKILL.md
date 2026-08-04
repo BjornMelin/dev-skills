@@ -1,6 +1,9 @@
 ---
 name: better-typography
-description: Web typography from choosing fonts to spacing, wrapping and accessibility. Use when picking or pairing typefaces, configuring variable fonts or OpenType features, setting up a type scale, checking heading hierarchy, styling text in components, truncating text, styling underlines, selection, placeholders or carets, or reviewing frontend code for typography. Triggers on typography, fonts, font formats, woff2, variable fonts, font-weight, opentype, font-feature-settings, letter-spacing, line-height, type scale, heading hierarchy, heading levels, tabular numbers, text-wrap, truncation, line clamp, underlines, text-decoration, text selection, iOS input zoom, font smoothing, text contrast, measure, line length, text-box, smart punctuation, drop cap.
+description: "Web typography from choosing fonts to spacing, wrapping, and truncation. Use when picking or pairing typefaces, setting up a type scale, styling text in components, or reviewing a frontend for typography. Covers woff2, variable fonts, font-feature-settings, letter-spacing, line-height, type scale, heading hierarchy, tabular numbers, text-wrap, line clamp, measure, text-box, underlines, text-decoration, text selection, smart punctuation, drop cap, font smoothing, and iOS input zoom."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # Great typography
@@ -11,18 +14,18 @@ When reviewing, read the page instead of scanning the code: squint to check the 
 
 The words themselves (button labels, error messages, empty states) are covered by the `better-writing` skill; semantic heading structure by `better-accessibility`; spatial RTL layout and logical CSS properties by `better-layout`; rendered-pair contrast measurement and color remediation by `better-colors`. This skill owns how text renders, wraps, and behaves in mixed-direction content.
 
-**Match the project's styling system.** Before suggesting or writing any fix, check how the codebase styles things and express every change in that system: Tailwind utilities in a Tailwind project, plain declarations in CSS, CSS Modules, styled-components or StyleX. The [cheat sheet](css-cheat-sheet.md) maps each declaration to its Tailwind equivalent. Never introduce a second styling approach just to apply a typography fix.
+**Match the project's styling system.** Before suggesting or writing any fix, check how the codebase styles things and express every change in that system: Tailwind utilities in a Tailwind project, plain declarations in CSS, CSS Modules, styled-components or StyleX. The [cheat sheet](references/css-cheat-sheet.md) maps each declaration to its Tailwind equivalent. Never introduce a second styling approach just to apply a typography fix.
 
 ## Quick Reference
 
 | Category | When to use | Reference |
 | --- | --- | --- |
-| Choosing fonts | Font categories, pairing, formats, typeface anatomy | [choosing-fonts.md](choosing-fonts.md) |
-| Variable fonts & OpenType | Axes, weights, tabular numbers, stylistic sets | [variable-fonts-and-opentype.md](variable-fonts-and-opentype.md) |
-| Spacing & sizing | Type scale, heading hierarchy, line-height, letter-spacing, text trimming | [spacing-and-sizing.md](spacing-and-sizing.md) |
-| Wrapping & punctuation | Measure, wrapping, truncation, smart punctuation, RTL | [wrapping-and-punctuation.md](wrapping-and-punctuation.md) |
-| Details & accessibility | Underlines, selection, forms, decorative text, contrast | [details-and-accessibility.md](details-and-accessibility.md) |
-| CSS cheat sheet | Quick lookup of every property covered, with Tailwind equivalents | [css-cheat-sheet.md](css-cheat-sheet.md) |
+| Choosing fonts | Font categories, pairing, formats, typeface anatomy | [choosing-fonts.md](references/choosing-fonts.md) |
+| Variable fonts & OpenType | Axes, weights, tabular numbers, stylistic sets | [variable-fonts-and-opentype.md](references/variable-fonts-and-opentype.md) |
+| Spacing & sizing | Type scale, heading hierarchy, line-height, letter-spacing, text trimming | [spacing-and-sizing.md](references/spacing-and-sizing.md) |
+| Wrapping & punctuation | Measure, wrapping, truncation, smart punctuation, RTL | [wrapping-and-punctuation.md](references/wrapping-and-punctuation.md) |
+| Details & accessibility | Underlines, selection, forms, decorative text, contrast | [details-and-accessibility.md](references/details-and-accessibility.md) |
+| CSS cheat sheet | Quick lookup of every property covered, with Tailwind equivalents | [css-cheat-sheet.md](references/css-cheat-sheet.md) |
 
 ## Core Principles
 
@@ -130,6 +133,12 @@ Set `lang` so browsers and assistive technology choose the right pronunciation, 
 | Thin/Light weight on `14px` UI text | Weight `400`+ below `18px`; thin weights are display-only |
 | `leading-none` on a three-line card description | At least `1.4` on any text that wraps to 3+ lines |
 
+## Severity
+
+- `HIGH` makes text unreadable, unavailable, or structurally misleading.
+- `MEDIUM` harms hierarchy, wrapping, or scanning.
+- `LOW` is isolated typographic polish.
+
 ## Review Output Format
 
 Use this format only when the user asks for a standalone typography review. When `better-interface` orchestrates the review, provide domain evidence and findings to that skill and let its output format, severity scale, consolidation rules, cap, and verdict take precedence.
@@ -140,7 +149,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` makes text unreadable, unavailable, or structurally misleading; `MEDIUM` harms hierarchy, wrapping, or scanning; `LOW` is isolated typographic polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: show the current typography and an actionable replacement.
 - **Why**: name the violated principle and its effect on readability or hierarchy.

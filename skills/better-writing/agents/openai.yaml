@@ -1,3 +1,6 @@
 interface:
   display_name: "Better Writing"
-  short_description: "UX writing, interface copy and microcopy"
+  short_description: "Interface copy and UX microcopy"
+  default_prompt: "Use $better-writing to write or review user-facing product text: button and link labels, form errors, placeholders, settings labels, empty states, and notifications."
+policy:
+  allow_implicit_invocation: true

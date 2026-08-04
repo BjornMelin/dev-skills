@@ -4,6 +4,22 @@ Contrast is always measured between a **foreground color** (text, icon, or UI el
 
 **Report, don't repaint.** When a check fails, report it (the failing foreground/background pair, its measured Lc or ratio, and the threshold it misses) and leave the colors unchanged. A project's colors are a design decision; only apply the fix below when the user asks for one.
 
+## Which algorithm decides
+
+APCA and WCAG 2 are different models, not two scales of one measurement. There is no exact
+conversion between an Lc value and a WCAG ratio, and a pair can pass one and fail the other.
+So the verdict rests on whichever standard the project is actually held to:
+
+| Situation | Decides the verdict | The other one |
+| --- | --- | --- |
+| The project makes a formal WCAG 2.x conformance claim, or is under a legal or contractual accessibility requirement | **WCAG 2 ratio** | Report the Lc as supporting evidence |
+| Anything else (product work with no conformance claim) | **APCA Lc** | Report the WCAG ratio when it disagrees |
+
+When `better-accessibility` asks for a named WCAG level (AA or AAA), answer in WCAG ratios —
+that is a conformance question. Report the Lc alongside it, and when the two disagree, say so
+explicitly rather than picking the flattering number. Default to WCAG when you cannot tell
+whether a conformance claim exists: it is the stricter obligation to miss.
+
 ## APCA thresholds (recommended)
 
 APCA (Accessible Perceptual Contrast Algorithm) is more perceptually accurate than WCAG 2 and pairs naturally with oklch since both are grounded in perceptual lightness. Use APCA as the default.

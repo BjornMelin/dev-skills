@@ -1,6 +1,9 @@
 ---
 name: better-colors
-description: OKLCH color space and color usage for web projects. Convert hex/rgb/hsl to oklch, generate palettes, check contrast, handle gamut boundaries, theme with Tailwind v4, and apply color with meaning. Triggers on oklch, color conversion, palette generation, contrast ratio, gamut, display p3, design tokens, semantic color tokens, hue drift, chroma, dark mode colors, accent color, color meaning, light and dark appearance, increased contrast.
+description: "OKLCH color space and color usage for web projects: convert hex, rgb, or hsl to oklch, generate palettes, and theme with Tailwind v4. Use for color systems, contrast checks, and applying color with meaning. Covers oklch, chroma, hue drift, gamut, display p3, APCA and WCAG contrast, semantic color tokens, dark mode colors, accent color, and increased contrast."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # OKLCH Colors
@@ -11,11 +14,11 @@ OKLCH is a perceptually uniform color space where lightness, chroma, and hue are
 
 | Category | When to use | Reference |
 | --- | --- | --- |
-| Conversion | Hex/rgb/hsl to oklch | [color-conversion.md](color-conversion.md) |
-| Palettes | Generate scales, multi-hue, dark mode | [palette-generation.md](palette-generation.md) |
-| Contrast | APCA/WCAG checks, reporting failures, fixing on request | [accessibility-contrast.md](accessibility-contrast.md) |
-| Gamut & Tailwind | P3 fallbacks, `@theme` scales, gamut clamping | [gamut-and-tailwind.md](gamut-and-tailwind.md) |
-| Usage | Semantic tokens, one meaning per color, primary-action emphasis, appearance variants | [color-usage.md](color-usage.md) |
+| Conversion | Hex/rgb/hsl to oklch | [color-conversion.md](references/color-conversion.md) |
+| Palettes | Generate scales, multi-hue, dark mode | [palette-generation.md](references/palette-generation.md) |
+| Contrast | APCA/WCAG checks, reporting failures, fixing on request | [accessibility-contrast.md](references/accessibility-contrast.md) |
+| Gamut & Tailwind | P3 fallbacks, `@theme` scales, gamut clamping | [gamut-and-tailwind.md](references/gamut-and-tailwind.md) |
+| Usage | Semantic tokens, one meaning per color, primary-action emphasis, appearance variants | [color-usage.md](references/color-usage.md) |
 
 ## Core Principles
 
@@ -80,6 +83,12 @@ Use three decimal places for L and C and up to three for H. Drop trailing zeros 
 | Several colored control backgrounds in one view | Fill only the single primary action; secondaries stay neutral |
 | Palette verified only in light mode | Recheck every foreground/background pair in both appearances |
 
+## Severity
+
+- `HIGH` makes content unreadable or assigns a misleading semantic color.
+- `MEDIUM` creates a noticeable theme, gamut, or consistency failure.
+- `LOW` is isolated polish.
+
 ## Review Output Format
 
 Use this format only when the user asks for a standalone color review. When `better-interface` orchestrates the review, provide domain evidence and findings to that skill and let its output format, severity scale, consolidation rules, cap, and verdict take precedence.
@@ -90,7 +99,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` makes content unreadable or assigns a misleading semantic color; `MEDIUM` creates a noticeable theme, gamut, or consistency failure; `LOW` is isolated polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: show the current value or token and the exact replacement.
 - **Why**: name the violated principle and include measured contrast or gamut evidence when relevant.

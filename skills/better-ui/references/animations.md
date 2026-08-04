@@ -180,7 +180,7 @@ Exit animations should be softer and less attention-grabbing than enter animatio
 - Use a small fixed `translateY` (e.g., `-12px`) instead of the full container height
 - Keep some directional movement to indicate where the element went
 - Exit duration should be shorter than enter duration (150ms vs 300ms)
-- Use a subtle exit when it preserves spatial context. Remove immediately when motion adds no information, the interaction repeats frequently, or reduced motion is requested.
+- Use a subtle exit when it preserves spatial context. Remove immediately when motion adds no information or the interaction repeats frequently. Under `prefers-reduced-motion` do not remove the transition outright: `better-accessibility` owns that rule and specifies replacing slides and scales with an opacity crossfade.
 
 ## Contextual Icon Animations
 

@@ -1,6 +1,9 @@
 ---
 name: better-layout
-description: Layout structure for web interfaces, from grouping and alignment to reading order, progressive disclosure, and adaptive breakpoints. Use when structuring a page or component, spacing or aligning controls, deciding what collapses at small sizes, handling RTL layout direction, or reviewing frontend code for layout. Triggers on layout, spacing, alignment, grouping, negative space, whitespace, visual hierarchy, reading order, progressive disclosure, breakpoints, responsive layout, container queries, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, logical properties.
+description: "Layout structure for web interfaces: grouping, alignment, spacing, and reading order. Use when structuring a page or component, deciding what collapses at small sizes, or reviewing frontend code for layout. Covers breakpoints, container queries, progressive disclosure, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, and logical properties."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # Layout that communicates structure
@@ -15,8 +18,8 @@ Treat the numeric values below as starting points for interfaces without an esta
 
 | Category | When to Use |
 | --- | --- |
-| [Grouping & Alignment](grouping-and-alignment.md) | Space vs separators, alignment edges, logical properties, importance ordering |
-| [Spacing & Adaptivity](spacing-and-adaptivity.md) | Spacing between targets, layout margins, progressive disclosure, full-bleed content, breakpoints, i18n growth |
+| [Grouping & Alignment](references/grouping-and-alignment.md) | Space vs separators, alignment edges, logical properties, importance ordering |
+| [Spacing & Adaptivity](references/spacing-and-adaptivity.md) | Spacing between targets, layout margins, progressive disclosure, full-bleed content, breakpoints, i18n growth |
 
 ## Core Principles
 
@@ -73,6 +76,12 @@ Plan for substantial and language-dependent string growth rather than relying on
 | Fixed-width text container sized to one language | `max-width` + wrapping; test pseudo-localization and representative locales |
 | Primary action at the clip-prone bottom of a pane | Sticky positioning or stable chrome with safe-area padding |
 
+## Severity
+
+- `HIGH` blocks content or an action at a supported viewport.
+- `MEDIUM` harms hierarchy, reading order, or adaptability.
+- `LOW` is isolated alignment or spacing polish.
+
 ## Review Output Format
 
 Use this format only when the user asks for a standalone layout review. When `better-interface` orchestrates the review, provide domain evidence and findings to that skill and let its output format, severity scale, consolidation rules, cap, and verdict take precedence.
@@ -83,7 +92,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` blocks content or an action at a supported viewport; `MEDIUM` harms hierarchy, reading order, or adaptability; `LOW` is isolated alignment or spacing polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: show the current layout and an actionable replacement.
 - **Why**: name the violated principle and its effect on comprehension or adaptability.

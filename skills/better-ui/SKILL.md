@@ -1,6 +1,9 @@
 ---
 name: better-ui
-description: Design engineering principles for making interfaces feel polished. Use when building UI components, reviewing frontend code, implementing animations, hover states, shadows, borders, micro-interactions, enter/exit animations, choosing or reviewing icons, or any visual detail work. Triggers on UI polish, design details, "make it feel better", "feels off", stagger animations, border radius, optical alignment, image outlines, box shadows, icons, icon stroke weight, icon states, motion restraint.
+description: "Design engineering details that make interfaces feel polished. Use when building UI components, implementing animations, hover states and micro-interactions, choosing icons, or any visual detail work -- including when something feels off or should feel better. Covers UI polish, design details, border radius, optical alignment, box shadows, image outlines, icons, icon stroke weight, icon states, stagger animations, and motion restraint."
+license: MIT
+metadata:
+  version: "1.0.0"
 ---
 
 # Details that make interfaces feel better
@@ -11,16 +14,18 @@ When reviewing, slow the interface down: replay motion at 10% speed in the brows
 
 Preserve the project's component library, tokens, and density. Match its established motion language except where a principle below prescribes an exact interaction pattern.
 
-Typography (text wrapping, font rendering, tabular numbers, spacing) is covered by the `better-typography` skill; use that for anything text-related. Accessibility (hit areas, focus states, keyboard support, ARIA, reduced motion) is covered by the `better-accessibility` skill. Layout structure (grouping, spacing between sections, breakpoints, spatial RTL) is covered by the `better-layout` skill.
+Typography (text wrapping, font rendering, tabular numbers, spacing) is covered by the `better-typography` skill; use that for anything text-related. Accessibility (hit areas, focus states, keyboard support, ARIA, reduced-motion requirements) is covered by the `better-accessibility` skill. Layout structure (grouping, spacing between sections, breakpoints, spatial RTL including icon mirroring) is covered by the `better-layout` skill.
+
+The principles below give exact component-level recipes. For the project's broader motion vocabulary — easing-curve selection, duration scales, and spring physics reasoning — the `emil-design-eng` skill goes deeper; prefer it when choosing a curve, and use the values here when implementing the specific patterns they name.
 
 ## Quick Reference
 
 | Category | When to Use |
 | --- | --- |
-| [Surfaces](surfaces.md) | Border radius, optical alignment, shadows, image outlines |
-| [Animations](animations.md) | Interruptible animations, enter/exit transitions, icon animations, scale on press, motion restraint |
-| [Icons](icons.md) | Icon stroke weight, states via `currentColor`, outline vs fill, sizing, RTL flipping |
-| [Performance](performance.md) | Transition specificity, `will-change` usage |
+| [Surfaces](references/surfaces.md) | Border radius, optical alignment, shadows, image outlines |
+| [Animations](references/animations.md) | Interruptible animations, enter/exit transitions, icon animations, scale on press, motion restraint |
+| [Icons](references/icons.md) | Icon stroke weight, states via `currentColor`, outline vs fill, sizing |
+| [Performance](references/performance.md) | Transition specificity, `will-change` usage |
 
 ## Core Principles
 
@@ -30,11 +35,11 @@ Outer radius = inner radius + padding. Mismatched radii on nested elements is th
 
 ### 2. Optical Over Geometric Alignment
 
-When geometric centering looks off, align optically. Buttons with icons, play triangles, and asymmetric icons all need manual adjustment.
+When geometric centering looks off, align optically with an exact offset. A button with a leading icon takes `2px` less padding on the icon side than the text side. A play triangle inside a circular button shifts `2px` toward the trailing edge, because its visual mass sits left of its bounding box. Asymmetric icons follow the same rule: offset toward the heavier side.
 
 ### 3. Shadows for Elevation, Borders for Structure
 
-For buttons, cards, and containers whose border exists only to create depth, prefer layered transparent `box-shadow` values. Keep borders that communicate structure or state: dividers, layout separators, and selected or focus states.
+For buttons, cards, and containers whose border exists only to create depth, use three layered transparent shadows rather than one: a `1px` hairline for the edge, a short blur for contact, and a longer blur for lift — for example `0 1px 0 oklch(0 0 0 / 0.05), 0 1px 2px oklch(0 0 0 / 0.06), 0 4px 12px oklch(0 0 0 / 0.08)`. Keep borders that communicate structure or state: dividers, layout separators, and selected or focus states.
 
 ### 4. Interruptible Animations
 
@@ -46,7 +51,7 @@ For an infrequent staged entrance where sequence helps communicate hierarchy, br
 
 ### 6. Subtle Exit Animations
 
-Use a small fixed `translateY` instead of full height. Exits should be softer than enters. Use `ease-out` for both enter and exit transitions.
+Use a small fixed `translateY` (`-12px`) instead of the full container height, and keep the exit shorter than the enter: `150ms` out against `300ms` in. Use `ease-out` for both.
 
 ### 7. Contextual Icon Animations
 
@@ -100,6 +105,12 @@ No custom animation on high-frequency interactions: the attention cost repeats o
 | Filled icons everywhere | Outline as default, fill only for the active state |
 | Entrance animation on every hover or keystroke | Instant feedback or ≤150ms opacity/color transition |
 
+## Severity
+
+- `HIGH` makes an interaction misleading, unresponsive, or repeatedly disruptive.
+- `MEDIUM` creates a noticeable craft or consistency problem.
+- `LOW` is isolated polish.
+
 ## Review Output Format
 
 Use this format only when the user asks for a standalone UI-polish review. When `better-interface` orchestrates the review, provide domain evidence and findings to that skill and let its output format, severity scale, consolidation rules, cap, and verdict take precedence.
@@ -110,7 +121,6 @@ Present the standalone review in two parts.
 
 Group all confirmed findings by principle. Use a markdown table with **Severity**, **Location**, **Before**, **After**, and **Why** columns. Never use separate "Before:" / "After:" lines.
 
-- **Severity**: `HIGH` makes an interaction misleading, unresponsive, or repeatedly disruptive; `MEDIUM` creates a noticeable craft or consistency problem; `LOW` is isolated polish.
 - **Location**: cite `path/to/file:line`. If the artifact has no source files, cite the exact screen and component instead.
 - **Before / After**: show the current implementation and an actionable replacement.
 - **Why**: name the violated principle and explain how it affects the interface.

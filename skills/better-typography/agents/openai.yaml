@@ -1,3 +1,6 @@
 interface:
   display_name: "Better Typography"
   short_description: "Web typography from fonts to spacing and wrapping"
+  default_prompt: "Use $better-typography to style or review text: typeface pairing, variable fonts and OpenType features, type scales, line-height and measure, wrapping, and truncation."
+policy:
+  allow_implicit_invocation: true
