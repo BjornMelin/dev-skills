@@ -80,6 +80,7 @@ following as the required focused gates based on touched files:
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents`
 - Claude subagent pack: `python3 subagents/claude/scripts/sync_agents.py --validate`
 - Structured-output schemas: `python3 tools/skill/check_output_schemas.py .`
+- Interface suite consistency: `python3 tools/skill/check_interface_suite.py .`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
 - Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Bootstrap packs: `cargo run -q -p codex-dev -- --json bootstrap status`, `python3 tools/bootstrap/render_bootstrap_pack.py --validate`, render changed packs into temp directories only, and run the Codex subagent smoke matrix in `docs/runbooks/validation.md`
