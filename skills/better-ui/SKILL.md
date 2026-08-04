@@ -1,6 +1,6 @@
 ---
 name: better-ui
-description: "Design engineering details that make interfaces feel polished. Use when building UI components, implementing animations, hover states and micro-interactions, choosing icons, or any visual detail work -- including when something feels off or should feel better. Covers UI polish, design details, border radius, optical alignment, box shadows, image outlines, icons, icon stroke weight, icon states, stagger animations, and motion restraint."
+description: "Design engineering principles for making interfaces feel polished. Use when building UI components, reviewing frontend code, implementing animations, hover states, shadows, borders, micro-interactions, enter/exit animations, choosing or reviewing icons, or any visual detail work. Triggers on UI polish, design details, make it feel better, feels off, stagger animations, border radius, optical alignment, image outlines, box shadows, icons, icon stroke weight, icon states, motion restraint."
 license: MIT
 metadata:
   version: "1.0.0"
@@ -16,7 +16,7 @@ Preserve the project's component library, tokens, and density. Match its establi
 
 Typography (text wrapping, font rendering, tabular numbers, spacing) is covered by the `better-typography` skill; use that for anything text-related. Accessibility (hit areas, focus states, keyboard support, ARIA, reduced-motion requirements) is covered by the `better-accessibility` skill. Layout structure (grouping, spacing between sections, breakpoints, spatial RTL including icon mirroring) is covered by the `better-layout` skill.
 
-The principles below give exact component-level recipes. For the project's broader motion vocabulary — easing-curve selection, duration scales, and spring physics reasoning — the `emil-design-eng` skill goes deeper; prefer it when choosing a curve, and use the values here when implementing the specific patterns they name.
+The principles below give exact component-level recipes and are self-sufficient. For the project's broader motion vocabulary — easing-curve selection, duration scales, and spring physics reasoning — the `emil-design-eng` skill goes deeper if it is installed; prefer it when choosing a curve, and use the values here when implementing the specific patterns named below. If it is not available, the values here stand on their own.
 
 ## Quick Reference
 

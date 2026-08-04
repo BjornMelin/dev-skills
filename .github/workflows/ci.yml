@@ -78,6 +78,10 @@ jobs:
         run: |
           python3 -m compileall -q tools/skill/check_expo_motion_public_contract.py
           python3 tools/skill/check_expo_motion_public_contract.py
+      - name: Validate Claude subagent pack
+        run: |
+          python3 -m compileall -q subagents/claude/scripts
+          python3 subagents/claude/scripts/sync_agents.py --validate
       - name: Validate plugin skills and manifests
         run: |
           set -euo pipefail

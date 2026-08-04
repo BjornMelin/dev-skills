@@ -1,6 +1,6 @@
 ---
 name: better-layout
-description: "Layout structure for web interfaces: grouping, alignment, spacing, and reading order. Use when structuring a page or component, deciding what collapses at small sizes, or reviewing frontend code for layout. Covers breakpoints, container queries, progressive disclosure, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, and logical properties."
+description: "Layout structure for web interfaces, from grouping and alignment to reading order, progressive disclosure, and adaptive breakpoints. Use when structuring a page or component, spacing or aligning controls, deciding what collapses at small sizes, handling RTL layout direction, or reviewing frontend code for layout. Triggers on layout, spacing, alignment, grouping, negative space, whitespace, visual hierarchy, reading order, progressive disclosure, breakpoints, responsive layout, container queries, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, logical properties."
 license: MIT
 metadata:
   version: "1.0.0"

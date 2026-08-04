@@ -1,8 +1,8 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["domain", "evidence", "findings", "rejected", "verification", "blocked"],
-  "description": "Taste-lane output: candidates from candidate-schema.json, verified against source and judged. Every finding carries a severity and an actionable fix. Evidence lanes must not use this schema; they emit candidate-schema.json.",
+  "required": ["domain", "evidence", "candidates", "rejected", "verification", "blocked"],
+  "description": "Evidence-lane output. Candidates are observations, not findings: no severity and no fix. A taste lane turns these into judged findings matching findings-schema.json.",
   "properties": {
     "domain": {
       "type": "string",
@@ -19,33 +19,42 @@
       "type": "string",
       "description": "Files, components, and states actually inspected. Not what was in scope."
     },
-    "findings": {
+    "candidates": {
       "type": "array",
-      "description": "One entry per root cause. No verdict, no cap; the orchestrator applies both.",
+      "description": "One entry per suspected root cause. Deliberately has no severity and no `after`: assigning either is judgment, which happens in the taste lane.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "locations", "before", "after", "why"],
+        "required": ["locations", "observed", "rule"],
         "properties": {
-          "severity": { "type": "string", "enum": ["HIGH", "MEDIUM", "LOW"] },
           "locations": {
             "type": "array",
-            "description": "Every path:line sharing this root cause.",
+            "description": "Every path:line sharing this candidate.",
             "items": { "type": "string" }
           },
-          "before": { "type": "string" },
-          "after": { "type": "string" },
-          "why": { "type": "string" },
-          "principle": {
+          "observed": {
             "type": "string",
-            "description": "The owning skill's principle this violates."
+            "description": "The current implementation, quoted or described exactly as found."
+          },
+          "rule": {
+            "type": "string",
+            "description": "The owning skill's principle or Common Mistakes row this appears to violate."
+          },
+          "measurement": {
+            "type": "string",
+            "description": "Any computed value that decides the case: a contrast ratio or Lc, a hit-area size, a line count."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "How sure the lane is before a taste lane verifies it against source."
           }
         }
       }
     },
     "rejected": {
       "type": "array",
-      "description": "Candidates inspected and deliberately not reported. Required so restraint survives the lane boundary.",
+      "description": "Candidates inspected and deliberately not raised. Required so restraint survives the lane boundary.",
       "items": {
         "type": "object",
         "additionalProperties": false,

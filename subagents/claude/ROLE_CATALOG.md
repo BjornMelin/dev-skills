@@ -16,11 +16,21 @@ to `agent-backups/claude-<timestamp>` beside the target directory before being o
 
 ## Routing matrix
 
-| Role | Model | Effort | Tools | Writes | Dispatched by |
+| Role | Model | Effort | Tools | Non-mutating by | Dispatched by |
 | --- | --- | --- | --- | --- | --- |
-| `interface-evidence-lane` | `opus` | `high` | Read, Grep, Glob, Bash | no | `better-interface` |
-| `interface-taste-lane` | `opus` | `high` | Read, Grep, Glob | no | `better-interface` |
-| `interface-consolidator` | `opus` | `high` | Read, Grep, Glob | no | `better-interface` |
+| `interface-evidence-lane` | `opus` | `high` | Read, Grep, Glob, Bash | **instruction** | `better-interface` |
+| `interface-taste-lane` | `opus` | `high` | Read, Grep, Glob | tool scope | `better-interface` |
+| `interface-consolidator` | `opus` | `high` | Read, Grep, Glob | tool scope | `better-interface` |
+
+**The evidence lane is not structurally read-only.** It holds `Bash` because inventory work
+needs it — `rg` sweeps, computed values, reading a build manifest — and omitting `Edit` and
+`Write` does not stop a shell from redirecting output or running `git`. Its body forbids
+writes explicitly, but that is prompt compliance, not enforcement. `permissionMode: plan`
+would add a real gate, except a parent session running `acceptEdits` or `bypassPermissions`
+takes precedence, and this workstation sets `defaultMode: bypassPermissions` — so it would not
+bind. Treat the lane as trusted-but-capable and do not describe it as sandboxed.
+
+The other two are genuinely read-only: no `Edit`, no `Write`, no `Bash`.
 
 ## Why these are roles, not one agent per domain
 

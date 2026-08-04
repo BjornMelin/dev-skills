@@ -58,6 +58,10 @@ Example skill path: `skills/docker-architect/SKILL.md`.
 - When replacing or retiring a skill, move the old source to flat `archive/skills/<skill-name>/` or an applicable optional `archive/skills/{gsap,native,rust}/<skill-name>/` group, add `archive.json` with `skill_archive.v1`, set `archived_path` to that full path, remove active catalog links, and verify with `codex-dev --json skills audit`. The leaf directory remains the hyphen-case skill name; group directories are never skills.
 - Set `kind: "snapshot"` in `archive.json` when archiving a previously installed global copy (for example `~/.agents/skills/<name>`) whose active `skills/<name>/` remains canonical. Snapshots allow `source_path: "~/.agents/skills/<name>"` and let the leaf name match an active entrypoint, which the audit reports as a warning instead of an error. See `archive/skills/README.md` for the full contract.
 - Custom subagent TOML names must be **snake_case** and must not shadow Codex built-ins (`default`, `worker`, `explorer`) unless explicitly requested.
+- Claude Code subagents live in `subagents/claude/agents/global/<name>.md` with YAML frontmatter, **hyphen-case**, filename matching `name`. `model` and `effort` are required and must be pinned explicitly; `model: inherit` is rejected. Validate and install with `python3 subagents/claude/scripts/sync_agents.py --validate` and `--target global|project`. Scope `tools` to the smallest surface that does the job, and if a role keeps `Bash` do not describe it as read-only — say non-mutating by instruction, because omitting `Edit`/`Write` does not stop a shell from writing.
+- A skill that defines review severity gives it its own `## Severity` section above **Review Output Format**, listing `HIGH`, `MEDIUM`, and `LOW` for that domain. An orchestrating skill needs that calibration, so it must not sit inside a section scoped to standalone reviews.
+- Prefer `references/` for a skill's long-form material. A vendored upstream skill may keep its original directory layout instead, so updates merge cleanly; document the exception in the skill body and expect the catalog to report `references: 0`.
+- Cross-skill hand-offs name the owner and stay non-blocking. When the named skill is not in this repository, phrase it as "prefer if available" and keep the local guidance self-sufficient; a standalone installer must never be routed to a skill it does not have.
 - Keep generated Rust docs and `target/` out of git; document Rust APIs by updating the relevant docs under `docs/reference/`.
 
 ## Testing Guidelines
@@ -71,8 +75,9 @@ following as the required focused gates based on touched files:
 - All skills: `for d in skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
 - Plugin skills: `for d in plugins/*/skills/*; do [ -f "$d/SKILL.md" ] && python3 tools/skill/quick_validate.py "$d"; done`
 - Local plugins: `node plugins/web-motion/scripts/validate-atomic-skills.mjs` and `find .claude-plugin plugins -type f -name '*.json' -exec jq empty {} +`
-- Python helpers: `python3 -m compileall -q skills tools subagents/codex/scripts`
+- Python helpers: `python3 -m compileall -q skills tools subagents/codex/scripts subagents/claude/scripts`
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents`
+- Claude subagent pack: `python3 subagents/claude/scripts/sync_agents.py --validate`
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
 - Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Bootstrap packs: `cargo run -q -p codex-dev -- --json bootstrap status`, `python3 tools/bootstrap/render_bootstrap_pack.py --validate`, render changed packs into temp directories only, and run the Codex subagent smoke matrix in `docs/runbooks/validation.md`

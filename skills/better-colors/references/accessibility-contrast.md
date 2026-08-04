@@ -6,19 +6,18 @@ Contrast is always measured between a **foreground color** (text, icon, or UI el
 
 ## Which algorithm decides
 
-APCA and WCAG 2 are different models, not two scales of one measurement. There is no exact
-conversion between an Lc value and a WCAG ratio, and a pair can pass one and fail the other.
-So the verdict rests on whichever standard the project is actually held to:
+The rule lives in this skill's Principle 3; it is restated here only as a reminder, and
+Principle 3 wins on any discrepancy:
 
 | Situation | Decides the verdict | The other one |
 | --- | --- | --- |
-| The project makes a formal WCAG 2.x conformance claim, or is under a legal or contractual accessibility requirement | **WCAG 2 ratio** | Report the Lc as supporting evidence |
+| Formal WCAG 2.x conformance claim, a legal or contractual requirement, or a named level (AA/AAA) in the request | **WCAG 2 ratio** | Report the Lc as supporting evidence |
 | Anything else (product work with no conformance claim) | **APCA Lc** | Report the WCAG ratio when it disagrees |
+| Cannot tell whether a conformance claim exists | **WCAG 2 ratio** | The stricter obligation to miss |
 
-When `better-accessibility` asks for a named WCAG level (AA or AAA), answer in WCAG ratios —
-that is a conformance question. Report the Lc alongside it, and when the two disagree, say so
-explicitly rather than picking the flattering number. Default to WCAG when you cannot tell
-whether a conformance claim exists: it is the stricter obligation to miss.
+`better-accessibility` decides whether contrast is required and how severe a failure is; this
+skill measures the pair and answers in the unit the table selects. When the two algorithms
+disagree, say so explicitly rather than picking the flattering number.
 
 ## APCA thresholds (recommended)
 

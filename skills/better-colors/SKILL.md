@@ -1,6 +1,6 @@
 ---
 name: better-colors
-description: "OKLCH color space and color usage for web projects: convert hex, rgb, or hsl to oklch, generate palettes, and theme with Tailwind v4. Use for color systems, contrast checks, and applying color with meaning. Covers oklch, chroma, hue drift, gamut, display p3, APCA and WCAG contrast, semantic color tokens, dark mode colors, accent color, and increased contrast."
+description: "OKLCH color space and color usage for web projects. Convert hex/rgb/hsl to oklch, generate palettes, check contrast, handle gamut boundaries, theme with Tailwind v4, and apply color with meaning. Triggers on oklch, color conversion, palette generation, contrast ratio, APCA, gamut, display p3, design tokens, semantic color tokens, hue drift, chroma, dark mode colors, accent color, color meaning, light and dark appearance, increased contrast."
 license: MIT
 metadata:
   version: "1.0.0"
@@ -52,6 +52,20 @@ oklch(0.8 0.05 200 / 0.5)
 Use three decimal places for L and C and up to three for H. Drop trailing zeros and format `-0` as `0`. OKLCH is Baseline 2023; when support requirements are unusually broad, check the target project's browser matrix instead of relying on a fixed global-coverage percentage.
 
 ### 3. Measure Contrast, Gamut, and Palette Behavior
+
+**This skill owns contrast measurement and which algorithm settles a verdict.** APCA and WCAG 2
+are different models with no exact conversion, so one rule decides:
+
+- A formal WCAG 2.x conformance claim, or a legal or contractual accessibility requirement, or
+  a named level such as AA or AAA in the request → **the WCAG ratio decides**. Report the Lc as
+  supporting evidence.
+- Anything else → **APCA `Lc` decides**. Report the WCAG ratio when the two disagree.
+- Cannot tell whether a conformance claim exists → use WCAG. It is the stricter obligation to miss.
+
+`better-accessibility` decides *whether* contrast is required for a given element and how severe
+a failure is; this skill measures the rendered pair and answers in whichever unit the rule above
+selects. Never report only the flattering number. Full thresholds are in
+[accessibility-contrast.md](references/accessibility-contrast.md).
 
 | Rule | Value |
 | --- | --- |

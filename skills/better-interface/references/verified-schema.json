@@ -1,12 +1,26 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "confirmed", "rejected", "coverage"],
+  "required": ["verdict", "confirmed", "rejected", "coverage", "verification"],
   "properties": {
     "verdict": {
       "type": "string",
-      "enum": ["Block", "Needs changes", "Approve", "No verdict"],
-      "description": "\"No verdict\" only when every lane failed; a total lane failure must never read as Approve."
+      "enum": ["Block", "Needs changes", "Approve", "Inconclusive", "No verdict"],
+      "description": "\"Approve\" requires every domain to be Clear or judged; use \"Inconclusive\" when any domain is Degraded or Not reviewed. \"No verdict\" only when every lane failed."
+    },
+    "verification": {
+      "type": "array",
+      "description": "Every check the lanes ran, carried through verbatim. The report mandates this section, so it cannot be dropped at consolidation.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["check", "result"],
+        "properties": {
+          "check": { "type": "string", "description": "The exact command or interaction steps." },
+          "result": { "type": "string" },
+          "verified": { "type": "boolean" }
+        }
+      }
     },
     "coverage": {
       "type": "array",

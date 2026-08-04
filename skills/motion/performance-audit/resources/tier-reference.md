@@ -414,19 +414,32 @@ Observed cost: **8ms per frame** on a page with ~1300 elements — consuming the
 2. Use `@property` with `inherits: false`
 3. Animate the target property directly instead of via a variable
 
-### React useLayoutEffect Thrashing
+### React useLayoutEffect: one-time measurement, not thrashing
 
-A common React pattern that causes thrashing:
+A common React pattern, frequently mis-graded:
 
 ```javascript
-// F-tier — read in useLayoutEffect triggers synchronous layout
+// NOT F-tier — one forced layout per `text` change, no read-after-write cycle
 useLayoutEffect(() => {
     if (element.scrollWidth > element.clientWidth) {
-        // Read
-        element.dataset.overflowing = "yes" // Write
+        // Read (forces layout once, on commit)
+        element.dataset.overflowing = "yes" // Write (no read follows)
     }
 }, [text])
 ```
+
+**Grade this a one-time measurement, not F-tier.** F-tier requires interleaved reads and
+writes forcing synchronous layout *multiple times per frame*; this reads once, writes once,
+and never reads again. It does cost a layout flush on commit, so it is not free — but calling
+it catastrophic produces false criticals, and the batching fix below is an optimisation rather
+than a correction.
+
+It becomes genuine F-tier when any of these hold, and you must show the evidence before
+grading it so:
+
+- the read/write pair runs inside a loop over multiple elements
+- it runs every frame (rAF, scroll, or resize handler) rather than on a state change
+- a second read follows the write in the same effect, re-forcing layout
 
 **Fix**: Use Motion's `frame` API to batch reads and writes:
 

@@ -1,6 +1,6 @@
 ---
 name: better-interface
-description: "Cross-discipline interface review and build across better-accessibility, better-layout, better-writing, better-typography, better-colors and better-ui. Use for a holistic UI audit or cross-discipline design review of a screen, flow, or feature, or to build one with the same rules applied forward. Modes: quick, core, full, build."
+description: "Cross-discipline interface review and build that coordinates better-accessibility, better-layout, better-writing, better-typography, better-colors and better-ui. Use for a holistic UI audit, a full interface review, or a cross-discipline design review of a screen, flow, feature, or product interface, or to build one with the same rules applied forward. Triggers on better-interface, full interface review, holistic UI audit, cross-discipline design review, review the whole interface. Modes: quick, core, full, build."
 license: MIT
 metadata:
   version: "1.0.0"
@@ -20,10 +20,13 @@ Infer the screen, flow, feature, or repository scope from the request and curren
 
 | Mode | Coverage | Finding cap |
 | --- | --- | --- |
-| `quick` | Primary user path and highest-traffic states; report only `HIGH` and `MEDIUM` issues | 5 |
-| `core` | Detect across all six domains, then judge only the domains that produced candidates | 8 |
-| `full` | Entire requested scope across all six domain skills, including empty, loading, error, and narrow-width states when present | 15 |
+| `quick` | Primary user path and highest-traffic states. Detect across all six domains; judge inline, no lanes. Report only `HIGH` and `MEDIUM` | 5 |
+| `core` | Detect across all six domains, then judge **at most two** — the domains whose candidates look most severe. Unjudged domains are reported `Detected only` | 8 |
+| `full` | Entire requested scope, including empty, loading, error, and narrow-width states when present. Detect across all six domains and judge **every domain that produced candidates** — no cap | 15 |
 | `build` | Implement the requested change, then self-review the diff against every domain in play | n/a |
+
+`core` is the deliberately cheap tier and is the only mode that leaves candidates unjudged.
+`full` means fully reviewed: if a domain produced candidates, it gets a judge lane.
 
 If the requested scope is too large to inspect credibly, narrow it to the highest-traffic complete flow and state the boundary. Never imply uninspected surfaces were reviewed.
 
@@ -35,7 +38,7 @@ Recon output is reusable. Pass it into every lane you dispatch so no lane re-der
 
 ### 3. Use Domain Skills as the Sources of Truth
 
-Before reviewing, confirm that all six owning skills below are available. Load and apply every available owner. In `quick` mode, inspect all six domains but spend depth only where the primary flow has evidence. In `core` and `full` mode, complete each available domain review before consolidation.
+Before reviewing, confirm that all six owning skills below are available. Load and apply every available owner. All four modes sweep all six domains for candidates; they differ only in how many of those domains get a judge lane, per the table in Principle 1. In `full` mode, every domain that produced candidates is judged before consolidation.
 
 Review in this order so foundational failures are not hidden by polish:
 
@@ -65,7 +68,7 @@ Split the work by task type, not by domain. Every domain decomposes the same way
 | **Judge** | Kill false positives against the source, assign severity, write the Before → After. | An `opus` lane, or this skill inline |
 | **Consolidate** | Dedupe by root cause, rank, cap, record restraint, emit the verdict. | Always this skill, inline |
 
-Detection is cheap and judgment is expensive, so **detect across all six domains every time and gate only the judge lanes on evidence**. A domain that produced no candidates costs nothing beyond its detection pass, and coverage is never silently narrowed. `core` judges at most two domains, `full` at most four; if more domains have candidates than the cap allows, judge the highest-severity ones and say which were left at candidate level.
+Detection is cheap and judgment is expensive, so **detect across all six domains every time and gate only the judge lanes on evidence**. A domain that produced no candidates costs nothing beyond its detection pass, and coverage is never silently narrowed. `full` judges every domain that produced candidates. `core` judges at most two and must mark the rest `Detected only` in the coverage table — never `Clear`, because an unjudged candidate is not the same as no candidate.
 
 Never send interface copy, visual design, motion, or naming decisions to a non-Claude model for judgment: those are taste calls. Detection of mechanical copy defects — terminology drift, inconsistent capitalization, non-verb-first labels, a placeholder restating its label — is a lint and may run anywhere.
 
@@ -75,15 +78,24 @@ If the host cannot run lanes, do the same passes inline in the review order abov
 
 Each lane prompt states: the resolved scope, the recon results from Principle 2, the one domain skill it must load, whether it is read-only, and the exact shape it must return. Lanes gather evidence; this skill decides.
 
-A lane returns `Domain`, `Evidence` (what was actually inspected), `Findings`, `Rejected` (candidates deliberately not reported, with the reason), `Verification`, and `Blocked` (anything in scope it could not inspect, or `None`). For a machine-checkable contract use [findings-schema.json](references/findings-schema.json); after judging, use [verified-schema.json](references/verified-schema.json). A lane emits no verdict and applies no cap — six lanes each emitting `Block` is six reports, not one.
+There are three distinct payloads, and using the wrong one is the most common way this breaks:
 
-`Rejected` is part of the contract because restraint cannot survive a lane boundary otherwise: a lane that discards its rejected candidates makes Principle 10 impossible to satisfy honestly.
+| Stage | Emits | Schema |
+| --- | --- | --- |
+| Inventory + detect | **Candidates** — `locations`, `observed`, `rule`, optional `measurement`. Explicitly **no severity and no fix**; assigning either is judgment | [candidate-schema.json](references/candidate-schema.json) |
+| Judge | **Findings** — the same root causes verified against source, now with `severity` and an actionable `after` | [findings-schema.json](references/findings-schema.json) |
+| Consolidate | The merged report: coverage for all six domains, deduped findings, rejected candidates, **verification**, one verdict | [verified-schema.json](references/verified-schema.json) |
+
+Every payload also carries `Domain`, `Evidence` (what was actually inspected), `Rejected` (candidates deliberately not raised, with the reason), `Verification`, and `Blocked` (anything in scope it could not inspect, or `None`). A detect or judge lane emits no verdict and applies no cap — six lanes each emitting `Block` is six reports, not one.
+
+`Rejected` is part of every contract because restraint cannot survive a lane boundary otherwise: a lane that discards its rejected candidates makes Principle 10 impossible to satisfy honestly. `Verification` is carried through consolidation for the same reason — the report mandates that section, so it cannot be dropped at the last hop.
 
 ### 6. Lane Failure Is Reported, Never Absorbed
 
 - A lane that errored or returned unusable output is **degraded coverage**. Say so explicitly; the remaining lanes' findings stand alone.
-- If every lane failed, there is **no verdict**. Report the failure and stop. A total lane failure must never read as a clean `Approve`.
-- Zero candidates across live lanes is a real result: report `Approve` with no findings.
+- **`Approve` requires complete coverage.** If any domain is `Degraded`, `Not reviewed`, or `Detected only`, the verdict is `Inconclusive` even when every live lane came back clean — the unreviewed domain is exactly where the unfound problem would be. Name the missing domains and what it would take to close them.
+- If every lane failed, there is **no verdict**. Report the failure and stop.
+- Zero candidates across *all six* domains, with none degraded, is a real result: report `Approve` with no findings.
 
 ### 7. Require Evidence
 
@@ -191,4 +203,6 @@ End with exactly one:
 
 - `Block` — one or more `HIGH` findings remain.
 - `Needs changes` — only `MEDIUM` or `LOW` findings remain.
-- `Approve` — no actionable findings remain and the claimed coverage was verified.
+- `Inconclusive` — no actionable findings in what was judged, but at least one domain is `Degraded`, `Not reviewed`, or `Detected only`. Name them.
+- `Approve` — no actionable findings remain and every one of the six domains was inspected and judged.
+- `No verdict` — every lane failed.

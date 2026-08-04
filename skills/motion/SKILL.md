@@ -21,21 +21,34 @@ Improve the animation capabilities of the agent.
 ## Where this skill sits
 
 This skill owns the Motion library and the Motion AI Kit: its APIs, spring and easing
-generation, and MotionScore grading. Adjacent owners:
+generation, and MotionScore grading. It is self-sufficient for all of that.
 
-| Concern | Owner |
-| --- | --- |
-| Motion craft judgment — which curve, how long, whether it earns its place | `emil-design-eng` |
-| Surfaces and icons: radius, shadows, image outlines, icon states | `better-ui` |
-| Finished CSS-only `t-*` transition recipes with motion tokens | `transitions-dev` |
-| GSAP, ScrollTrigger, SplitText, Flip | `gsap` |
-| Reduced-motion requirements and other accessibility rules | `better-accessibility` |
-| Native (Expo / React Native / Reanimated) motion | `expo-motion` |
-| Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin |
+Adjacent concerns have better owners **when those skills are installed**. Not all of them ship
+in this repository, so treat every row as "prefer if available, otherwise apply the guidance
+here" — never as a blocker:
 
-Use this skill for Motion API truth, generated spring and easing values, and performance
-grading. Take taste decisions from `emil-design-eng` and accessibility requirements from
-`better-accessibility`.
+| Concern | Prefer if available | In this repo? |
+| --- | --- | --- |
+| Motion craft judgment — which curve, how long, whether it earns its place | `emil-design-eng` | no |
+| Surfaces and icons: radius, shadows, image outlines, icon states | `better-ui` | yes |
+| Finished CSS-only `t-*` transition recipes with motion tokens | `transitions-dev` | no |
+| GSAP, ScrollTrigger, SplitText, Flip | `gsap` | yes |
+| Reduced-motion requirements and other accessibility rules | `better-accessibility` | yes |
+| Native (Expo / React Native / Reanimated) motion | `expo-motion` | yes |
+| Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin | yes |
+
+### Precedence where this skill and `better-ui` disagree
+
+Both are installed together often enough that the conflicts need settling:
+
+- **Existing Framer Motion projects.** `better-ui` says to preserve whichever package is
+  already installed and never mix import paths. That wins for an existing codebase: do not
+  migrate `framer-motion` imports to `motion/react` as part of an unrelated change. Migration
+  guidance in `codex/` applies only when the user has actually asked to migrate.
+- **`will-change`.** Use the measurable trigger: add it only after observing first-frame
+  stutter, on `transform`/`opacity`/`filter` only, and remove it when the animation ends.
+  A permanent `will-change` holds a compositor layer for the element's lifetime, which costs
+  more than the stutter it prevents.
 
 ## Tools this skill uses
 

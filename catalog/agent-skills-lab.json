@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-08-04T05:18:04.774138506Z",
+  "generatedAt": "2026-08-04T06:00:42.638284699Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "f282ca9b2c2fc2464d0611aaf688b26013d36bbe",
+  "sourceCommit": "72809d5bd5493dfb997ec7e887b1bc0d931618f0",
   "sourceRef": "main",
   "skillsCount": 74,
   "totalSkillDirectories": 74,
@@ -350,7 +350,7 @@
     {
       "name": "better-accessibility",
       "slug": "better-accessibility",
-      "description": "Accessibility (a11y) engineering for product interfaces. Use when building or reviewing UI components, modals, menus, forms, and custom widgets, or when keyboard, focus, or screen-reader behavior breaks. Covers WCAG, aria, aria-label, aria-live, focus-visible, focus trap, tabindex, keyboard navigation, screen reader, sr-only, alt text, hit area, touch target, semantic HTML, form errors, disabled buttons, skip link, and prefers-reduced-motion.",
+      "description": "Accessibility engineering for product interfaces, from focus states and keyboard support to ARIA, forms, and screen readers. Use when building or reviewing UI components, modals, menus, forms, custom widgets, or when the user says make this accessible or reports keyboard or screen-reader issues. Triggers on accessibility, a11y, WCAG, aria, focus ring, focus-visible, focus trap, keyboard navigation, tab order, tabindex, screen reader, sr-only, aria-live, alt text, hit area, touch target, prefers-reduced-motion, autoplay, toast duration, skip link, semantic HTML, aria-label, form errors, disabled buttons, not keyboard accessible.",
       "license": "MIT",
       "path": "skills/better-accessibility",
       "skillMdPath": "skills/better-accessibility/SKILL.md",
@@ -400,7 +400,7 @@
     {
       "name": "better-colors",
       "slug": "better-colors",
-      "description": "OKLCH color space and color usage for web projects: convert hex, rgb, or hsl to oklch, generate palettes, and theme with Tailwind v4. Use for color systems, contrast checks, and applying color with meaning. Covers oklch, chroma, hue drift, gamut, display p3, APCA and WCAG contrast, semantic color tokens, dark mode colors, accent color, and increased contrast.",
+      "description": "OKLCH color space and color usage for web projects. Convert hex/rgb/hsl to oklch, generate palettes, check contrast, handle gamut boundaries, theme with Tailwind v4, and apply color with meaning. Triggers on oklch, color conversion, palette generation, contrast ratio, APCA, gamut, display p3, design tokens, semantic color tokens, hue drift, chroma, dark mode colors, accent color, color meaning, light and dark appearance, increased contrast.",
       "license": "MIT",
       "path": "skills/better-colors",
       "skillMdPath": "skills/better-colors/SKILL.md",
@@ -450,7 +450,7 @@
     {
       "name": "better-interface",
       "slug": "better-interface",
-      "description": "Cross-discipline interface review and build across better-accessibility, better-layout, better-writing, better-typography, better-colors and better-ui. Use for a holistic UI audit or cross-discipline design review of a screen, flow, or feature, or to build one with the same rules applied forward. Modes: quick, core, full, build.",
+      "description": "Cross-discipline interface review and build that coordinates better-accessibility, better-layout, better-writing, better-typography, better-colors and better-ui. Use for a holistic UI audit, a full interface review, or a cross-discipline design review of a screen, flow, feature, or product interface, or to build one with the same rules applied forward. Triggers on better-interface, full interface review, holistic UI audit, cross-discipline design review, review the whole interface. Modes: quick, core, full, build.",
       "license": "MIT",
       "path": "skills/better-interface",
       "skillMdPath": "skills/better-interface/SKILL.md",
@@ -478,12 +478,12 @@
         "missing_scripts"
       ],
       "resources": {
-        "references": 2,
+        "references": 3,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 3
+        "total": 4
       },
       "exposure": {
         "readme_catalog": true,
@@ -498,7 +498,7 @@
     {
       "name": "better-layout",
       "slug": "better-layout",
-      "description": "Layout structure for web interfaces: grouping, alignment, spacing, and reading order. Use when structuring a page or component, deciding what collapses at small sizes, or reviewing frontend code for layout. Covers breakpoints, container queries, progressive disclosure, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, and logical properties.",
+      "description": "Layout structure for web interfaces, from grouping and alignment to reading order, progressive disclosure, and adaptive breakpoints. Use when structuring a page or component, spacing or aligning controls, deciding what collapses at small sizes, handling RTL layout direction, or reviewing frontend code for layout. Triggers on layout, spacing, alignment, grouping, negative space, whitespace, visual hierarchy, reading order, progressive disclosure, breakpoints, responsive layout, container queries, safe area, full-bleed, edge-to-edge, layout margins, RTL layout, logical properties.",
       "license": "MIT",
       "path": "skills/better-layout",
       "skillMdPath": "skills/better-layout/SKILL.md",
@@ -546,7 +546,7 @@
     {
       "name": "better-typography",
       "slug": "better-typography",
-      "description": "Web typography from choosing fonts to spacing, wrapping, and truncation. Use when picking or pairing typefaces, setting up a type scale, styling text in components, or reviewing a frontend for typography. Covers woff2, variable fonts, font-feature-settings, letter-spacing, line-height, type scale, heading hierarchy, tabular numbers, text-wrap, line clamp, measure, text-box, underlines, text-decoration, text selection, smart punctuation, drop cap, font smoothing, and iOS input zoom.",
+      "description": "Web typography from choosing fonts to spacing, wrapping and accessibility. Use when picking or pairing typefaces, configuring variable fonts or OpenType features, setting up a type scale, checking heading hierarchy, styling text in components, truncating text, styling underlines, selection, placeholders or carets, or reviewing frontend code for typography. Triggers on typography, fonts, font formats, woff2, variable fonts, font-weight, opentype, font-feature-settings, letter-spacing, line-height, type scale, heading hierarchy, heading levels, tabular numbers, text-wrap, truncation, line clamp, underlines, text-decoration, text selection, iOS input zoom, font smoothing, measure, line length, text-box, smart punctuation, drop cap.",
       "license": "MIT",
       "path": "skills/better-typography",
       "skillMdPath": "skills/better-typography/SKILL.md",
@@ -596,7 +596,7 @@
     {
       "name": "better-ui",
       "slug": "better-ui",
-      "description": "Design engineering details that make interfaces feel polished. Use when building UI components, implementing animations, hover states and micro-interactions, choosing icons, or any visual detail work -- including when something feels off or should feel better. Covers UI polish, design details, border radius, optical alignment, box shadows, image outlines, icons, icon stroke weight, icon states, stagger animations, and motion restraint.",
+      "description": "Design engineering principles for making interfaces feel polished. Use when building UI components, reviewing frontend code, implementing animations, hover states, shadows, borders, micro-interactions, enter/exit animations, choosing or reviewing icons, or any visual detail work. Triggers on UI polish, design details, make it feel better, feels off, stagger animations, border radius, optical alignment, image outlines, box shadows, icons, icon stroke weight, icon states, motion restraint.",
       "license": "MIT",
       "path": "skills/better-ui",
       "skillMdPath": "skills/better-ui/SKILL.md",
@@ -646,7 +646,7 @@
     {
       "name": "better-writing",
       "slug": "better-writing",
-      "description": "Interface copy and UX microcopy. Use when writing or reviewing any user-facing product text; docs and marketing prose belong to writing-guidelines. Covers microcopy, button labels, link text, error messages, empty states, placeholder text, settings labels, onboarding, notifications, capitalization, title case, and sentence case.",
+      "description": "UX writing and interface copy, from button labels to error messages and empty states. Use when writing or reviewing any user-facing text: button and link labels, form errors, placeholders, settings labels, onboarding flows, notifications, or empty states. Docs and marketing prose belong to writing-guidelines. Triggers on UX writing, microcopy, interface copy, product copy, copywriting, button labels, link text, error messages, empty states, placeholder text, settings labels, capitalization, title case, sentence case.",
       "license": "MIT",
       "path": "skills/better-writing",
       "skillMdPath": "skills/better-writing/SKILL.md",

@@ -1,6 +1,6 @@
 ---
 name: better-writing
-description: "Interface copy and UX microcopy. Use when writing or reviewing any user-facing product text; docs and marketing prose belong to writing-guidelines. Covers microcopy, button labels, link text, error messages, empty states, placeholder text, settings labels, onboarding, notifications, capitalization, title case, and sentence case."
+description: "UX writing and interface copy, from button labels to error messages and empty states. Use when writing or reviewing any user-facing text: button and link labels, form errors, placeholders, settings labels, onboarding flows, notifications, or empty states. Docs and marketing prose belong to writing-guidelines. Triggers on UX writing, microcopy, interface copy, product copy, copywriting, button labels, link text, error messages, empty states, placeholder text, settings labels, capitalization, title case, sentence case."
 license: MIT
 metadata:
   version: "1.0.0"
