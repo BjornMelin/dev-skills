@@ -323,6 +323,7 @@ for local development and validation commands.
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
 | `gsap` | Master GSAP skill for React/Next.js and vanilla JS: tweens, timelines, ScrollTrigger, the `useGSAP` hook, every free plugin (SplitText, MorphSVG, DrawSVG, Flip, Draggable), `gsap.utils`, performance, and reduced-motion — with a Next.js recipe cookbook and the `gsap-audit` CLI. | [skills/gsap/SKILL.md](skills/gsap/SKILL.md) |
+| `improve-ui` | Read-only design-system drift audit: prove each deviation from a documented design contract, then plan verified refinements. System consistency only — not a general UI review. | [skills/improve-ui/SKILL.md](skills/improve-ui/SKILL.md) |
 | `kimi-ui-agent` | Explicit-only Kimi-powered UI agent for repo profiling, adapter setup, and plan-first frontend worktree orchestration. | [skills/kimi-ui-agent/SKILL.md](skills/kimi-ui-agent/SKILL.md) |
 | `langgraph-multiagent` | LangGraph/LangChain multi-agent: supervisors, handoffs, RAG, memory, guardrails, migrations. | [skills/langgraph-multiagent/SKILL.md](skills/langgraph-multiagent/SKILL.md) |
 | `motion` | Motion/CSS animation via the Motion AI Kit: best practices, API and example search, CSS spring generation, transition visualisation, and MotionScore performance audits. | [skills/motion/SKILL.md](skills/motion/SKILL.md) |
@@ -358,6 +359,8 @@ for local development and validation commands.
 | `technical-writing` | Internal engineering docs: PRDs, specs, architecture, runbooks, migrations, and maintainer guides. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
 | `vitest-dev` | Vitest for TypeScript + Next.js: stable suites, fast local + CI, sharding. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
+| `wcag-audit-patterns` | WCAG 2.2 conformance audit: SC-numbered checklist, axe-core and Playwright harness, pa11y and Lighthouse CLI, and remediation guidance. | [skills/wcag-audit-patterns/SKILL.md](skills/wcag-audit-patterns/SKILL.md) |
+| `web-interface-guidelines` | Terse pre-commit sweep of UI code against the Vercel Web Interface Guidelines, across interaction, forms, layout, content, performance, and accessibility. | [skills/web-interface-guidelines/SKILL.md](skills/web-interface-guidelines/SKILL.md) |
 | `zod-v4` | Zod v4: schemas, v3 migration, errors, JSON Schema/OpenAPI, framework hooks. | [skills/zod-v4/SKILL.md](skills/zod-v4/SKILL.md) |
 
 ## Using these skills

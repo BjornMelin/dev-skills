@@ -1,0 +1,6 @@
+interface:
+  display_name: "Web Interface Guidelines"
+  short_description: "Terse Vercel guidelines sweep over a diff"
+  default_prompt: "Use $web-interface-guidelines for a fast checklist pass over UI code against the Vercel Web Interface Guidelines."
+policy:
+  allow_implicit_invocation: true
