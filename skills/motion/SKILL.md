@@ -37,18 +37,28 @@ here" — never as a blocker:
 | Native (Expo / React Native / Reanimated) motion | `expo-motion` | yes |
 | Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin | yes |
 
-### Precedence where this skill and `better-ui` disagree
+### Precedence: this section overrides the vendored directories
 
-Both are installed together often enough that the conflicts need settling:
+The capability directories below are upstream Motion content, kept in their original form so
+updates merge cleanly. Where they disagree with this section, **this section wins** — they were
+written for a greenfield Motion project, not for reviewing or extending someone else's codebase.
 
-- **Existing Framer Motion projects.** `better-ui` says to preserve whichever package is
-  already installed and never mix import paths. That wins for an existing codebase: do not
-  migrate `framer-motion` imports to `motion/react` as part of an unrelated change. Migration
-  guidance in `codex/` applies only when the user has actually asked to migrate.
-- **`will-change`.** Use the measurable trigger: add it only after observing first-frame
-  stutter, on `transform`/`opacity`/`filter` only, and remove it when the animation ends.
-  A permanent `will-change` holds a compositor layer for the element's lifetime, which costs
-  more than the stutter it prevents.
+- **Existing Framer Motion projects.** `codex/index.md` says "Never import from `framer-motion`"
+  and instructs migrating existing imports. Do **not** follow that as written. An unrequested
+  package migration breaks a working codebase, and `better-ui` requires preserving whichever
+  package is installed rather than mixing import paths. Read that instruction as: prefer
+  `motion` for a *new* project, and migrate only when the user has explicitly asked for a
+  migration.
+- **`will-change`.** `best-practices/index.md` says to set it whenever animating with CSS
+  transitions or independent transforms. Treat that as the upper bound, not the default. Add it
+  only after observing first-frame stutter, on `transform`/`opacity`/`filter` only, and remove
+  it when the animation ends — a permanent `will-change` holds a compositor layer for the
+  element's lifetime, which costs more than the stutter it prevents. This matches `better-ui`,
+  so a reviewer should not flag its absence on a smooth animation.
+- **Property tiers.** `performance-audit/` grades animated properties S–F. The tiers assume the
+  common case; a property is not compositable unconditionally, and a layout read is not a
+  thrash unless it repeats within a frame. Treat a tier as a starting hypothesis that needs the
+  surrounding code to confirm it, not a verdict.
 
 ## Tools this skill uses
 
@@ -80,7 +90,7 @@ checks come only from the runtime path. Property-tier classification comes from 
 
 ## If a required Motion MCP tool is unavailable
 
-This skill ships with an MCP server. Some tools expect this server to be running. If you attempt to use a tool that requires the MCP server and it is not found, tell the user:
+The Motion AI Kit provides an MCP server; this forked skill directory does not bundle it, and installing the skill does not install the server. Some capabilities above require it to be configured and running. If you attempt to use a tool that requires the MCP server and it is not found, tell the user:
 
 > This capability requires the Motion AI Kit. Install it from **https://motion.dev/docs/ai-kit**.
 

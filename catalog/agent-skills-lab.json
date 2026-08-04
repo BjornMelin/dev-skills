@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-08-04T09:08:22.426272380Z",
+  "generatedAt": "2026-08-04T09:40:04.670080127Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "41f44810fdb008454481e3146de29c1a46ab1dd2",
+  "sourceCommit": "69ca512749caa8779422b5274cdc97d55ff02206",
   "sourceRef": "main",
   "skillsCount": 74,
   "totalSkillDirectories": 74,
@@ -465,15 +465,16 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -487,7 +488,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/better-interface.skill",

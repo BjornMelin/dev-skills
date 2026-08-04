@@ -24,7 +24,12 @@ Shared review contract (put in BOTH lane prompts):
 
 ## Phase 1 - launch both lanes in parallel (same message)
 
-**Opus lane** - `Agent(model: 'opus', effort: 'high', run_in_background: true)`.
+**Opus lane** - dispatch a role whose tool scope is actually read-only rather than a generic
+agent: `Agent(subagent_type: 'interface-taste-lane', run_in_background: true)` if the
+`subagents/claude` pack is installed (it holds no `Edit`, `Write`, or `Bash`), otherwise
+`Agent(model: 'opus', effort: 'high', run_in_background: true)` **with the caveat that a
+generic agent's read-only-ness is prompt compliance, not tool scope** - say so in the report
+rather than claiming an enforced read-only review.
 Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
 \"opus-5\". Return ONLY a JSON object matching
 `<skill-dir>/references/findings-schema.json`
@@ -58,11 +63,16 @@ tier, which is retired.
 
 ## Phase 2 - lane failure semantics (never skip)
 
-- A lane that errored or returned unusable output = **degraded coverage**:
-  say so explicitly in the final report; the other lane's verdict stands alone.
+- A lane that errored or returned unusable output = **degraded coverage**: say so explicitly
+  in the final report. The surviving lane's *findings* stand, but its clean bill of health does
+  not - a single-lane review cannot conclude "ship", because the whole point of two lanes is
+  that each sees what the other misses.
 - BOTH lanes failed = **no verdict**. Report the failure and stop - a total
   lane failure must never read as a clean "ship".
-- Zero raw findings across live lanes = verdict "ship"; skip Phase 3.
+- Zero raw findings across **both live** lanes = verdict "ship"; skip Phase 3.
+- Zero findings but a degraded lane = **never "ship"**. Half a review that found nothing
+  is not evidence of nothing to find. Report the surviving lane's result explicitly as
+  partial coverage and name the lane that failed.
 
 ## Phase 3 - adversarial verify
 

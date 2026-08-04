@@ -23,7 +23,7 @@ Infer the screen, flow, feature, or repository scope from the request and curren
 | `quick` | Primary user path and highest-traffic states. Detect across all six domains; judge inline, no lanes. Report only `HIGH` and `MEDIUM` | 5 |
 | `core` | Detect across all six domains, then judge **at most two** — the domains whose candidates look most severe. Unjudged domains are reported `Detected only` | 8 |
 | `full` | Entire requested scope, including empty, loading, error, and narrow-width states when present. Detect across all six domains and judge **every domain that produced candidates** — no cap | 15 |
-| `build` | Implement the requested change, then self-review the diff against every domain in play | n/a |
+| `build` | Implement the requested change, then self-review the diff against the domains it touches. Selected-domain, not a six-domain sweep | 15, scoped to the diff |
 
 `core` is the deliberately cheap tier and is the only mode that leaves candidates unjudged.
 `full` means fully reviewed: if a domain produced candidates, it gets a judge lane.
@@ -38,7 +38,11 @@ Recon output is reusable. Pass it into every lane you dispatch so no lane re-der
 
 ### 3. Use Domain Skills as the Sources of Truth
 
-Before reviewing, confirm that all six owning skills below are available. Load and apply every available owner. All four modes sweep all six domains for candidates; they differ only in how many of those domains get a judge lane, per the table in Principle 1. In `full` mode, every domain that produced candidates is judged before consolidation.
+Before reviewing, confirm that all six owning skills below are available. Load and apply every available owner.
+
+The three **review** modes — `quick`, `core`, `full` — sweep all six domains for candidates and differ only in how many of those domains get a judge lane, per the table in Principle 1. In `full` mode, every domain that produced candidates is judged before consolidation.
+
+`build` is the exception: it is a **selected-domain** mode. A change touches the domains it touches, and sweeping the five you did not alter produces findings about code you did not write. Principle 14 governs how the selection is made and recorded; every domain still appears in the coverage table, with the unselected ones marked `Not in scope` and the reason.
 
 Review in this order so foundational failures are not hidden by polish:
 
@@ -84,25 +88,36 @@ So dispatch is a deliberate spend, and the mode ladder is a cost ladder:
 - `full` judges every domain that produced candidates and is expensive by design. Reach for it
   on a surface that matters, not as a default sweep.
 
-**Effort buys traversal depth, not polish.** The same lane, same file, measured at both tiers:
+**Effort buys traversal depth, not polish.** One detect lane, one 484-line component, run twice
+on the same non-Claude runtime at two reasoning tiers:
 
 | Reasoning effort | Wall clock | Tokens | Candidates |
 | --- | --- | --- | --- |
 | `high` | ~4 min | ~75k | 2 of 6 |
 | `max` | ~14 min | ~153k | 6 of 6 |
 
-The four the fast lane missed were not tail noise. It never entered `node_modules`, so it
+The four the fast tier missed were not tail noise. It never entered `node_modules`, so it
 missed both findings that required reading what the dialog primitive actually renders —
 including a high-confidence one, that focus never returns to the trigger because the ref the
 library restores through is unset. It also missed a 16×16 hit area inside a file it had
 already read.
 
-So match effort to mode rather than trying to economise inside a mode. `full` dispatches at
-maximum effort because tracing into a dependency is the thing that justifies dispatching at
-all. `quick` and `core` accept a shallower read by design and can run at a lower tier — a lane
-that only reads the component and its direct imports still catches the obvious failures at a
-third of the wall clock. What you must not do is run `full` at a fast tier and report it as
-full coverage.
+Treat that as one data point on one file, not a law: it establishes that the tiers differ in
+how far they traverse, not a fixed ratio you can plan capacity against. Re-measure on your own
+surface before relying on the numbers.
+
+**Where the tier is actually selectable.** Only on a lane you dispatch to an external runtime
+with an explicit effort flag. The Claude role agents in `subagents/claude/` are pinned to
+`effort: high` in their definitions, deliberately: `model-routing` holds that
+verification-shaped work never gets a higher tier, and two diverse high lanes beat one deeper
+lane for error decorrelation. The Agent tool has no effort parameter, so there is nothing to
+override at the call site either.
+
+So the modes differ by **how many lanes run and how deep the sweep goes**, not by reasoning
+tier. `full` judges every domain with candidates; `core` judges at most two. When a detect lane
+runs on an external runtime, give `full` the deeper tier and `quick`/`core` the faster one, and
+record which tier actually ran in **Scope and Coverage**. What you must not do is run a
+shallower sweep and report it as full coverage.
 
 Never send interface copy, visual design, motion, or naming decisions to a non-Claude model for judgment: those are taste calls. Detection of mechanical copy defects — terminology drift, inconsistent capitalization, non-verb-first labels, a placeholder restating its label — is a lint and may run anywhere.
 
@@ -116,11 +131,25 @@ There are three distinct payloads, and using the wrong one is the most common wa
 
 | Stage | Emits | Schema |
 | --- | --- | --- |
-| Inventory + detect | **Candidates** — `locations`, `observed`, `rule`, optional `measurement`. Explicitly **no severity and no fix**; assigning either is judgment | [candidate-schema.json](references/candidate-schema.json) |
+| Inventory + detect | **Candidates** — `locations`, `observed`, `rule`, `measurement`. Explicitly **no severity and no fix**; assigning either is judgment | [candidate-schema.json](references/candidate-schema.json) |
 | Judge | **Findings** — the same root causes verified against source, now with `severity` and an actionable `after` | [findings-schema.json](references/findings-schema.json) |
 | Consolidate | The merged report: coverage for all six domains, deduped findings, rejected candidates, **verification**, one verdict | [verified-schema.json](references/verified-schema.json) |
 
-Every payload also carries `Domain`, `Evidence` (what was actually inspected), `Rejected` (candidates deliberately not raised, with the reason), `Verification`, and `Blocked` (anything in scope it could not inspect, or `None`). A detect or judge lane emits no verdict and applies no cap — six lanes each emitting `Block` is six reports, not one.
+The two **lane** payloads share a root shape: `domain`, `evidence` (what was actually
+inspected), the candidate or finding array, `rejected`, `verification`, and `blocked` (anything
+in scope the lane could not inspect, or `"None"`). They differ only in that array.
+
+The **consolidated** payload is a different shape and deliberately so: it is the parent's
+synthesis, not a lane's report, so it has no single `domain` or `blocked` — per-domain state
+lives in its `coverage` array instead, and per-lane `blocked` is folded into that domain's
+`state`. Do not send a lane payload where a consolidated one is expected.
+
+Every field these schemas declare is **required**, including the ones that are conceptually
+optional. Strict structured outputs cannot express an omitted key, so `measurement`,
+`confidence`, `principle`, `verified`, and `degradedCoverage` are required-and-nullable: emit
+`null`, never leave them out.
+
+A detect or judge lane emits no verdict and applies no cap — six lanes each emitting `Block` is six reports, not one. The mode's finding cap is applied by this skill after consolidation, because a schema cannot see which mode is running.
 
 `Rejected` is part of every contract because restraint cannot survive a lane boundary otherwise: a lane that discards its rejected candidates makes Principle 11 impossible to satisfy honestly. `Verification` is carried through consolidation for the same reason — the report mandates that section, so it cannot be dropped at the last hop.
 
@@ -145,6 +174,11 @@ asymmetric by stage:
 When a lane does consult an external source, it cites the source and the version it applies to,
 in the same `Verification` entry as the check. A judged finding that rests on documentation
 rather than on the code in front of it must say so, so the reader can weigh it.
+
+This table is a **correctness convention, not a sandbox**. A lane with shell access can reach
+the network whatever this says; the rule exists so findings stay anchored to the version the
+project actually installs, not to guarantee isolation. Treat a lane that ignores it as having
+produced an unreliable finding, and check the `Verification` entries to tell.
 
 ### 7. Lane Failure Is Reported, Never Absorbed
 
@@ -247,10 +281,15 @@ code existed. If a domain in play has no criteria from step 2, that is the gap t
 Run the checks per Principle 12 and report the exact commands and results. A build that
 type-checks but was never rendered is `Not verified` on anything visual, and should say so.
 
-Output the consolidated report scoped to the diff, with all named domains in the coverage
-table and the same verdict ladder. `Approve` still requires complete coverage of the domains
-you named — a build whose accessibility criteria were never checked is `Inconclusive`, not
-`Approve`.
+Output the consolidated report scoped to the diff, capped at 15 findings, using the same verdict
+ladder. All six domains still appear in the coverage table: the ones you selected carry their
+result, and the ones you did not carry `Not in scope` plus the reason the change does not touch
+them — "no user-facing copy changed", "no color or token was altered". That is what makes the
+selection auditable instead of an omission.
+
+`Approve` requires complete coverage **of the domains you selected**. A build whose
+accessibility criteria were never checked is `Inconclusive`. A domain honestly marked
+`Not in scope` does not block `Approve`; a domain you selected and then skipped does.
 
 ## Common Mistakes
 

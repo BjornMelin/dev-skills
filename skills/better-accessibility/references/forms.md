@@ -46,7 +46,7 @@ The complete pattern:
 
 ## Autocomplete and input types
 
-`autocomplete` with a meaningful `name` fills forms in one tap and is a WCAG requirement (1.3.5) for fields about the user. The common tokens:
+`autocomplete` with a meaningful `name` fills forms in one tap. WCAG 1.3.5 (AA) requires that the *purpose* of an input collecting information about the user be programmatically determinable; `autocomplete` with one of the spec's defined tokens is the technique that satisfies it on the web, so in practice this is how you meet it. It applies to fields about the user, not to every input. The common tokens:
 
 | Field | `autocomplete` |
 | --- | --- |

@@ -70,11 +70,12 @@ codex exec -m gpt-5.6-luna -c model_reasoning_effort="max" -s read-only --cd <re
 
 ## Effort
 
-Always pin effort explicitly - sol's vendor default is `low`. Per MODELS.md
-(2026-07-24 recalibration): `"high"` (Sol worker) is the standard review tier;
-`"medium"` only for trivial bounded diffs. **Never xhigh or ultra.** If a Sol-high
-review still leaves material doubt, escalate per MODELS.md: Root resolves the
-hard part inline, or one independent `gpt-5.6-terra` `"max"` adversarial pass.
+Always pin effort explicitly - never inherit a vendor default. Per MODELS.md,
+`gpt-5.6-luna` at `"max"` is the review tier; `"high"` only for a fast look at a
+small diff where latency matters more than depth. The Sol worker tiers are
+retired. If a Luna max review still leaves material doubt, escalate per
+MODELS.md: one independent `gpt-5.6-terra` `"max"` adversarial pass, then Root
+resolves the hard part inline.
 
 References adapted from openai/codex-plugin-cc (Apache-2.0; see references/NOTICE
 and the full license text in references/LICENSE).

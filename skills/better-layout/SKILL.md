@@ -67,7 +67,7 @@ Plan for substantial and language-dependent string growth rather than relying on
 
 ### 11. Let Flex and Grid Children Shrink
 
-A flex or grid item's default minimum size is its content, not zero — so a long unbroken string, a wide table, or a `<pre>` block pushes its parent wider instead of wrapping or truncating, and the overflow surfaces somewhere else entirely. Set `min-inline-size: 0` (or `min-width: 0`) on the shrinking child, or `overflow: hidden`, which has the same effect.
+A flex or grid item's default minimum size is its content, not zero — so a long unbroken string, a wide table, or a `<pre>` block pushes its parent wider instead of wrapping or truncating, and the overflow surfaces somewhere else entirely. Set `min-inline-size: 0` (or `min-width: 0`) on the shrinking child. Any `overflow` other than `visible` also zeroes that automatic minimum, which is why `overflow: hidden` appears to fix it — but it clips the content and establishes a new formatting context as well, so reach for the explicit `min-inline-size: 0` unless you actually wanted those.
 
 This is the mechanical cause of most "the layout blows out at narrow widths" bugs, and of truncation that silently does nothing: `text-overflow: ellipsis` cannot engage on a child that never gets smaller than its content. Truncation mechanics belong to `better-typography`; making room for them is this skill's job.
 

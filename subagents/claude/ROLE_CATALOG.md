@@ -66,5 +66,13 @@ Every role body follows the same shape used by the Codex pack:
 - Return a stable, declared shape — here, JSON validated against the schemas in
   `skills/better-interface/references/`.
 
-All three are read-only. None has `Edit` or `Write`; the review path never mutates a
-repository, and `better-interface` applies fixes itself in `build` mode.
+None of the three has `Edit` or `Write`, and `better-interface` applies fixes itself in `build`
+mode. But see the caveat above: only the taste lane and the consolidator are read-only *by tool
+scope*. The evidence lane holds `Bash`, so its non-mutation — and the router's rule that detect
+lanes must not fetch external documentation — are **instructions it follows, not limits the
+harness imposes**. A shell can write, and it can reach the network. Do not describe that lane as
+sandboxed, and do not rely on the external-doc rule as a security boundary; it is a
+correctness convention that keeps findings anchored to the installed version.
+
+If you need either property enforced rather than requested, drop `Bash` from the role and move
+shell-dependent inventory to the orchestrator, which already runs the external-runtime lanes.

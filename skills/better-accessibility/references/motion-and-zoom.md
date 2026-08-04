@@ -54,13 +54,13 @@ Animations must be interruptible and driven by user input; nothing should autopl
 
 Motion the user didn't ask for, and UI that acts on its own schedule:
 
-- **No autoplaying media without visible controls** (WCAG 2.2.2): anything that moves, blinks or updates automatically for more than 5 seconds needs a visible pause/stop control. Muted looping hero videos included.
+- **No autoplaying media without visible controls** (WCAG 2.2.2): moving, blinking, or scrolling content needs a visible pause, stop, or hide control when all three hold — it starts automatically, it lasts more than 5 seconds, and it is presented alongside other content. Auto-updating information has the same requirement. Muted looping hero videos are covered; a full-screen loader with nothing beside it is not, and motion that is essential to the activity is exempt. Treat the three conditions as the test, not the 5 seconds alone.
 - **Prefer explicit dismissal over timers.** Auto-dismissing toasts are acceptable only for low-stakes confirmations; anything containing an action, an error, or information the user may need to act on stays until dismissed. If a toast must time out, 5 seconds is the floor, and hovering or focusing it pauses the timer.
 - **Never put critical information only in a timed element.** A vanished toast with the only link to an undo action is data loss on a schedule.
 
 ## Zoom and reflow
 
-- **200% zoom** (WCAG 1.4.4): all content and functionality must survive text scaled to 200%. Never block zoom: no `user-scalable=no`, no `maximum-scale=1`. Safari ignores the cap but every other browser enforces it.
+- **200% zoom** (WCAG 1.4.4): all content and functionality must survive text scaled to 200%. Never block zoom: no `user-scalable=no`, no `maximum-scale=1`. Browser handling of those viewport values varies and has changed over time — several now ignore them precisely because blocking zoom is a failure — so treat the attribute as a defect regardless of whether the current browser happens to honour it.
 - **Reflow at 320px** (WCAG 1.4.10): at 400% zoom on a 1280px viewport (equivalent to a 320px viewport) the page must work with vertical scrolling only: no two-dimensional scrolling except for genuinely 2D content (tables, maps, code blocks), which scroll inside their own container.
 
 Fixed heights are what break under zoom: use `min-height` on anything containing text and let containers grow.

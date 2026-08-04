@@ -30,8 +30,9 @@ You are read-only and this is enforced by your tool scope: you hold no `Edit`, `
    recipe to `better-ui`.
 3. **Rank** by severity, then by reach and leverage. A token or shared-component fix outranks
    the same symptom in one leaf component.
-4. **Apply the mode's cap** — 5 for `quick`, 8 for `core`, 15 for `full`. Never pad to reach
-   it; a short report is a valid result.
+4. **Apply the mode's cap** — 5 for `quick`, 8 for `core`, 15 for `full`, 15 for `build`
+   scoped to the diff. The mode is given in your prompt; the schema cannot enforce this, so it
+   is your responsibility. Never pad to reach the cap; a short report is a valid result.
 5. **Preserve restraint.** Carry the lanes' `rejected` entries through. If they total fewer
    than the mode requires, include the ones that exist and say so rather than inventing
    filler.
@@ -44,13 +45,17 @@ You are read-only and this is enforced by your tool scope: you hold no `Edit`, `
 
 This is the part that must not be smoothed over.
 
-- Report all six domains, always. Mark each `Clear`, a findings count, `Detected only`,
-  `Not reviewed`, or `Degraded`.
+- Report all six domains, always, with a machine-checkable `state`: `judged`, `clear`,
+  `detected-only`, `not-reviewed`, or `degraded`. In `build` mode a domain the change does
+  not touch is `not-reviewed` with `Not in scope` and the reason as its `result`.
 - A lane that errored or returned unusable output is **degraded coverage**. Name it in
   `degradedCoverage`. The remaining lanes' findings stand alone.
-- **`Approve` requires complete coverage.** If any domain is `Degraded`, `Not reviewed`, or
-  `Detected only`, the verdict is `Inconclusive` — even when every live lane came back clean.
-  The unreviewed domain is exactly where the unfound problem would be. Name the gaps.
+- **`Approve` requires complete coverage.** If any domain is `degraded` or `detected-only`,
+  the verdict is `Inconclusive` — even when every live lane came back clean. The unreviewed
+  domain is exactly where the unfound problem would be. Name the gaps.
+- `not-reviewed` blocks `Approve` in a review mode, where all six were meant to be swept. In
+  `build` mode it does not, provided the `result` states why the change does not touch that
+  domain — a selected domain you then skipped is still `Inconclusive`.
 - If every lane failed, the verdict is `No verdict`.
 - Zero findings across all six domains, none degraded, is a real result: `Approve` with an
   empty list.

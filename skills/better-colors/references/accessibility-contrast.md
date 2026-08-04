@@ -21,7 +21,9 @@ disagree, say so explicitly rather than picking the flattering number.
 
 ## APCA thresholds (recommended)
 
-APCA (Accessible Perceptual Contrast Algorithm) is more perceptually accurate than WCAG 2 and pairs naturally with oklch since both are grounded in perceptual lightness. Use APCA as the default.
+APCA (Accessible Perceptual Contrast Algorithm) models perceived contrast better than WCAG 2's luminance ratio and pairs naturally with oklch, since both are grounded in perceptual lightness. Use it as the default for product work, per the rule above.
+
+It is not a ratified conformance standard: APCA is in development for WCAG 3, and the thresholds below are a simplified reading of its font-size and weight lookup table rather than normative levels. That is exactly why a conformance claim falls back to WCAG 2 — cite Lc as design evidence, never as a compliance result.
 
 Lc (Lightness Contrast) measures the perceived contrast between foreground and background. These levels are simplified from APCA's full font-size/weight lookup table:
 

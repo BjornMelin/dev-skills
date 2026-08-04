@@ -30,10 +30,16 @@ decisions to codex.
 | maximum intelligence | `gpt-5.6-terra` + `"max"` | one independent adversarial check or alternate solution, and the rare task Luna max cannot carry |
 | last resort | `gpt-5.6-sol` + `"max"` | rare and root-gated; burns quota disproportionately |
 
-Luna is ~80% cheaper than when the old Sol ladder was written and its weekly
-limits are effectively unlimited, so it is the default at max effort. Terra came
-down ~20% and earns its premium over Luna max only when the last few points of
-capability are load-bearing. The Sol medium/high worker tiers are retired.
+Rationale, per the MODELS.md recalibration dated 2026-08-01: Luna is
+substantially cheaper than when the old Sol ladder was written and its weekly
+limits are effectively unlimited, so it is the default at max effort; Terra
+earns its premium over Luna max only when the last few points of capability are
+load-bearing. The Sol medium/high worker tiers are retired.
+
+These are commercial terms, not stable facts — they were true at that
+recalibration and will drift. Re-check them against current provider pricing
+before treating cost as the reason for a routing decision, and prefer the
+measured latency figures below, which do not depend on pricing.
 
 **Quota is no longer the binding constraint on Luna; wall-clock is.** Measured on
 one read-only analysis lane over a single component and its imports:

@@ -51,32 +51,54 @@
     },
     "coverage": {
       "type": "array",
-      "description": "All six domains, always.",
+      "description": "Exactly one entry per domain, all six, always. Absence is not how a domain is excluded -- use the result field.",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": [
           "domain",
           "evidence",
-          "result"
+          "result",
+          "state"
         ],
         "properties": {
           "domain": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "better-accessibility",
+              "better-layout",
+              "better-writing",
+              "better-typography",
+              "better-colors",
+              "better-ui"
+            ]
           },
           "evidence": {
             "type": "string"
           },
           "result": {
             "type": "string",
-            "description": "Findings count, \"Clear\", \"Detected only\", \"Not reviewed\", or \"Degraded\"."
+            "description": "Findings count as a string, or one of the reserved words."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "judged",
+              "clear",
+              "detected-only",
+              "not-reviewed",
+              "degraded"
+            ],
+            "description": "Machine-checkable coverage state. Approve requires every domain to be judged or clear."
           }
         }
-      }
+      },
+      "minItems": 6,
+      "maxItems": 6
     },
     "confirmed": {
       "type": "array",
-      "description": "Deduped by root cause, ordered by severity then reach, capped by mode.",
+      "description": "Deduped by root cause, ordered by severity then reach. The mode cap (5 quick / 8 core / 15 full) is enforced by the orchestrator after validation; a schema cannot see the mode.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -146,7 +168,7 @@
         "string",
         "null"
       ],
-      "description": "Named lanes that errored or returned unusable output, or omit when none did."
+      "description": "Named lanes that errored or returned unusable output. Required: use null when none did -- strict structured outputs cannot express an omitted key."
     }
   }
 }

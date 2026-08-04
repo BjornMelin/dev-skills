@@ -113,8 +113,11 @@ def validate(agent: Agent) -> list[str]:
     for key in LIST_OR_STRING_KEYS & set(meta):
         if not isinstance(meta[key], (str, list)):
             errors.append(f"'{key}' must be a string or list, got {type(meta[key]).__name__}")
-    if "maxTurns" in meta and not isinstance(meta["maxTurns"], int):
-        errors.append("'maxTurns' must be an integer")
+    if "maxTurns" in meta:
+        turns = meta["maxTurns"]
+        # bool is a subclass of int, so isinstance(True, int) is True -- reject it explicitly.
+        if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
+            errors.append("'maxTurns' must be a positive integer")
 
     name = meta.get("name")
     if isinstance(name, str) and name:
@@ -152,21 +155,37 @@ def discover() -> tuple[list[Agent], list[str]]:
     return agents, errors
 
 
-def check_target_safe(target: Path) -> list[str]:
-    """Refuse to install through a symlink, at the directory or the file level."""
+def check_path_chain(path: Path, label: str) -> list[str]:
+    """Reject a symlink anywhere in `path` or any of its ancestors.
+
+    Checking only the first couple of ancestors is not enough: a symlink higher up redirects
+    the whole subtree just as effectively, so walk the chain to the root.
+    """
     errors = []
-    if target.is_symlink():
-        errors.append(f"target directory is a symlink: {target} -> {os.readlink(target)}")
-    elif target.exists() and not target.is_dir():
-        errors.append(f"target exists and is not a directory: {target}")
-    for parent in list(target.parents)[:2]:
+    if path.is_symlink():
+        errors.append(f"{label} is a symlink: {path} -> {os.readlink(path)}")
+    elif path.exists() and not path.is_dir():
+        errors.append(f"{label} exists and is not a directory: {path}")
+    for parent in path.parents:
         if parent.is_symlink():
-            errors.append(f"target parent is a symlink: {parent}")
+            errors.append(f"{label} ancestor is a symlink: {parent} -> {os.readlink(parent)}")
     return errors
 
 
+def check_target_safe(target: Path, backup_root: Path) -> list[str]:
+    """Refuse to install or back up through a symlink, at any level.
+
+    The backup directory is checked too: it is written before the destination is replaced, so
+    a symlink there redirects the copy of the file being overwritten.
+    """
+    return check_path_chain(target, "target directory") + check_path_chain(
+        backup_root, "backup directory"
+    )
+
+
 def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
-    unsafe = check_target_safe(target)
+    backup_root = target.parent / "agent-backups"
+    unsafe = check_target_safe(target, backup_root)
     for dst in (target / a.path.name for a in agents):
         if dst.is_symlink():
             unsafe.append(f"destination is a symlink: {dst} -> {os.readlink(dst)}")
@@ -179,7 +198,9 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
     if not dry_run:
         target.mkdir(parents=True, exist_ok=True)
 
-    backup_dir = target.parent / "agent-backups" / f"claude-{stamp()}"
+    # mkdtemp gives an exclusive directory, so two installs in the same second cannot
+    # collide and overwrite each other's backups.
+    backup_dir: Path | None = None
     wrote = False
     for agent in agents:
         dst = target / agent.path.name
@@ -191,7 +212,12 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
             print(f"  would sync {agent.name} -> {dst}")
             continue
         if dst.exists():
-            backup_dir.mkdir(parents=True, exist_ok=True)
+            if dst.is_symlink():  # re-check: the earlier scan is a separate moment in time
+                print(f"UNSAFE destination became a symlink: {dst}", file=sys.stderr)
+                return 1
+            if backup_dir is None:
+                backup_root.mkdir(parents=True, exist_ok=True)
+                backup_dir = Path(tempfile.mkdtemp(dir=backup_root, prefix=f"claude-{stamp()}-"))
             shutil.copy2(dst, backup_dir / dst.name)
         # stage beside the target so os.replace is atomic (same filesystem), then swap
         fd, tmp = tempfile.mkstemp(dir=target, prefix=f".{dst.name}.", suffix=".tmp")
@@ -208,7 +234,7 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
         wrote = True
         print(f"  synced     {agent.name} -> {dst}")
 
-    if wrote and backup_dir.exists():
+    if wrote and backup_dir is not None:
         print(f"backups: {backup_dir}")
     return 0
 

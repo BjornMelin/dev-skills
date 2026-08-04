@@ -111,6 +111,12 @@ out of version control.
   React Native motion guidance for Reanimated, Worklets, gestures, assets, and
   reduced motion.
 - [Expo Motion Audit Reference](reference/expo-motion-audit.md)
+- [Interface Skill Suite](../skills/better-interface/SKILL.md): cross-discipline
+  interface review and build across accessibility, layout, writing, typography,
+  color, and UI polish. Four modes (`quick`, `core`, `full`, `build`), a
+  detect/judge/consolidate lane pipeline with JSON hand-back schemas in
+  `skills/better-interface/references/`, and the read-only lane roles in
+  [`subagents/claude`](../subagents/claude/ROLE_CATALOG.md).
 - [`kimi-ui-agent`](reference/kimi-ui-agent.md)
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)
