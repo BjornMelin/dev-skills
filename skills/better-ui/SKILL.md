@@ -63,7 +63,9 @@ Add a subtle `1px` outline with low opacity to images for consistent depth. The 
 
 ### 9. Scale on Press
 
-A subtle `scale(0.96)` on click gives buttons tactile feedback. Always use `0.96`. Never use a value smaller than `0.95`: anything below feels exaggerated. Add a `static` prop to disable it when motion would be distracting.
+A subtle scale on click gives buttons tactile feedback. Use `0.96` when there is nothing else to follow; `0.95`–`0.97` all read as a press and the difference is imperceptible, so a project's own motion system or a sibling skill's value wins over this one. What matters is the floor: never go below `0.95`, where the press starts to read as a bounce.
+
+Apply it consistently — a page where some buttons respond to press and others don't feels broken in a way no single button does. Add a `static` prop to disable it where motion would be distracting.
 
 ### 10. Skip Animation on Page Load
 

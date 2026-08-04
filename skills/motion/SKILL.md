@@ -23,19 +23,19 @@ Improve the animation capabilities of the agent.
 This skill owns the Motion library and the Motion AI Kit: its APIs, spring and easing
 generation, and MotionScore grading. It is self-sufficient for all of that.
 
-Adjacent concerns have better owners **when those skills are installed**. Not all of them ship
-in this repository, so treat every row as "prefer if available, otherwise apply the guidance
-here" — never as a blocker:
+Adjacent concerns have better owners. Treat every row as "prefer if available, otherwise apply
+the guidance here" — never as a blocker. Check availability at runtime rather than assuming
+either way; a static list of what is installed rots the moment the estate changes.
 
-| Concern | Prefer if available | In this repo? |
-| --- | --- | --- |
-| Motion craft judgment — which curve, how long, whether it earns its place | `emil-design-eng` | no |
-| Surfaces and icons: radius, shadows, image outlines, icon states | `better-ui` | yes |
-| Finished CSS-only `t-*` transition recipes with motion tokens | `transitions-dev` | no |
-| GSAP, ScrollTrigger, SplitText, Flip | `gsap` | yes |
-| Reduced-motion requirements and other accessibility rules | `better-accessibility` | yes |
-| Native (Expo / React Native / Reanimated) motion | `expo-motion` | yes |
-| Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin | yes |
+| Concern | Prefer |
+| --- | --- |
+| Motion craft judgment — which curve, how long, whether it earns its place | `emil-design-eng` |
+| Surfaces and icons: radius, shadows, image outlines, icon states | `better-ui` |
+| Finished CSS-only `t-*` transition recipes with motion tokens | `transitions-dev` |
+| GSAP, ScrollTrigger, SplitText, Flip | `gsap` |
+| Reduced-motion requirements and other accessibility rules | `better-accessibility` |
+| Native (Expo / React Native / Reanimated) motion | `expo-motion` |
+| Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin |
 
 ### Precedence: this section overrides the vendored directories
 
