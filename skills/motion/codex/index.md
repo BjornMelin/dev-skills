@@ -6,7 +6,7 @@ Call it **before** implementing any non-trivial animation. Drag, sliders, reveal
 
 ## 1. Search
 
-```
+```text
 search-motion-codex({ platform, searchTerm })
 ```
 
@@ -41,12 +41,16 @@ The response embeds adaptation rules. Follow them:
 -   Adapt colours, fonts, and styling to the host project; match its conventions (use Tailwind classes in a Tailwind project, etc.).
 -   Install any referenced packages.
 -   **Never import from `framer-motion`** — only from `motion`. Migrate any existing `framer-motion` imports.
--   If example code imports from **`motion-plus`**, it is required — do not substitute or work around it. Install it from the Motion registry:
+-   Use the platform's own import path: `motion/react` when the platform is `react`, `motion-v` when it is `vue`, and bare `motion` only for vanilla JavaScript. A bare `motion` import in a React project resolves to the wrong entry point.
+-   If example code imports from **`motion-plus`**, it is required — do not substitute or work around it. Install it from the Motion registry with the token from an environment variable, never pasted into the command line:
 
-```
-npm install "https://api.motion.dev/registry.tgz?package=motion-plus&version=latest&token=YOUR_AUTH_TOKEN"
+```shell
+npm install "https://api.motion.dev/registry.tgz?package=motion-plus&version=latest&token=${MOTION_TOKEN}"
 ```
 
-Tell the user to generate a Motion+ token at **https://motion.dev/dashboard/tokens** and swap it into the install URL. Never ask the user for the token directly.
+Require `MOTION_TOKEN` to be set in the shell or CI environment; tell the user to generate a
+Motion+ token at **https://motion.dev/dashboard/tokens** and export it. Never ask the user for
+the token directly, and never let it appear in shell history or the URL of a committed
+artifact.
 
 -   Saved transitions: Where appropriate, you can use a user's saved transitions in place of the transitions in the docs/examples. Choose an appropriate transition (if any) - no super bouncy springs on a wedding website for instance.

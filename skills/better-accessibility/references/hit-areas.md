@@ -39,6 +39,7 @@ If the visible element is smaller (e.g., a 20×20 checkbox), extend the hit area
 /* Small checkbox with expanded 44px hit area, on the wrapping label */
 .checkbox-label {
   position: relative;
+  display: inline-block; /* a non-replaced inline label ignores width/height */
   width: 20px;
   height: 20px;
 }
@@ -81,6 +82,10 @@ If the extended hit area overlaps another interactive element, shrink the pseudo
 
 ## Touch behavior
 
-- Add `touch-action: manipulation` to interactive elements to remove the double-tap-to-zoom delay on mobile.
+- Apply `touch-action: manipulation` only where double-tap-to-zoom is intentionally
+  unnecessary for that control and the touch interaction has been tested. It removes the
+  double-tap zoom gesture (keeping panning and pinch-zoom), so it is not a universal tap-delay
+  fix — on a mobile-optimized page with a proper viewport meta tag the delay is usually already
+  gone.
 - Set `-webkit-tap-highlight-color` to match the design instead of the default gray flash.
 - Prefer generous targets and clear affordances over finicky interactions (tiny drag handles, precise hover zones).

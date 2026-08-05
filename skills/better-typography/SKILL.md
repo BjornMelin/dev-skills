@@ -158,12 +158,14 @@ Consolidate a repeated systemic issue into one row and list every affected locat
 ### Example
 
 #### Tabular numbers
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | MEDIUM | `src/Price.tsx:17` | `<span>{price}</span>` on a live price | `<span className="tabular-nums">{price}</span>` | Proportional digits cause changing values to shift |
 | LOW | `src/numbers.css:8` | `font-feature-settings: "tnum" 1` | `font-variant-numeric: tabular-nums` | The high-level property preserves fallback behavior |
 
 #### Line-height and measure
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | MEDIUM | `src/Article.tsx:33` | `leading-none` on a body paragraph | `leading-normal` (`1.5`–`1.6`) | Wrapped body text needs enough vertical separation |

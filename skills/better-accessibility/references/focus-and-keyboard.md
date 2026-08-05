@@ -70,13 +70,14 @@ Give in-page anchor targets `scroll-margin-top` (e.g. `scroll-margin-top: 80px` 
 Composite widgets (tabs, menus, toolbars, radio groups) occupy a single Tab stop. The active item has `tabindex="0"`, all others `tabindex="-1"`, and arrow keys move both focus and the `0`:
 
 ```tsx
+// ArrowLeft/ArrowRight move activeIndex, wrapping
 <div role="tablist">
   {tabs.map((tab, i) => (
     <button
       role="tab"
       tabIndex={i === activeIndex ? 0 : -1}
       aria-selected={i === activeIndex}
-      onKeyDown={handleArrowKeys} // ArrowLeft/ArrowRight move activeIndex, wrapping
+      onKeyDown={handleArrowKeys}
     >
       {tab.label}
     </button>

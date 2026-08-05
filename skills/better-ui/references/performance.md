@@ -53,30 +53,32 @@ the curated list is broad enough to animate properties you did not intend.
 
 ## Use `will-change` Sparingly
 
-`will-change` hints the browser to pre-promote an element to its own GPU compositing layer. Without it, the browser promotes the element only when the animation starts; that one-time layer promotion can cause a micro-stutter on the first frame.
+`will-change` hints the browser to pre-promote an element to its own GPU compositing layer; it is a hint, not a guaranteed promotion switch. Without it, the browser promotes the element only when the animation starts; that one-time layer promotion can cause a micro-stutter on the first frame.
 
 This particularly helps when an element is changing `scale`, `rotation`, or moving around with `transform`. For other properties, it doesn't help much: the browser can't composite them on the GPU anyway.
+
+Apply it to a temporary, profiled class — the element stays promoted (and costs memory) as long as the declaration applies, so a persistent class on a large or numerous element can increase memory and compositing costs after the animation is done.
 
 ### Rules
 
 ```css
-/* Good: specific property that benefits from GPU compositing */
-.animated-card {
+/* Good: specific property, on a temporary class added only while animating */
+.is-animating {
   will-change: transform;
 }
 
 /* Good: multiple compositor-friendly properties */
-.animated-card {
+.is-animating {
   will-change: transform, opacity;
 }
 
 /* Bad: never use will-change: all */
-.animated-card {
+.is-animating {
   will-change: all;
 }
 
 /* Bad: properties that can't be GPU-composited anyway */
-.animated-card {
+.is-animating {
   will-change: background-color, padding;
 }
 ```

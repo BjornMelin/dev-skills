@@ -69,11 +69,11 @@ selects. Never report only the flattering number. Full thresholds are in
 
 | Rule | Value |
 | --- | --- |
-| Light/dark boundary | L > 0.73 = light background → dark text; below it, light text still scores higher |
+| Light/dark boundary | Neutral-background heuristic: L > 0.73 = light background → dark text; below it, light text still scores higher. Hue and chroma can flip the higher-contrast polarity, so always verify the rendered pair |
 | Lightness gap (light bg) | Foreground L < 0.35 when background L > 0.9 |
 | Lightness gap (dark bg) | Foreground L > 0.9 when background L < 0.25 |
 | Hue drift threshold | > 10° spread across palette steps = visible drift |
-| APCA body text | \|Lc\| >= 75 minimum, >= 90 preferred |
+| APCA body text | \|Lc\| >= 75 minimum, >= 90 preferred; thresholds depend on text size, weight, and foreground/background polarity — measure the rendered pair before reporting a verdict |
 | APCA non-body text | \|Lc\| >= 60 minimum |
 | WCAG 2 normal text | 4.5:1 AA, 7:1 AAA |
 | Contrast fix (only when asked) | Adjust L first; preserve C and H when possible, then remeasure the rendered pair |

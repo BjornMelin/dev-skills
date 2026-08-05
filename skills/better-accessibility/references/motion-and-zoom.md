@@ -48,7 +48,7 @@ Reduced motion means reduced, not eliminated: it targets vestibular triggers, no
 | Autoplaying video, GIFs, looping decoration | Smooth scrolling → instant jump | Instant state changes (hover color, focus ring) |
 | Spinning, large-scale movement across the screen | Auto-rotating carousels → start paused | Brief functional feedback (button press) |
 
-Animations must be interruptible and driven by user input; nothing should autoplay or refuse to stop. Under reduced motion, carousels start paused.
+Nonessential animations must be interruptible and driven by user input; nothing should autoplay or refuse to stop. Essential motion — loading spinners, progress indicators, feedback for a user's own action — is exempt from the no-autoplay rule. Under reduced motion, carousels start paused.
 
 ## Autoplay and timed UI
 

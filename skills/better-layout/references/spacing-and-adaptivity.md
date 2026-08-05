@@ -74,16 +74,17 @@ The peeking-scroller recipe: the container's padding creates the peek, and snap 
   scroll-snap-type: x mandatory;
 }
 .scroller > * {
-  flex: 0 0 calc(100% - 48px - 24px); /* container minus margins minus peek */
+  flex: 0 0 calc(100% - 12px - 24px); /* content box minus gap minus peek */
   scroll-snap-align: start;
 }
 ```
 
 ```html
-<!-- Tailwind: the 80% width keeps the next card's leading 16-32px visible -->
+<!-- Tailwind: the basis below keeps the next card's leading 24px visible;
+     it is (content box - gap - peek), not a viewport percentage -->
 <div class="flex gap-3 overflow-x-auto px-6 [scroll-padding-inline:1.5rem] snap-x snap-mandatory">
-  <div class="w-[80%] shrink-0 snap-start">…</div>
-  <div class="w-[80%] shrink-0 snap-start">…</div>
+  <div class="w-[calc(100%_-_12px_-_24px)] shrink-0 snap-start">…</div>
+  <div class="w-[calc(100%_-_12px_-_24px)] shrink-0 snap-start">…</div>
 </div>
 ```
 
@@ -111,6 +112,11 @@ Sticky headers and floating action buttons account for safe areas:
   position: fixed;
   inset-inline-end: calc(16px + env(safe-area-inset-right));
   bottom: calc(16px + env(safe-area-inset-bottom));
+}
+/* env() safe-area names are physical: right/left, not inline-start/end. In RTL,
+   inline-end resolves to the left edge, so compensate with the physical left inset. */
+[dir="rtl"] .fab {
+  inset-inline-end: calc(16px + env(safe-area-inset-left));
 }
 ```
 

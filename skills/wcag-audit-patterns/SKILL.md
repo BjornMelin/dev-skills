@@ -441,7 +441,7 @@ async function runAccessibilityAudit(page) {
     return await axe.run(document, {
       runOnly: {
         type: 'tag',
-        values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']
+        values: ['wcag2a', 'wcag21a', 'wcag2aa', 'wcag21aa', 'wcag22aa']
       }
     });
   });
@@ -458,7 +458,13 @@ test('should have no accessibility violations', async ({ page }) => {
   await page.goto('/');
   const results = await runAccessibilityAudit(page);
 
-  expect(results.violations).toHaveLength(0);
+  // Failing on `incomplete` as well means axe's "could not determine" nodes
+  // never disappear from the audit: they must be manually reviewed or
+  // explicitly explained, not silently passed.
+  expect({ violations: results.violations, incomplete: results.incomplete }).toEqual({
+    violations: [],
+    incomplete: []
+  });
 });
 ````
 

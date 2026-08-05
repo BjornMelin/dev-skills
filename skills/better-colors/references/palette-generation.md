@@ -18,7 +18,7 @@ Given a base color with lightness (L), chroma percentage, and hue (H):
 
 **Step 1. Lightness bounds:**
 
-```
+```text
 delta = 0.4
 minL = max(0.05, baseL - delta)
 maxL = min(0.95, baseL + delta)
@@ -30,7 +30,7 @@ Lightness is clamped to [0.05, 0.95] to avoid pure black/white which have zero c
 
 **Step 3. Clamp chroma per step.** Each lightness level has a different maximum chroma for a given hue and color space:
 
-```
+```text
 maxChroma = findMaxChroma(step[i].L, hue, colorSpace)
 step[i].C = (chromaPercentage / 100) * maxChroma
 ```

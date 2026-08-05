@@ -26,8 +26,8 @@ Animations that run entirely on the compositor thread. The main thread is not in
 | ----------- | -------------------------------------------------------- |
 | `transform` | translate, rotate, scale, skew, matrix, perspective      |
 | `opacity`   |                                                          |
-| `filter`    | blur, brightness, contrast, drop-shadow, grayscale, etc. |
-| `clip-path` |                                                          |
+| `filter`    | blur, brightness, contrast, drop-shadow, grayscale, etc. Conditional — see the S/A tier note |
+| `clip-path` | Conditional — see the S/A tier note                      |
 
 ### Qualifying Methods
 
@@ -38,7 +38,13 @@ The property alone isn't enough — the animation method must also support compo
 -   **Web Animations API** (`element.animate()`) — S-tier
 -   **Motion `animate()` and `<motion.div />`** with compositor props — S-tier (uses WAAPI internally)
 -   **`scroll-timeline` / `view-timeline`** with compositor props — S-tier
--   **Motion `scroll() and `useScroll` (also via`useTransform`)** with compositor targets — S-tier
+-   **Motion `scroll()` and `useScroll` (also via `useTransform`)** with compositor targets — S-tier
+
+### Conditional S-tier properties (`filter`, `clip-path`)
+
+`filter` and `clip-path` do not behave as unconditional compositor properties: their compositor
+execution varies by browser, effect, layer size, and device. Assign S-tier to them only after
+runtime profiling of the specific animation; A-tier is the safe default.
 
 ### Caveats
 

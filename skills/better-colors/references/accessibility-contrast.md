@@ -81,7 +81,7 @@ The gap is asymmetric because APCA is polarity-aware: mirrored pairs don't score
 
 A background counts as light when its oklch lightness exceeds 0.73, the APCA crossover on neutral backgrounds:
 
-```
+```text
 if L > 0.73 → use dark text on this background
 if L <= 0.73 → use light text on this background
 ```

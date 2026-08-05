@@ -203,6 +203,7 @@ function IconButton({ isActive, icon: Icon, label }) {
           animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
           exit={{ opacity: 0, scale: 0.25, filter: "blur(4px)" }}
           transition={{ type: "spring", duration: 0.3, bounce: 0 }}
+          aria-hidden="true"
         >
           <Icon />
         </motion.span>
@@ -233,7 +234,7 @@ function IconButton({ isActive, ActiveIcon, InactiveIcon, label }) {
               : "scale-[0.25] opacity-0 blur-[4px]"
           )}
         >
-          <ActiveIcon />
+          <ActiveIcon aria-hidden="true" />
         </div>
         <div
           className={cn(
@@ -244,7 +245,7 @@ function IconButton({ isActive, ActiveIcon, InactiveIcon, label }) {
               : "scale-100 opacity-100 blur-0"
           )}
         >
-          <InactiveIcon />
+          <InactiveIcon aria-hidden="true" />
         </div>
       </div>
     </button>

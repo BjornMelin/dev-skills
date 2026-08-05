@@ -6,7 +6,7 @@ Use the procedure in this skill to find & fix animation performance issues eithe
 2. Report: Present findings to the user. Request which to fix (or all), unless prompt already asks to fix ("/motion fix animation performance in Modal.tsx" etc).
 3. Fix: Implement requested fixes and summarise.
 
-### Scoring overview
+## Scoring overview
 
 MotionScore ranks animations based on their render pipeline cost using a tier grade between S-F:
 
@@ -35,11 +35,15 @@ If requesting a "runtime" audit, or providing a specific URL, we should perform 
 
 If the prompt contains a URL (eg `http://localhost:3000`, `myhomepage.com`, `localhost:5173`, a public origin) or the word "runtime", additionally the runtime audit:
 
-```
-npx motionscore <url> --agent
+```shell
+npx motionscore <url> --agent --no-upload
 ```
 
 `--agent` runs a local Puppeteer audit and returns a report keyed by selector with library hints and grep targets. Use it when the user asks to audit "the homepage", "this page" (if you know the dev server URL), or any specific URL.
+
+`--no-upload` keeps the audit local. MotionScore uploads results to a public URL by default;
+only omit the flag when the user explicitly requests an upload, and use `--private` when a
+private upload is required and supported.
 
 How to use the output:
 
@@ -118,7 +122,7 @@ For every animation below S-tier, check if an upgrade is possible:
 -   **C → C**: Ensure CSS variables are registered with `@property` and `inherits: false` where applicable. Doesn't prevent paint but will prevent style recalculation wildfire.
 -   **A → S**: Replace Motion `x`/`y`/`scale` etc with `transform` to run animation via WAAPI. Only works when values aren't being animated independently, for instance:
 
-```
+```shell
 <motion.div initial={{ x: -100 }} animate={{ x: 0 }} whileHover={{ scale: 2 }} />
 ```
 
@@ -140,7 +144,7 @@ Only suggest upgrades that are practical. Not every D-tier animation can be upgr
 
 Structure every audit report exactly like this.
 
-```
+```tsx
 ## Motion Performance Audit
 
 **Scope:** [file/component/directory/project]
@@ -153,7 +157,7 @@ Render as a code block bar chart. Bar width is proportional to percentage using 
 
 The overall rank should be a perceptual average rank of the scores. For instance two A's and a C should be a B. 50% S and an evenly spread distribution for other scores should be A. Etc.
 
-```
+```text
 
 Rank
 
@@ -167,20 +171,20 @@ Rank
 ..:::::..::
 
 Breakdown
-S ██████████████████████░░░░░░░░░░░░░░░░░░░ 14 · 45%
-A █████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 6 · 19%
-B ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 4 · 13%
-C ███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 5 · 16%
-D █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 1 · 3%
-F █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 1 · 3%
+S ███████████░░░░░░░░░░░░░░░ 11 · 45%
+A █████░░░░░░░░░░░░░░░░░░░░░ 5 · 19%
+B ███░░░░░░░░░░░░░░░░░░░░░░░ 3 · 13%
+C ████░░░░░░░░░░░░░░░░░░░░░░ 4 · 16%
+D █░░░░░░░░░░░░░░░░░░░░░░░░░ 1 · 3%
+F █░░░░░░░░░░░░░░░░░░░░░░░░░ 1 · 3%
 
-```
+```text
 
 Each ranking has its own ASCII graphic.
 
 S
 
-```
+```text
 
 :'██████::
 '██... ██:
@@ -191,11 +195,11 @@ S
 . ██████::
 :......:::
 
-```
+```text
 
 A
 
-```
+```text
 
 :::'███::::
 ::'██ ██:::
@@ -206,7 +210,7 @@ A
 .██:::: ██:
 ..:::::..::
 
-```
+```text
 
 B
 
@@ -221,7 +225,7 @@ B
 .████████::
 ........:::
 
-```
+```text
 
 C
 
@@ -236,7 +240,7 @@ C
 . ██████::
 :......:::
 
-```
+```text
 
 D
 
@@ -251,7 +255,7 @@ D
 .████████::
 ........:::
 
-```
+```text
 
 F
 
@@ -266,7 +270,7 @@ F
 .████████:
 ........::
 
-```
+```text
 
 ### Findings
 
@@ -324,11 +328,11 @@ That said, if there's a GSAP animation that uses independent transforms for no r
 
 **Motion (framer-motion / motion)**
 
--   Uses WAAPI under the hood → compositor properties are genuine S-tier
--   `animate()` with `transform`/`opacity`/`clipPath`/`filter` → S-tier
+-   Uses WAAPI or `ScrollTimeline` only when browser support and animation configuration permit it. Grade by the actual execution path: native (WAAPI/ScrollTimeline) compositor properties → S-tier; JavaScript-driven compositor animations — including independent transforms, springs, `onUpdate`, and fallback `scroll()` paths — → A-tier. Apply the same rule to `animate()` and `whileInView`.
+-   `animate()` with `transform`/`opacity`/`clipPath`/`filter` → S-tier when natively executed, A-tier otherwise
 -   `layout` / `layoutId` props → B-tier (FLIP technique, one-time layout read)
--   `whileInView` → S-tier (depending on values being animated) + auto-deactivates off-screen (good practice)
--   `scroll()` with compositor targets → S-tier (ScrollTimeline)
+-   `whileInView` → S-tier only when it actually executes natively (depending on values being animated) + auto-deactivates off-screen (good practice)
+-   `scroll()` with compositor targets → S-tier when ScrollTimeline is used, A-tier on the fallback path
 -   `frame.read()` / `frame.update()` → prevents layout thrashing across libraries
 -   Deferred keyframe resolution batches DOM reads (2.5x faster than unbatched)
 

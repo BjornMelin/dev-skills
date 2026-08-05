@@ -4,6 +4,13 @@ description: "Cross-discipline interface review and build that coordinates bette
 license: MIT
 metadata:
   version: "1.0.0"
+  companion-skills:
+    - better-accessibility
+    - better-layout
+    - better-writing
+    - better-typography
+    - better-colors
+    - better-ui
 ---
 
 # Review the interface as one system
@@ -354,5 +361,5 @@ End with exactly one:
 - `Block` — one or more `HIGH` findings remain.
 - `Needs changes` — only `MEDIUM` or `LOW` findings remain.
 - `Inconclusive` — no actionable findings in what was judged, but at least one domain is `Degraded`, `Not reviewed`, or `Detected only`. Name them.
-- `Approve` — no actionable findings remain and every one of the six domains was inspected and judged.
+- `Approve` — no actionable findings remain and every domain that had to be inspected was inspected and judged. In `core` and `full`, that is all six domains; in `build`, it is every selected domain, and a domain honestly marked `Not in scope` does not block `Approve` (see Principle 14).
 - `No verdict` — every lane failed.

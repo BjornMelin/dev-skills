@@ -59,7 +59,7 @@ reserved for exactly this adversarial-check shape. Use `gpt-5.6-luna` at `"max"`
 instead when Terra is unavailable or the diff is routine; never a Sol worker
 tier, which is retired.
 
-3. On completion, read `mmr-codex-findings.json`; set reviewer to
+1. On completion, read `mmr-codex-findings.json`; set reviewer to
    "gpt-5.6-terra" if absent.
 
 ## Phase 2 - lane failure semantics (never skip)

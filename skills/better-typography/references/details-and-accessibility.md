@@ -83,7 +83,7 @@ Typography must survive the reader changing it: zoom, a larger browser font size
 | Text | Size |
 | --- | --- |
 | Long-form body starting point | Around `16px`, verified in the actual typeface and measure |
-| Inputs and menus starting point | Around `14px` |
+| Inputs and menus starting point | Around `14px` (`16px` minimum on mobile — iOS input zoom, see above) |
 | Captions | `13px` |
 | Floor | Rarely below `12px` |
 
@@ -102,7 +102,7 @@ html {
 
 ```tsx
 <html lang="en">
-  <body class="font-sans antialiased">
+  <body className="font-sans antialiased">
     <main>{children}</main>
   </body>
 </html>

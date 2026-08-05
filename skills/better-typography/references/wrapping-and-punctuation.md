@@ -54,5 +54,5 @@ Keyboard characters are not always the best characters:
 
 Two refinements for mixed-direction text:
 
-- **Long paragraphs align by their own language.** A one- or two-line snippet follows the surrounding UI's direction, but a paragraph of three or more lines aligns to its own script's direction: an English paragraph stays start-aligned LTR even inside an RTL interface. `text-align: start` with the correct `lang`/`dir` on the paragraph element handles this.
+- **Long paragraphs align by their own language.** Set `lang` and `dir` from the content's script, never from how many lines it currently occupies — wrapping changes with viewport, font size, and zoom, so a line-count rule flips direction mid-layout. Use `dir="auto"` for unknown user-provided text and `text-align: start` so alignment follows the element's resolved direction: an English paragraph stays start-aligned LTR even inside an RTL interface.
 - **Never reverse digits.** Numbers keep their digit order in every direction: a phone number or "541" reads identically in RTL. Browsers handle this via the Unicode bidi algorithm; don't fight it with manual reordering, and wrap mixed number/text values in `<bdi>` if adjacent RTL text disturbs them.

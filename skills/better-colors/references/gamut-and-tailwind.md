@@ -31,7 +31,8 @@ oklch(0.7 0.22 150)
 ```css
 /* sRGB fallback for all browsers */
 .accent {
-  color: oklch(0.7 0.2 150);
+  color: #4ade80; /* every browser */
+  color: oklch(0.7 0.2 150); /* browsers with oklch support */
 }
 
 /* P3 enhancement for wider gamut displays */

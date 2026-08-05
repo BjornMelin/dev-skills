@@ -160,6 +160,7 @@ Consolidate a repeated systemic issue into one row and list every affected locat
 | LOW | `src/card.css:11` | `border-radius: 16px` on both nested surfaces | Outer `24px`, inner `16px` with `8px` padding | Equal nested radii make the inner surface look pinched |
 
 #### Scale on press
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | LOW | `src/Button.tsx:19` | `<button className="...">` | Add `active:scale-[0.96] transition-transform` | Press feedback makes the control feel responsive |

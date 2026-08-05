@@ -55,7 +55,7 @@ In content layouts, keep full-width buttons inside the layout margins (start nea
 
 Backgrounds and media extend to the viewport edges; controls and text stay inside the layout margins and safe areas (`env(safe-area-inset-*)`). Sticky chrome floats above the content layer, it doesn't dam it.
 
-Sticky chrome has a keyboard cost this skill must not create and leave for someone else: a focused control that scrolls underneath it is a WCAG 2.2 SC 2.4.11 failure. Whenever you add fixed or sticky chrome, set `scroll-padding-block` on the scroll container to at least its height. The requirement itself belongs to `better-accessibility`; reserving the space is layout's job.
+Sticky chrome has a keyboard cost this skill must not create and leave for someone else: a focused control that scrolls entirely underneath it is a WCAG 2.2 SC 2.4.11 failure. Partial obscuration is permitted; author-created content must never completely hide the focused component. Whenever you add fixed or sticky chrome, set `scroll-padding-block` on the scroll container to at least its height so focus never lands fully under it. The requirement itself belongs to `better-accessibility`; reserving the space is layout's job.
 
 ### 9. Hold Structure Until It Breaks
 
@@ -67,7 +67,7 @@ Plan for substantial and language-dependent string growth rather than relying on
 
 ### 11. Let Flex and Grid Children Shrink
 
-A flex or grid item's default minimum size is its content, not zero — so a long unbroken string, a wide table, or a `<pre>` block pushes its parent wider instead of wrapping or truncating, and the overflow surfaces somewhere else entirely. Set `min-inline-size: 0` (or `min-width: 0`) on the shrinking child. Any `overflow` other than `visible` also zeroes that automatic minimum, which is why `overflow: hidden` appears to fix it — but it clips the content and establishes a new formatting context as well, so reach for the explicit `min-inline-size: 0` unless you actually wanted those.
+A flex or grid item's default minimum size is its content, not zero — so a long unbroken string, a wide table, or a `<pre>` block pushes its parent wider instead of wrapping or truncating, and the overflow surfaces somewhere else entirely. Set `min-inline-size: 0` (or `min-width: 0`) on the shrinking child. A flex item that is a scroll container (`overflow: scroll`, `auto`, `hidden`) also zeroes that automatic minimum — `overflow: clip` is non-scrollable and does not — but scrolling clips the content and establishes a new formatting context, so reach for the explicit `min-inline-size: 0` unless you actually wanted those.
 
 This is the mechanical cause of most "the layout blows out at narrow widths" bugs, and of truncation that silently does nothing: `text-overflow: ellipsis` cannot engage on a child that never gets smaller than its content. Truncation mechanics belong to `better-typography`; making room for them is this skill's job.
 
@@ -120,12 +120,14 @@ Consolidate a repeated systemic issue into one row and list every affected locat
 ### Example
 
 #### Group with space, not lines
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | LOW | `src/Settings.tsx:41` | `border-b` on every settings row | Remove borders; use `space-y-2` within groups and `space-y-8` between groups | Spacing communicates grouping with less visual noise |
 | LOW | `src/ProfileForm.tsx:58` | `<hr>` between form sections | Replace with `mt-10` on each section heading | Section hierarchy should not depend on repeated rules |
 
 #### Align to shared edges
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | LOW | `src/Card.tsx:24` | Card text at `pl-4`, card icon at `pl-3` | Align both to the same `pl-4` edge | Shared edges create a legible structure |

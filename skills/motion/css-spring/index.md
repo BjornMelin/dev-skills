@@ -10,13 +10,13 @@ Call the `generate-css-spring` MCP tool with the user's spring parameters.
 
 The tool accepts spring configuration:
 
--   **bounce** (number, -1 to 1): How bouncy the spring is. 0 = no bounce, positive = overshoot, negative = underdamp. Default: 0.
--   **duration** (number, seconds): Duration of the spring animation. Default: 0.8.
+-   **bounce** (number, 0 to 1): How bouncy the spring is. 0 = no bounce, higher = more overshoot. Default: 0.2.
+-   **duration** (number, seconds): Perceptual duration of the spring. Default: 0.4.
 
 Or raw physics parameters:
 
 -   **stiffness** (number): Spring stiffness coefficient
--   **damping** (number): Damping coefficient
+-   **damping** (number): Damping coefficient. Must be greater than 0: a spring with `damping: 0` never settles, so the generator would sample forever.
 -   **mass** (number): Mass of the spring
 
 ### Example

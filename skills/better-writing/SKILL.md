@@ -10,7 +10,7 @@ metadata:
 
 Clear and brief beats clever, consistency beats variety, and the best error message is the interaction redesigned so the error can't happen. Apply these principles when writing or reviewing any user-facing text.
 
-How copy renders (capitalization via `text-transform`, truncation, smart punctuation) is covered by the `better-typography` skill; error markup and announcements (`aria-invalid`, live regions) by the `better-accessibility` skill; room for translated strings by the `better-layout` skill.
+How copy renders (capitalization via `text-transform`, truncation, smart punctuation) is covered by the `better-typography` skill; error markup and announcements (`aria-invalid`, live regions) by the `better-accessibility` skill; room for translated strings by the `better-layout` skill. If those skills are unavailable, keep these local minimums: rendering (capitalize with `text-transform` only when the source stays natural case, and truncate with `text-overflow: ellipsis` on a wrapping container); error markup (mark invalid inputs with `aria-invalid="true"` and tie the visible message to the field with `aria-describedby`); announcements (announce post-submit results in a live region, e.g. `role="status"`, and keep messages concise); translated strings (leave at least 30% headroom for expansion in buttons, labels, and table headers, and never build copy by concatenating fragments across languages).
 
 ## Core Principles
 

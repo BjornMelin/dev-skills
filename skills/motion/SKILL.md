@@ -73,14 +73,18 @@ The Motion AI Kit MCP server exposes these; call them by their fully qualified n
 | `mcp__motion__visualise-cubic-bezier` | Preview a named or custom bezier |
 | `mcp__motion__devtools-status`, `mcp__motion__get-devtools-update` | Motion DevTools session state |
 
-**MotionScore is a CLI, not an MCP tool**: run `npx motionscore <url> --agent`. It needs a
+**MotionScore is a CLI, not an MCP tool**: run `npx motionscore <url> --agent --no-upload`. It needs a
 reachable URL, so it works only when a dev server or public origin is available.
+
+MotionScore uploads results to a shareable URL by default. Always pass `--no-upload` to audit
+locally unless the user explicitly asked for an upload; never upload a page's runtime behavior
+without approval.
 
 ### Runtime audit or static review?
 
 | Situation | Do this |
 | --- | --- |
-| A URL or dev-server address is available, or the user said "runtime" | `npx motionscore <url> --agent`, then use its selector-keyed findings and `Source hint` lines to jump straight to the code |
+| A URL or dev-server address is available, or the user said "runtime" | `npx motionscore <url> --agent --no-upload`, then use its selector-keyed findings and `Source hint` lines to jump straight to the code |
 | A file, directory, or code snippet is named, with no URL | Static audit per `performance-audit/index.md`; classify every animation by render-pipeline tier |
 | Both are available and the surface matters | Run both and triangulate: the runtime report is authoritative for what actually executes, static analysis for what exists but did not run |
 | The runtime audit fails (no dev server, navigation timeout, browser launch error) | Fall back to static discovery and say so; never report a failed audit as a clean one |

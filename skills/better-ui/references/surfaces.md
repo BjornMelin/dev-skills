@@ -144,8 +144,12 @@ In dark mode, simplify to a single white ring, since layered depth shadows aren'
 ```css
 /* Dark mode: adapt to whatever setup the project uses
    (prefers-color-scheme, class, data attribute, etc.) */
---shadow-border: 0 0 0 1px oklch(1 0 0 / 0.08);
---shadow-border-hover: 0 0 0 1px oklch(1 0 0 / 0.13);
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-border: 0 0 0 1px oklch(1 0 0 / 0.08);
+    --shadow-border-hover: 0 0 0 1px oklch(1 0 0 / 0.13);
+  }
+}
 ```
 
 ### Usage with Hover Transition
@@ -198,9 +202,11 @@ img {
 ### Dark Mode
 
 ```css
-img {
-  outline: 1px solid oklch(1 0 0 / 0.1);
-  outline-offset: -1px;
+@media (prefers-color-scheme: dark) {
+  img {
+    outline: 1px solid oklch(1 0 0 / 0.1);
+    outline-offset: -1px;
+  }
 }
 ```
 
