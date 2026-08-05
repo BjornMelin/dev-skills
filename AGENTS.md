@@ -79,8 +79,9 @@ following as the required focused gates based on touched files:
 - Python helpers: `python3 -m compileall -q skills tools subagents/codex/scripts subagents/claude/scripts`
 - Custom agent templates: `python3 skills/subagent-creator/scripts/subagent_creator.py validate skills/deep-researcher/templates/agents skills/subagent-creator/templates/agents skills/subspawn/templates/agents subagents/codex/agents`
 - Claude subagent pack: `python3 subagents/claude/scripts/sync_agents.py --validate`
-- Structured-output schemas: `python3 tools/skill/check_output_schemas.py .`
-- Interface suite consistency: `python3 tools/skill/check_interface_suite.py .`
+- Structured-output schemas: `python3 tools/skill/check_output_schemas.py .` and its regression harness `python3 tools/skill/test_check_output_schemas.py`
+- Interface suite consistency: `python3 tools/skill/check_interface_suite.py .` and its regression harness `python3 tools/skill/test_check_interface_suite.py`
+- Both gates above ship with a committed regression harness because both once passed on input they existed to reject. A change to either checker must keep its harness green, and a new check inside one needs a case that fails without it. Assert the specific diagnosis, not just a non-zero exit: a gate that skips a file or crashes also exits non-zero.
 - Subspawn plans: run `python3 skills/subspawn/scripts/subspawn_plan.py validate-roles` and `python3 skills/subspawn/scripts/subspawn_plan.py plan --preset research --task "validation smoke" --scope "docs and template metadata" --json`
 - Skill/subagent eval lab: `python3 tools/eval/skill_subagent_eval.py --json`
 - Bootstrap packs: `cargo run -q -p codex-dev -- --json bootstrap status`, `python3 tools/bootstrap/render_bootstrap_pack.py --validate`, render changed packs into temp directories only, and run the Codex subagent smoke matrix in `docs/runbooks/validation.md`

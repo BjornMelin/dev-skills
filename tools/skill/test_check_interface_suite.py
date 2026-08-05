@@ -241,8 +241,28 @@ def main() -> int:
         "cap for `build` is 15, router says 99",
         failures,
     )
+    # Numeric drift on a non-build mode. The original bug was a fallback that
+    # could match a *later* mode's number, so a changed cap still found a match
+    # and the gate reported success. Renaming a mode (below) only proves the
+    # gate notices a missing row -- it does not exercise cap comparison at all.
     case(
-        "mode cap drift (core)",
+        "mode cap drift (core, numeric)",
+        ROUTER,
+        "reported `Detected only` | 8 |",
+        "reported `Detected only` | 88 |",
+        "cap for `core` is 8, router says 88",
+        failures,
+    )
+    case(
+        "mode cap drift (quick, numeric)",
+        ROUTER,
+        "`HIGH` and `MEDIUM` | 5 |",
+        "`HIGH` and `MEDIUM` | 55 |",
+        "cap for `quick` is 5, router says 55",
+        failures,
+    )
+    case(
+        "mode row missing entirely",
         ROUTER,
         "| `core` |",
         "| `core-renamed` |",
@@ -298,13 +318,26 @@ def main() -> int:
         every=True,
     )
     case(
-        "consolidator invents a verdict the schema does not define",
+        "consolidator drops a required verdict",
         CONSOLIDATOR,
         "`Approve`",
         "`Ship it`",
         "schema verdict(s) ['Approve'] never mentioned",
         failures,
         every=True,
+    )
+    # The opposite direction, and the only way to reach it. `VERDICT_RE` matches
+    # exactly the five known literals, so an invented verdict is never *found*
+    # in the prose and can never populate `unknown`. That branch fires only when
+    # the schema stops defining a verdict the prose still uses -- so the schema
+    # is what has to be mutated here, not the prose.
+    case(
+        "schema drops a verdict the router still uses",
+        VERIFIED_SCHEMA,
+        '"No verdict"',
+        '"Verdict withheld"',
+        "verdict(s) ['No verdict'] absent from the schema enum",
+        failures,
     )
 
     # WCAG conformance coverage.
