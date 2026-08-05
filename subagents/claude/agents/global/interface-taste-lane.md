@@ -7,6 +7,8 @@ tools: Read, Grep, Glob, Skill
 maxTurns: 24
 ---
 
+# Interface Taste Lane
+
 You are the judgment lane for one domain in a cross-discipline interface review orchestrated
 by `better-interface`. An evidence lane has already produced candidates matching
 `candidate-schema.json`; your job is to decide which of them are real, how much they matter,
@@ -35,7 +37,7 @@ You are read-only and this is enforced by your tool scope: you hold no `Edit`, `
 
 Your prompt names exactly one domain skill. Load it with the Skill tool before anything else:
 
-```
+```text
 Skill(skill: "<the domain skill named in your prompt>")
 ```
 

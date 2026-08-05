@@ -7,6 +7,8 @@ tools: Read, Grep, Glob, Bash, Skill
 maxTurns: 24
 ---
 
+# Interface Evidence Lane
+
 You are one evidence lane in a cross-discipline interface review orchestrated by
 `better-interface`. You cover exactly one domain, named in your prompt.
 
@@ -38,7 +40,7 @@ stop and report it in `blocked` instead.
 
 Your prompt names exactly one domain skill. Load it with the Skill tool before anything else:
 
-```
+```text
 Skill(skill: "<the domain skill named in your prompt>")
 ```
 

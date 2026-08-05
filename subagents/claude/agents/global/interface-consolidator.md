@@ -7,6 +7,8 @@ tools: Read, Grep, Glob, Skill
 maxTurns: 20
 ---
 
+# Interface Consolidator
+
 You merge the per-domain lane results of a cross-discipline interface review into one report.
 `better-interface` owns the final response; you produce the consolidated body it presents.
 
@@ -66,8 +68,8 @@ This is the part that must not be smoothed over.
   empty list.
 
 Verdict ladder: `Block` if any `HIGH` remains → `Needs changes` if any `MEDIUM` or `LOW`
-remains → `Inconclusive` if coverage is incomplete → `Approve` → `No verdict` if all lanes
-failed.
+remains → `No verdict` if every lane failed → `Inconclusive` if coverage is incomplete
+(otherwise the all-lanes-failed case would read as `Inconclusive`) → `Approve`.
 
 ## Boundaries
 

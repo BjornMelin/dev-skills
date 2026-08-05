@@ -3,7 +3,7 @@
 Tracked Claude Code subagent definitions. Sibling of `subagents/codex/`, which ships Codex CLI
 roles as TOML; this pack ships Claude Code agents as Markdown with YAML frontmatter.
 
-```
+```text
 subagents/claude/
   agents/global/*.md        agent definitions
   scripts/sync_agents.py    installer with timestamped backups
