@@ -2,7 +2,7 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "b4af45329793bedbd4f5a6729d95b83806360b05",
+  "sourceCommit": "03fe9eff7ef92e5f8adfaa967807e973975a1aaf",
   "sourceRef": "main",
   "skillsCount": 77,
   "totalSkillDirectories": 77,
@@ -459,9 +459,9 @@
         "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/better-interface/SKILL.md"
       },
       "installCommands": {
-        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-interface -g -a codex -y",
-        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-interface -a codex",
-        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-interface"
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill better-interface -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-accessibility -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-layout -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-writing -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-typography -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-colors -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-ui -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill better-interface -a codex && npx skills add BjornMelin/dev-skills --skill better-accessibility -a codex && npx skills add BjornMelin/dev-skills --skill better-layout -a codex && npx skills add BjornMelin/dev-skills --skill better-writing -a codex && npx skills add BjornMelin/dev-skills --skill better-typography -a codex && npx skills add BjornMelin/dev-skills --skill better-colors -a codex && npx skills add BjornMelin/dev-skills --skill better-ui -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill better-interface && npx skills add BjornMelin/dev-skills --agent '*' --skill better-accessibility && npx skills add BjornMelin/dev-skills --agent '*' --skill better-layout && npx skills add BjornMelin/dev-skills --agent '*' --skill better-writing && npx skills add BjornMelin/dev-skills --agent '*' --skill better-typography && npx skills add BjornMelin/dev-skills --agent '*' --skill better-colors && npx skills add BjornMelin/dev-skills --agent '*' --skill better-ui"
       },
       "readinessLabels": [
         "Valid",
