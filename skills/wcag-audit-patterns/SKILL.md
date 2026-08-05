@@ -62,6 +62,16 @@ Moderate:
 
 ## Audit Checklist
 
+Covers every WCAG 2.2 Level A and AA success criterion. The four AAA criteria
+(2.4.12, 2.4.13, 3.3.9, and the rest of the AAA set) are deliberately out of scope —
+audit them against the specification directly when a product targets AAA.
+
+4.1.1 Parsing is obsolete in WCAG 2.2 and is retained below only as a good-practice note.
+
+Where `better-accessibility` is named, that skill owns the prescriptive remedy; this
+checklist owns the conformance question. When it is unavailable, apply the checklist item
+against the specification and record that the remedy detail went uncovered.
+
 ### Perceivable (Principle 1)
 
 ````markdown
@@ -105,6 +115,14 @@ Check:
 
 - [ ] Video has audio description for visual content
 
+### 1.2.4 Captions (Live) (Level AA)
+
+- [ ] Live audio content has real-time captions
+
+### 1.2.5 Audio Description (Prerecorded) (Level AA)
+
+- [ ] Prerecorded video has a full audio description track
+
 ## 1.3 Adaptable
 
 ### 1.3.1 Info and Relationships (Level A)
@@ -146,6 +164,20 @@ Check:
 - [ ] Instructions don't rely on shape/color alone
 - [ ] "Click the red button" → "Click Submit (red button)"
 
+### 1.3.4 Orientation (Level AA)
+
+- [ ] Content works in both portrait and landscape
+- [ ] Orientation locked only where essential
+
+### 1.3.5 Identify Input Purpose (Level AA)
+
+- [ ] Inputs collecting user data carry the right `autocomplete` token
+
+```html
+<input name="email" type="email" autocomplete="email" />
+<input name="tel" type="tel" autocomplete="tel" />
+```
+
 ## 1.4 Distinguishable
 
 ### 1.4.1 Use of Color (Level A)
@@ -153,6 +185,11 @@ Check:
 - [ ] Color is not only means of conveying info
 - [ ] Links distinguishable without color
 - [ ] Error states not color-only
+
+### 1.4.2 Audio Control (Level A)
+
+- [ ] Audio playing over 3 seconds can be paused or stopped
+- [ ] Volume control independent of system volume
 
 ### 1.4.3 Contrast (Minimum) (Level AA)
 
@@ -167,6 +204,11 @@ Tools: WebAIM Contrast Checker, axe DevTools
 - [ ] Text resizes to 200% without loss
 - [ ] No horizontal scrolling at 320px
 - [ ] Content reflows properly
+
+### 1.4.5 Images of Text (Level AA)
+
+- [ ] Real text used instead of images of text
+- [ ] Exceptions are logos and essential presentation only
 
 ### 1.4.10 Reflow (Level AA)
 
@@ -187,6 +229,14 @@ Tools: WebAIM Contrast Checker, axe DevTools
 - [ ] Paragraph spacing 2x font size
 - [ ] Letter spacing 0.12x font size
 - [ ] Word spacing 0.16x font size
+
+### 1.4.13 Content on Hover or Focus (Level AA)
+
+- [ ] Hover/focus content is dismissible without moving the pointer
+- [ ] Pointer can move onto the revealed content without it disappearing
+- [ ] Content stays visible until dismissed, invalid, or no longer relevant
+
+Tooltips and hover menus are the usual failures. `better-accessibility` owns the rule.
 
 ````
 
@@ -213,6 +263,12 @@ Check:
 - [ ] Focus can move away from all components
 - [ ] Modal dialogs trap focus correctly
 - [ ] Focus returns after modal closes
+
+### 2.1.4 Character Key Shortcuts (Level A)
+
+- [ ] Single-character shortcuts can be turned off, remapped, or are focus-scoped
+
+A bare `/` or `s` hotkey fires while a speech-input user is dictating.
 
 ## 2.2 Enough Time
 
@@ -290,6 +346,11 @@ indicators, which convey state rather than decoration. `better-accessibility` ow
 <a href="report.pdf">Download Q4 Sales Report (PDF)</a>
 ```
 
+### 2.4.5 Multiple Ways (Level AA)
+
+- [ ] More than one route to each page: nav, search, sitemap, or index
+- [ ] Exception is a page that is a step in a process
+
 ### 2.4.6 Headings and Labels (Level AA)
 
 - [ ] Headings describe content
@@ -308,10 +369,59 @@ indicators, which convey state rather than decoration. `better-accessibility` ow
 }
 ```
 
-### 2.4.11 Focus Not Obscured (Level AA) - WCAG 2.2
+### 2.4.11 Focus Not Obscured (Minimum) (Level AA) - WCAG 2.2
 
-- [ ] Focused element not fully hidden
-- [ ] Sticky headers don't obscure focus
+- [ ] Focused element not *entirely* hidden by author-created content
+- [ ] Sticky headers, fixed footers, and cookie banners don't obscure focus
+
+Partial obscuring passes at AA; full obscuring fails. `better-accessibility` owns the
+`scroll-padding-block` remedy.
+
+## 2.5 Input Modalities
+
+### 2.5.1 Pointer Gestures (Level A)
+
+- [ ] Multipoint and path-based gestures have a single-pointer alternative
+- [ ] Pinch-zoom, swipe, and drag-along-a-path are not the only path
+
+### 2.5.2 Pointer Cancellation (Level A)
+
+- [ ] Action fires on up-event, not down-event
+- [ ] Action can be aborted by moving away before release
+
+### 2.5.3 Label in Name (Level A)
+
+- [ ] Accessible name contains the visible label text, in the same order
+- [ ] `aria-label` does not contradict the visible text a speech user will say
+
+```html
+<!-- Bad: speech user says "Search", nothing matches -->
+<button aria-label="Submit query">Search</button>
+
+<!-- Good -->
+<button aria-label="Search products">Search</button>
+```
+
+### 2.5.4 Motion Actuation (Level A)
+
+- [ ] Shake, tilt, and other device-motion triggers have a UI equivalent
+- [ ] Motion response can be disabled
+
+### 2.5.7 Dragging Movements (Level AA) - WCAG 2.2
+
+- [ ] Every drag operation has a single-pointer path that is not dragging
+- [ ] Reorderable lists, sliders, kanban boards, and resize handles checked
+- [ ] Exceptions claimed only where dragging is essential or user-agent owned
+
+`better-accessibility` owns the remedy patterns.
+
+### 2.5.8 Target Size (Minimum) (Level AA) - WCAG 2.2
+
+- [ ] Targets are at least 24x24 CSS pixels, or meet a defined exception
+- [ ] Exception claimed by name: Spacing, Equivalent, Inline, User Agent Control, Essential
+
+Undersized targets are not automatic failures — check the five exceptions before
+reporting one. `better-accessibility` owns the sizing rule and the spacing math.
 
 ````
 
@@ -358,6 +468,13 @@ indicators, which convey state rather than decoration. `better-accessibility` ow
 - [ ] Same functionality = same label
 - [ ] Icons used consistently
 
+### 3.2.6 Consistent Help (Level A) - WCAG 2.2
+
+- [ ] Help mechanisms appear in the same relative order on every page that has them
+- [ ] Contact details, chat, and help links do not move between pages
+
+Applies only to help that already exists; the criterion does not require adding help.
+
 ## 3.3 Input Assistance
 
 ### 3.3.1 Error Identification (Level A)
@@ -387,6 +504,22 @@ indicators, which convey state rather than decoration. `better-accessibility` ow
 - [ ] Legal/financial forms reversible
 - [ ] Data checked before submission
 - [ ] User can review before submit
+
+### 3.3.7 Redundant Entry (Level A) - WCAG 2.2
+
+- [ ] Information already entered in the same process is auto-populated or selectable
+- [ ] Exceptions are re-entry for security, and entries no longer valid
+
+Multi-step checkouts repeating an address are the common failure.
+
+### 3.3.8 Accessible Authentication (Minimum) (Level AA) - WCAG 2.2
+
+- [ ] No cognitive function test (puzzle, memory, transcription) is required to log in
+- [ ] Or an alternative path exists, or a mechanism assists
+- [ ] Password fields allow paste and password managers
+
+Blocking paste on a password field is the most common failure of this criterion.
+Object recognition and personal-content identification remain permitted.
 
 ````
 

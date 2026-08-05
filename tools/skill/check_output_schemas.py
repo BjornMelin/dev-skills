@@ -58,13 +58,17 @@ def walk(node: object, path: str, errors: list[str]) -> None:
         None. Violations are appended to ``errors``.
     """
     if isinstance(node, dict):
-        if _type_is_object(node.get("type")) and (
-            node.get("additionalProperties") is not False
-        ):
+        # A node counts as an object either by declared type or by carrying
+        # `properties` without one. Both are checked, but the violation is
+        # recorded once: reporting the same path twice made a single defect
+        # read as two.
+        declares_object = _type_is_object(node.get("type"))
+        props = node.get("properties")
+        is_object = declares_object or isinstance(props, dict)
+        if is_object and node.get("additionalProperties") is not False:
             errors.append(
                 f'{path}: objects must set "additionalProperties": false'
             )
-        props = node.get("properties")
         if isinstance(props, dict):
             required = node.get("required")
             if not isinstance(required, list):
@@ -83,10 +87,6 @@ def walk(node: object, path: str, errors: list[str]) -> None:
                 errors.append(
                     f"{path}: 'required' names keys absent from "
                     f"'properties': {extra}"
-                )
-            if node.get("additionalProperties") is not False:
-                errors.append(
-                    f'{path}: objects must set "additionalProperties": false'
                 )
             for key, sub in props.items():
                 walk(sub, f"{path}.{key}", errors)

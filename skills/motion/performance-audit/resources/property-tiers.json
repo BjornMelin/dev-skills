@@ -138,7 +138,7 @@
     ]
   },
   "motionPropertyMap": {
-    "note": "Motion shorthand props and their CSS equivalents. All map to compositor properties but cannot be hardware accelerated (A-tier via rAF).",
+    "note": "Motion independent-transform shorthands and their CSS equivalents. Each maps to a compositor property, but Motion composes them into a single transform on the main thread, so WAAPI cannot accelerate them: A-tier via rAF. Do not read this tier as a property-level verdict -- animating the same value as a transform string is S-tier.",
     "props": {
       "x": "translateX",
       "y": "translateY",
@@ -149,8 +149,13 @@
       "rotate": "rotate",
       "scale": "scale",
       "scaleX": "scaleX",
-      "scaleY": "scaleY",
-      "opacity": "opacity"
+      "scaleY": "scaleY"
+    },
+    "waapiProps": {
+      "note": "Motion animates these as real CSS properties through WAAPI, so they stay S-tier and need no remediation. opacity is not an independent-transform shorthand and must not be downgraded with the props above.",
+      "props": [
+        "opacity"
+      ]
     },
     "layoutProps": {
       "note": "These Motion props trigger A-tier transform animations but require upfront measurements, making them B-tier.",
