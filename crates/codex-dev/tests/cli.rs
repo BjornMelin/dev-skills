@@ -1706,6 +1706,76 @@ fn skills_catalog_emits_public_agent_skills_artifact() {
 }
 
 #[test]
+fn skills_catalog_chains_companion_skill_installs() {
+    let temp = tempdir().expect("tempdir");
+    let repo = write_skill_inventory_repo(temp.path());
+    let orchestrator = repo.join("skills/orchestrator-skill");
+    std::fs::create_dir_all(&orchestrator).expect("orchestrator dir");
+    std::fs::write(
+        orchestrator.join("SKILL.md"),
+        r#"---
+name: orchestrator-skill
+description: Coordinates its companion skills.
+metadata:
+  companion-skills:
+    - alpha-skill
+    - beta-skill
+---
+
+# Orchestrator
+"#,
+    )
+    .expect("orchestrator skill");
+    let out = temp.path().join("agent-skills-lab.json");
+
+    let output = Command::cargo_bin("codex-dev")
+        .expect("binary")
+        .args([
+            "--json",
+            "skills",
+            "catalog",
+            "--repo-root",
+            repo.to_str().expect("repo path"),
+            "--generated-at",
+            "2026-05-20T08:00:00Z",
+            "--source-repository",
+            "https://github.com/example/dev-skills/",
+            "--source-commit",
+            "abc123",
+            "--source-ref",
+            "main",
+            "--out",
+            out.to_str().expect("out path"),
+        ])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope: Value = serde_json::from_slice(&output).expect("skills catalog json");
+    let skills = envelope["result"]["skills"]
+        .as_array()
+        .expect("skills array");
+    let orchestrator = skills
+        .iter()
+        .find(|skill| skill["slug"] == "orchestrator-skill")
+        .expect("orchestrator entry");
+    assert_eq!(
+        orchestrator["installCommands"]["codexGlobal"],
+        "npx skills add BjornMelin/dev-skills --skill orchestrator-skill -g -a codex -y \
+         && npx skills add BjornMelin/dev-skills --skill alpha-skill -g -a codex -y \
+         && npx skills add BjornMelin/dev-skills --skill beta-skill -g -a codex -y"
+    );
+    assert_eq!(
+        orchestrator["installCommands"]["allAgents"],
+        "npx skills add BjornMelin/dev-skills --agent '*' --skill orchestrator-skill \
+         && npx skills add BjornMelin/dev-skills --agent '*' --skill alpha-skill \
+         && npx skills add BjornMelin/dev-skills --agent '*' --skill beta-skill"
+    );
+}
+
+#[test]
 fn bootstrap_status_emits_stable_json_report() {
     let temp = tempdir().expect("tempdir");
     let repo = write_bootstrap_repo(temp.path());

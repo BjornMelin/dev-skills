@@ -824,6 +824,8 @@ pub struct SkillInventoryEntry {
     pub license: Option<String>,
     pub allowed_tools: Vec<String>,
     pub metadata_present: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub companion_skills: Vec<String>,
     pub path: String,
     pub skill_md: String,
     pub resources: SkillResourceInventory,
@@ -876,6 +878,7 @@ struct SkillFrontmatter {
     license: Option<String>,
     allowed_tools: Vec<String>,
     metadata_present: bool,
+    companion_skills: Vec<String>,
     keys: BTreeSet<String>,
 }
 
@@ -3646,13 +3649,10 @@ fn agent_skills_catalog_skill(
             directory: github_tree_url(source_repository, source_commit, &skill.path),
             skill_md: github_blob_url(source_repository, source_commit, &skill.skill_md),
         },
-        install_commands: AgentSkillsCatalogSkillInstallCommands {
-            codex_global: format!(
-                "npx skills add BjornMelin/dev-skills --skill {slug} -g -a codex -y"
-            ),
-            codex_project: format!("npx skills add BjornMelin/dev-skills --skill {slug} -a codex"),
-            all_agents: format!("npx skills add BjornMelin/dev-skills --agent '*' --skill {slug}"),
-        },
+        install_commands: agent_skills_catalog_skill_install_commands(
+            &slug,
+            &skill.companion_skills,
+        ),
         readiness_labels: agent_skills_catalog_readiness_labels(skill, &resources),
         quality_signals: agent_skills_catalog_quality_signals(skill, &resources),
         improvement_signals: skill.underbuilt_signals.clone(),
@@ -3666,6 +3666,25 @@ fn agent_skills_catalog_skill(
             present: skill.package.present,
             rejected: skill.package.rejected,
         },
+    }
+}
+
+fn agent_skills_catalog_skill_install_commands(
+    slug: &str,
+    companion_skills: &[String],
+) -> AgentSkillsCatalogSkillInstallCommands {
+    let chain = |template: &str| -> String {
+        let mut command = template.replace("{slug}", slug);
+        for companion in companion_skills {
+            command.push_str(" && ");
+            command.push_str(&template.replace("{slug}", companion));
+        }
+        command
+    };
+    AgentSkillsCatalogSkillInstallCommands {
+        codex_global: chain("npx skills add BjornMelin/dev-skills --skill {slug} -g -a codex -y"),
+        codex_project: chain("npx skills add BjornMelin/dev-skills --skill {slug} -a codex"),
+        all_agents: chain("npx skills add BjornMelin/dev-skills --agent '*' --skill {slug}"),
     }
 }
 
@@ -3867,6 +3886,9 @@ fn skill_inventory_entry(
             .map(|frontmatter| frontmatter.allowed_tools.clone())
             .unwrap_or_default(),
         metadata_present: frontmatter.is_some_and(|frontmatter| frontmatter.metadata_present),
+        companion_skills: frontmatter
+            .map(|frontmatter| frontmatter.companion_skills.clone())
+            .unwrap_or_default(),
         path: repo_relative_string(repo_root, skill_dir),
         skill_md: repo_relative_string(repo_root, skill_md),
         resources,
@@ -3919,6 +3941,7 @@ fn skill_inventory_unreadable_entry(
         license: None,
         allowed_tools: Vec::new(),
         metadata_present: false,
+        companion_skills: Vec::new(),
         path: repo_relative_string(repo_root, skill_dir),
         skill_md: repo_relative_string(repo_root, &skill_md),
         resources,
@@ -4393,12 +4416,57 @@ fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatte
             }
             "metadata" => {
                 parsed.metadata_present = true;
+                parsed.companion_skills = parse_metadata_companion_skills(&lines, &mut index);
             }
             _ => {}
         }
         index += 1;
     }
     Ok(parsed)
+}
+
+fn parse_metadata_companion_skills(lines: &[&str], index: &mut usize) -> Vec<String> {
+    let mut companions = Vec::new();
+    let mut next = *index + 1;
+    while next < lines.len() {
+        let line = lines[next];
+        if !line.starts_with(char::is_whitespace) {
+            break;
+        }
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("companion-skills:") {
+            let rest = rest.trim();
+            if rest.is_empty() {
+                let mut item = next + 1;
+                while item < lines.len() {
+                    let item_line = lines[item];
+                    if let Some(value) = item_line.trim().strip_prefix("- ") {
+                        companions.push(clean_frontmatter_scalar(value));
+                        item += 1;
+                    } else {
+                        break;
+                    }
+                }
+                next = item.saturating_sub(1);
+            } else {
+                let inline = strip_yaml_inline_comment(rest).trim();
+                if inline.starts_with('[') && inline.ends_with(']') {
+                    companions = inline
+                        .trim_start_matches('[')
+                        .trim_end_matches(']')
+                        .split(',')
+                        .map(clean_frontmatter_scalar)
+                        .filter(|value| !value.is_empty())
+                        .collect();
+                } else {
+                    companions.push(clean_frontmatter_scalar(inline));
+                }
+            }
+        }
+        next += 1;
+    }
+    *index = next.saturating_sub(1);
+    companions
 }
 
 fn frontmatter_base_indent(lines: &[&str]) -> usize {
