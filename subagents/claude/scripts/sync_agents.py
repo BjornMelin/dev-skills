@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 """Install the Claude Code subagent catalog with backups.
 
-Mirrors ``subagents/codex/scripts/sync_agents.py`` for the Claude side: Codex roles are TOML
-under ``~/.codex/agents``; Claude agents are Markdown with YAML frontmatter under
-``~/.claude/agents`` (global) or ``<project>/.claude/agents`` (project).
+Mirrors ``subagents/codex/scripts/sync_agents.py`` for the Claude side: Codex
+roles are TOML under ``~/.codex/agents``; Claude agents are Markdown with YAML
+frontmatter under ``~/.claude/agents`` (global) or ``<project>/.claude/agents``
+(project).
 
 Safety properties this installer guarantees:
 
-* **No symlink traversal.** The target directory and every destination file are checked with
-  ``lstat``. A symlinked target would write outside the intended tree; a symlinked destination
-  would back up and then overwrite its referent. Both abort before any write.
-* **Atomic replacement.** Files are staged in the target directory and ``os.replace``\\d into
-  position, so an interrupted run never leaves a partially written agent. ``shutil.copy2``
-  truncates the live destination and has no rollback.
-* **Fail before the first write.** Validation and safety checks run over the whole catalog up
-  front, so a bad definition or an unsafe path aborts before anything is touched.
+* **No symlink traversal.** The target directory and every destination file
+  are checked with ``lstat``. A symlinked target would write outside the
+  intended tree; a symlinked destination would back up and then overwrite its
+  referent. Both abort before any write.
+* **Atomic replacement.** Files are staged in the target directory and
+  ``os.replace``\\d into position, so an interrupted run never leaves a
+  partially written agent. ``shutil.copy2`` truncates the live destination and
+  has no rollback.
+* **Fail before the first write.** Validation and safety checks run over the
+  whole catalog up front, so a bad definition or an unsafe path aborts before
+  anything is touched.
 
-Note what is *not* guaranteed: installation is per-file, not transactional. Once writing
-begins, an I/O failure partway through leaves the earlier agents installed and the rest not.
-Each individual file is replaced atomically and the previous version is in the backup
-directory, so recovery is re-running the install; there is no catalog-level rollback.
+Note what is *not* guaranteed: installation is per-file, not transactional.
+Once writing begins, an I/O failure partway through leaves the earlier agents
+installed and the rest not. Each individual file is replaced atomically and
+the previous version is in the backup directory, so recovery is re-running the
+install; there is no catalog-level rollback.
 
-Home is always resolved at runtime via ``Path.home()``. This repository is public and
-``tools/policy/check_public_leaks.py`` rejects a literal home path in any tracked file.
+Home is always resolved at runtime via ``Path.home()``. This repository is
+public and ``tools/policy/check_public_leaks.py`` rejects a literal home path
+in any tracked file.
 """
 
 from __future__ import annotations
@@ -39,17 +45,18 @@ from pathlib import Path
 
 try:
     import yaml
-except ImportError:  # pragma: no cover - dependency is declared in requirements-ci.txt
+except ImportError:  # pragma: no cover - declared in requirements-ci.txt
     print("PyYAML is required: pip install pyyaml", file=sys.stderr)
     raise SystemExit(1)
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS_ROOT = ROOT / "agents" / "global"
 
-# Claude Code agent frontmatter. `model` and `effort` are required and pinned explicitly on
-# every role: MODELS.md forbids inheriting a worker model or effort. This is the subset this
-# pack uses, not the full set Claude Code accepts -- unknown keys are rejected so a typo
-# cannot silently produce an agent that behaves differently than the file reads.
+# Claude Code agent frontmatter. `model` and `effort` are required and pinned
+# explicitly on every role: MODELS.md forbids inheriting a worker model or
+# effort. This is the subset this pack uses, not the full set Claude Code
+# accepts -- unknown keys are rejected so a typo cannot silently produce an
+# agent that behaves differently than the file reads.
 REQUIRED_KEYS = ("name", "description", "model", "effort")
 ALLOWED_KEYS = {
     "name",
@@ -66,7 +73,15 @@ ALLOWED_KEYS = {
     "background",
     "color",
 }
-STRING_KEYS = {"name", "description", "model", "effort", "permissionMode", "memory", "color"}
+STRING_KEYS = {
+    "name",
+    "description",
+    "model",
+    "effort",
+    "permissionMode",
+    "memory",
+    "color",
+}
 LIST_OR_STRING_KEYS = {"tools", "disallowedTools", "skills"}
 VALID_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 VALID_PERMISSION_MODES = {"default", "plan", "acceptEdits", "bypassPermissions"}
@@ -74,17 +89,35 @@ NAME_CHARS = set("abcdefghijklmnopqrstuvwxyz0123456789-")
 
 
 def stamp() -> str:
+    """Return a UTC timestamp safe for backup directory names."""
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 @dataclass(frozen=True)
 class Agent:
+    """A parsed subagent definition.
+
+    Attributes:
+        path: The source Markdown file.
+        name: The declared frontmatter name.
+        meta: The parsed frontmatter mapping.
+    """
+
     path: Path
     name: str
     meta: dict
 
 
 def parse(path: Path) -> tuple[Agent | None, list[str]]:
+    """Parse one agent file's YAML frontmatter.
+
+    Args:
+        path: The agent Markdown file to parse.
+
+    Returns:
+        A tuple of the parsed Agent (or None when the file has no usable
+        frontmatter) and a list of human-readable parse errors.
+    """
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---\n"):
         return None, ["no YAML frontmatter"]
@@ -101,6 +134,14 @@ def parse(path: Path) -> tuple[Agent | None, list[str]]:
 
 
 def validate(agent: Agent) -> list[str]:
+    """Check one agent's frontmatter against the pack's contract.
+
+    Args:
+        agent: The parsed agent to validate.
+
+    Returns:
+        A list of human-readable violations; empty when the agent is valid.
+    """
     errors = []
     meta = agent.meta
 
@@ -114,29 +155,43 @@ def validate(agent: Agent) -> list[str]:
 
     for key in STRING_KEYS & set(meta):
         if not isinstance(meta[key], str):
-            errors.append(f"'{key}' must be a string, got {type(meta[key]).__name__}")
+            errors.append(
+                f"'{key}' must be a string, got {type(meta[key]).__name__}"
+            )
     for key in LIST_OR_STRING_KEYS & set(meta):
         if not isinstance(meta[key], (str, list)):
-            errors.append(f"'{key}' must be a string or list, got {type(meta[key]).__name__}")
+            errors.append(
+                f"'{key}' must be a string or list, "
+                f"got {type(meta[key]).__name__}"
+            )
     if "maxTurns" in meta:
         turns = meta["maxTurns"]
-        # bool is a subclass of int, so isinstance(True, int) is True -- reject it explicitly.
+        # bool is a subclass of int, so isinstance(True, int) is True --
+        # reject it explicitly.
         if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
             errors.append("'maxTurns' must be a positive integer")
 
     name = meta.get("name")
     if isinstance(name, str) and name:
         if set(name) - NAME_CHARS:
-            errors.append(f"name '{name}' must be lowercase letters, digits, and hyphens only")
+            errors.append(
+                f"name '{name}' must be lowercase letters, "
+                f"digits, and hyphens only"
+            )
         if name != agent.path.stem:
-            errors.append(f"name '{name}' must match filename '{agent.path.stem}'")
+            errors.append(
+                f"name '{name}' must match filename '{agent.path.stem}'"
+            )
 
     if meta.get("model") == "inherit":
         errors.append("model must be pinned explicitly, never 'inherit'")
 
     effort = meta.get("effort")
     if effort is not None and effort not in VALID_EFFORTS:
-        errors.append(f"invalid effort '{effort}'; expected one of {sorted(VALID_EFFORTS)}")
+        errors.append(
+            f"invalid effort '{effort}'; "
+            f"expected one of {sorted(VALID_EFFORTS)}"
+        )
 
     mode = meta.get("permissionMode")
     if mode is not None and mode not in VALID_PERMISSION_MODES:
@@ -146,6 +201,12 @@ def validate(agent: Agent) -> list[str]:
 
 
 def discover() -> tuple[list[Agent], list[str]]:
+    """Parse and validate every agent in the catalog.
+
+    Returns:
+        A tuple of the valid agents and any catalog-wide errors, including
+        per-file parse/validation failures and duplicate names.
+    """
     agents, errors = [], []
     for path in sorted(AGENTS_ROOT.glob("*.md")):
         agent, parse_errors = parse(path)
@@ -156,15 +217,26 @@ def discover() -> tuple[list[Agent], list[str]]:
         errors += [f"{path.name}: {e}" for e in validate(agent)]
     names = [a.name for a in agents]
     for dupe in {n for n in names if names.count(n) > 1}:
-        errors.append(f"duplicate agent name '{dupe}'; the loader silently discards one")
+        errors.append(
+            f"duplicate agent name '{dupe}'; "
+            f"the loader silently discards one"
+        )
     return agents, errors
 
 
 def check_path_chain(path: Path, label: str) -> list[str]:
     """Reject a symlink anywhere in `path` or any of its ancestors.
 
-    Checking only the first couple of ancestors is not enough: a symlink higher up redirects
-    the whole subtree just as effectively, so walk the chain to the root.
+    Checking only the first couple of ancestors is not enough: a symlink
+    higher up redirects the whole subtree just as effectively, so walk the
+    chain to the root.
+
+    Args:
+        path: The directory to inspect.
+        label: Human-readable name for error messages.
+
+    Returns:
+        A list of safety violations; empty when the chain is safe.
     """
     errors = []
     if path.is_symlink():
@@ -173,15 +245,26 @@ def check_path_chain(path: Path, label: str) -> list[str]:
         errors.append(f"{label} exists and is not a directory: {path}")
     for parent in path.parents:
         if parent.is_symlink():
-            errors.append(f"{label} ancestor is a symlink: {parent} -> {os.readlink(parent)}")
+            errors.append(
+                f"{label} ancestor is a symlink: "
+                f"{parent} -> {os.readlink(parent)}"
+            )
     return errors
 
 
 def check_target_safe(target: Path, backup_root: Path) -> list[str]:
     """Refuse to install or back up through a symlink, at any level.
 
-    The backup directory is checked too: it is written before the destination is replaced, so
-    a symlink there redirects the copy of the file being overwritten.
+    The backup directory is checked too: it is written before the destination
+    is replaced, so a symlink there redirects the copy of the file being
+    overwritten.
+
+    Args:
+        target: The destination agents directory.
+        backup_root: The backup parent directory.
+
+    Returns:
+        A list of safety violations; empty when both chains are safe.
     """
     return check_path_chain(target, "target directory") + check_path_chain(
         backup_root, "backup directory"
@@ -189,16 +272,32 @@ def check_target_safe(target: Path, backup_root: Path) -> list[str]:
 
 
 def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
+    """Install the catalog into a target agents directory.
+
+    Args:
+        agents: The validated agents to install.
+        target: Destination directory.
+        dry_run: When True, report what would change without writing.
+
+    Returns:
+        0 on success (or a clean dry run), 1 when a safety check fails.
+    """
     backup_root = target.parent / "agent-backups"
     unsafe = check_target_safe(target, backup_root)
     for dst in (target / a.path.name for a in agents):
         if dst.is_symlink():
-            unsafe.append(f"destination is a symlink: {dst} -> {os.readlink(dst)}")
+            unsafe.append(
+                f"destination is a symlink: "
+                f"{dst} -> {os.readlink(dst)}"
+            )
         elif dst.exists() and not dst.is_file():
-            # A directory or device sitting where an agent file belongs would raise inside
-            # the write loop -- after earlier agents had already been installed, breaking the
-            # fail-before-first-write guarantee. Catch it in the preflight instead.
-            unsafe.append(f"destination exists and is not a regular file: {dst}")
+            # A directory or device sitting where an agent file belongs would
+            # raise inside the write loop -- after earlier agents had already
+            # been installed, breaking the fail-before-first-write guarantee.
+            # Catch it in the preflight instead.
+            unsafe.append(
+                f"destination exists and is not a regular file: {dst}"
+            )
     if unsafe:
         for error in unsafe:
             print(f"UNSAFE {error}", file=sys.stderr)
@@ -208,8 +307,8 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
     if not dry_run:
         target.mkdir(parents=True, exist_ok=True)
 
-    # mkdtemp gives an exclusive directory, so two installs in the same second cannot
-    # collide and overwrite each other's backups.
+    # mkdtemp gives an exclusive directory, so two installs in the same second
+    # cannot collide and overwrite each other's backups.
     backup_dir: Path | None = None
     wrote = False
     for agent in agents:
@@ -222,15 +321,26 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
             print(f"  would sync {agent.name} -> {dst}")
             continue
         if dst.exists():
-            if dst.is_symlink():  # re-check: the earlier scan is a separate moment in time
-                print(f"UNSAFE destination became a symlink: {dst}", file=sys.stderr)
+            if dst.is_symlink():  # re-check: scan above is a separate moment
+                print(
+                    f"UNSAFE destination became a symlink: {dst}",
+                    file=sys.stderr,
+                )
                 return 1
             if backup_dir is None:
                 backup_root.mkdir(parents=True, exist_ok=True)
-                backup_dir = Path(tempfile.mkdtemp(dir=backup_root, prefix=f"claude-{stamp()}-"))
+                backup_dir = Path(
+                    tempfile.mkdtemp(
+                        dir=backup_root,
+                        prefix=f"claude-{stamp()}-",
+                    )
+                )
             shutil.copy2(dst, backup_dir / dst.name)
-        # stage beside the target so os.replace is atomic (same filesystem), then swap
-        fd, tmp = tempfile.mkstemp(dir=target, prefix=f".{dst.name}.", suffix=".tmp")
+        # stage beside the target so os.replace is atomic (same filesystem),
+        # then swap
+        fd, tmp = tempfile.mkstemp(
+            dir=target, prefix=f".{dst.name}.", suffix=".tmp"
+        )
         try:
             with os.fdopen(fd, "wb") as handle:
                 handle.write(payload)
@@ -250,11 +360,25 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the installer CLI.
+
+    Args:
+        argv: Optional arguments; defaults to ``sys.argv[1:]``.
+
+    Returns:
+        0 on success, 1 on validation or safety failure.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--target", choices=("global", "project"), default="global")
+    parser.add_argument(
+        "--target", choices=("global", "project"), default="global"
+    )
     parser.add_argument("--project-dir", type=Path, default=Path.cwd())
-    parser.add_argument("--list", action="store_true", help="list the catalog and exit")
-    parser.add_argument("--validate", action="store_true", help="validate sources and exit")
+    parser.add_argument(
+        "--list", action="store_true", help="list the catalog and exit"
+    )
+    parser.add_argument(
+        "--validate", action="store_true", help="validate sources and exit"
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
