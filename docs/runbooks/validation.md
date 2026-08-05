@@ -32,6 +32,25 @@ python3 tools/policy/test_check_public_leaks.py
 - `Skills, plugins, and docs` runs the strict offline eval, plugin and generated
   mirror validation, design-motion tooling, bootstrap validation, the
   `kimi-ui-agent` clean install/typecheck/tests/doctor, and documentation links.
+  It also runs two consistency gates and, immediately after each, that gate's
+  own regression harness:
+
+  ```bash
+  python3 tools/skill/check_output_schemas.py .
+  python3 tools/skill/test_check_output_schemas.py
+  python3 tools/skill/check_interface_suite.py .
+  python3 tools/skill/test_check_interface_suite.py
+  ```
+
+  The harnesses are paired with the gates deliberately. Both checkers once
+  shipped passing on input they were written to reject -- the schema gate
+  skipped any file whose root lacked `properties`, and the suite gate scanned
+  every table in the router, so a second table whose rows also begin with a mode
+  name overwrote the real cap. Each harness copies the real files into a
+  temporary root, injects one specific defect, and requires that gate's specific
+  diagnosis rather than any non-zero exit, since a gate that skips a file or
+  crashes also exits non-zero. Changing a checker means keeping its harness
+  green; adding a check to one means adding a case that fails without it.
 
 Install the one pinned Python dependency before reproducing the second job:
 
