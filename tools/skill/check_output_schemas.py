@@ -29,6 +29,8 @@ SKIP_DIR_PARTS = {"node_modules", "target", ".git", "archive"}
 
 def walk(node: object, path: str, errors: list[str]) -> None:
     if isinstance(node, dict):
+        if node.get("type") == "object" and node.get("additionalProperties") is not False:
+            errors.append(f"{path}: objects must set \"additionalProperties\": false")
         props = node.get("properties")
         if isinstance(props, dict):
             required = node.get("required")
@@ -54,6 +56,17 @@ def walk(node: object, path: str, errors: list[str]) -> None:
     elif isinstance(node, list):
         for item in node:
             walk(item, path, errors)
+
+
+def _has_object(node: object) -> bool:
+    """True when the schema declares an object anywhere, with or without `properties`."""
+    if isinstance(node, dict):
+        if node.get("type") == "object" or "properties" in node:
+            return True
+        return any(_has_object(v) for k, v in node.items() if k != "description")
+    if isinstance(node, list):
+        return any(_has_object(v) for v in node)
+    return False
 
 
 def schema_files(root: pathlib.Path) -> list[pathlib.Path]:
@@ -82,8 +95,12 @@ def main(argv: list[str]) -> int:
             print(f"INVALID {rel}: {exc}", file=sys.stderr)
             failures += 1
             continue
-        # A JSON Schema meta-file (draft declaration only) has no object shape to check.
-        if not isinstance(schema, dict) or "properties" not in schema:
+        if not isinstance(schema, dict):
+            continue
+        # Do not require `properties` at the root: a root `{"type": "object"}` with no
+        # properties, or an `anyOf` of object branches, still has objects that strict mode
+        # requires to set additionalProperties: false. Skipping them left that class unchecked.
+        if not _has_object(schema):
             continue
         checked += 1
         errors: list[str] = []

@@ -18,9 +18,9 @@ to `agent-backups/claude-<timestamp>` beside the target directory before being o
 
 | Role | Model | Effort | Tools | Non-mutating by | Dispatched by |
 | --- | --- | --- | --- | --- | --- |
-| `interface-evidence-lane` | `opus` | `high` | Read, Grep, Glob, Bash | **instruction** | `better-interface` |
-| `interface-taste-lane` | `opus` | `high` | Read, Grep, Glob | tool scope | `better-interface` |
-| `interface-consolidator` | `opus` | `high` | Read, Grep, Glob | tool scope | `better-interface` |
+| `interface-evidence-lane` | `opus` | `high` | Read, Grep, Glob, Bash, Skill | **instruction** | `better-interface` |
+| `interface-taste-lane` | `opus` | `high` | Read, Grep, Glob, Skill | tool scope | `better-interface` |
+| `interface-consolidator` | `opus` | `high` | Read, Grep, Glob, Skill | tool scope | `better-interface` |
 
 **The evidence lane is not structurally read-only.** It holds `Bash` because inventory work
 needs it — `rg` sweeps, computed values, reading a build manifest — and omitting `Edit` and
@@ -31,6 +31,10 @@ takes precedence, and this workstation sets `defaultMode: bypassPermissions` —
 bind. Treat the lane as trusted-but-capable and do not describe it as sandboxed.
 
 The other two are genuinely read-only: no `Edit`, no `Write`, no `Bash`.
+
+All three hold `Skill`, which they need to load the domain skill named in their prompt. An
+explicit `tools:` list that omits it blocks skill invocation entirely, which would leave a
+lane unable to obtain the rubric it exists to apply.
 
 ## Why these are roles, not one agent per domain
 

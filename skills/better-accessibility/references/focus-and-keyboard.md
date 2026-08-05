@@ -88,8 +88,12 @@ Composite widgets (tabs, menus, toolbars, radio groups) occupy a single Tab stop
 
 Modals must trap focus. The modern technique is the `inert` attribute on everything behind the dialog; it removes background content from the tab order and from assistive tech in one move:
 
+The dialog must live **outside** the subtree you mark inert — a portal, or a sibling of the app
+root. Render it inside `#app-content` and you have just made the dialog inert along with the
+background, so nothing in it can take focus:
+
 ```tsx
-// On open
+// On open. `dialogRef` points at a node OUTSIDE #app-content (portal or sibling).
 document.getElementById("app-content").inert = true;
 const dialog = dialogRef.current;
 (dialog.querySelector("[autofocus]") ??
@@ -97,7 +101,13 @@ const dialog = dialogRef.current;
 
 // On close
 document.getElementById("app-content").inert = false;
-triggerRef.current?.focus(); // always return focus to the element that opened it
+if (triggerRef.current?.isConnected) {
+  triggerRef.current.focus();
+} else {
+  // The trigger was removed while the dialog was open — a deleted row, a closed menu.
+  // Optional chaining alone would silently drop focus to <body> and lose the user's place.
+  fallbackRef.current?.focus(); // nearest logical container, given tabindex="-1"
+}
 ```
 
 Native `<dialog>` with `showModal()` gives you the trap, `inert` background, and Escape handling for free; prefer it. A custom overlay that can't use `<dialog>` needs `role="dialog"`, `aria-modal="true"`, and an accessible name (`aria-labelledby` pointing at its heading). Either way:

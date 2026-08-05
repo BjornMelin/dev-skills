@@ -41,6 +41,12 @@ CANDIDATE_SCHEMA = "skills/better-interface/references/candidate-schema.json"
 FINDINGS_SCHEMA = "skills/better-interface/references/findings-schema.json"
 
 VERDICT_RE = re.compile(r"`(Block|Needs changes|Approve|Inconclusive|No verdict)`")
+# Anchored to the mode table specifically. Scanning every table let a later row that also
+# begins with a mode name (Principle 6's tool-access matrix) overwrite the real cap, after
+# which this check silently passed regardless of what the consolidator said.
+MODE_TABLE_RE = re.compile(
+    r"^\| Mode \| Coverage \| Finding cap \|\n\|[-| ]+\|\n((?:\|.*\n)+)", re.M
+)
 CAP_ROW_RE = re.compile(r"^\|\s*`(quick|core|full|build)`\s*\|.*\|\s*([^|]*?)\s*\|\s*$", re.M)
 
 
@@ -76,21 +82,33 @@ def check_verdicts(root: pathlib.Path, errors: list[str]) -> None:
 
 def check_mode_caps(root: pathlib.Path, errors: list[str]) -> None:
     router = read(root, ROUTER)
+    table = MODE_TABLE_RE.search(router)
+    if not table:
+        errors.append(f"{ROUTER}: could not find the Mode/Coverage/Finding cap table")
+        return
     caps: dict[str, str] = {}
-    for mode, cap in CAP_ROW_RE.findall(router):
+    for mode, cap in CAP_ROW_RE.findall(table.group(1)):
+        if mode in caps:
+            errors.append(f"{ROUTER}: duplicate mode row for `{mode}` in the mode table")
         digits = re.findall(r"\d+", cap)
         caps[mode] = digits[0] if digits else "none"
     for mode in ("quick", "core", "full", "build"):
         if mode not in caps:
             errors.append(f"{ROUTER}: mode table has no row for `{mode}`")
 
+    # Parse the consolidator's own "N for `mode`" pairs and compare dicts. A loose regex per
+    # mode is not enough: `` `full`[^.\n]*15 `` happily matches the *next* mode's cap in
+    # "99 for `full`, 15 for `build`", so a real drift passed.
     consolidator = read(root, CONSOLIDATOR)
+    stated = {m: c for c, m in re.findall(r"(\d+) for `(quick|core|full|build)`", consolidator)}
     for mode, cap in caps.items():
         if cap == "none":
             continue
-        if not re.search(rf"{cap} for `{mode}`|`{mode}`[^.\n]*{cap}", consolidator):
+        if mode not in stated:
+            errors.append(f"{CONSOLIDATOR}: states no cap for `{mode}` (router says {cap})")
+        elif stated[mode] != cap:
             errors.append(
-                f"{CONSOLIDATOR}: cap for `{mode}` does not match the router's {cap}"
+                f"{CONSOLIDATOR}: cap for `{mode}` is {stated[mode]}, router says {cap}"
             )
 
 

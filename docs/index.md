@@ -115,8 +115,9 @@ out of version control.
   interface review and build across accessibility, layout, writing, typography,
   color, and UI polish. Four modes (`quick`, `core`, `full`, `build`), a
   detect/judge/consolidate lane pipeline with JSON hand-back schemas in
-  `skills/better-interface/references/`, and the read-only lane roles in
-  [`subagents/claude`](../subagents/claude/ROLE_CATALOG.md).
+  `skills/better-interface/references/`, and the lane roles in
+  [`subagents/claude`](../subagents/claude/ROLE_CATALOG.md) — taste and consolidator are
+  read-only by tool scope; the evidence lane holds `Bash` and is non-mutating by instruction.
 - [`kimi-ui-agent`](reference/kimi-ui-agent.md)
 - [Rust Skill Suite](reference/rust-skill-suite.md)
 - [Subagent Creator Skill](reference/subagent-creator.md)

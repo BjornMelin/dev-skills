@@ -20,7 +20,7 @@
         "Inconclusive",
         "No verdict"
       ],
-      "description": "\"Approve\" requires every domain to be Clear or judged; use \"Inconclusive\" when any domain is Degraded or Not reviewed. \"No verdict\" only when every lane failed."
+      "description": "Derived from coverage, not chosen independently. `Approve` requires every domain to be `judged` or `clear` -- or, in `build` mode only, `not-in-scope` with a stated reason. Any `degraded`, `detected-only`, or `not-reviewed` domain forces `Inconclusive`, including a clean `core` review that left domains at `detected-only`. `No verdict` only when every lane failed. A schema cannot express this conditional, so the orchestrator enforces it."
     },
     "verification": {
       "type": "array",
@@ -275,13 +275,24 @@
             ]
           },
           "domain": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "better-accessibility",
+              "better-layout",
+              "better-writing",
+              "better-typography",
+              "better-colors",
+              "better-ui"
+            ],
+            "description": "Must match a key in `coverage`; the same six-domain vocabulary as the lane schemas."
           },
           "locations": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "minItems": 1,
+            "description": "Every path:line sharing this root cause. At least one -- an entry with no location cannot be verified or deduplicated."
           },
           "before": {
             "type": "string"

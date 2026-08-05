@@ -61,11 +61,11 @@ Icon-only buttons need a descriptive `aria-label`. Visible label text must appea
 
 ### 9. Don't Rely on Color Alone
 
-Status needs a redundant cue: icon, text, or underline alongside the color. Determine which contrast requirement applies from the content and state, then use `better-colors` to measure the rendered foreground/background pair; that skill decides which algorithm settles the verdict and will answer in WCAG ratios whenever a conformance level is named. When contrast fails, report the pair and the requirement it misses; do not change the project's colors unless asked.
+Status needs a redundant cue: icon, text, or underline alongside the color. Determine which contrast requirement applies from the content and state, then use `better-colors` to measure the rendered foreground/background pair; that skill decides which algorithm settles the verdict and will answer in WCAG ratios whenever a conformance level is named. Without it, still report the pair: name the foreground and background you resolved, state the WCAG level that applies, and mark the ratio **Not measured** rather than guessing — an unmeasured pair is a finding about missing evidence, not a passing check. When contrast fails, report the pair and the requirement it misses; do not change the project's colors unless asked.
 
 ### 10. Honor prefers-reduced-motion
 
-Wrap motion in `@media (prefers-reduced-motion: no-preference)` so it is opt-in. Under reduced motion, replace slides and scales with opacity crossfades; kill parallax and autoplay entirely. Independent of the preference: autoplaying media needs a visible pause control, and toasts carrying actions or errors stay until dismissed.
+Wrap motion in `@media (prefers-reduced-motion: no-preference)` so it is opt-in. Under reduced motion, replace slides and scales with opacity crossfades, and stop parallax and auto-advancing UI — carousels that rotate themselves, auto-scrolling tickers. This is about motion the interface starts on its own, not about media playback: an autoplaying video is governed by the pause-control rule below, which applies regardless of the preference. Independent of the preference: autoplaying media needs a visible pause control, and toasts carrying actions or errors stay until dismissed.
 
 ### 11. Announce Dynamic Content
 
@@ -148,24 +148,28 @@ Consolidate a repeated systemic issue into one row and list every affected locat
 ### Example
 
 #### Accessible names everywhere
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | HIGH | `src/Dialog.tsx:42` | `<button><XIcon /></button>` | Add `aria-label="Close"`; mark the icon `aria-hidden="true"` | The icon-only control has no accessible name |
 | HIGH | `src/Nav.tsx:18` | `<a href="/settings"><GearIcon /></a>` | Add `aria-label="Settings"` | The link destination is unavailable to screen readers |
 
 #### Visible focus rings
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | HIGH | `src/button.css:12` | `button:focus { outline: none; }` | `button:focus-visible { outline: 2px solid; outline-offset: 2px; }` | Keyboard users cannot see focus |
 | HIGH | `src/Menu.tsx:31` | `focus:outline-none` | `focus-visible:outline-2 focus-visible:outline-offset-2` | Menu navigation has no visible focus indicator |
 
 #### Errors that announce
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | HIGH | `src/EmailField.tsx:27` | Error shown only as `border-red-500` | Add `aria-invalid="true"` + `aria-describedby="email-error"` with inline error text | Color alone neither explains nor announces the error |
 | MEDIUM | `src/SignupForm.tsx:64` | Submit disabled until the form is valid | Keep submit enabled; on failure, focus the first invalid field | A disabled action hides what must be fixed |
 
 #### Minimum hit area
+
 | Severity | Location | Before | After | Why |
 | --- | --- | --- | --- | --- |
 | MEDIUM | `src/Toolbar.tsx:22` | `size-4` icon-only button | Extend the hit area to 44×44px with `after:absolute after:size-11` | The target is too small for reliable touch input |

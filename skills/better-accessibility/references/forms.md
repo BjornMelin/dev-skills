@@ -42,7 +42,7 @@ The complete pattern:
 - Errors render inline next to their fields, with an icon or text, never a red border alone (color-only cues fail).
 - On submit, focus the first invalid field.
 - Allow incomplete submission so validation can surface; don't disable submit until valid (see below).
-- Accept free text and validate after; don't block typing or filter characters as the user types. Trim values before validating; autocomplete and text expansion add trailing spaces.
+- Accept free text and validate after; don't block typing or filter characters as the user types. Trim values before validating where the field's contract allows it — autocomplete and text expansion add trailing spaces to names, emails, and codes. **Never trim a password or any other exact-value secret**: whitespace is part of the credential, and silently stripping it turns a correct password into a failed sign-in the user cannot diagnose.
 
 ## Autocomplete and input types
 

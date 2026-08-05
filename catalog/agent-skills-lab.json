@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-08-04T23:22:20.974946331Z",
+  "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "3ce4fe6d51153660380325c819320db8d2a411de",
+  "sourceCommit": "b4af45329793bedbd4f5a6729d95b83806360b05",
   "sourceRef": "main",
   "skillsCount": 77,
   "totalSkillDirectories": 77,
@@ -466,25 +466,27 @@
       "readinessLabels": [
         "Valid",
         "Documented",
+        "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
         "docs_indexed",
         "has_references",
-        "has_agents"
+        "has_agents",
+        "resource_rich"
       ],
       "improvementSignals": [
         "missing_dist_package",
         "missing_scripts"
       ],
       "resources": {
-        "references": 3,
+        "references": 4,
         "scripts": 0,
         "assets": 0,
         "templates": 0,
         "agents": 1,
-        "total": 4
+        "total": 5
       },
       "exposure": {
         "readme_catalog": true,

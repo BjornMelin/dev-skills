@@ -92,56 +92,26 @@ Split the work by task type, not by domain. Every domain decomposes the same way
 | **Judge** | Kill false positives against the source, assign severity, write the Before → After. | An `opus` lane, or this skill inline |
 | **Consolidate** | Dedupe by root cause, rank, cap, record restraint, emit the verdict. | Always this skill, inline |
 
-**Dispatching a lane is not cheap. Measure before you assume.** A single detect lane over one
-484-line component — reading the component, its four UI primitives, and the installed Radix
-source — cost roughly **150k tokens and 14 minutes** at maximum reasoning effort. Six of those
-is most of a million tokens. What a lane buys is *depth and a clean context*, not savings:
-that run traced into `node_modules` to check what the dialog primitive actually renders, which
-an inline pass sharing context with five other rule sets will not do.
+**Dispatching a lane is not cheap.** Measured on one 484-line component, a single detect lane
+cost roughly **150k tokens and 14 minutes** at maximum reasoning effort — six of those is most
+of a million tokens. What a lane buys is *depth and a clean context*, not savings: that run
+traced into `node_modules` to check what the dialog primitive actually renders, which an inline
+pass sharing context with five other rule sets will not do.
 
-So dispatch is a deliberate spend, and the mode ladder is a cost ladder:
+So dispatch is a deliberate spend and the mode ladder is a cost ladder. `quick` and `core` are
+cheap because they **dispatch little or nothing**, not because detection is inherently cheap.
+`core` judges at most two domains and must mark the rest `Detected only` — never `Clear`,
+because an unjudged candidate is not the same as no candidate. `full` judges every domain with
+candidates and is expensive by design; reach for it on a surface that matters.
 
-- `quick` and `core` are cheap because they **dispatch little or nothing**, not because
-  detection is inherently cheap. `quick` runs inline. `core` judges at most two domains and
-  must mark the rest `Detected only` in the coverage table — never `Clear`, because an
-  unjudged candidate is not the same as no candidate.
-- `full` judges every domain that produced candidates and is expensive by design. Reach for it
-  on a surface that matters, not as a default sweep.
+Effort is selectable only on a lane dispatched to an external runtime with an explicit effort
+flag. The Claude roles in `subagents/claude/` are pinned to `effort: high` deliberately, per
+`model-routing`, and the Agent tool has no effort parameter to override at the call site. So
+the modes differ by **how many lanes run**, not by reasoning tier. Record which tier actually
+ran in **Scope and Coverage**; never run a shallower sweep and report it as full coverage.
 
-**Effort buys traversal depth, not polish.** One detect lane, one 484-line component, run twice
-on the same non-Claude runtime at two reasoning tiers:
-
-| Reasoning effort | Wall clock | Tokens | Candidates |
-| --- | --- | --- | --- |
-| `high` | ~4 min | ~75k | 2 of 6 |
-| `max` | ~14 min | ~153k | 6 of 6 |
-
-The four the fast tier missed were not tail noise. It never entered `node_modules`, so it
-missed both findings that required reading what the dialog primitive actually renders —
-including a high-confidence one, that focus never returns to the trigger because the ref the
-library restores through is unset. It also missed a 16×16 hit area inside a file it had
-already read.
-
-Treat that as one data point on one file, not a law: it establishes that the tiers differ in
-how far they traverse, not a fixed ratio you can plan capacity against. Re-measure on your own
-surface before relying on the numbers.
-
-**Where the tier is actually selectable.** Only on a lane you dispatch to an external runtime
-with an explicit effort flag. The Claude role agents in `subagents/claude/` are pinned to
-`effort: high` in their definitions, deliberately: `model-routing` holds that
-verification-shaped work never gets a higher tier, and two diverse high lanes beat one deeper
-lane for error decorrelation. The Agent tool has no effort parameter, so there is nothing to
-override at the call site either.
-
-So the modes differ by **how many lanes run and how deep the sweep goes**, not by reasoning
-tier. `full` judges every domain with candidates; `core` judges at most two. When a detect lane
-runs on an external runtime, give `full` the deeper tier and `quick`/`core` the faster one, and
-record which tier actually ran in **Scope and Coverage**. What you must not do is run a
-shallower sweep and report it as full coverage.
-
-Never send interface copy, visual design, motion, or naming decisions to a non-Claude model for judgment: those are taste calls. Detection of mechanical copy defects — terminology drift, inconsistent capitalization, non-verb-first labels, a placeholder restating its label — is a lint and may run anywhere.
-
-If the host cannot run lanes, do the same passes inline in the review order above and say so in **Scope and Coverage**. All six rule sets stay resident on that path, so prefer `quick` or a narrowed scope there.
+The measurements, the high-versus-max comparison, and what the faster tier missed are in
+[dispatch-cost.md](references/dispatch-cost.md).
 
 ### 5. Contract Every Lane
 
@@ -163,7 +133,8 @@ in scope the lane could not inspect, or `"None"`). They differ only in that arra
 
 The **consolidated** payload is a different shape and deliberately so: it is the parent's
 synthesis, not a lane's report, so it has no single `domain` or `blocked` — per-domain state
-lives in its `coverage` array instead, and per-lane `blocked` is folded into that domain's
+lives in its `coverage` **object**, keyed by domain name with all six keys required, and
+per-lane `blocked` is folded into that domain's
 `state`. Do not send a lane payload where a consolidated one is expected.
 
 Every field these schemas declare is **required**, including the ones that are conceptually
@@ -215,11 +186,7 @@ Every finding cites `path/to/file:line` and shows the current implementation. If
 
 ### 9. Rank by User Impact
 
-Use one shared severity scale, calibrated per domain by that domain skill's own `## Severity` section:
-
-- `HIGH`: blocks a task, misleads the user, hides content or controls, causes data-loss risk, or creates a repeated systemic failure.
-- `MEDIUM`: meaningfully harms comprehension, efficiency, adaptability, or consistency.
-- `LOW`: isolated polish with limited task impact. Include only in `full` mode.
+Rank every finding on the shared scale in **## Severity** below, calibrated per domain by that domain skill's own `## Severity` section.
 
 Within a severity, rank by reach and leverage. A token or shared-component fix outranks the same symptom in one leaf component.
 
@@ -332,6 +299,15 @@ accessibility criteria were never checked is `Inconclusive`. A domain honestly m
 | Review silently edits code | Stay read-only unless implementation was requested or the mode is `build` |
 | Building first and consulting the domain skills afterward | Consult the owners in play before writing code |
 | "Approve" with pending actionable findings | Use `Needs changes` or `Block` |
+
+## Severity
+
+One shared scale across all six domains. Each domain skill's own `## Severity` section
+calibrates what these mean in its territory; this is the vocabulary they calibrate.
+
+- `HIGH`: blocks a task, misleads the user, hides content or controls, causes data-loss risk, or creates a repeated systemic failure.
+- `MEDIUM`: meaningfully harms comprehension, efficiency, adaptability, or consistency.
+- `LOW`: isolated polish with limited task impact. Include only in `full` mode.
 
 ## Review Output Format
 

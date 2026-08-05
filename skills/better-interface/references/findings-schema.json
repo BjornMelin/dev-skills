@@ -51,10 +51,11 @@
           },
           "locations": {
             "type": "array",
-            "description": "Every path:line sharing this root cause.",
+            "description": "Every path:line sharing this root cause. At least one -- an entry with no location cannot be verified or deduplicated.",
             "items": {
               "type": "string"
-            }
+            },
+            "minItems": 1
           },
           "before": {
             "type": "string"

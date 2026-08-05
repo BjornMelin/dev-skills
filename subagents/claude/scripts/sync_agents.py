@@ -194,6 +194,11 @@ def install(agents: list[Agent], target: Path, dry_run: bool) -> int:
     for dst in (target / a.path.name for a in agents):
         if dst.is_symlink():
             unsafe.append(f"destination is a symlink: {dst} -> {os.readlink(dst)}")
+        elif dst.exists() and not dst.is_file():
+            # A directory or device sitting where an agent file belongs would raise inside
+            # the write loop -- after earlier agents had already been installed, breaking the
+            # fail-before-first-write guarantee. Catch it in the preflight instead.
+            unsafe.append(f"destination exists and is not a regular file: {dst}")
     if unsafe:
         for error in unsafe:
             print(f"UNSAFE {error}", file=sys.stderr)
