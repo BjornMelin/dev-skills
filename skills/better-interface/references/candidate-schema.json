@@ -1,0 +1,138 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "domain",
+    "evidence",
+    "candidates",
+    "rejected",
+    "verification",
+    "blocked"
+  ],
+  "description": "Evidence-lane output. Candidates are observations, not findings: no severity and no fix. A taste lane turns these into judged findings matching findings-schema.json.",
+  "properties": {
+    "domain": {
+      "type": "string",
+      "enum": [
+        "better-accessibility",
+        "better-layout",
+        "better-writing",
+        "better-typography",
+        "better-colors",
+        "better-ui"
+      ]
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Files, components, and states actually inspected. Not what was in scope."
+    },
+    "candidates": {
+      "type": "array",
+      "description": "One entry per suspected root cause. Deliberately has no severity and no `after`: assigning either is judgment, which happens in the taste lane.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "locations",
+          "observed",
+          "rule",
+          "measurement",
+          "confidence"
+        ],
+        "properties": {
+          "locations": {
+            "type": "array",
+            "description": "Every path:line sharing this root cause. At least one -- an entry with no location cannot be verified or deduplicated.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "observed": {
+            "type": "string",
+            "description": "The current implementation, quoted or described exactly as found."
+          },
+          "rule": {
+            "type": "string",
+            "description": "The owning skill's principle or Common Mistakes row this appears to violate."
+          },
+          "measurement": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Any computed value that decides the case: a contrast ratio or Lc, a hit-area size, a line count."
+          },
+          "confidence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              null
+            ],
+            "description": "How sure the lane is before a taste lane verifies it against source."
+          }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "description": "Candidates inspected and deliberately not raised. Required so restraint survives the lane boundary.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "location",
+          "candidate",
+          "rejectedBecause"
+        ],
+        "properties": {
+          "location": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "rejectedBecause": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check",
+          "result",
+          "verified"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "description": "The exact command or interaction steps."
+          },
+          "result": {
+            "type": "string"
+          },
+          "verified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "blocked": {
+      "type": "string",
+      "description": "Anything in scope this lane could not inspect, or \"None\"."
+    }
+  }
+}

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Better UI"
+  short_description: "Surface and icon polish for interfaces"
+  default_prompt: "Use $better-ui for interface craft details: concentric border radius, shadows versus borders, image outlines, optical alignment, and icon stroke weight and states."
+policy:
+  allow_implicit_invocation: true

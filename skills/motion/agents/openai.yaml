@@ -1,0 +1,6 @@
+interface:
+  display_name: Motion
+  short_description: Implement and audit web motion
+  default_prompt: Use $motion for Motion/CSS animation, springs, easing, or MotionScore audits.
+policy:
+  allow_implicit_invocation: true

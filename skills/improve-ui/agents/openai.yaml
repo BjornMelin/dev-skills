@@ -1,0 +1,6 @@
+interface:
+  display_name: "Improve UI"
+  short_description: "Design-system drift audit with a three-proof gate"
+  default_prompt: "Use $improve-ui to check whether a surface has drifted from its documented design contract, proving each deviation before proposing a refinement."
+policy:
+  allow_implicit_invocation: true

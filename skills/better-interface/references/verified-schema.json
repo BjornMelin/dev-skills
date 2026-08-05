@@ -1,0 +1,350 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "mode",
+    "verification",
+    "coverage",
+    "confirmed",
+    "rejected",
+    "degradedCoverage"
+  ],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "Block",
+        "Needs changes",
+        "Approve",
+        "Inconclusive",
+        "No verdict"
+      ],
+      "description": "Derived from coverage, not chosen independently. `Approve` requires every domain to be `judged` or `clear` -- or, in `build` mode only, `not-in-scope` with a stated reason. Any `degraded`, `detected-only`, or `not-reviewed` domain forces `Inconclusive`, including a clean `core` review that left domains at `detected-only`. `No verdict` only when every lane failed. A schema cannot express this conditional, so the orchestrator enforces it."
+    },
+    "verification": {
+      "type": "array",
+      "description": "Every check the lanes ran, carried through verbatim. The report mandates this section, so it cannot be dropped at consolidation.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "check",
+          "result",
+          "verified"
+        ],
+        "properties": {
+          "check": {
+            "type": "string",
+            "description": "The exact command or interaction steps."
+          },
+          "result": {
+            "type": "string"
+          },
+          "verified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "better-accessibility",
+        "better-layout",
+        "better-writing",
+        "better-typography",
+        "better-colors",
+        "better-ui"
+      ],
+      "description": "Every domain, keyed by name. All six keys are required, so a domain cannot be silently omitted and cannot appear twice.",
+      "properties": {
+        "better-accessibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        },
+        "better-layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        },
+        "better-writing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        },
+        "better-typography": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        },
+        "better-colors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        },
+        "better-ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "evidence",
+            "result"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "judged",
+                "clear",
+                "detected-only",
+                "not-reviewed",
+                "not-in-scope",
+                "degraded"
+              ],
+              "description": "judged/clear permit Approve. detected-only, not-reviewed and degraded force Inconclusive. not-in-scope is valid only in build mode and permits Approve, but requires a reason in `result`."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "What was actually inspected, or why nothing was."
+            },
+            "result": {
+              "type": "string",
+              "description": "Findings count, or the reason for the state. Required non-empty for not-in-scope and not-reviewed."
+            }
+          }
+        }
+      }
+    },
+    "confirmed": {
+      "type": "array",
+      "description": "Deduped by root cause, ordered by severity then reach. The mode cap (5 quick / 8 core / 15 full) is enforced by the orchestrator after validation; a schema cannot see the mode.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "domain",
+          "locations",
+          "before",
+          "after",
+          "why"
+        ],
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "better-accessibility",
+              "better-layout",
+              "better-writing",
+              "better-typography",
+              "better-colors",
+              "better-ui"
+            ],
+            "description": "Must match a key in `coverage`; the same six-domain vocabulary as the lane schemas."
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "Every path:line sharing this root cause. At least one -- an entry with no location cannot be verified or deduplicated."
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rejected": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "location",
+          "candidate",
+          "rejectedBecause"
+        ],
+        "properties": {
+          "location": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "rejectedBecause": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "degradedCoverage": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Named lanes that errored or returned unusable output. Required: use null when none did -- strict structured outputs cannot express an omitted key."
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "quick",
+        "core",
+        "full",
+        "build"
+      ],
+      "description": "The mode that produced this report. not-in-scope coverage is only valid when this is build."
+    }
+  }
+}

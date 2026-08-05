@@ -1,0 +1,6 @@
+interface:
+  display_name: "Better Layout"
+  short_description: "Structure, grouping, alignment and adaptive layout"
+  default_prompt: "Use $better-layout to structure or review a page or component for grouping, alignment, spacing, reading order, responsive breakpoints, and RTL mirroring with logical properties."
+policy:
+  allow_implicit_invocation: true

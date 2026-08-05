@@ -1,0 +1,6 @@
+interface:
+  display_name: "Better Colors"
+  short_description: "OKLCH palettes, contrast and theming"
+  default_prompt: "Use $better-colors to convert colors to oklch, generate palettes, measure contrast, handle gamut and display-p3 fallbacks, and apply semantic color tokens."
+policy:
+  allow_implicit_invocation: true

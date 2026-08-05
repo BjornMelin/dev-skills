@@ -4,7 +4,21 @@ This pack is the source of truth for Bjorn's Codex custom subagents.
 It renders global agents under `agents/global` and project overlays under
 `agents/overlays/<repo>`.
 
-Runtime policy:
+> **The runtime policy below predates the MODELS.md Luna recalibration.**
+> This pack was last revised 2026-07-22; `MODELS.md` was recalibrated
+> 2026-08-01, which made `gpt-5.6-luna` at `max` the Codex default for almost
+> everything and demoted `gpt-5.6-sol` to a rare last resort that "burns quota
+> disproportionately". It also requires every worker to pin effort explicitly
+> rather than defaulting to a tier. None of the 48 roles below names Luna, and
+> 40 still route to Sol.
+>
+> **`MODELS.md` is the authority.** Where it and this table disagree, follow
+> `MODELS.md`. The `codex-review`, `codex-delegate`, and `multi-model-review`
+> skills have been realigned to the Luna ladder; this pack has not, because
+> rewriting 48 roles alters daily runtime behavior and deserves its own review
+> rather than riding along with an interface-skills PR.
+
+Runtime policy (stale — see the note above):
 
 - `gpt-5.6-terra` handles bounded retrieval and mechanical inventory;
 - `gpt-5.6-sol` handles judgment, implementation, planning, and synthesis;

@@ -1,0 +1,6 @@
+interface:
+  display_name: "WCAG Audit Patterns"
+  short_description: "WCAG 2.2 conformance audit with automated tooling"
+  default_prompt: "Use $wcag-audit-patterns to run a WCAG 2.2 conformance audit: SC-numbered checklist, axe-core and Playwright harness, pa11y and Lighthouse CLI, then remediation guidance."
+policy:
+  allow_implicit_invocation: true

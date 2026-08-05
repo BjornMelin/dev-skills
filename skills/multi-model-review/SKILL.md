@@ -25,6 +25,12 @@ Shared review contract (put in BOTH lane prompts):
 ## Phase 1 - launch both lanes in parallel (same message)
 
 **Opus lane** - `Agent(model: 'opus', effort: 'high', run_in_background: true)`.
+
+This lane needs shell access to collect the diff, so its read-only-ness is **prompt compliance,
+not tool scope**: the shared contract forbids edits, nothing enforces it. Say so in the report
+rather than claiming an enforced read-only review. Do not substitute one of the
+`subagents/claude` interface roles here - they require a named interface domain, evidence-lane
+candidates, and `better-interface`'s schema, none of which a generic diff review supplies.
 Prompt = shared contract + "You are the Claude reviewer lane. Set reviewer to
 \"opus-5\". Return ONLY a JSON object matching
 `<skill-dir>/references/findings-schema.json`
@@ -44,22 +50,30 @@ skill is invoked) - substitute the real absolute path in every prompt/command.
 2. Run ONE bare background Bash command (600000ms timeout):
 
 ```bash
-codex exec -m gpt-5.6-sol -c model_reasoning_effort="high" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
+codex exec -m gpt-5.6-terra -c model_reasoning_effort="max" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
 ```
 
-Effort routing per MODELS.md (2026-07-24 recalibration): `"high"` (Sol worker)
-is the default review tier; `"medium"` only for trivial bounded diffs. Never xhigh.
+Model routing per MODELS.md: this lane exists to be an *independent* second
+opinion, so it pins `gpt-5.6-terra` at `"max"` - the maximum-intelligence tier,
+reserved for exactly this adversarial-check shape. Use `gpt-5.6-luna` at `"max"`
+instead when Terra is unavailable or the diff is routine; never a Sol worker
+tier, which is retired.
 
-3. On completion, read `mmr-codex-findings.json`; set reviewer to
-   "gpt-5.6-sol" if absent.
+1. On completion, read `mmr-codex-findings.json`; set reviewer to
+   "gpt-5.6-terra" if absent.
 
 ## Phase 2 - lane failure semantics (never skip)
 
-- A lane that errored or returned unusable output = **degraded coverage**:
-  say so explicitly in the final report; the other lane's verdict stands alone.
+- A lane that errored or returned unusable output = **degraded coverage**: say so explicitly
+  in the final report. The surviving lane's *findings* stand, but its clean bill of health does
+  not - a single-lane review cannot conclude "ship", because the whole point of two lanes is
+  that each sees what the other misses.
 - BOTH lanes failed = **no verdict**. Report the failure and stop - a total
   lane failure must never read as a clean "ship".
-- Zero raw findings across live lanes = verdict "ship"; skip Phase 3.
+- Zero raw findings across **both live** lanes = verdict "ship"; skip Phase 3.
+- Zero findings but a degraded lane = **never "ship"**. Half a review that found nothing
+  is not evidence of nothing to find. Report the surviving lane's result explicitly as
+  partial coverage and name the lane that failed.
 
 ## Phase 3 - adversarial verify
 

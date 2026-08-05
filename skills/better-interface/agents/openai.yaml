@@ -1,0 +1,6 @@
+interface:
+  display_name: "Better Interface"
+  short_description: "Cross-discipline interface review and build"
+  default_prompt: "Use $better-interface to review a screen, flow, or feature across accessibility, layout, writing, typography, color, and UI polish, or to build one with the same rules applied forward."
+policy:
+  allow_implicit_invocation: true
