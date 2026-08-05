@@ -59,7 +59,20 @@ TRACKED = [
 
 
 def make_root(tmp: str) -> Path:
-    """Copy the real suite files into a throwaway root."""
+    """Copy the real suite files into a throwaway root.
+
+    Cases mutate the real repository's files rather than synthetic stand-ins,
+    so a case cannot drift from the contract it claims to guard.
+
+    Args:
+        tmp: Temporary directory to build the fixture inside.
+
+    Returns:
+        The fixture root to hand the gate.
+
+    Raises:
+        OSError: If a source file is missing or the copy fails.
+    """
     root = Path(tmp) / "fixture"
     for rel in TRACKED:
         dst = root / rel
@@ -75,7 +88,19 @@ def make_root(tmp: str) -> Path:
 
 
 def run_gate(root: Path) -> tuple[int, str]:
-    """Run the gate against a fixture root; return (exit code, output)."""
+    """Run the gate against a fixture root.
+
+    Args:
+        root: Fixture repository root the gate should inspect.
+
+    Returns:
+        The gate's exit code and its combined stdout and stderr. Both streams
+        are merged because the gate prints diagnoses to stderr and its success
+        line to stdout, and cases assert against either.
+
+    Raises:
+        OSError: If the interpreter cannot be executed.
+    """
     proc = subprocess.run(
         [sys.executable, str(GATE), str(root)],
         capture_output=True,
@@ -85,11 +110,24 @@ def run_gate(root: Path) -> tuple[int, str]:
 
 
 def patch(root: Path, rel: str, old: str, new: str, every: bool) -> bool:
-    """Replace `old` with `new` in a fixture file; False if `old` is absent.
+    """Replace `old` with `new` in a fixture file.
 
-    `every` matters for vocabulary checks: the router states most verdicts
-    twice, so replacing one occurrence leaves the other satisfying the gate and
-    the case passes for the wrong reason.
+    Args:
+        root: Fixture root containing the file.
+        rel: Repository-relative path to mutate.
+        old: Anchor text to replace.
+        new: Replacement text.
+        every: Replace all occurrences rather than only the first. This matters
+            for vocabulary checks: the router states most verdicts twice, so
+            replacing one leaves the other satisfying the gate and the case
+            passes for the wrong reason.
+
+    Returns:
+        True when the anchor was found and replaced, False when it is absent
+        so the caller can fail the case loudly instead of skipping it.
+
+    Raises:
+        OSError: If the fixture file cannot be read or written.
     """
     path = root / rel
     text = path.read_text(encoding="utf-8")
@@ -103,7 +141,16 @@ def patch(root: Path, rel: str, old: str, new: str, every: bool) -> bool:
 
 
 def expect(cond: bool, label: str, failures: list[str]) -> None:
-    """Record a labelled assertion result."""
+    """Record a labelled assertion result.
+
+    Args:
+        cond: Whether the case passed.
+        label: Human-readable case name for the result line.
+        failures: Accumulates failed case labels in place.
+
+    Returns:
+        None. Results are printed and recorded in ``failures``.
+    """
     print(f"  {'ok' if cond else 'FAIL'}  {label}")
     if not cond:
         failures.append(label)
@@ -114,10 +161,30 @@ def case(
     rel: str,
     old: str,
     new: str,
+    diagnostic: str,
     failures: list[str],
     every: bool = False,
 ) -> None:
-    """Inject one disagreement and require the gate to reject it."""
+    """Inject one disagreement and require the gate's specific diagnosis.
+
+    Args:
+        label: Human-readable case name for the result line.
+        rel: Repository-relative file to mutate.
+        old: Anchor text to replace.
+        new: Replacement text carrying the injected defect.
+        diagnostic: Fragment the gate must emit. Asserting only a non-zero exit
+            and the generic marker would let an unrelated validation failure
+            satisfy the case -- a test passing for the wrong reason, which is
+            the defect class these tests exist to prevent.
+        failures: Accumulates failed case labels in place.
+        every: Replace all occurrences rather than the first.
+
+    Returns:
+        None. Results are printed and recorded in ``failures``.
+
+    Raises:
+        OSError: If a fixture file cannot be read or written.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         root = make_root(tmp)
         if not patch(root, rel, old, new, every):
@@ -126,11 +193,28 @@ def case(
             expect(False, f"{label} [ANCHOR NOT FOUND in {rel}]", failures)
             return
         code, out = run_gate(root)
-        expect(code == 1 and "INCONSISTENT" in out, label, failures)
+        if code != 1:
+            expect(False, f"{label} [expected exit 1, got {code}]", failures)
+            return
+        if diagnostic not in out:
+            expect(
+                False,
+                f"{label} [wrong diagnosis; wanted {diagnostic!r}]",
+                failures,
+            )
+            return
+        expect(True, label, failures)
 
 
 def main() -> int:
-    """Run every regression case; return a process exit code."""
+    """Run every regression case.
+
+    Returns:
+        0 when every case behaves as specified, 1 otherwise.
+
+    Raises:
+        OSError: If a fixture cannot be created or the gate cannot be run.
+    """
     failures: list[str] = []
 
     print("baseline:")
@@ -145,16 +229,16 @@ def main() -> int:
 
     print("\nrejects injected drift:")
 
-    # The bug that made this gate report success on real drift: Principle 6's
-    # tool-access matrix rows also start with a mode name.
     # `build` specifically: the router contains a *second* table whose rows
     # also begin with "| `build` |" (Principle 6's tool-access matrix). The
-    # gate must read the cap from the mode table and ignore that one.
+    # gate must read the cap from the mode table and ignore that one. Scanning
+    # every table is the bug that let real drift pass.
     case(
         "mode cap drift (build)",
         ROUTER,
         "15, scoped to the diff |",
         "99, scoped to the diff |",
+        "cap for `build` is 15, router says 99",
         failures,
     )
     case(
@@ -162,6 +246,7 @@ def main() -> int:
         ROUTER,
         "| `core` |",
         "| `core-renamed` |",
+        "mode table has no row for `core`",
         failures,
     )
 
@@ -171,6 +256,7 @@ def main() -> int:
         VERIFIED_SCHEMA,
         '"better-ui"',
         '"better-ui-typo"',
+        "coverage must require all six domain keys",
         failures,
     )
     case(
@@ -178,6 +264,7 @@ def main() -> int:
         CANDIDATE_SCHEMA,
         '"better-colors"',
         '"better-colours"',
+        "domain enum",
         failures,
     )
 
@@ -188,6 +275,7 @@ def main() -> int:
         "skills/better-ui/SKILL.md",
         "- `HIGH`",
         "- `CRITICAL`",
+        "severity ladder is ['CRITICAL', 'MEDIUM', 'LOW']",
         failures,
     )
     case(
@@ -195,6 +283,7 @@ def main() -> int:
         "skills/better-colors/SKILL.md",
         "## Severity",
         "## Severity notes (prose)",
+        "no '## Severity' section",
         failures,
     )
 
@@ -204,6 +293,7 @@ def main() -> int:
         ROUTER,
         "`Needs changes`",
         "`Needs-changes`",
+        "schema verdict(s) ['Needs changes'] never mentioned",
         failures,
         every=True,
     )
@@ -212,6 +302,7 @@ def main() -> int:
         CONSOLIDATOR,
         "`Approve`",
         "`Ship it`",
+        "schema verdict(s) ['Approve'] never mentioned",
         failures,
         every=True,
     )
@@ -222,6 +313,7 @@ def main() -> int:
         WCAG_SKILL,
         "### 2.5.8 Target Size (Minimum) (Level AA) - WCAG 2.2",
         "### Target size notes",
+        "missing WCAG 2.2 A/AA criteria ['2.5.8']",
         failures,
     )
     case(
@@ -229,6 +321,7 @@ def main() -> int:
         WCAG_SKILL,
         "### 3.3.8 Accessible Authentication (Minimum) (Level AA) - WCAG 2.2",
         "### Accessible authentication",
+        "missing WCAG 2.2 A/AA criteria ['3.3.8']",
         failures,
     )
 

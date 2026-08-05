@@ -30,7 +30,19 @@ GATE = Path(__file__).resolve().parent / "check_output_schemas.py"
 
 
 def run_gate(root: Path) -> tuple[int, str]:
-    """Run the gate against a fixture root; return (exit code, stderr)."""
+    """Run the gate against a fixture root.
+
+    Args:
+        root: Directory the gate scans for schemas.
+
+    Returns:
+        The gate's exit code and its combined stdout and stderr. Both streams
+        are merged because the gate prints diagnoses to stderr and its success
+        line to stdout, and cases assert against either.
+
+    Raises:
+        OSError: If the interpreter cannot be executed.
+    """
     proc = subprocess.run(
         [sys.executable, str(GATE), str(root)],
         capture_output=True,
@@ -40,22 +52,48 @@ def run_gate(root: Path) -> tuple[int, str]:
 
 
 def write_schema(root: Path, schema: object) -> None:
-    """Place one schema where the gate's discovery glob will find it."""
+    """Place one schema where the gate's discovery glob will find it.
+
+    The gate only considers files named `*schema*.json` inside a `references`
+    or `schemas` directory under `skills/` or `plugins/`, so the path matters
+    as much as the content.
+
+    Args:
+        root: Fixture root to write beneath.
+        schema: JSON-serializable schema body.
+
+    Returns:
+        None.
+
+    Raises:
+        OSError: If the fixture directory or file cannot be written.
+        TypeError: If `schema` is not JSON-serializable.
+    """
     path = root / "skills" / "probe" / "references" / "probe-schema.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(schema, indent=2), encoding="utf-8")
 
 
 def expect(cond: bool, label: str, failures: list[str]) -> None:
-    """Record a labelled assertion result."""
+    """Record a labelled assertion result.
+
+    Args:
+        cond: Whether the case passed.
+        label: Human-readable case name for the result line.
+        failures: Accumulates failed case labels in place.
+
+    Returns:
+        None. Results are printed and recorded in ``failures``.
+    """
     print(f"  {'ok' if cond else 'FAIL'}  {label}")
     if not cond:
         failures.append(label)
 
 
-REJECT_CASES: list[tuple[str, object]] = [
+REJECT_CASES: list[tuple[str, str, object]] = [
     (
         "nullable object missing additionalProperties",
+        "$.meta: objects must set \"additionalProperties\": false",
         {
             "type": "object",
             "additionalProperties": False,
@@ -71,6 +109,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "implicit object (properties, no declared type)",
+        "$.m: objects must set \"additionalProperties\": false",
         {
             "type": "object",
             "additionalProperties": False,
@@ -85,6 +124,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "anyOf branch missing additionalProperties",
+        "$: objects must set \"additionalProperties\": false",
         {
             "anyOf": [
                 {
@@ -103,6 +143,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "bare root object with no properties",
+        "$: objects must set \"additionalProperties\": false",
         {"type": "object"},
     ),
     (
@@ -112,10 +153,12 @@ REJECT_CASES: list[tuple[str, object]] = [
         # `properties` anywhere, a broken type check makes the whole file
         # invisible and the gate reports "0 schema(s) checked" -- success.
         "bare nullable object, no properties anywhere",
+        "$: objects must set \"additionalProperties\": false",
         {"type": ["object", "null"]},
     ),
     (
         "nullable object nested under a non-object root",
+        "$: objects must set \"additionalProperties\": false",
         {
             "anyOf": [
                 {"type": "string"},
@@ -125,6 +168,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "optional-by-omission (property absent from required)",
+        "$: 'required' must include every key in 'properties'; missing ['b']",
         {
             "type": "object",
             "additionalProperties": False,
@@ -137,6 +181,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "required names a key absent from properties",
+        "$: 'required' names keys absent from 'properties': ['ghost']",
         {
             "type": "object",
             "additionalProperties": False,
@@ -146,6 +191,7 @@ REJECT_CASES: list[tuple[str, object]] = [
     ),
     (
         "violation nested inside array items",
+        "$.rows.items: objects must set \"additionalProperties\": false",
         {
             "type": "object",
             "additionalProperties": False,
@@ -189,23 +235,34 @@ VALID_SCHEMA = {
 
 
 def main() -> int:
-    """Run every regression case; return a process exit code."""
+    """Run every regression case.
+
+    Returns:
+        0 when every case behaves as specified, 1 otherwise.
+
+    Raises:
+        OSError: If a fixture cannot be created or the gate cannot be run.
+    """
     failures: list[str] = []
 
     print("rejects strict-mode violations:")
-    for label, schema in REJECT_CASES:
+    for label, diagnostic, schema in REJECT_CASES:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_schema(root, schema)
             code, out = run_gate(root)
-            # Non-zero is necessary but not sufficient: a gate that skips the
-            # file reports success, and one that crashes also exits non-zero.
-            # Require the specific diagnosis.
-            expect(
-                code == 1 and "INVALID" in out,
-                label,
-                failures,
-            )
+            # Non-zero is necessary but not sufficient: a gate that crashes
+            # also exits non-zero, and an unrelated violation would satisfy a
+            # bare "INVALID" check. Require this case's own diagnosis, path
+            # included, so a case cannot pass for the wrong reason.
+            if code != 1:
+                expect(False, f"{label} [expected exit 1, got {code}]",
+                       failures)
+            elif diagnostic not in out:
+                expect(False, f"{label} [wrong diagnosis; wanted "
+                       f"{diagnostic!r}]", failures)
+            else:
+                expect(True, label, failures)
 
     print("\naccepts a valid schema:")
     with tempfile.TemporaryDirectory() as tmp:
