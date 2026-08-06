@@ -1,0 +1,1 @@
+> **IMPORTANT:** Default shadcn runner: `bunx --bun shadcn@latest`. In pnpm repos, use `pnpm dlx shadcn@latest`. Detect via `packageManager`, then lockfile. Examples use Bun; substitute pnpm runner when repo is pnpm.

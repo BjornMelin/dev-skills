@@ -1,0 +1,8 @@
+interface:
+  display_name: "shadcn/ui"
+  short_description: "Manages shadcn/ui components: adding, searching, fixing, debugging, styling, and composing UI."
+  default_prompt: "Use $shadcn to add, search, fix, style, and compose shadcn/ui components, including registry work, presets, and components.json configuration."
+  icon_small: "./assets/shadcn-small.png"
+  icon_large: "./assets/shadcn.png"
+policy:
+  allow_implicit_invocation: true
