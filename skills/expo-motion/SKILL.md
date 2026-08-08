@@ -92,6 +92,10 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 
 `references/recipes.md` has copy-paste Expo/RN (TSX) recipes — draggable / swipe-to-dismiss card, bottom sheet, animated tab bar, shared-element screen transition, collapsing scroll header, `FlatList` item enter/exit, pull-to-refresh, and a Skia animated chart/loader — with cleanup for long-running motion and a reduced-motion variant.
 
+Use the `FlatList` recipe only for small lists or after representative-device measurement.
+`performance.layout-animation-in-list` reports per-cell layout animation as a performance lead;
+large virtualized lists need a static/reduced-motion branch.
+
 ## Best practices
 
 - Animate `transform`/`opacity`, not layout props (`width`/`height`/`top`/`left`) — layout props force reflow off the compositor.
@@ -131,12 +135,34 @@ const r = useSharedValue(20); // animate r.value with withTiming(...)
 
 ## Optional power tool: `expo-motion-audit` CLI
 
-This repo ships a Rust CLI, `expo-motion-audit`, that statically audits Expo/RN motion code (JS/TS/JSX/TSX) and config — missing `'worklet'`, shared-value misuse on the JS thread, deprecated `runOnJS`/`runOnUI`, layout-prop animation, missing reduced-motion, missing `cancelAnimation`, and config checks (`react-native-worklets/plugin` presence + last-ordering, New-Architecture flag, Expo package compatibility). Optional — if not installed, proceed with the guidance above.
+This repo ships a Rust CLI, `expo-motion-audit`, that statically audits Expo/RN motion
+source and config. It does not check package compatibility; keep that target-manifest concern
+with the install gate above. The [rule catalog](../../crates/expo-motion-audit-core/src/rules.rs)
+is authoritative. Use the exact IDs below in reports and baselines; abbreviated descriptions are
+not CLI IDs. Optional. If it is not installed, proceed with the guidance above.
+
+| Rule ID | Lead |
+| --- | --- |
+| `reanimated-core.layout-prop-animation` | Layout props animate in an animated style. |
+| `reanimated-core.shared-value-reassign` | A shared-value binding is reassigned instead of writing `.value`. |
+| `worklets-threading.deprecated-run-on` | Deprecated `runOnJS` or `runOnUI` is used. |
+| `worklets-threading.value-access-on-js` | A shared value is read or written during render. |
+| `worklets-threading.bridge-in-hot-path` | JS bridging occurs in an animated reaction or gesture callback. |
+| `worklets-threading.missing-worklet` | An extracted animated callback lacks `'worklet'`. |
+| `layout.infinite-repeat-no-reduced-motion` | An infinite repeat has no reduced-motion reference. |
+| `accessibility.missing-reduced-motion` | Reanimated use has no reduced-motion handling. |
+| `lifecycle.missing-cancel-animation` | Animated shared values have no `cancelAnimation` reference. |
+| `config.worklets-plugin-missing-or-not-last` | The Worklets Babel plugin is absent or misordered. |
+| `config.deprecated-reanimated-plugin` | The deprecated Reanimated Babel plugin is configured. |
+| `config.new-arch-disabled` | Reanimated 4 is used while New Architecture is explicitly disabled. |
+| `config.unable-to-analyze` | A dynamic config could not be analyzed. |
+| `performance.layout-animation-in-list` | A `FlatList`/`SectionList` cell animates entering, exiting, or layout. |
 
 ```bash
 # Install once (from this repo): cargo install --path crates/expo-motion-audit --locked --force
+expo-motion-audit doctor --format json
 expo-motion-audit scan --root . --format json
-expo-motion-audit scan --root . --categories worklets-threading,config
+expo-motion-audit scan --root . --categories worklets-threading,performance,config
 ```
 
 Treat findings as leads — verify each against the current code before changing behavior. Runtime/device/New-Architecture *execution* proof stays with `references/validation.md` / Expo Doctor.

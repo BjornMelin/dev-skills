@@ -6,7 +6,9 @@ Rules for using Motion in React and TypeScript projects. Framer Motion is now ca
 
 -   **Never** import from `framer-motion`.
 -   Import from `motion/react` in client components.
--   In server components, import `motion` like: `import * as motion from "motion/react-client"`
+-   In server components, use `motion/react-client` only for declarative server-rendered DOM
+    wrappers. Hooks, refs, scroll, gestures, layout measurement, presence hooks, and browser
+    reads need a client boundary. See the [Web Motion React field guide](../../../plugins/web-motion/skills/web-motion-react/references/motion-react-field-guide.md).
 -   Files marked `"use client"` must import from `"motion/react"`.
 -   The `animate` function: import from `"motion/react"` in React files, from `"motion"` elsewhere.
 

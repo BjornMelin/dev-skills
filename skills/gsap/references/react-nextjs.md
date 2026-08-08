@@ -1,8 +1,10 @@
 # GSAP with React & Next.js
 
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
 The official, TypeScript-first way to run GSAP in React and Next.js (App Router) is the `useGSAP()` hook from `@gsap/react`: it scopes selectors, reverts every animation and ScrollTrigger on unmount, and is safe under React Strict Mode and SSR. This reference covers the canonical setup, the full `useGSAP` API, refs and scoping, `contextSafe()`, the `gsap.context()` fallback, and Next.js client-boundary and route-change rules.
 
-> GSAP is 100% free, including every plugin (ScrollTrigger, SplitText, MorphSVG, Draggable, etc.), in the public `gsap` package on npm — no license gate, trial, or private registry. `@gsap/react` is GreenSock's official React integration. Use `gsap` v3.13+ with `@gsap/react`.
+> GSAP is 100% free, including every plugin (ScrollTrigger, SplitText, MorphSVG, Draggable, etc.), in the public `gsap` package on npm, with no license gate, trial, or private registry. `@gsap/react` is GreenSock's official React integration.
 
 ## Table of Contents
 
@@ -308,7 +310,7 @@ The same code works in the Pages Router. The difference is there is no `'use cli
 - ❌ **Don't forget `gsap.registerPlugin(useGSAP, …)`** before any `useGSAP` call or plugin use — register once in `lib/gsap.ts`.
 - ❌ **Don't call `setState` in per-frame GSAP/ScrollTrigger callbacks.** Use refs or animate values directly.
 - ❌ **Don't rebuild the whole scene on every render.** Use a precise `dependencies` array; set `revertOnUpdate: true` only when a dependency change should truly reset the animation.
-- ❌ **Don't add license/premium/trial framing.** All plugins are free in the public `gsap` package (v3.13+).
+- ❌ **Don't add license/premium/trial framing.** All plugins have been free in the public `gsap` package since GSAP 3.13.
 
 ## Related references
 

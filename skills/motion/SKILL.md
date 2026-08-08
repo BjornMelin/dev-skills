@@ -37,6 +37,15 @@ either way; a static list of what is installed rots the moment the estate change
 | Native (Expo / React Native / Reanimated) motion | `expo-motion` |
 | Cross-stack motion direction, 3D, and motion-token architecture | the `design-motion` plugin |
 
+## Modern React
+
+[`web-motion-react`](../../plugins/web-motion/skills/web-motion-react/SKILL.md) is the
+canonical owner for Motion React API detail. Use `MotionConfig reducedMotion="user"` for
+subtree policy and `useReducedMotion()` for local branches. Start with `motion/react`; when a
+measured bundle budget needs it, pair `LazyMotion` with `m` from `motion/react-m`:
+`domAnimation` covers animations, variants, exit, hover/tap/focus, while `domMax` also enables
+pan/drag and layout.
+
 ### Precedence: this section overrides the vendored directories
 
 The capability directories below are upstream Motion content, kept in their original form so

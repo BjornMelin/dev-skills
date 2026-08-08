@@ -1,8 +1,9 @@
 # Runtime Verification
 
-Static analysis (this skill's scripts, `motion-token-audit`, the R3F art-direction
-audit, type-check, lint) proves *structure*. It cannot prove that a scene actually
-renders, that motion holds its frame budget, or that reduced motion works — those
+Static analysis (this skill's scripts, `motion-token-audit`, `expo-motion-audit`,
+`gsap-audit`, the R3F art-direction audit, type-check, and lint) proves *structure*.
+It cannot prove that a scene actually renders, that motion holds its frame budget,
+or that reduced motion works. Those
 are runtime facts that need a running app. This reference is the runtime-proof path
 for design-motion work; it wires **existing** tools, and every one is optional (if a
 tool is absent, degrade and state what stayed unverified — never imply a pass).
@@ -42,6 +43,12 @@ Do not use a browser. The mature device-proof ladder already exists at
 New-Architecture verification, a dev build on a real device, the 5-tier risk ladder,
 and a closeout naming device/OS with an attached recording. Unit tests cannot assert
 frame pacing, dropped frames, or GPU output.
+
+## Optional analyzers
+
+Before runtime proof, use the [optional analyzer commands](../SKILL.md#optional-analyzers) for
+the target stack. Record each installed CLI's exact `doctor` version and the `scan` categories
+used in the audit report. Static findings are leads only; they do not replace runtime proof.
 
 ## Degradation contract
 

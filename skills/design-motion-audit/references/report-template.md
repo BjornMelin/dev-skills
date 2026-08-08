@@ -12,9 +12,15 @@ prioritized punch list first, and route every fix to the skill that owns the sta
 ## Stack & scope
 - Stacks detected: <R3F / three.js / Reanimated / GSAP / CSS / Motion>
 - Files/routes/scenes reviewed: <n> (<how scoped>)
-- Tools run: motion-token-audit <ver?> · r3f art-direction audit · expo-motion-audit /
-  gsap-audit / web-three-r3f audit (as applicable) · runtime: playwright-cli /
-  MotionScore (or "static only — runtime unverified")
+- Other static/runtime tools: <r3f art-direction audit / web-three-r3f audit / playwright-cli /
+  MotionScore, or "static only; runtime unverified">
+
+## Optional analyzers
+| Tool | Exact version run (from `doctor`) | Categories run |
+| --- | --- | --- |
+| `motion-token-audit` | [exact installed version or not run] | [all, scan CSV, or not run] |
+| `expo-motion-audit` | [exact installed version or not run] | [all, scan CSV, or not run] |
+| `gsap-audit` | [exact installed version or not run] | [all, scan CSV, or not run] |
 
 ## Prioritized punch list
 | # | Severity | Area | File:line | Finding | Fix | Route to |
