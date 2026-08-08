@@ -27,7 +27,7 @@ pub(super) fn write_kimi_mirror(report: &KimiSyncReport) -> Result<()> {
         let link_path = tmp_skills.join(&skill.name);
         create_dir_symlink(&skill.source_path, &link_path)?;
     }
-    write_json(tmp_root.join("manifest.json"), report)?;
+    write_json(&tmp_root.join("manifest.json"), report)?;
 
     if let Some(parent) = report.mirror_root.parent() {
         fs::create_dir_all(parent)
@@ -80,10 +80,7 @@ fn assert_safe_sync_path(sync_root: &Path, path: &Path) -> Result<()> {
             sync_root.display()
         );
     }
-    if fs::symlink_metadata(sync_root)
-        .map(|metadata| metadata.file_type().is_symlink())
-        .unwrap_or(false)
-    {
+    if fs::symlink_metadata(sync_root).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
         bail!("refusing symlinked Kimi sync root: {}", sync_root.display());
     }
     let canonical_sync_root = fs::canonicalize(sync_root)

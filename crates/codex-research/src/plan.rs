@@ -1,6 +1,9 @@
-use crate::*;
+use crate::{
+    PlanArgs, ResearchConfig, Result, SearchArgs, TopicKind, build_plan, print_json, route_list,
+    route_name,
+};
 
-pub(crate) fn output_plan(args: PlanArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
+pub(crate) fn output_plan(args: &PlanArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
     let plan = build_plan(&args.query, args.profile, TopicKind::General, config);
     if json_out {
         print_json(&plan)
@@ -27,7 +30,7 @@ pub(crate) fn output_plan(args: PlanArgs, config: &ResearchConfig, json_out: boo
 }
 
 pub(crate) fn output_search_plan(
-    args: SearchArgs,
+    args: &SearchArgs,
     config: &ResearchConfig,
     json_out: bool,
 ) -> Result<()> {

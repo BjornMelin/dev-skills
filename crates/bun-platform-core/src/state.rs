@@ -21,8 +21,7 @@ impl PlatformPaths {
             config_dir: base.config_dir().join("dev-skills").join("bun-platform"),
             state_dir: base
                 .state_dir()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| base.data_local_dir().to_path_buf())
+                .map_or_else(|| base.data_local_dir().to_path_buf(), Path::to_path_buf)
                 .join("dev-skills")
                 .join("bun-platform"),
             cache_dir: base.cache_dir().join("dev-skills").join("bun-platform"),

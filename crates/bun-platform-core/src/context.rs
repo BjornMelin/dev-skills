@@ -38,11 +38,15 @@ impl SkillContext {
 
     pub fn list_rule_ids(&self) -> Result<Vec<String>> {
         let mut rule_ids = fs::read_dir(&self.rules_dir)?
-            .filter_map(|entry| entry.ok())
+            .filter_map(std::result::Result::ok)
             .filter_map(|entry| {
                 let path = entry.path();
                 let name = path.file_name()?.to_str()?;
-                if !name.ends_with(".md") || name == "_index.md" {
+                if !path
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+                    || name == "_index.md"
+                {
                     return None;
                 }
                 Some(name.trim_end_matches(".md").to_string())

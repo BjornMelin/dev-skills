@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use crate::types::{Finding, PlannedFix, Severity};
 
 pub fn format_findings_text(findings: &[Finding]) -> String {
@@ -8,21 +10,22 @@ pub fn format_findings_text(findings: &[Finding]) -> String {
     let mut out = String::new();
     for finding in findings {
         let location = format!("{}:{}:{}", finding.file, finding.line, finding.column);
-        out.push_str(&format!(
-            "{:<5} {} {}\n",
+        let _ = writeln!(
+            out,
+            "{:<5} {} {}",
             finding.severity.as_upper(),
             finding.rule_id,
             location
-        ));
-        out.push_str(&format!("  {}\n", finding.message));
+        );
+        let _ = writeln!(out, "  {}", finding.message);
         if let Some(why) = &finding.why {
-            out.push_str(&format!("  Why: {why}\n"));
+            let _ = writeln!(out, "  Why: {why}");
         }
         if let Some(fix) = &finding.suggested_fix {
-            out.push_str(&format!("  Fix: {fix}\n"));
+            let _ = writeln!(out, "  Fix: {fix}");
         }
         if let Some(snippet) = &finding.snippet {
-            out.push_str(&format!("  {snippet}\n"));
+            let _ = writeln!(out, "  {snippet}");
         }
     }
     out
@@ -35,15 +38,16 @@ pub fn format_findings_md(findings: &[Finding]) -> String {
     let mut out = String::from("# Bun Platform Audit Findings\n\n");
     for finding in findings {
         let location = format!("{}:{}:{}", finding.file, finding.line, finding.column);
-        out.push_str(&format!(
-            "- **{}** `{}` ({}): {}\n",
+        let _ = writeln!(
+            out,
+            "- **{}** `{}` ({}): {}",
             finding.severity.as_upper(),
             finding.rule_id,
             location,
             finding.message
-        ));
+        );
         if let Some(fix) = &finding.suggested_fix {
-            out.push_str(&format!("  - Fix: {fix}\n"));
+            let _ = writeln!(out, "  - Fix: {fix}");
         }
     }
     out
@@ -64,11 +68,8 @@ pub fn format_fixes_text(fixes: &[PlannedFix], applied: bool) -> String {
         format!("Planned {} safe fix(es):\n", fixes.len())
     };
     for fix in fixes {
-        out.push_str(&format!(
-            "- [{:?}] {} {}\n",
-            fix.kind, fix.rule_id, fix.file
-        ));
-        out.push_str(&format!("  {}\n", fix.description));
+        let _ = writeln!(out, "- [{:?}] {} {}", fix.kind, fix.rule_id, fix.file);
+        let _ = writeln!(out, "  {}", fix.description);
     }
     out
 }

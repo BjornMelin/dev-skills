@@ -1,4 +1,11 @@
-use crate::*;
+use crate::{
+    GithubCommand, ProviderKind, ResearchConfig, Result, SourceCacheInsert, Value,
+    attach_source_to_run, bail, classify_privacy, github_api_source_url, github_get_response,
+    github_get_tracked, github_issue_call_count, github_pr_call_count, github_repo_url,
+    github_search_limitations, http_client, init_db, json, maybe_debit, merge_metadata,
+    metadata_text, normalize_compare, path_segment, print_json, privacy_class_name,
+    record_source_cache, research_paths, slash_path, track_provider_result,
+};
 
 pub(crate) struct GithubResponse {
     pub(crate) value: Value,
@@ -43,7 +50,7 @@ pub(crate) async fn handle_github(
             .await?;
             let metadata = merge_metadata(
                 json!({ "operation": "search-repos", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("repositories") }),
-                json!({ "rate_limit": response.rate_limit }),
+                &json!({ "rate_limit": response.rate_limit }),
             );
             (response.value, github_api_source_url(url), metadata, budget)
         }
@@ -69,7 +76,7 @@ pub(crate) async fn handle_github(
             .await?;
             let metadata = merge_metadata(
                 json!({ "operation": "search-code", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("code") }),
-                json!({ "rate_limit": response.rate_limit }),
+                &json!({ "rate_limit": response.rate_limit }),
             );
             (response.value, github_api_source_url(url), metadata, budget)
         }
@@ -100,7 +107,7 @@ pub(crate) async fn handle_github(
             .await?;
             let metadata = merge_metadata(
                 json!({ "operation": "search-issues", "query": metadata_query, "per_page": per_page, "limitations": github_search_limitations("issues") }),
-                json!({ "rate_limit": response.rate_limit }),
+                &json!({ "rate_limit": response.rate_limit }),
             );
             (response.value, github_api_source_url(url), metadata, budget)
         }
@@ -337,7 +344,7 @@ pub(crate) async fn handle_github(
                     .await?;
             (
                 value,
-                github_repo_url(&repo, &format!("blob/{ref_name}/{path}", ref_name = r#ref)),
+                github_repo_url(&repo, &format!("blob/{ref}/{path}")),
                 json!({ "operation": "file", "repo": repo, "path": path, "ref": r#ref }),
                 budget,
             )

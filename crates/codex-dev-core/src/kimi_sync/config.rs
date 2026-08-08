@@ -10,13 +10,12 @@ use sha2::{Digest, Sha256};
 use super::{CodexConfig, PluginState, SkillConfigRule};
 
 pub(super) fn default_home_path(path: Option<PathBuf>, child: &str) -> Result<PathBuf> {
-    match path {
-        Some(path) => Ok(path),
-        None => {
-            let home = home_path()
-                .ok_or_else(|| anyhow::anyhow!("home directory could not be determined"))?;
-            Ok(home.join(child))
-        }
+    if let Some(path) = path {
+        Ok(path)
+    } else {
+        let home =
+            home_path().ok_or_else(|| anyhow::anyhow!("home directory could not be determined"))?;
+        Ok(home.join(child))
     }
 }
 
@@ -73,7 +72,7 @@ pub(super) fn read_codex_config(path: &Path) -> Result<CodexConfig> {
                 .and_then(toml::Value::as_bool)
                 .unwrap_or(true);
             plugins.insert(
-                key.to_string(),
+                key.clone(),
                 PluginState {
                     name: name.to_string(),
                     source: source.to_string(),
@@ -88,12 +87,11 @@ pub(super) fn read_codex_config(path: &Path) -> Result<CodexConfig> {
 
 pub(super) fn resolve_project_root(project_root: Option<PathBuf>) -> Result<Option<PathBuf>> {
     let explicit = project_root.is_some();
-    let root = match project_root {
-        Some(path) => path,
-        None => {
-            let cwd = env::current_dir().context("failed to read current directory")?;
-            find_git_root(&cwd).unwrap_or(cwd)
-        }
+    let root = if let Some(path) = project_root {
+        path
+    } else {
+        let cwd = env::current_dir().context("failed to read current directory")?;
+        find_git_root(&cwd).unwrap_or(cwd)
     };
     match fs::canonicalize(&root) {
         Ok(path) if path.is_dir() => Ok(Some(path)),
@@ -122,7 +120,7 @@ pub(super) fn project_hash(project_root: Option<&Path>) -> String {
     let mut hasher = Sha256::new();
     hasher.update(project_root.display().to_string().as_bytes());
     let hash = hasher.finalize();
-    format!("{:x}", hash)[..16].to_string()
+    format!("{hash:x}")[..16].to_string()
 }
 
 pub(super) fn paths_equivalent(left: &Path, right: &Path) -> bool {

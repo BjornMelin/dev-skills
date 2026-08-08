@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -209,10 +210,10 @@ struct ReviewCommentFingerprint {
 
 pub(crate) fn handle_pr_review_command(command: PrReviewCommand) -> Result<CommandOutput> {
     match command {
-        PrReviewCommand::Start(args) => handle_pr_review_start(args, "pr review start"),
+        PrReviewCommand::Start(args) => handle_pr_review_start(&args, "pr review start"),
         PrReviewCommand::Refresh(mut args) => {
             args.fresh = true;
-            handle_pr_review_start(args, "pr review refresh")
+            handle_pr_review_start(&args, "pr review refresh")
         }
         PrReviewCommand::Query(args) => {
             let worklist: PrReviewWorklist = read_json(&args.worklist)?;
@@ -248,7 +249,7 @@ pub(crate) fn handle_pr_review_command(command: PrReviewCommand) -> Result<Comma
             })
         }
         PrReviewCommand::ApplySuggestions(args) => {
-            let report = plan_or_apply_suggestions(args)?;
+            let report = plan_or_apply_suggestions(&args)?;
             Ok(CommandOutput {
                 ok: report["ok"].as_bool().unwrap_or(false),
                 command: "pr review apply-suggestions",
@@ -266,7 +267,7 @@ pub(crate) fn handle_pr_review_command(command: PrReviewCommand) -> Result<Comma
         }
         PrReviewCommand::Closeout(args) => {
             let generated_at = args.checked_at.unwrap_or_else(Utc::now);
-            let report = plan_or_apply_closeout(args, generated_at)?;
+            let report = plan_or_apply_closeout(&args, generated_at)?;
             Ok(CommandOutput {
                 ok: report.ok,
                 command: "pr review closeout",
@@ -285,7 +286,10 @@ pub(crate) fn handle_pr_review_command(command: PrReviewCommand) -> Result<Comma
     }
 }
 
-fn handle_pr_review_start(args: PrReviewStartArgs, command: &'static str) -> Result<CommandOutput> {
+fn handle_pr_review_start(
+    args: &PrReviewStartArgs,
+    command: &'static str,
+) -> Result<CommandOutput> {
     if args.fresh && args.source_dir.is_some() {
         bail!(
             "--fresh cannot be combined with --source-dir; remove --source-dir to capture live hosted state"
@@ -295,7 +299,7 @@ fn handle_pr_review_start(args: PrReviewStartArgs, command: &'static str) -> Res
     let (repo, number) = resolve_pr_identity(args.repo.as_deref(), args.number)?;
     let capsule = resolve_pr_review_capsule(args.capsule.as_deref(), &repo, number, checked_at)?;
     let state = run_pr_agent_state(
-        PrAgentArgs {
+        &PrAgentArgs {
             capsule: capsule.clone(),
             repo: repo.clone(),
             number,
@@ -315,9 +319,9 @@ fn handle_pr_review_start(args: PrReviewStartArgs, command: &'static str) -> Res
             .push("one or more hosted source captures failed".to_string());
     }
     let worklist_path = capsule.join("pr-review-worklist.json");
-    write_json(worklist_path.clone(), &worklist)?;
+    write_json(&worklist_path, &worklist)?;
     if let Some(out) = args.out.as_deref() {
-        write_json(out.to_path_buf(), &worklist)?;
+        write_json(out, &worklist)?;
     }
     let result = pr_review_start_result(&worklist, &worklist_path, args.out.as_deref())?;
     let path_note = pr_review_start_path_note(args.out.as_deref());
@@ -386,7 +390,7 @@ pub(crate) fn handle_review_command(command: ReviewCommand) -> Result<CommandOut
             let checked_at = args.checked_at.unwrap_or_else(Utc::now);
             let worklist = ingest_local_review(&args.source, args.kind, checked_at)?;
             if let Some(out) = args.out {
-                write_json(out, &worklist)?;
+                write_json(&out, &worklist)?;
             }
             Ok(CommandOutput {
                 ok: true,
@@ -621,12 +625,7 @@ fn build_pr_review_worklist(
         .find(|source| source.id == "gh-review-threads");
     let mut threads = Vec::new();
     if let Some(source) = thread_source {
-        if source.status != PrAgentSourceStatus::Captured {
-            diagnostics.push(format!(
-                "review-thread source was not captured; gh-review-threads status was {:?}",
-                source.status
-            ));
-        } else {
+        if source.status == PrAgentSourceStatus::Captured {
             let path = PathBuf::from(&source.path);
             let value = read_json::<Value>(&path).with_context(|| {
                 format!("failed to read review thread source {}", path.display())
@@ -639,6 +638,11 @@ fn build_pr_review_worklist(
             );
             }
             threads = parsed_threads.threads;
+        } else {
+            diagnostics.push(format!(
+                "review-thread source was not captured; gh-review-threads status was {:?}",
+                source.status
+            ));
         }
     } else {
         diagnostics.push("review-thread source was not captured".to_string());
@@ -805,8 +809,7 @@ fn extract_suggestions(
         let after_start = &rest[start + "```suggestion".len()..];
         let after_header = after_start
             .find('\n')
-            .map(|index| &after_start[index + 1..])
-            .unwrap_or("");
+            .map_or("", |index| &after_start[index + 1..]);
         let Some(end) = closing_fence_offset(after_header) else {
             break;
         };
@@ -897,8 +900,6 @@ fn current_diff_lines_for_range(hunk: &str, start_line: u64, end_line: u64) -> V
                 current.push(text.to_string());
             }
             current_line = line_number.checked_add(1);
-        } else if line.starts_with('-') {
-            continue;
         }
     }
     current
@@ -908,7 +909,7 @@ fn parse_current_hunk_start(header: &str) -> Option<u64> {
     let after_plus = header.split_once('+')?.1;
     let digits = after_plus
         .chars()
-        .take_while(|ch| ch.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
         .collect::<String>();
     digits.parse().ok()
 }
@@ -930,8 +931,7 @@ fn build_clusters(items: &[PrReviewWorkItem]) -> Vec<PrReviewCluster> {
         let prefix = item
             .path
             .as_deref()
-            .map(path_prefix)
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), path_prefix);
         by_prefix.entry(prefix).or_default().push(item.id.clone());
     }
     by_prefix
@@ -1000,20 +1000,22 @@ fn render_pr_review_worklist(worklist: &PrReviewWorklist) -> String {
         worklist.summary.fast_noop
     );
     for cluster in &worklist.clusters {
-        markdown.push_str(&format!("## {} ({})\n\n", cluster.id, cluster.path_prefix));
+        write!(markdown, "## {} ({})\n\n", cluster.id, cluster.path_prefix)
+            .expect("writing to a String is infallible");
         for item_id in &cluster.item_ids {
             if let Some(item) = worklist.items.iter().find(|item| &item.id == item_id) {
-                markdown.push_str(&format!(
-                    "- {} `{}` {}:{} [{}] {}\n",
+                writeln!(
+                    markdown,
+                    "- {} `{}` {}:{} [{}] {}",
                     item.id,
                     item.thread_id,
                     item.path.as_deref().unwrap_or("<no-path>"),
                     item.line
-                        .map(|line| line.to_string())
-                        .unwrap_or_else(|| "?".to_string()),
+                        .map_or_else(|| "?".to_string(), |line| line.to_string()),
                     item.severity,
                     item.body_excerpt
-                ));
+                )
+                .expect("writing to a String is infallible");
             }
         }
         markdown.push('\n');
@@ -1021,7 +1023,7 @@ fn render_pr_review_worklist(worklist: &PrReviewWorklist) -> String {
     markdown
 }
 
-fn plan_or_apply_suggestions(args: PrReviewApplySuggestionsArgs) -> Result<Value> {
+fn plan_or_apply_suggestions(args: &PrReviewApplySuggestionsArgs) -> Result<Value> {
     let worklist: PrReviewWorklist = read_json(&args.worklist)?;
     let repo_root = fs::canonicalize(&args.repo_root).with_context(|| {
         format!(
@@ -1262,7 +1264,7 @@ fn suggestion_action(
 }
 
 fn plan_or_apply_closeout(
-    args: PrReviewCloseoutArgs,
+    args: &PrReviewCloseoutArgs,
     generated_at: DateTime<Utc>,
 ) -> Result<PrReviewCloseoutReport> {
     if args.apply && args.source_dir.is_some() {
@@ -1301,7 +1303,7 @@ fn plan_or_apply_closeout(
         .filter(|command| !command.trim().is_empty())
         .cloned()
         .collect::<Vec<_>>();
-    let target_threads = closeout_targets(&args, worklist.as_ref())?;
+    let target_threads = closeout_targets(args, worklist.as_ref())?;
     let early_diagnostics = closeout_precondition_diagnostics(
         args.apply,
         expected_head_sha.as_deref(),
@@ -1338,7 +1340,7 @@ fn plan_or_apply_closeout(
     };
     let current_state = if args.apply || args.source_dir.is_some() {
         Some(run_pr_agent_state(
-            PrAgentArgs {
+            &PrAgentArgs {
                 capsule: capsule.expect("capsule resolved"),
                 repo: repo.clone(),
                 number,
@@ -1650,7 +1652,7 @@ fn closeout_targets(
                 expected_comments: Some(BTreeSet::new()),
                 expected_comment_count: Some(0),
             });
-        target.work_item_id = item.id.clone();
+        target.work_item_id.clone_from(&item.id);
         if let Some(fingerprint) = work_item_comment_fingerprint(item)
             && let Some(expected_comments) = &mut target.expected_comments
         {
@@ -1900,8 +1902,9 @@ fn render_local_review_worklist(worklist: &LocalReviewWorklist) -> String {
         worklist.source, worklist.kind, worklist.summary.items
     );
     for item in &worklist.items {
-        markdown.push_str(&format!(
-            "- {} line {} {}{}\n",
+        writeln!(
+            markdown,
+            "- {} line {} {}{}",
             item.id,
             item.source_line,
             item.path
@@ -1909,7 +1912,8 @@ fn render_local_review_worklist(worklist: &LocalReviewWorklist) -> String {
                 .map(|path| format!("`{path}` "))
                 .unwrap_or_default(),
             item.body_excerpt
-        ));
+        )
+        .expect("writing to a String is infallible");
     }
     markdown
 }
@@ -2108,7 +2112,7 @@ fn normalized_commit_scope(segment: &str) -> String {
 fn commit_type_for_files(paths: &[String]) -> &'static str {
     if paths
         .iter()
-        .all(|path| path.ends_with(".md") || path == "README.md" || path == "AGENTS.md")
+        .all(|path| path_has_extension(path, "md") || path == "README.md" || path == "AGENTS.md")
     {
         "docs"
     } else if paths
@@ -2130,6 +2134,10 @@ fn commit_type_for_files(paths: &[String]) -> &'static str {
     }
 }
 
+fn path_has_extension(path: &str, extension: &str) -> bool {
+    Path::new(path).extension().and_then(|value| value.to_str()) == Some(extension)
+}
+
 fn subject_for_group(commit_type: &str, scope: &str, paths: &[String]) -> String {
     let behavior = if paths.iter().any(|path| path.contains("gh-pr-review-fix")) {
         "hard-cut PR review remediation workflow"
@@ -2149,7 +2157,7 @@ fn validation_commands_for_files(paths: &[String]) -> Vec<String> {
     let mut commands = BTreeSet::new();
     if paths
         .iter()
-        .any(|path| path.starts_with("crates/") && path.ends_with(".rs"))
+        .any(|path| path.starts_with("crates/") && path_has_extension(path, "rs"))
     {
         commands.insert("cargo fmt --all --check".to_string());
         commands.insert("cargo clippy --all-targets -- -D warnings".to_string());
@@ -2186,7 +2194,7 @@ fn validation_commands_for_files(paths: &[String]) -> Vec<String> {
     for python_path in changed_eval_python_files(paths) {
         commands.insert(format!("python3 -m py_compile {python_path}"));
     }
-    if paths.iter().any(|path| path.ends_with(".md")) {
+    if paths.iter().any(|path| path_has_extension(path, "md")) {
         commands.insert("python3 tools/docs/check_links.py docs README.md AGENTS.md".to_string());
     }
     commands.insert("git diff --check".to_string());
@@ -2235,7 +2243,7 @@ fn changed_motion_plugin_scripts(paths: &[String]) -> BTreeSet<String> {
 fn changed_eval_python_files(paths: &[String]) -> BTreeSet<String> {
     paths
         .iter()
-        .filter(|path| path.starts_with("tools/eval/") && path.ends_with(".py"))
+        .filter(|path| path.starts_with("tools/eval/") && path_has_extension(path, "py"))
         .cloned()
         .collect()
 }

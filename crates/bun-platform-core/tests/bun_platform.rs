@@ -1,5 +1,5 @@
 use bun_platform_core::{
-    PlatformPaths, SkillContext, VERIFIED_BUN_VERSION, apply_safe_fixes,
+    CliOverrides, PlatformPaths, SkillContext, VERIFIED_BUN_VERSION, apply_safe_fixes,
     create_release_sync_report, load_audit_config, plan_safe_fixes, preview_release_sync,
     run_audit,
 };
@@ -24,10 +24,11 @@ impl TestEnv {
     fn new(label: &str) -> Self {
         let guard = test_lock()
             .lock()
-            .unwrap_or_else(|error| error.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let root = unique_temp_dir(label);
         fs::create_dir_all(&root).expect("create temp root");
         // Serialized by test_lock so environment mutation cannot race.
+        #[allow(unsafe_code)]
         unsafe {
             env::set_var("XDG_CONFIG_HOME", root.join("config"));
             env::set_var("XDG_CACHE_HOME", root.join("cache"));
@@ -88,7 +89,7 @@ fn reports_mixed_lockfiles_as_an_error() {
     let _env = TestEnv::new("mixed-lockfiles");
     let root = copy_fixture("mixed-lockfiles");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
     assert!(
         findings
@@ -111,7 +112,7 @@ fn does_not_report_bunx_warning_for_non_bun_repo() {
     .expect("package");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -126,7 +127,7 @@ fn plans_and_applies_safe_package_json_fixes() {
     let _env = TestEnv::new("safe-fixes");
     let root = copy_fixture("safe-fixes");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let planned = plan_safe_fixes(&root, &config).expect("plan");
     let rule_ids = planned[0].rule_ids.clone();
@@ -150,7 +151,7 @@ fn parses_jsonc_tsconfig_without_rewriting_it() {
     let tsconfig_path = root.join("tsconfig.json");
     let before = fs::read_to_string(&tsconfig_path).expect("tsconfig before audit");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let findings = run_audit(&root, &config, &paths).expect("audit JSONC tsconfig");
 
@@ -183,7 +184,7 @@ fn reports_missing_bun_types_dependency_when_types_unset() {
     )
     .expect("write tsconfig.json");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
@@ -210,7 +211,7 @@ fn reports_empty_types_array_as_scoping_out_bun() {
     )
     .expect("write tsconfig.json");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
@@ -237,7 +238,7 @@ fn reports_unset_types_with_bun_types_installed() {
     )
     .expect("write tsconfig.json");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
@@ -263,7 +264,7 @@ fn rejects_invalid_jsonc_tsconfig_with_location() {
     )
     .expect("write invalid tsconfig");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let error = run_audit(&root, &config, &paths).expect_err("invalid JSONC must fail");
     let message = format!("{error:#}");
@@ -278,7 +279,7 @@ fn normalizes_next_scripts_when_vercel_bun_runtime_is_enabled() {
     let _env = TestEnv::new("vercel-next");
     let root = copy_fixture("vercel-next");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let findings = run_audit(&root, &config, &paths).expect("audit");
     assert!(
@@ -313,7 +314,7 @@ fn respects_disabled_rules_and_baseline_suppressions() {
     .expect("write config");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
     assert!(
         !findings
@@ -339,7 +340,7 @@ fn recognizes_current_bun_lockfile_name() {
     fs::remove_file(root.join("bun.lockb")).expect("remove old lockfile");
     fs::write(root.join("bun.lock"), "").expect("write current lockfile");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -354,7 +355,7 @@ fn run_audit_does_not_write_cache_by_default() {
     let _env = TestEnv::new("external-state");
     let root = copy_fixture("safe-fixes");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
 
     let _ = run_audit(&root, &config, &paths).expect("audit");
 
@@ -367,9 +368,9 @@ fn writes_external_rollbacks_and_opt_in_cache() {
     let _env = TestEnv::new("external-state-cache");
     let root = copy_fixture("safe-fixes");
     let paths = PlatformPaths::discover().expect("paths");
-    let overrides = bun_platform_core::CliOverrides {
+    let overrides = CliOverrides {
         write_cache: true,
-        ..Default::default()
+        ..CliOverrides::default()
     };
     let config = load_audit_config(&root, None, &overrides).expect("config");
 
@@ -394,7 +395,7 @@ fn reports_adapter_findings() {
 
     let github_root = copy_fixture("github-actions");
     let github_config =
-        load_audit_config(&github_root, None, &Default::default()).expect("github config");
+        load_audit_config(&github_root, None, &CliOverrides::default()).expect("github config");
     let github_findings = run_audit(&github_root, &github_config, &paths).expect("github audit");
     assert!(
         github_findings
@@ -409,7 +410,7 @@ fn reports_adapter_findings() {
 
     let docker_root = copy_fixture("docker");
     let docker_config =
-        load_audit_config(&docker_root, None, &Default::default()).expect("docker config");
+        load_audit_config(&docker_root, None, &CliOverrides::default()).expect("docker config");
     let docker_findings = run_audit(&docker_root, &docker_config, &paths).expect("docker audit");
     assert!(
         docker_findings
@@ -419,7 +420,7 @@ fn reports_adapter_findings() {
 
     let monorepo_root = copy_fixture("monorepo");
     let monorepo_config =
-        load_audit_config(&monorepo_root, None, &Default::default()).expect("monorepo config");
+        load_audit_config(&monorepo_root, None, &CliOverrides::default()).expect("monorepo config");
     let monorepo_findings =
         run_audit(&monorepo_root, &monorepo_config, &paths).expect("monorepo audit");
     assert!(
@@ -446,7 +447,7 @@ fn ignores_commented_vercel_ts_bun_version() {
     .expect("vercel.ts");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -473,7 +474,7 @@ fn ignores_empty_vercel_ts_bun_version() {
     .expect("vercel.ts");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -500,7 +501,7 @@ fn detects_only_active_vercel_ts_bun_runtime_config() {
     .expect("vercel.ts");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -527,7 +528,7 @@ fn detects_version_pinned_vercel_ts_bun_runtime() {
     .expect("vercel.ts");
 
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -542,9 +543,9 @@ fn include_scope_excludes_github_workflow_findings() {
     let _env = TestEnv::new("include-workflow");
     let root = copy_fixture("github-actions");
     let paths = PlatformPaths::discover().expect("paths");
-    let overrides = bun_platform_core::CliOverrides {
+    let overrides = CliOverrides {
         include_paths: vec![PathBuf::from("package.json")],
-        ..Default::default()
+        ..CliOverrides::default()
     };
     let config = load_audit_config(&root, None, &overrides).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
@@ -566,7 +567,7 @@ fn multiline_frozen_bun_install_is_not_reported() {
     )
     .expect("workflow");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -581,10 +582,10 @@ fn cache_fingerprint_includes_direct_root_inputs() {
     let _env = TestEnv::new("cache-root-inputs");
     let root = copy_fixture("github-actions");
     let paths = PlatformPaths::discover().expect("paths");
-    let overrides = bun_platform_core::CliOverrides {
+    let overrides = CliOverrides {
         include_paths: vec![PathBuf::from("package.json")],
         write_cache: true,
-        ..Default::default()
+        ..CliOverrides::default()
     };
     let config = load_audit_config(&root, None, &overrides).expect("config");
 
@@ -592,7 +593,7 @@ fn cache_fingerprint_includes_direct_root_inputs() {
     assert!(
         !initial
             .iter()
-            .any(|finding| finding.file.ends_with(".nvmrc"))
+            .any(|finding| Path::new(&finding.file).ends_with(".nvmrc"))
     );
 
     fs::write(root.join(".nvmrc"), "22\n").expect("nvmrc");
@@ -601,7 +602,7 @@ fn cache_fingerprint_includes_direct_root_inputs() {
     assert!(
         updated
             .iter()
-            .any(|finding| finding.file.ends_with(".nvmrc"))
+            .any(|finding| Path::new(&finding.file).ends_with(".nvmrc"))
     );
 }
 
@@ -610,10 +611,10 @@ fn cache_fingerprint_distinguishes_missing_and_empty_files() {
     let _env = TestEnv::new("cache-file-existence");
     let root = copy_fixture("github-actions");
     let paths = PlatformPaths::discover().expect("paths");
-    let overrides = bun_platform_core::CliOverrides {
+    let overrides = CliOverrides {
         include_paths: vec![PathBuf::from("package.json")],
         write_cache: true,
-        ..Default::default()
+        ..CliOverrides::default()
     };
     let config = load_audit_config(&root, None, &overrides).expect("config");
 
@@ -621,7 +622,7 @@ fn cache_fingerprint_distinguishes_missing_and_empty_files() {
     assert!(
         !initial
             .iter()
-            .any(|finding| finding.file.ends_with(".nvmrc"))
+            .any(|finding| Path::new(&finding.file).ends_with(".nvmrc"))
     );
 
     fs::write(root.join(".nvmrc"), "").expect("empty nvmrc");
@@ -630,7 +631,7 @@ fn cache_fingerprint_distinguishes_missing_and_empty_files() {
     assert!(
         updated
             .iter()
-            .any(|finding| finding.file.ends_with(".nvmrc"))
+            .any(|finding| Path::new(&finding.file).ends_with(".nvmrc"))
     );
 }
 
@@ -647,7 +648,7 @@ fn explicit_vercel_adapter_reports_missing_bun_version() {
     )
     .expect("config");
     let paths = PlatformPaths::discover().expect("paths");
-    let config = load_audit_config(&root, None, &Default::default()).expect("config");
+    let config = load_audit_config(&root, None, &CliOverrides::default()).expect("config");
     let findings = run_audit(&root, &config, &paths).expect("audit");
 
     assert!(
@@ -687,7 +688,8 @@ fn rejects_missing_explicit_config_path() {
     let _env = TestEnv::new("missing-config");
     let root = copy_fixture("safe-fixes");
     let missing = root.join("missing-config.json");
-    let error = load_audit_config(&root, Some(&missing), &Default::default()).expect_err("error");
+    let error =
+        load_audit_config(&root, Some(&missing), &CliOverrides::default()).expect_err("error");
     assert!(error.to_string().contains("config file does not exist"));
 }
 
@@ -704,7 +706,7 @@ fn rejects_unknown_config_keys() {
     )
     .expect("write config");
 
-    let error = load_audit_config(&root, None, &Default::default()).expect_err("error");
+    let error = load_audit_config(&root, None, &CliOverrides::default()).expect_err("error");
     assert!(format!("{error:#}").contains("unknown field"));
 }
 
@@ -724,7 +726,7 @@ fn rejects_invalid_inline_baseline_object_shape() {
     )
     .expect("write config");
 
-    let error = load_audit_config(&root, None, &Default::default()).expect_err("error");
+    let error = load_audit_config(&root, None, &CliOverrides::default()).expect_err("error");
     assert!(error.to_string().contains("suppressionKeys"));
 }
 
@@ -749,7 +751,7 @@ fn rejects_invalid_baseline_file_shape() {
     )
     .expect("write config");
 
-    let error = load_audit_config(&root, None, &Default::default()).expect_err("error");
+    let error = load_audit_config(&root, None, &CliOverrides::default()).expect_err("error");
     assert!(error.to_string().contains("suppressionKeys"));
 }
 
@@ -771,10 +773,12 @@ fn config_schema_and_template_stay_aligned() {
     )
     .expect("write template config");
     fs::write(root.join("bun-platform-baseline.json"), "[]").expect("write template baseline");
-    load_audit_config(&root, None, &Default::default()).expect("template config loads");
+    load_audit_config(&root, None, &CliOverrides::default()).expect("template config loads");
 
     assert_eq!(
-        template_object.get("writeCache").and_then(|v| v.as_bool()),
+        template_object
+            .get("writeCache")
+            .and_then(serde_json::Value::as_bool),
         Some(false)
     );
     assert_eq!(
