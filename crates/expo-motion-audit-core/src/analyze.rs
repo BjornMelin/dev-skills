@@ -17,7 +17,7 @@
 //! positive/negative rate for a stable, dependency-light static check that runs
 //! without type information. Each such rule documents its specific limitation.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -78,10 +78,12 @@ const HOT_PATH_METHODS: &[&str] = &["onUpdate", "onChange"];
 
 /// Reduced-motion identifiers the accessibility/layout rules look for.
 const REDUCED_MOTION_TOKENS: &[&str] = &[
+    "ReducedMotionConfig",
     "useReducedMotion",
     "ReduceMotion",
     "AccessibilityInfo",
     "isReduceMotionEnabled",
+    "reduceMotion",
 ];
 
 /// Layout properties that should be animated via transforms instead.
@@ -104,6 +106,7 @@ const LAYOUT_PROPS: &[&str] = &[
 /// File-scoped facts gathered in a single pre-pass and shared by heuristic
 /// rules that need a whole-file view (imports, reduced-motion tokens, shared
 /// value activity).
+#[allow(clippy::struct_excessive_bools)] // flags-only accumulator; a bitset would obscure the per-rule reads
 #[derive(Default)]
 struct FileFacts {
     /// Local bindings imported from `react-native-reanimated`, keyed by local
@@ -117,6 +120,12 @@ struct FileFacts {
     uses_reanimated_animation: bool,
     /// A shared value is driven by a `with*` factory somewhere in the file.
     animates_shared_value: bool,
+    /// Local FlatList/SectionList bindings imported from react-native.
+    list_bindings: BTreeSet<String>,
+    /// Function bindings passed to a renderItem JSX prop.
+    render_item_functions: BTreeSet<String>,
+    /// Item/Row components rendered by a renderItem function.
+    list_cell_components: BTreeSet<String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -186,15 +195,20 @@ pub fn analyze_source(relative_path: &str, source: &str, source_type: SourceType
 }
 
 /// Pre-pass: gather whole-file facts used by several rules.
-fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
+fn collect_file_facts(source: &str, semantic: &Semantic<'_>) -> FileFacts {
     use oxc_ast::AstKind;
 
     let mut facts = FileFacts::default();
+    facts.render_item_functions.insert("renderItem".to_string());
+    facts
+        .render_item_functions
+        .extend(render_item_function_names(source));
 
     for node in semantic.nodes() {
         match node.kind() {
             AstKind::ImportDeclaration(import) => {
                 record_imports(import, &mut facts);
+                record_list_imports(import, &mut facts);
             }
             AstKind::IdentifierReference(identifier) => {
                 let name = identifier.name.as_str();
@@ -222,6 +236,15 @@ fn collect_file_facts<'a>(source: &str, semantic: &Semantic<'a>) -> FileFacts {
                     && jsx_attribute_is_reanimated_layout_prop(node.id(), semantic, &facts)
                 {
                     facts.uses_reanimated_animation = true;
+                }
+            }
+            AstKind::JSXOpeningElement(opening)
+                if function_is_used_as_render_item(semantic, node.id(), &facts) =>
+            {
+                if let Some(name) = simple_jsx_element_name(&opening.name)
+                    && is_item_or_row_component(name)
+                {
+                    facts.list_cell_components.insert(name.to_string());
                 }
             }
             AstKind::AssignmentExpression(assignment)
@@ -295,6 +318,53 @@ fn record_imports(import: &oxc_ast::ast::ImportDeclaration<'_>, facts: &mut File
     }
 }
 
+fn record_list_imports(import: &oxc_ast::ast::ImportDeclaration<'_>, facts: &mut FileFacts) {
+    if import.import_kind.is_type() || import.source.value.as_str() != "react-native" {
+        return;
+    }
+    let Some(specifiers) = &import.specifiers else {
+        return;
+    };
+    for specifier in specifiers {
+        let ImportDeclarationSpecifier::ImportSpecifier(named) = specifier else {
+            continue;
+        };
+        if named.import_kind.is_value()
+            && matches!(named.imported.name().as_str(), "FlatList" | "SectionList")
+        {
+            facts
+                .list_bindings
+                .insert(named.local.name.as_str().to_string());
+        }
+    }
+}
+
+/// Extract simple `renderItem={renderRow}` bindings without attempting JSX
+/// data-flow. Inline callbacks are recognized through AST ancestry instead.
+fn render_item_function_names(source: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut remainder = source;
+    while let Some(offset) = remainder.find("renderItem") {
+        remainder = &remainder[offset + "renderItem".len()..];
+        let after_name = remainder.trim_start();
+        let Some(after_equals) = after_name.strip_prefix('=') else {
+            continue;
+        };
+        let Some(after_brace) = after_equals.trim_start().strip_prefix('{') else {
+            continue;
+        };
+        let identifier: String = after_brace
+            .trim_start()
+            .chars()
+            .take_while(|character| character.is_ascii_alphanumeric() || *character == '_')
+            .collect();
+        if !identifier.is_empty() {
+            names.insert(identifier);
+        }
+    }
+    names
+}
+
 /// Per-node rule dispatch.
 fn check_node<'a, F>(node: &AstNode<'a>, semantic: &Semantic<'a>, facts: &FileFacts, emit: &mut F)
 where
@@ -313,6 +383,9 @@ where
         // Rule 4: reading/writing a resolved shared value's `.value` on JS.
         AstKind::StaticMemberExpression(member) => {
             check_value_access_on_js(member, semantic, node.id(), emit);
+        }
+        AstKind::JSXAttribute(attribute) => {
+            check_layout_animation_in_list(attribute, node.id(), semantic, facts, emit);
         }
         _ => {}
     }
@@ -468,18 +541,16 @@ fn check_value_access_on_js<'a, F>(
     if !is_shared_value {
         return;
     }
-    if access_runs_on_ui_or_effect(semantic, node_id, member.span) {
+    if !access_is_in_component_render(semantic, node_id) {
         return;
     }
     emit(
         ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS,
         Severity::High,
-        Confidence::Medium,
+        Confidence::High,
         member.span,
-        format!(
-            "`{name}.value` is read/written on the JS thread (outside any worklet, animated hook, or effect)."
-        ),
-        "Access shared values inside a worklet/animated hook, or read them in useEffect/useDerivedValue.",
+        format!("`{name}.value` is read or written during component render."),
+        "Move shared-value access into useAnimatedStyle/useDerivedValue/useAnimatedReaction, a worklet, or an event handler.",
     );
 }
 
@@ -502,13 +573,13 @@ where
     ) else {
         return;
     };
-    if enclosing_hot_path_method(semantic, call_node_id).is_some() {
+    if let Some(context) = enclosing_hot_path_context(semantic, call_node_id) {
         emit(
             ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH,
             Severity::Medium,
-            Confidence::Medium,
+            Confidence::High,
             call.span,
-            format!("`{name}` runs on every frame inside a gesture onUpdate/onChange callback."),
+            format!("`{name}` runs on every frame inside {context}."),
             "Throttle the bridge, or move per-frame work into the worklet and bridge only on end/state change.",
         );
     }
@@ -529,9 +600,7 @@ fn check_missing_worklet<'a, F>(
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
-    let is_target = callee_identifier(call)
-        .map(|name| ANIMATED_HOOKS.contains(&name))
-        .unwrap_or(false)
+    let is_target = callee_identifier(call).is_some_and(|name| ANIMATED_HOOKS.contains(&name))
         || callee_is_gesture_worklet_method(call);
     if !is_target {
         return;
@@ -584,6 +653,41 @@ where
         call.span,
         "Infinite `withRepeat(anim, -1, ...)` in a file with no reduced-motion guard.".to_string(),
         "Gate looping animations behind useReducedMotion()/ReduceMotion so motion-sensitive users opt out.",
+    );
+}
+
+/// Per-cell entering/exiting/layout animations scale poorly in virtualized
+/// lists. This intentionally requires both a react-native list import and a
+/// renderItem/component relationship before reporting.
+fn check_layout_animation_in_list<F>(
+    attribute: &oxc_ast::ast::JSXAttribute<'_>,
+    node_id: oxc_semantic::NodeId,
+    semantic: &Semantic<'_>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    if facts.list_bindings.is_empty() {
+        return;
+    }
+    let Some(name) = jsx_attribute_name(&attribute.name) else {
+        return;
+    };
+    if !matches!(name, "entering" | "exiting" | "layout")
+        || !function_is_used_as_render_item(semantic, node_id, facts)
+            && !enclosing_function_name(semantic, node_id)
+                .is_some_and(|name| facts.list_cell_components.contains(&name))
+    {
+        return;
+    }
+    emit(
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST,
+        Severity::Low,
+        Confidence::Medium,
+        attribute.span,
+        format!("List cell applies a `{name}` animation for each rendered item."),
+        "Prefer itemLayoutAnimation where supported, or avoid entering/exiting/layout animations per cell in long lists.",
     );
 }
 
@@ -696,7 +800,7 @@ fn argument_is_negative_one(argument: &Argument<'_>) -> bool {
         Expression::UnaryExpression(unary) if unary.operator.as_str() == "-" => {
             matches!(
                 unary.argument.without_parentheses(),
-                Expression::NumericLiteral(number) if number.value == 1.0
+                Expression::NumericLiteral(number) if (number.value - 1.0).abs() < f64::EPSILON
             )
         }
         _ => false,
@@ -864,9 +968,9 @@ fn assignment_drives_shared_value(assignment: &oxc_ast::ast::AssignmentExpressio
 /// Whether an expression is a `with*` animation factory call.
 fn expression_is_with_animation(expression: &Expression<'_>) -> bool {
     match expression.without_parentheses() {
-        Expression::CallExpression(call) => callee_identifier(call)
-            .map(|name| WITH_ANIMATIONS.contains(&name))
-            .unwrap_or(false),
+        Expression::CallExpression(call) => {
+            callee_identifier(call).is_some_and(|name| WITH_ANIMATIONS.contains(&name))
+        }
         _ => false,
     }
 }
@@ -912,8 +1016,7 @@ fn identifier_resolves_to_function_body<'a>(
             let label = function
                 .id
                 .as_ref()
-                .map(|id| id.name.as_str())
-                .unwrap_or(identifier.name.as_str());
+                .map_or(identifier.name.as_str(), |id| id.name.as_str());
             Some((label, function.span, body))
         }
         AstKind::VariableDeclarator(declarator) => {
@@ -921,16 +1024,14 @@ fn identifier_resolves_to_function_body<'a>(
             let binding_label = declarator
                 .id
                 .get_binding_identifier()
-                .map(|id| id.name.as_str())
-                .unwrap_or(identifier.name.as_str());
+                .map_or(identifier.name.as_str(), |id| id.name.as_str());
             match init {
                 Expression::FunctionExpression(function) => {
                     let body = function.body.as_ref()?;
                     let label = function
                         .id
                         .as_ref()
-                        .map(|id| id.name.as_str())
-                        .unwrap_or(binding_label);
+                        .map_or(binding_label, |id| id.name.as_str());
                     Some((label, function.span, body))
                 }
                 Expression::ArrowFunctionExpression(arrow) => {
@@ -943,71 +1044,33 @@ fn identifier_resolves_to_function_body<'a>(
     }
 }
 
-/// Whether the node at `node_id` runs on the UI thread or inside an effect.
-///
-/// We climb ancestors; the access is considered NOT on the JS thread if any
-/// ancestor is a worklet (function body with a `'worklet'` directive), an
-/// animated-hook/gesture callback, an event handler, or a `useEffect`/
-/// `useLayoutEffect`/`useAnimatedReaction` call's callback argument.
-///
-/// JSX event handlers (`onPress={() => { sv.value = ... }}`) run at event time
-/// on the JS thread, so writing/reading a shared value there is fine. We treat
-/// an access as off the render path when it is inside a function that is the
-/// value of a JSX event-handler attribute. A bare expression in a JSX attribute
-/// with no intervening function (e.g. `style={{ width: sv.value }}`) is read
-/// during render and stays on the JS render path.
-fn access_runs_on_ui_or_effect(
-    semantic: &Semantic<'_>,
-    node_id: oxc_semantic::NodeId,
-    access_span: Span,
-) -> bool {
+/// Whether a shared-value access sits directly in a capitalized component's
+/// render body. Nested helpers, hook callbacks, worklets and event handlers are
+/// excluded to keep this high-confidence rule conservative.
+fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> bool {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
     let mut current = node_id;
-    // Whether we have climbed through a function boundary on the way up. A JSX
-    // event handler only exempts the access if a function intervenes.
-    let mut passed_through_function = false;
-    let mut function_ancestor_spans = Vec::new();
     loop {
         let parent_id = nodes.parent_id(current);
         if parent_id == current {
-            // Reached the root without finding a UI-thread context.
             return false;
         }
         match nodes.kind(parent_id) {
-            // A function carrying a `'worklet'` directive runs on the UI thread.
             AstKind::Function(function) => {
                 if let Some(body) = &function.body
                     && function_body_has_worklet_directive(body)
                 {
-                    return true;
+                    return false;
                 }
-                function_ancestor_spans.push(function.span);
-                passed_through_function = true;
+                return function_is_component_render(semantic, parent_id);
             }
-            AstKind::ArrowFunctionExpression(arrow) => {
-                function_ancestor_spans.push(arrow.span);
-                passed_through_function = true;
+            AstKind::ArrowFunctionExpression(_) => {
+                return function_is_component_render(semantic, parent_id);
             }
-            AstKind::FunctionBody(body) => {
-                if function_body_has_worklet_directive(body) {
-                    return true;
-                }
-            }
-            // A function/arrow passed as an argument to an animated hook, gesture
-            // callback, event handler, or effect runs off the JS render path.
-            AstKind::CallExpression(call)
-                if call_has_ui_or_effect_callback(call, access_span, &function_ancestor_spans) =>
-            {
-                return true;
-            }
-            // A JSX event-handler prop (`onPress={() => { ... }}`) runs at event
-            // time on the JS thread, but only when a function intervenes.
-            AstKind::JSXAttribute(attribute)
-                if passed_through_function && jsx_attribute_is_event_handler(attribute) =>
-            {
-                return true;
+            AstKind::FunctionBody(body) if function_body_has_worklet_directive(body) => {
+                return false;
             }
             _ => {}
         }
@@ -1015,89 +1078,88 @@ fn access_runs_on_ui_or_effect(
     }
 }
 
-/// Whether a JSX attribute is an event handler: its name starts with `on`
-/// followed by an uppercase letter (e.g. `onPress`, `onChange`, `onScroll`,
-/// `onLongPress`).
-fn jsx_attribute_is_event_handler(attribute: &oxc_ast::ast::JSXAttribute<'_>) -> bool {
-    let Some(name) = jsx_attribute_name(&attribute.name) else {
+fn function_is_component_render(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    let Some(name) = function_node_name(semantic, function_id) else {
         return false;
     };
-    let mut chars = name.chars();
-    chars.next() == Some('o')
-        && chars.next() == Some('n')
-        && chars.next().is_some_and(|c| c.is_ascii_uppercase())
+    starts_with_ascii_uppercase(&name)
+        && !starts_with_event_handler_prefix(&name)
+        && !function_is_callback_context(semantic, function_id)
 }
 
-/// Whether a call expression establishes a UI-thread or effect context for the
-/// specific callback containing the shared-value access.
-fn call_has_ui_or_effect_callback(
-    call: &CallExpression<'_>,
-    access_span: Span,
-    function_spans: &[Span],
+fn function_is_callback_context(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
 ) -> bool {
-    if let Some(name) = callee_identifier(call)
-        && (ANIMATED_HOOKS.contains(&name)
-            || matches!(
-                name,
-                "useEffect" | "useLayoutEffect" | "runOnUI" | "scheduleOnUI"
-            ))
-    {
-        let callback_indexes: &[usize] = if name == "useAnimatedReaction" {
-            &[0, 1]
-        } else {
-            &[0]
-        };
-        return callback_indexes.iter().any(|index| {
-            call_argument_has_callback_containing(call, *index, access_span, function_spans)
-        });
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::CallExpression(call) => {
+                let is_callback_call = callee_identifier(call).is_some_and(|name| {
+                    ANIMATED_HOOKS.contains(&name)
+                        || matches!(
+                            name,
+                            "useEffect" | "useLayoutEffect" | "runOnUI" | "scheduleOnUI"
+                        )
+                }) || callee_is_gesture_worklet_method(call);
+                return is_callback_call;
+            }
+            AstKind::JSXAttribute(attribute) => {
+                return jsx_attribute_name(&attribute.name)
+                    .is_some_and(starts_with_event_handler_prefix);
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
     }
-    callee_is_gesture_worklet_method(call)
-        && call_argument_has_callback_containing(call, 0, access_span, function_spans)
+    false
 }
 
-fn call_argument_has_callback_containing(
-    call: &CallExpression<'_>,
-    index: usize,
-    access_span: Span,
-    function_spans: &[Span],
-) -> bool {
-    let Some(expression) = call.arguments.get(index).and_then(argument_expression) else {
-        return false;
-    };
-    expression_has_callback_containing(expression, access_span, function_spans)
-}
+fn function_node_name(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
 
-fn expression_has_callback_containing(
-    expression: &Expression<'_>,
-    access_span: Span,
-    function_spans: &[Span],
-) -> bool {
-    match expression.without_parentheses() {
-        Expression::ArrowFunctionExpression(arrow) => {
-            span_contains(arrow.span, access_span)
-                && function_spans.iter().any(|span| *span == arrow.span)
-        }
-        Expression::FunctionExpression(function) => {
-            span_contains(function.span, access_span)
-                && function_spans.iter().any(|span| *span == function.span)
-        }
-        Expression::ObjectExpression(object) => object.properties.iter().any(|property| {
-            let ObjectPropertyKind::ObjectProperty(property) = property else {
-                return false;
-            };
-            expression_has_callback_containing(&property.value, access_span, function_spans)
-        }),
-        _ => false,
+    let nodes = semantic.nodes();
+    match nodes.kind(function_id) {
+        AstKind::Function(function) => function
+            .id
+            .as_ref()
+            .map(|identifier| identifier.name.as_str().to_string())
+            .or_else(|| function_binding_name(nodes, function_id)),
+        AstKind::ArrowFunctionExpression(_) => function_binding_name(nodes, function_id),
+        _ => None,
     }
 }
 
-fn span_contains(outer: Span, inner: Span) -> bool {
-    outer.start <= inner.start && inner.end <= outer.end
+fn function_binding_name(
+    nodes: &oxc_semantic::AstNodes<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    match nodes.kind(nodes.parent_id(function_id)) {
+        AstKind::VariableDeclarator(declarator) => declarator
+            .id
+            .get_binding_identifier()
+            .map(|identifier| identifier.name.as_str().to_string()),
+        AstKind::ObjectProperty(property) => property_key_name(&property.key).map(str::to_string),
+        _ => None,
+    }
 }
 
-/// If `node_id` is inside a gesture `onUpdate`/`onChange` callback, return its
-/// node id (the enclosing call). Used by the hot-path rule.
-fn enclosing_hot_path_method(
+fn enclosing_function_id(
     semantic: &Semantic<'_>,
     node_id: oxc_semantic::NodeId,
 ) -> Option<oxc_semantic::NodeId> {
@@ -1110,14 +1172,143 @@ fn enclosing_hot_path_method(
         if parent_id == current {
             return None;
         }
-        if let AstKind::CallExpression(call) = nodes.kind(parent_id)
-            && matches!(
-                call.callee.without_parentheses(),
-                Expression::StaticMemberExpression(member)
-                    if HOT_PATH_METHODS.contains(&member.property.name.as_str())
-            )
-        {
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
             return Some(parent_id);
+        }
+        current = parent_id;
+    }
+}
+
+fn enclosing_function_name(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    function_node_name(semantic, enclosing_function_id(semantic, node_id)?)
+}
+
+fn starts_with_ascii_uppercase(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|character| character.is_ascii_uppercase())
+}
+
+fn starts_with_event_handler_prefix(name: &str) -> bool {
+    name.strip_prefix("on")
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|character| character.is_ascii_uppercase())
+}
+
+fn function_is_used_as_render_item(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    let Some(function_id) = enclosing_function_id(semantic, node_id) else {
+        return false;
+    };
+    if function_node_name(semantic, function_id)
+        .is_some_and(|name| facts.render_item_functions.contains(&name))
+    {
+        return true;
+    }
+    function_is_inline_list_render_item(semantic, function_id, facts)
+}
+
+fn function_is_inline_list_render_item(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::JSXAttribute(attribute)
+                if jsx_attribute_name(&attribute.name) == Some("renderItem") =>
+            {
+                return jsx_attribute_belongs_to_list(semantic, parent_id, facts);
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+fn jsx_attribute_belongs_to_list(
+    semantic: &Semantic<'_>,
+    attribute_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = attribute_id;
+    for _ in 0..3 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
+            return simple_jsx_element_name(&opening.name)
+                .is_some_and(|name| facts.list_bindings.contains(name));
+        }
+        current = parent_id;
+    }
+    false
+}
+
+fn simple_jsx_element_name<'a>(name: &'a JSXElementName<'a>) -> Option<&'a str> {
+    match name {
+        JSXElementName::Identifier(identifier) => Some(identifier.name.as_str()),
+        _ => None,
+    }
+}
+
+fn is_item_or_row_component(name: &str) -> bool {
+    starts_with_ascii_uppercase(name) && (name.ends_with("Item") || name.ends_with("Row"))
+}
+
+/// Return a human-readable per-frame callback context around a bridge call.
+fn enclosing_hot_path_context(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<&'static str> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    let mut passed_through_function = false;
+    loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => {
+                passed_through_function = true;
+            }
+            AstKind::CallExpression(call) if passed_through_function => {
+                if callee_identifier(call) == Some("useAnimatedReaction") {
+                    return Some("a useAnimatedReaction callback");
+                }
+                if let Expression::StaticMemberExpression(member) =
+                    call.callee.without_parentheses()
+                    && HOT_PATH_METHODS.contains(&member.property.name.as_str())
+                {
+                    return Some("a gesture onUpdate/onChange callback");
+                }
+            }
+            _ => {}
         }
         current = parent_id;
     }

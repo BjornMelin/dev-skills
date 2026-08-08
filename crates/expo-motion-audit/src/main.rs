@@ -6,6 +6,7 @@
 //! - 1: usage or IO error.
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
@@ -55,7 +56,7 @@ enum Commands {
         #[arg(
             long,
             value_name = "CSV",
-            help = "Comma-separated subset of: reanimated-core,worklets-threading,gestures,layout,accessibility,lifecycle,config. Default = all."
+            help = "Comma-separated subset of: reanimated-core,worklets-threading,gestures,layout,accessibility,lifecycle,performance,config. Default = all."
         )]
         categories: Option<String>,
         #[arg(
@@ -290,10 +291,12 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
         OutputFormat::Markdown => {
             let mut text = format_markdown(TOOL_NAME, TOOL_VERSION, &outcome.findings);
             if outcome.truncated {
-                text.push_str(&format!(
+                write!(
+                    text,
                     "\nLimitation: file walk truncated at {} files; some files were not analyzed.\n",
                     outcome.files_scanned
-                ));
+                )
+                .expect("writing to a String is infallible");
             }
             text
         }

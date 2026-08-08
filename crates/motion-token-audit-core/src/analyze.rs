@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, ArrayExpression, CallExpression, Expression, ObjectExpression, ObjectPropertyKind,
-    PropertyKey,
+    Argument, ArrayExpression, CallExpression, Expression, JSXAttributeName, JSXElementName,
+    JSXMemberExpressionObject, ObjectExpression, ObjectPropertyKind, PropertyKey,
 };
 use oxc_parser::Parser;
-use oxc_semantic::SemanticBuilder;
+use oxc_semantic::{Semantic, SemanticBuilder};
 use oxc_span::{GetSpan, SourceType, Span};
 
 use crate::rules::{descriptor, ids};
@@ -20,6 +20,8 @@ const STACKS: &[(&str, Category)] = &[
     ("reanimated", Category::TokensReanimated),
     ("gsap", Category::TokensGsap),
     ("react", Category::TokensReact),
+    ("tailwind", Category::TokensTailwind),
+    ("motion", Category::TokensMotion),
     ("r3f", Category::TokensR3f),
 ];
 
@@ -167,7 +169,7 @@ pub fn analyze_css(relative_path: &str, source: &str, tokens: &MotionTokens) -> 
                     &mut findings,
                     &mut coverage,
                     tokens,
-                    LiteralContext {
+                    &LiteralContext {
                         id: ids::CSS_DURATION_LITERAL,
                         category: Category::TokensCss,
                         file: relative_path,
@@ -185,7 +187,7 @@ pub fn analyze_css(relative_path: &str, source: &str, tokens: &MotionTokens) -> 
                 &mut findings,
                 &mut coverage,
                 tokens,
-                EasingContext {
+                &EasingContext {
                     id: ids::CSS_EASING_LITERAL,
                     category: Category::TokensCss,
                     location: Location {
@@ -248,8 +250,42 @@ pub fn analyze_source(
                 );
             }
             oxc_ast::AstKind::ObjectExpression(object) => {
-                check_motion_react_object(
+                let handled = check_motion_jsx_object(
                     object,
+                    node.id(),
+                    &semantic,
+                    relative_path,
+                    &line_index,
+                    tokens,
+                    &mut findings,
+                    &mut coverage,
+                );
+                if !handled {
+                    check_motion_react_object(
+                        object,
+                        relative_path,
+                        &line_index,
+                        tokens,
+                        &mut findings,
+                        &mut coverage,
+                    );
+                }
+            }
+            oxc_ast::AstKind::StringLiteral(string) => {
+                check_tailwind_literal(
+                    string.span,
+                    source,
+                    relative_path,
+                    &line_index,
+                    tokens,
+                    &mut findings,
+                    &mut coverage,
+                );
+            }
+            oxc_ast::AstKind::TemplateLiteral(template) => {
+                check_tailwind_literal(
+                    template.span,
+                    source,
                     relative_path,
                     &line_index,
                     tokens,
@@ -332,7 +368,7 @@ fn check_reanimated_call(
             findings,
             coverage,
             tokens,
-            LiteralContext {
+            &LiteralContext {
                 id: ids::REANIMATED_DURATION_LITERAL,
                 category: Category::TokensReanimated,
                 file: relative_path,
@@ -355,7 +391,7 @@ fn check_reanimated_call(
             findings,
             coverage,
             tokens,
-            LiteralContext {
+            &LiteralContext {
                 id: ids::REANIMATED_DURATION_LITERAL,
                 category: Category::TokensReanimated,
                 file: relative_path,
@@ -383,7 +419,7 @@ fn check_reanimated_call(
                 findings,
                 coverage,
                 tokens,
-                EasingContext {
+                &EasingContext {
                     id: ids::REANIMATED_EASING_LITERAL,
                     category: Category::TokensReanimated,
                     location: Location {
@@ -452,7 +488,7 @@ fn check_gsap_call(
                 findings,
                 coverage,
                 tokens,
-                LiteralContext {
+                &LiteralContext {
                     id: ids::GSAP_DURATION_LITERAL,
                     category: Category::TokensGsap,
                     file: relative_path,
@@ -484,6 +520,278 @@ fn check_gsap_call(
     }
 }
 
+/// Motion 12 JSX props express durations in seconds and cubic-bezier easings as
+/// four-number arrays. Only objects directly attached to a `motion.*` prop are
+/// considered, avoiding generic objects that happen to contain `transition`.
+#[allow(clippy::too_many_arguments)]
+fn check_motion_jsx_object(
+    object: &ObjectExpression<'_>,
+    node_id: oxc_semantic::NodeId,
+    semantic: &Semantic<'_>,
+    relative_path: &str,
+    line_index: &LineIndex,
+    tokens: &MotionTokens,
+    findings: &mut Vec<Finding>,
+    coverage: &mut [Coverage],
+) -> bool {
+    let Some(attribute) = motion_jsx_attribute_for_object(semantic, node_id) else {
+        return false;
+    };
+    match attribute {
+        "transition" => emit_motion_transition_literals(
+            object,
+            relative_path,
+            line_index,
+            tokens,
+            findings,
+            coverage,
+        ),
+        "animate" | "exit" | "initial" => {
+            emit_motion_transition_literals(
+                object,
+                relative_path,
+                line_index,
+                tokens,
+                findings,
+                coverage,
+            );
+            if let Some(transition) = object_property_object(object, "transition") {
+                emit_motion_transition_literals(
+                    transition,
+                    relative_path,
+                    line_index,
+                    tokens,
+                    findings,
+                    coverage,
+                );
+            }
+        }
+        _ => {}
+    }
+    true
+}
+
+fn emit_motion_transition_literals(
+    object: &ObjectExpression<'_>,
+    relative_path: &str,
+    line_index: &LineIndex,
+    tokens: &MotionTokens,
+    findings: &mut Vec<Finding>,
+    coverage: &mut [Coverage],
+) {
+    if let Some((value, span)) = object_numeric_property(object, "duration")
+        && let Some(ms) = round_ms(value * 1000.0)
+    {
+        let (line, column) = line_index.line_col(span.start);
+        let raw = format!("{value}");
+        let context = LiteralContext {
+            id: ids::MOTION_DURATION_LITERAL,
+            category: Category::TokensMotion,
+            file: relative_path,
+            line,
+            column,
+            value_ms: ms,
+            raw: &raw,
+            unit: "ms",
+        };
+        emit_duration(findings, coverage, tokens, &context);
+    }
+    if let Some((bezier, span)) = object_array_property(object, "ease")
+        .and_then(|(array, span)| bezier_from_array(array).map(|bezier| (bezier, span)))
+    {
+        let (line, column) = line_index.line_col(span.start);
+        let context = EasingContext {
+            id: ids::MOTION_EASING_LITERAL,
+            category: Category::TokensMotion,
+            location: Location {
+                file: relative_path,
+                line,
+                column,
+            },
+            bezier,
+            raw: "motion transition ease array",
+        };
+        emit_easing(findings, coverage, tokens, &context);
+    }
+}
+
+fn motion_jsx_attribute_for_object<'a>(
+    semantic: &'a Semantic<'a>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<&'a str> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::JSXAttribute(attribute) => {
+                let name = jsx_attribute_name(&attribute.name)?;
+                if !matches!(name, "transition" | "animate" | "exit" | "initial") {
+                    return None;
+                }
+                return jsx_attribute_belongs_to_motion(semantic, parent_id).then_some(name);
+            }
+            // A nested object is handled through its direct motion prop object.
+            AstKind::ObjectProperty(_) | AstKind::ObjectExpression(_) => return None,
+            _ => current = parent_id,
+        }
+    }
+    None
+}
+
+fn jsx_attribute_belongs_to_motion(
+    semantic: &Semantic<'_>,
+    attribute_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = attribute_id;
+    for _ in 0..3 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
+            return jsx_element_is_motion_member(&opening.name);
+        }
+        current = parent_id;
+    }
+    false
+}
+
+fn jsx_attribute_name<'a>(name: &'a JSXAttributeName<'a>) -> Option<&'a str> {
+    match name {
+        JSXAttributeName::Identifier(identifier) => Some(identifier.name.as_str()),
+        JSXAttributeName::NamespacedName(_) => None,
+    }
+}
+
+fn jsx_element_is_motion_member(name: &JSXElementName<'_>) -> bool {
+    let JSXElementName::MemberExpression(member) = name else {
+        return false;
+    };
+    jsx_member_root_name(&member.object) == Some("motion")
+}
+
+fn jsx_member_root_name<'a>(object: &'a JSXMemberExpressionObject<'a>) -> Option<&'a str> {
+    match object {
+        JSXMemberExpressionObject::IdentifierReference(identifier) => {
+            Some(identifier.name.as_str())
+        }
+        JSXMemberExpressionObject::MemberExpression(member) => jsx_member_root_name(&member.object),
+        JSXMemberExpressionObject::ThisExpression(_) => None,
+    }
+}
+
+/// Scan a string/template literal for Tailwind/NativeWind arbitrary motion
+/// classes. The literal span keeps locations exact without scanning comments or
+/// identifiers elsewhere in the file.
+#[allow(clippy::too_many_arguments)]
+fn check_tailwind_literal(
+    span: Span,
+    source: &str,
+    relative_path: &str,
+    line_index: &LineIndex,
+    tokens: &MotionTokens,
+    findings: &mut Vec<Finding>,
+    coverage: &mut [Coverage],
+) {
+    let start = usize::try_from(span.start).unwrap_or(usize::MAX);
+    let end = usize::try_from(span.end).unwrap_or(usize::MAX);
+    let Some(literal) = source.get(start..end) else {
+        return;
+    };
+
+    for prefix in ["duration-[", "delay-["] {
+        for (offset, value, raw) in tailwind_ms_literals(literal, prefix) {
+            let absolute = span
+                .start
+                .saturating_add(u32::try_from(offset).unwrap_or(u32::MAX));
+            let (line, column) = line_index.line_col(absolute);
+            let context = LiteralContext {
+                id: ids::TAILWIND_DURATION_LITERAL,
+                category: Category::TokensTailwind,
+                file: relative_path,
+                line,
+                column,
+                value_ms: value,
+                raw: &raw,
+                unit: "ms",
+            };
+            emit_duration(findings, coverage, tokens, &context);
+        }
+    }
+
+    for (offset, bezier, raw) in tailwind_easing_literals(literal) {
+        let absolute = span
+            .start
+            .saturating_add(u32::try_from(offset).unwrap_or(u32::MAX));
+        let (line, column) = line_index.line_col(absolute);
+        let context = EasingContext {
+            id: ids::TAILWIND_EASING_LITERAL,
+            category: Category::TokensTailwind,
+            location: Location {
+                file: relative_path,
+                line,
+                column,
+            },
+            bezier,
+            raw: &raw,
+        };
+        emit_easing(findings, coverage, tokens, &context);
+    }
+}
+
+fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)> {
+    let mut out = Vec::new();
+    let mut start_at = 0;
+    while let Some(offset) = literal[start_at..].find(prefix) {
+        let start = start_at + offset;
+        let number_start = start + prefix.len();
+        let Some(end_offset) = literal[number_start..].find("ms]") else {
+            break;
+        };
+        let number_end = number_start + end_offset;
+        let number = &literal[number_start..number_end];
+        if !number.is_empty()
+            && number.bytes().all(|byte| byte.is_ascii_digit())
+            && let Ok(value) = number.parse::<u32>()
+        {
+            let raw_end = number_end + "ms]".len();
+            out.push((start, value, literal[start..raw_end].to_string()));
+        }
+        start_at = number_end + "ms]".len();
+    }
+    out
+}
+
+fn tailwind_easing_literals(literal: &str) -> Vec<(usize, Bezier, String)> {
+    let prefix = "ease-[cubic-bezier(";
+    let mut out = Vec::new();
+    let mut start_at = 0;
+    while let Some(offset) = literal[start_at..].find(prefix) {
+        let start = start_at + offset;
+        let bezier_start = start + "ease-[".len();
+        let Some(end_offset) = literal[bezier_start..].find(")]") else {
+            break;
+        };
+        let bezier_end = bezier_start + end_offset + 1;
+        let raw_bezier = &literal[bezier_start..bezier_end];
+        if let Some(bezier) = parse_cubic_bezier(raw_bezier) {
+            let raw_end = bezier_end + 1;
+            out.push((start, bezier, literal[start..raw_end].to_string()));
+        }
+        start_at = bezier_end + 1;
+    }
+    out
+}
+
 fn check_motion_react_object(
     object: &ObjectExpression<'_>,
     relative_path: &str,
@@ -503,7 +811,7 @@ fn check_motion_react_object(
             findings,
             coverage,
             tokens,
-            LiteralContext {
+            &LiteralContext {
                 id: ids::REACT_DURATION_LITERAL,
                 category: Category::TokensReact,
                 file: relative_path,
@@ -523,7 +831,7 @@ fn check_motion_react_object(
             findings,
             coverage,
             tokens,
-            EasingContext {
+            &EasingContext {
                 id: ids::REACT_EASING_LITERAL,
                 category: Category::TokensReact,
                 location: Location {
@@ -563,7 +871,9 @@ fn js_stack_categories(source: &str) -> Vec<Category> {
     if source.contains("gsap.") {
         categories.push(Category::TokensGsap);
     }
-    if source.contains("<motion.") || source.contains("transition") {
+    if source.contains("<motion.") {
+        categories.push(Category::TokensMotion);
+    } else if source.contains("transition") {
         categories.push(Category::TokensReact);
     }
     if source.contains("@react-three/fiber") || source.contains("useFrame") {
@@ -605,7 +915,7 @@ fn emit_duration(
     findings: &mut Vec<Finding>,
     coverage: &mut [Coverage],
     tokens: &MotionTokens,
-    context: LiteralContext<'_>,
+    context: &LiteralContext<'_>,
 ) {
     coverage_for(context.category, coverage).hardcoded_literals += 1;
     let drift = tokens.has_duration_ms(context.value_ms);
@@ -636,29 +946,22 @@ fn emit_easing(
     findings: &mut Vec<Finding>,
     coverage: &mut [Coverage],
     tokens: &MotionTokens,
-    context: EasingContext<'_>,
+    context: &EasingContext<'_>,
 ) {
-    let EasingContext {
-        id,
-        category,
-        location,
-        bezier,
-        raw,
-    } = context;
-    coverage_for(category, coverage).hardcoded_literals += 1;
-    let drift = tokens.has_easing(bezier);
-    let entry = coverage_for(category, coverage);
+    coverage_for(context.category, coverage).hardcoded_literals += 1;
+    let drift = tokens.has_easing(context.bezier);
+    let entry = coverage_for(context.category, coverage);
     if drift {
         entry.drift += 1;
     } else {
         entry.orphan += 1;
     }
     findings.push(classified_finding(
-        id,
-        category,
-        location,
+        context.id,
+        context.category,
+        context.location,
         drift,
-        &format!("Hardcoded easing `{raw}`."),
+        &format!("Hardcoded easing `{}`.", context.raw),
         "Reference the shared motion easing token instead of an inline literal.",
     ));
 }
@@ -693,8 +996,7 @@ fn coverage_for(category: Category, coverage: &mut [Coverage]) -> &mut Coverage 
     let stack = STACKS
         .iter()
         .find(|(_, item)| *item == category)
-        .map(|(stack, _)| *stack)
-        .unwrap_or("r3f");
+        .map_or("r3f", |(stack, _)| *stack);
     coverage
         .iter_mut()
         .find(|entry| entry.stack == stack)
@@ -735,10 +1037,10 @@ fn strip_motion_custom_properties(line: &str) -> String {
             .find(';')
             .map_or(line.len(), |offset| start + offset + 1);
         let has_colon = line[start..declaration_end].contains(':');
-        if !has_colon {
-            out.push_str(&line[start_at..declaration_end]);
-        } else {
+        if has_colon {
             out.push_str(&line[start_at..start]);
+        } else {
+            out.push_str(&line[start_at..declaration_end]);
         }
         start_at = declaration_end;
     }

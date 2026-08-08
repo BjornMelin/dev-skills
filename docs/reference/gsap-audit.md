@@ -100,6 +100,16 @@ an `id | category | severity` table. JSON output is a `{ "rules": [...] }` objec
 where each rule carries `id`, `category`, `severity`, `confidence`, and
 `summary`.
 
+Newly added rules:
+
+| id | severity | summary |
+| --- | --- | --- |
+| `scrolltrigger.nested-timeline-child` | medium | Flags `scrollTrigger` on a chained timeline child tween instead of the top-level timeline. |
+| `react.tween-in-render` | high | Flags GSAP tween/timeline creation directly in a React component render body. |
+| `performance.will-change-permanent` | medium | Flags `willChange`/`will-change` in tween vars or timeline defaults. |
+| `core.missing-overwrite` | low | Flags event-handler `gsap.to`/`gsap.from` tweens without overwrite protection. |
+| `react.matchmedia-missing-revert` | medium | Flags `gsap.matchMedia()` files with neither `.revert()` nor `useGSAP()` cleanup. |
+
 ## completions
 
 Generate a shell completion script from the canonical Clap command definition:
@@ -129,7 +139,8 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
   argument call signatures.
 - `plugins`: plugin lifecycle issues such as dev-only plugins (for example
   GSDevTools) shipped in source and plugins used without registration.
-- `performance`: performance hazards such as disabled lag smoothing.
+- `performance`: performance hazards such as disabled lag smoothing and
+  permanently retained `will-change` compositor layers.
 - `utils`: `gsap.utils` helper issues.
 
 This doc describes rules only at the category level on purpose: the per-rule id

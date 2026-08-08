@@ -24,6 +24,11 @@ pub mod ids {
     pub const REACT_UNSCOPED_SELECTOR: &str = "react.unscoped-selector";
     pub const REACT_CONTEXT_MISSING_REVERT: &str = "react.context-missing-revert";
     pub const REACT_STATE_IN_CONTINUOUS_MOTION: &str = "react.state-in-continuous-motion";
+    pub const SCROLLTRIGGER_NESTED_TIMELINE_CHILD: &str = "scrolltrigger.nested-timeline-child";
+    pub const REACT_TWEEN_IN_RENDER: &str = "react.tween-in-render";
+    pub const PERFORMANCE_WILL_CHANGE_PERMANENT: &str = "performance.will-change-permanent";
+    pub const CORE_MISSING_OVERWRITE: &str = "core.missing-overwrite";
+    pub const REACT_MATCHMEDIA_MISSING_REVERT: &str = "react.matchmedia-missing-revert";
 }
 
 /// The full, ordered rule catalog. Order here drives `doctor` output order.
@@ -118,6 +123,41 @@ pub const CATALOG: &[RuleDescriptor] = &[
         severity: Severity::High,
         confidence: Confidence::Medium,
         summary: "React state is set from a continuous motion source, forcing a render per frame.",
+    },
+    RuleDescriptor {
+        id: ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD,
+        category: Category::Scrolltrigger,
+        severity: Severity::Medium,
+        confidence: Confidence::High,
+        summary: "A chained timeline child tween owns ScrollTrigger instead of the top-level timeline.",
+    },
+    RuleDescriptor {
+        id: ids::REACT_TWEEN_IN_RENDER,
+        category: Category::React,
+        severity: Severity::High,
+        confidence: Confidence::Medium,
+        summary: "A GSAP tween is created directly during React component render.",
+    },
+    RuleDescriptor {
+        id: ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
+        category: Category::Performance,
+        severity: Severity::Medium,
+        confidence: Confidence::Medium,
+        summary: "A GSAP vars object sets will-change for the animation's full lifetime.",
+    },
+    RuleDescriptor {
+        id: ids::CORE_MISSING_OVERWRITE,
+        category: Category::Core,
+        severity: Severity::Low,
+        confidence: Confidence::Medium,
+        summary: "An event-handler tween omits overwrite protection.",
+    },
+    RuleDescriptor {
+        id: ids::REACT_MATCHMEDIA_MISSING_REVERT,
+        category: Category::React,
+        severity: Severity::Medium,
+        confidence: Confidence::Medium,
+        summary: "gsap.matchMedia() is used without revert cleanup or useGSAP auto-cleanup.",
     },
 ];
 

@@ -92,6 +92,7 @@ const LAYOUT_PROPS: &[&str] = &[
 
 /// File-scoped facts gathered in a single pre-pass and shared by heuristic
 /// rules that need a whole-file view (imports, registrations, directives).
+#[allow(clippy::struct_excessive_bools)] // file-fact accumulator; named flags keep rule reads explicit
 #[derive(Default)]
 struct FileFacts {
     /// Identifiers passed to any `gsap.registerPlugin(...)` call in the file,
@@ -121,6 +122,14 @@ struct FileFacts {
     plugin_aliases: BTreeMap<String, String>,
     /// Local import aliases for dev-only helpers, keyed by local binding.
     dev_only_aliases: BTreeMap<String, String>,
+    /// The file imports React, making capitalized functions plausible components.
+    has_react_import: bool,
+    /// The file calls `gsap.matchMedia(...)`.
+    has_match_media_call: bool,
+    /// The file contains any `.revert(...)` cleanup call.
+    has_revert_call: bool,
+    /// The file calls `useGSAP(...)`, whose context handles cleanup automatically.
+    has_usegsap_call: bool,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -210,6 +219,9 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 record_usegsap_import_bindings(import, &mut facts);
                 record_plugin_import_aliases(import, &mut facts);
                 record_configured_gsap_imports(import, &mut facts);
+                if !import.import_kind.is_type() && import.source.value.as_str() == "react" {
+                    facts.has_react_import = true;
+                }
             }
             AstKind::ImportExpression(import) => {
                 record_configured_gsap_dynamic_import(import, semantic, node.id(), &mut facts);
@@ -227,6 +239,17 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 record_register(call, &mut facts);
                 if is_usegsap_call(call, &facts) {
                     facts.uses_gsap_surface = true;
+                    facts.has_usegsap_call = true;
+                }
+                if is_gsap_member_call(call, &facts, "matchMedia") {
+                    facts.has_match_media_call = true;
+                }
+                if matches!(
+                    call.callee.without_parentheses(),
+                    Expression::StaticMemberExpression(member)
+                        if member.property.name.as_str() == "revert"
+                ) {
+                    facts.has_revert_call = true;
                 }
             }
             AstKind::VariableDeclarator(declarator) => {
@@ -650,11 +673,9 @@ fn function_reschedules_animation_frame(
             Some(Expression::Identifier(argument)) => {
                 self_name.as_deref() == Some(argument.name.as_str())
             }
-            // An inline callback that itself contains a frame request is the
-            // recursive-arrow idiom; requiring a name would miss it.
-            Some(Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)) => {
-                false
-            }
+            // Anything else cannot be proven to reschedule THIS named callback.
+            // Inline arrow/function callbacks that re-request a frame (the
+            // recursive-arrow idiom) land here too — an accepted false negative.
             _ => false,
         }
     })
@@ -1142,7 +1163,7 @@ fn check_node<'a, F>(
             );
         }
         AstKind::CallExpression(call) => {
-            check_call(call, semantic, facts, emit);
+            check_call(call, node.id(), semantic, facts, emit);
             check_state_in_continuous_motion(call, node.id(), semantic, facts, emit);
         }
         // Rule 2: dev-only helpers referenced in non-test source. Skip TS
@@ -1223,6 +1244,7 @@ where
 /// Call-expression rules.
 fn check_call<'a, F>(
     call: &CallExpression<'a>,
+    node_id: oxc_semantic::NodeId,
     semantic: &Semantic<'a>,
     facts: &FileFacts,
     emit: &mut F,
@@ -1243,6 +1265,8 @@ fn check_call<'a, F>(
 
     // Tween-factory rules: gsap.to/from/fromTo/set(...) and timeline variants.
     if let Some(method) = gsap_tween_method(call, facts) {
+        check_tween_in_render(call, node_id, method, semantic, facts, emit);
+
         // Rule 5: GSAP-2 signature gsap.to(target, <number>, {...}).
         if matches!(method, "to" | "from" | "fromTo")
             && call.arguments.len() >= 2
@@ -1274,10 +1298,38 @@ fn check_call<'a, F>(
             }
             // Rules 3 & 4 only apply inside nested `scrollTrigger:` configs.
             check_nested_scrolltrigger_configs(vars, emit);
+
+            if let Some(span) = object_will_change_span(vars) {
+                emit(
+                    ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
+                    Severity::Medium,
+                    Confidence::Medium,
+                    span,
+                    "GSAP vars set `will-change` for the animation's full lifetime.".to_string(),
+                    "will-change holds a compositor layer permanently; toggle it around the animation or scope it in CSS with removal.",
+                );
+            }
         }
+
+        check_nested_timeline_scrolltrigger(call, method, emit);
+        check_missing_overwrite(call, node_id, method, semantic, facts, emit);
     }
     if let Some(vars) = gsap_timeline_vars_object(call, facts) {
         check_nested_scrolltrigger_configs(vars, emit);
+        if let Some(span) = timeline_defaults_will_change_span(vars) {
+            emit(
+                ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
+                Severity::Medium,
+                Confidence::Medium,
+                span,
+                "GSAP timeline defaults set `will-change` for the animation's full lifetime."
+                    .to_string(),
+                "will-change holds a compositor layer permanently; toggle it around the animation or scope it in CSS with removal.",
+            );
+        }
+    }
+    if is_gsap_member_call(call, facts, "timeline") {
+        check_tween_in_render(call, node_id, "timeline", semantic, facts, emit);
     }
 
     // ScrollTrigger.create({...}): the argument is a ScrollTrigger config.
@@ -1305,6 +1357,250 @@ fn check_call<'a, F>(
     if is_gsap_member_call(call, facts, "context") {
         check_context_missing_revert(call, semantic, emit);
     }
+}
+
+/// ScrollTrigger belongs on a timeline itself, not on a child tween in a
+/// fluent chain. A call-expression receiver is the precise signal for the
+/// chained form (`tl.from(...).to(...)` or `gsap.timeline().to(...)`).
+fn check_nested_timeline_scrolltrigger<F>(call: &CallExpression<'_>, method: &str, emit: &mut F)
+where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
+        return;
+    };
+    if !matches!(
+        member.object.without_parentheses(),
+        Expression::CallExpression(_)
+    ) {
+        return;
+    }
+    for vars in tween_vars_objects(call, method) {
+        if let Some(span) = object_key_span(vars, "scrollTrigger") {
+            emit(
+                ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD,
+                Severity::Medium,
+                Confidence::High,
+                span,
+                "ScrollTrigger only belongs on the top-level animation, never on timeline children."
+                    .to_string(),
+                "Move the scrollTrigger config to gsap.timeline({ scrollTrigger: ... }).",
+            );
+        }
+    }
+}
+
+/// A tween created directly in a capitalized React component function runs on
+/// every render. Hook callbacks and event handlers are deliberately excluded.
+fn check_tween_in_render<F>(
+    call: &CallExpression<'_>,
+    node_id: oxc_semantic::NodeId,
+    method: &str,
+    semantic: &Semantic<'_>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    if !facts.has_react_import {
+        return;
+    }
+    let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
+        return;
+    };
+    if function_is_hook_callback(semantic, function_id, facts)
+        || function_is_event_handler(semantic, function_id)
+    {
+        return;
+    }
+    let Some(name) = enclosing_function_name(semantic, function_id) else {
+        return;
+    };
+    if !starts_with_ascii_uppercase(&name) {
+        return;
+    }
+    emit(
+        ids::REACT_TWEEN_IN_RENDER,
+        Severity::High,
+        Confidence::Medium,
+        call.span,
+        format!("`{method}` creates a GSAP animation during `{name}` render."),
+        "Create the animation in useGSAP, useLayoutEffect, or useEffect so it runs after render and cleans up.",
+    );
+}
+
+/// Event-driven tweens can stack when interactions arrive faster than they
+/// finish. Only literal vars objects are checked; a spread may already carry an
+/// overwrite policy and is therefore suppressed.
+fn check_missing_overwrite<F>(
+    call: &CallExpression<'_>,
+    node_id: oxc_semantic::NodeId,
+    method: &str,
+    semantic: &Semantic<'_>,
+    _facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    if !matches!(method, "to" | "from") {
+        return;
+    }
+    let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
+        return;
+    };
+    if !function_is_event_handler(semantic, function_id) {
+        return;
+    }
+    let Some(vars) = tween_vars_objects(call, method).into_iter().next() else {
+        return;
+    };
+    if object_has_key(vars, "overwrite") || object_has_spread(vars) {
+        return;
+    }
+    emit(
+        ids::CORE_MISSING_OVERWRITE,
+        Severity::Low,
+        Confidence::Medium,
+        vars.span,
+        format!("Event-handler `gsap.{method}` tween has no overwrite policy."),
+        "Add `overwrite: \"auto\"` or use gsap.quickTo for repeated interactions.",
+    );
+}
+
+fn nearest_enclosing_function(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<oxc_semantic::NodeId> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            return Some(parent_id);
+        }
+        current = parent_id;
+    }
+}
+
+fn enclosing_function_name(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    match nodes.kind(function_id) {
+        AstKind::Function(function) => function
+            .id
+            .as_ref()
+            .map(|identifier| identifier.name.as_str().to_string())
+            .or_else(|| function_binding_name(nodes, function_id)),
+        AstKind::ArrowFunctionExpression(_) => function_binding_name(nodes, function_id),
+        _ => None,
+    }
+}
+
+fn function_binding_name(
+    nodes: &oxc_semantic::AstNodes<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    let parent_id = nodes.parent_id(function_id);
+    match nodes.kind(parent_id) {
+        AstKind::VariableDeclarator(declarator) => declarator
+            .id
+            .get_binding_identifier()
+            .map(|identifier| identifier.name.as_str().to_string()),
+        AstKind::ObjectProperty(property) => property_key_name(&property.key).map(str::to_string),
+        _ => None,
+    }
+}
+
+fn function_is_hook_callback(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::CallExpression(call) => {
+                return match call.callee.without_parentheses() {
+                    Expression::Identifier(identifier) => {
+                        matches!(
+                            identifier.name.as_str(),
+                            "useEffect" | "useLayoutEffect" | "useGSAP"
+                        ) || facts.usegsap_bindings.contains(identifier.name.as_str())
+                    }
+                    Expression::StaticMemberExpression(member) => matches!(
+                        member.property.name.as_str(),
+                        "useEffect" | "useLayoutEffect"
+                    ),
+                    _ => false,
+                };
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+fn function_is_event_handler(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    if enclosing_function_name(semantic, function_id)
+        .is_some_and(|name| starts_with_event_handler_prefix(&name))
+    {
+        return true;
+    }
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::JSXAttribute(attribute) => {
+                return attribute
+                    .name
+                    .as_identifier()
+                    .is_some_and(|name| starts_with_event_handler_prefix(name.name.as_str()));
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+fn starts_with_event_handler_prefix(name: &str) -> bool {
+    name.strip_prefix("on")
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|character| character.is_ascii_uppercase())
+}
+
+fn starts_with_ascii_uppercase(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|character| character.is_ascii_uppercase())
 }
 
 /// Rule 8: a known plugin identifier is *used* (member object or bare ref in a
@@ -1568,6 +1864,24 @@ fn check_file_level(
                 .to_string(),
         });
     }
+
+    if facts.has_match_media_call && !facts.has_revert_call && !facts.has_usegsap_call {
+        let span = program.span;
+        let (line, column) = line_index.line_col(span.start);
+        findings.push(Finding {
+            id: ids::REACT_MATCHMEDIA_MISSING_REVERT.to_string(),
+            category: Category::React,
+            severity: Severity::Medium,
+            confidence: Confidence::Medium,
+            file: relative_path.to_string(),
+            line,
+            column,
+            message: "gsap.matchMedia() is used without revert cleanup or useGSAP auto-cleanup."
+                .to_string(),
+            suggestion: "matchMedia contexts leak on unmount outside useGSAP auto-cleanup; call mm.revert() in cleanup."
+                .to_string(),
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1615,6 +1929,41 @@ fn object_has_key(object: &ObjectExpression<'_>, name: &str) -> bool {
             property,
             ObjectPropertyKind::ObjectProperty(inner) if property_key_name(&inner.key) == Some(name)
         )
+    })
+}
+
+fn object_key_span(object: &ObjectExpression<'_>, name: &str) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return None;
+        };
+        (property_key_name(&inner.key) == Some(name)).then_some(inner.span)
+    })
+}
+
+fn object_has_spread(object: &ObjectExpression<'_>) -> bool {
+    object
+        .properties
+        .iter()
+        .any(|property| matches!(property, ObjectPropertyKind::SpreadProperty(_)))
+}
+
+fn object_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
+    object_key_span(object, "willChange").or_else(|| object_key_span(object, "will-change"))
+}
+
+fn timeline_defaults_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            return None;
+        };
+        if property_key_name(&property.key) != Some("defaults") {
+            return None;
+        }
+        let Expression::ObjectExpression(defaults) = property.value.without_parentheses() else {
+            return None;
+        };
+        object_will_change_span(defaults)
     })
 }
 

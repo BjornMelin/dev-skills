@@ -14,11 +14,11 @@ use motion_token_audit_core::{
 };
 
 fn token_source() -> &'static str {
-    r#"export const motion = {
+    r"export const motion = {
   duration: { instant: 0, short: 200, medium: 360 },
   easing: { out: [0.16, 1, 0.3, 1] },
   spring: { snappy: { stiffness: 520, damping: 42, mass: 1 } },
-} as const;"#
+} as const;"
 }
 
 fn tokens() -> MotionTokens {
@@ -39,10 +39,10 @@ fn discovers_ssot_from_motion_ts_shape() {
 #[test]
 fn discovers_ssot_from_css_custom_properties() {
     let tokens = discover_css_tokens(
-        r#":root {
+        r":root {
   --motion-duration-short: 0.2s;
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-}"#,
+}",
     );
     assert!(tokens.has_duration_ms(200));
     assert!(!tokens.is_empty());
@@ -252,6 +252,92 @@ fn doctor_catalog_lists_every_rule() {
     for rule in CATALOG {
         assert!(rules.iter().any(|value| value["id"] == rule.id));
     }
+}
+
+#[test]
+fn tailwind_arbitrary_motion_values_classify_drift_and_orphan() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-[200ms] delay-[237ms] ease-[cubic-bezier(0.16,1,0.3,1)]" />;
+const dynamic = `hover:duration-[360ms] ${className}`;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 3);
+    assert!(
+        duration_findings
+            .iter()
+            .any(|finding| finding.message.starts_with("orphan:"))
+    );
+    assert!(
+        analysis
+            .findings
+            .iter()
+            .any(|finding| finding.id == ids::TAILWIND_EASING_LITERAL
+                && finding.message.starts_with("drift:"))
+    );
+}
+
+#[test]
+fn tailwind_named_motion_classes_do_not_fire_arbitrary_value_rules() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-fast delay-none ease-out" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(!ids(&analysis.findings).contains(&ids::TAILWIND_DURATION_LITERAL.to_string()));
+    assert!(!ids(&analysis.findings).contains(&ids::TAILWIND_EASING_LITERAL.to_string()));
+}
+
+#[test]
+fn motion_jsx_transition_literals_use_seconds_and_bezier_tokens() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const card = <motion.div transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} />;
+const exit = <motion.div exit={{ opacity: 0, transition: { duration: 0.237 } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 2);
+    assert!(
+        duration_findings
+            .iter()
+            .any(|finding| finding.message.contains("200ms")
+                && finding.message.starts_with("drift:"))
+    );
+    assert!(
+        analysis
+            .findings
+            .iter()
+            .any(|finding| finding.id == ids::MOTION_EASING_LITERAL
+                && finding.message.starts_with("drift:"))
+    );
+}
+
+#[test]
+fn non_motion_transition_objects_do_not_fire_motion_jsx_rules() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const options = { transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } };
+const card = <Card transition={{ duration: 0.2 }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(!ids(&analysis.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()));
+    assert!(!ids(&analysis.findings).contains(&ids::MOTION_EASING_LITERAL.to_string()));
 }
 
 fn temp_scan_root(name: &str) -> PathBuf {

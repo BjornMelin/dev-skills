@@ -49,7 +49,7 @@ fn rule_gsdevtools_in_source() {
     );
     assert!(fired(&bad, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 
-    let clean = analyze("src/a.ts", "ts", r#"const x = 1; export { x };"#);
+    let clean = analyze("src/a.ts", "ts", r"const x = 1; export { x };");
     assert!(!fired(&clean, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 
     let test_file = analyze(
@@ -179,13 +179,13 @@ fn rule_gsap2_signature_categorized_as_core() {
 
 #[test]
 fn rule_lag_smoothing_disabled() {
-    let bad_zero = analyze("src/a.ts", "ts", r#"gsap.ticker.lagSmoothing(0);"#);
+    let bad_zero = analyze("src/a.ts", "ts", r"gsap.ticker.lagSmoothing(0);");
     assert!(fired(&bad_zero, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
 
-    let bad_false = analyze("src/a.ts", "ts", r#"gsap.ticker.lagSmoothing(false);"#);
+    let bad_false = analyze("src/a.ts", "ts", r"gsap.ticker.lagSmoothing(false);");
     assert!(fired(&bad_false, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
 
-    let clean = analyze("src/a.ts", "ts", r#"gsap.ticker.lagSmoothing(500, 33);"#);
+    let clean = analyze("src/a.ts", "ts", r"gsap.ticker.lagSmoothing(500, 33);");
     assert!(!fired(&clean, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
 }
 
@@ -655,13 +655,13 @@ fn rule_context_missing_revert_semantic() {
     let bad = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {
     gsap.to(refEl, { x: 100 });
   }, scopeRef);
   console.log(ctx);
   return null;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::REACT_CONTEXT_MISSING_REVERT));
 
@@ -669,34 +669,34 @@ fn rule_context_missing_revert_semantic() {
     let clean_revert = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {
     gsap.to(refEl, { x: 100 });
   }, scopeRef);
   return () => ctx.revert();
-}"#,
+}",
     );
     assert!(!fired(&clean_revert, ids::REACT_CONTEXT_MISSING_REVERT));
 
     let property_read = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {});
   console.log(ctx.revert);
   return null;
-}"#,
+}",
     );
     assert!(fired(&property_read, ids::REACT_CONTEXT_MISSING_REVERT));
 
     let argument_to_other_call = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {});
   foo.revert(ctx);
   return null;
-}"#,
+}",
     );
     assert!(fired(
         &argument_to_other_call,
@@ -706,10 +706,10 @@ fn rule_context_missing_revert_semantic() {
     let discarded = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   gsap.context(() => {});
   return null;
-}"#,
+}",
     );
     assert!(fired(&discarded, ids::REACT_CONTEXT_MISSING_REVERT));
 }
@@ -770,10 +770,10 @@ fn rule_context_missing_revert_return_jsx_using_ctx_still_fires() {
     let bad = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {});
   return <div>{String(ctx)}</div>;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::REACT_CONTEXT_MISSING_REVERT));
 }
@@ -784,10 +784,10 @@ fn rule_context_missing_revert_bare_return_ctx_does_not_fire() {
     let clean = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {});
   return ctx;
-}"#,
+}",
     );
     assert!(!fired(&clean, ids::REACT_CONTEXT_MISSING_REVERT));
 }
@@ -798,10 +798,10 @@ fn rule_context_missing_revert_returned_cleanup_does_not_fire() {
     let clean = analyze(
         "src/a.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const ctx = gsap.context(() => {});
   return () => ctx.revert();
-}"#,
+}",
     );
     assert!(!fired(&clean, ids::REACT_CONTEXT_MISSING_REVERT));
 }
@@ -812,20 +812,16 @@ fn rule_context_missing_revert_returned_cleanup_does_not_fire() {
 
 #[test]
 fn rule_gsdevtools_type_position_does_not_fire() {
-    let var_type = analyze("src/a.ts", "ts", r#"let x: GSDevTools;"#);
+    let var_type = analyze("src/a.ts", "ts", r"let x: GSDevTools;");
     assert!(!fired(&var_type, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 
-    let param_type = analyze(
-        "src/a.ts",
-        "ts",
-        r#"function f(p: GSDevTools) { return p; }"#,
-    );
+    let param_type = analyze("src/a.ts", "ts", r"function f(p: GSDevTools) { return p; }");
     assert!(!fired(&param_type, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 }
 
 #[test]
 fn rule_gsdevtools_value_use_still_fires() {
-    let value_call = analyze("src/a.ts", "ts", r#"GSDevTools.create();"#);
+    let value_call = analyze("src/a.ts", "ts", r"GSDevTools.create();");
     assert!(fired(&value_call, ids::PLUGINS_GSDEVTOOLS_IN_SOURCE));
 
     let value_import = analyze(
@@ -842,10 +838,10 @@ fn rule_gsdevtools_value_use_still_fires() {
 
 #[test]
 fn rule_markers_unrelated_object_does_not_fire() {
-    let unrelated = analyze("src/a.ts", "ts", r#"const opts = { markers: true };"#);
+    let unrelated = analyze("src/a.ts", "ts", r"const opts = { markers: true };");
     assert!(!fired(&unrelated, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
 
-    let tween_vars = analyze("src/a.ts", "ts", r#"gsap.to(el, { markers: true });"#);
+    let tween_vars = analyze("src/a.ts", "ts", r"gsap.to(el, { markers: true });");
     assert!(!fired(&tween_vars, ids::SCROLLTRIGGER_MARKERS_IN_PROD));
 
     let tween_scrub = analyze(
@@ -1025,7 +1021,7 @@ fn rule_plugin_register_via_array_still_fires() {
     let bad = analyze(
         "src/a.ts",
         "ts",
-        r#"gsap.registerPlugin([ScrollTrigger]); ScrollTrigger.create({});"#,
+        r"gsap.registerPlugin([ScrollTrigger]); ScrollTrigger.create({});",
     );
     assert!(fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 }
@@ -1035,7 +1031,7 @@ fn rule_plugin_register_via_spread_suppresses_check() {
     let clean = analyze(
         "src/a.ts",
         "ts",
-        r#"gsap.registerPlugin(...plugins); ScrollTrigger.create({});"#,
+        r"gsap.registerPlugin(...plugins); ScrollTrigger.create({});",
     );
     assert!(!fired(&clean, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER));
 }
@@ -1067,7 +1063,7 @@ fn rule_unscoped_selector_inside_for_loop_fires() {
 
 #[test]
 fn rule_lag_smoothing_negative_zero_fires() {
-    let bad = analyze("src/a.ts", "ts", r#"gsap.ticker.lagSmoothing(-0);"#);
+    let bad = analyze("src/a.ts", "ts", r"gsap.ticker.lagSmoothing(-0);");
     assert!(fired(&bad, ids::PERFORMANCE_LAG_SMOOTHING_DISABLED));
 }
 
@@ -1121,7 +1117,7 @@ fn rule_plugin_vars_without_register_fire() {
         "physicsProps",
         "pixi",
     ] {
-        let source = format!(r#"gsap.to(el, {{ {vars_key}: true }});"#);
+        let source = format!(r"gsap.to(el, {{ {vars_key}: true }});");
         let bad = analyze("src/a.ts", "ts", &source);
         assert!(
             fired(&bad, ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER),
@@ -1132,7 +1128,7 @@ fn rule_plugin_vars_without_register_fire() {
     let registered = analyze(
         "src/a.ts",
         "ts",
-        r#"gsap.registerPlugin(MotionPathPlugin); gsap.to(el, { motionPath: true });"#,
+        r"gsap.registerPlugin(MotionPathPlugin); gsap.to(el, { motionPath: true });",
     );
     assert!(!fired(
         &registered,
@@ -1626,4 +1622,100 @@ export function Stuck() {
         gsap_audit_core::types::Severity::Low,
         "a boolean threshold must not trip the default medium gate"
     );
+}
+
+#[test]
+fn rule_nested_timeline_child_scrolltrigger_fires_and_top_level_tween_does_not() {
+    let bad = analyze(
+        "src/timeline.ts",
+        "ts",
+        r#"gsap.timeline().from(".a", { opacity: 0 }).to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 });"#,
+    );
+    assert!(fired(&bad, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
+
+    let clean = analyze(
+        "src/tween.ts",
+        "ts",
+        r#"gsap.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 });"#,
+    );
+    assert!(!fired(&clean, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
+}
+
+#[test]
+fn rule_tween_in_render_fires_and_hook_callback_does_not() {
+    let bad = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React from "react";
+import { gsap } from "gsap";
+export function Card() {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+}"#,
+    );
+    assert!(fired(&bad, ids::REACT_TWEEN_IN_RENDER));
+
+    let clean = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React, { useLayoutEffect } from "react";
+import { gsap } from "gsap";
+export function Card() {
+  useLayoutEffect(() => { gsap.to(ref.current, { x: 10 }); }, []);
+  return <div onClick={() => gsap.set(ref.current, { x: 0 })} />;
+}"#,
+    );
+    assert!(!fired(&clean, ids::REACT_TWEEN_IN_RENDER));
+}
+
+#[test]
+fn rule_permanent_will_change_fires_and_unrelated_style_does_not() {
+    let bad = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.to(".box", { "will-change": "transform", x: 10 });
+gsap.timeline({ defaults: { willChange: "transform" } });"#,
+    );
+    assert!(fired(&bad, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+
+    let clean = analyze(
+        "src/a.ts",
+        "ts",
+        r#"const style = { willChange: "transform" }; gsap.to(".box", { x: 10 });"#,
+    );
+    assert!(!fired(&clean, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+}
+
+#[test]
+fn rule_event_tween_missing_overwrite_fires_and_protected_tween_does_not() {
+    let bad = analyze(
+        "src/Button.tsx",
+        "tsx",
+        r"function onPointerEnter() { gsap.to(button, { scale: 1.05 }); }",
+    );
+    assert!(fired(&bad, ids::CORE_MISSING_OVERWRITE));
+
+    let clean = analyze(
+        "src/Button.tsx",
+        "tsx",
+        r#"const view = <button onPointerEnter={() => gsap.to(button, { scale: 1.05, overwrite: "auto" })} />;"#,
+    );
+    assert!(!fired(&clean, ids::CORE_MISSING_OVERWRITE));
+}
+
+#[test]
+fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
+    let bad = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); mm.add("(min-width: 800px)", () => {});"#,
+    );
+    assert!(fired(&bad, ids::REACT_MATCHMEDIA_MISSING_REVERT));
+
+    let clean = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); useEffect(() => () => mm.revert(), []);"#,
+    );
+    assert!(!fired(&clean, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 }
