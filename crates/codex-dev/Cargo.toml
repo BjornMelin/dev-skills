@@ -12,17 +12,20 @@ description = "Development operating-layer helper for Codex task capsules"
 name = "codex-dev"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
-anyhow = "1.0"
-bun-platform-core = { path = "../bun-platform-core" }
-chrono = { version = "0.4", features = ["serde"] }
-clap = { version = "4.6", features = ["derive"] }
-clap_complete = "4.6"
-clap_mangen = "0.3"
-codex-dev-core = { version = "0.1.0", path = "../codex-dev-core" }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-sha2 = "0.10"
+anyhow.workspace = true
+bun-platform-core.workspace = true
+chrono.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+clap_mangen.workspace = true
+codex-dev-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 assert_cmd = "2.0"
@@ -30,4 +33,4 @@ predicates = "3.1"
 tempfile = "3.23"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2"
+libc.workspace = true

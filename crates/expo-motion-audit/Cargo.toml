@@ -12,10 +12,13 @@ description = "Static auditor for Expo/React Native motion code (Reanimated 4) a
 name = "expo-motion-audit"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
-audit-gate = { path = "../audit-gate" }
-anyhow = "1.0"
-clap = { version = "4.6", features = ["derive"] }
-clap_complete = "4.6"
-expo-motion-audit-core = { path = "../expo-motion-audit-core" }
-serde_json = "1.0"
+audit-gate.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+expo-motion-audit-core.workspace = true
+serde_json.workspace = true
