@@ -2,10 +2,10 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "a181a0982fa274ad276925d52280fa7c85715198",
+  "sourceCommit": "4b712b953e448169c01580477bd7baa95883b2bb",
   "sourceRef": "main",
-  "skillsCount": 77,
-  "totalSkillDirectories": 77,
+  "skillsCount": 78,
+  "totalSkillDirectories": 78,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -2252,6 +2252,56 @@
       "package": {
         "path": "skills/dist/opensrc.skill",
         "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "parallel-cli",
+      "slug": "parallel-cli",
+      "description": "Use the Parallel CLI for web data work: URL extraction, deep research, data enrichment, entity discovery (findall), memory recall, and web monitoring. Web search goes to the parallel-search MCP server (free); escalate to `parallel-cli search` only when MCP is insufficient. Use for deep research, exhaustive investigation, extracting full content from URLs, enriching lists, finding entities, recalling prior runs, tracking web changes, and CLI setup/auth/balance.",
+      "license": "MIT",
+      "path": "skills/parallel-cli",
+      "skillMdPath": "skills/parallel-cli/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/parallel-cli",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/parallel-cli/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill parallel-cli -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill parallel-cli -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill parallel-cli"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Packaged",
+        "Documented",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "docs_indexed",
+        "package_available",
+        "has_references"
+      ],
+      "improvementSignals": [
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": true
+      },
+      "package": {
+        "path": "skills/dist/parallel-cli.skill",
+        "present": true,
         "rejected": false
       }
     },
