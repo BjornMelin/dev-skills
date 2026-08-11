@@ -12,6 +12,11 @@ skill-authoring systems added to this repository:
   Overview, Evidence, Subagents, PR, PR Agent, Validation, and Help panels.
 - `deep-researcher`: skill and Focused Six subagent pack for deep cited
   research.
+- `parallel-cli`: consolidated skill for Parallel web data work (URL
+  extraction, deep research, enrichment, entity discovery, memory recall,
+  web monitoring) that routes general search to the parallel-search MCP
+  server and escalates to `parallel-cli search` only when MCP is
+  insufficient.
 - Rust skill suite: layered Rust skills for core Rust, CLI/Clap, Ratatui TUI,
   Tauri v2 apps, Axum/Tokio services, and explicit broad architecture planning.
 - `subagent-creator`: skill and Python helper for authoring, installing,

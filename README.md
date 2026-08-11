@@ -331,6 +331,7 @@ for local development and validation commands.
 | `new-branch` | Create a conventional, semver-friendly branch first, then plan work and the PR. | [skills/new-branch/SKILL.md](skills/new-branch/SKILL.md) |
 | `notebook-ml-architect` | ML notebooks: leakage, reproducibility, refactor, modular pipelines, notebook→script. | [skills/notebook-ml-architect/SKILL.md](skills/notebook-ml-architect/SKILL.md) |
 | `opensrc` | Canonical source-level dependency inspection with the `opensrc` CLI for package internals, version diffs, and upgrade audits. | [skills/opensrc/SKILL.md](skills/opensrc/SKILL.md) |
+| `parallel-cli` | Parallel web data via CLI: URL extraction, deep research, enrichment, entity discovery, memory recall, and web monitoring. Routes general web search to the parallel-search MCP server and escalates to `parallel-cli search` only when MCP is insufficient. | [skills/parallel-cli/SKILL.md](skills/parallel-cli/SKILL.md) |
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
 | `pre-mortem` | Adversarial pre-mortem that stress-tests a plan before reality does: surface assumptions, map vulnerabilities and irreversible bets, then harden them. | [skills/pre-mortem/SKILL.md](skills/pre-mortem/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
