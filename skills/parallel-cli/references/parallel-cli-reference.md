@@ -62,7 +62,7 @@ parallel-cli search [OBJECTIVE] -q "keyword" -q "keyword2" --json \
   `--max-age-seconds` (min 600), `--timeout-seconds`.
 - Do not set `max_output_tokens` on the harness call; it truncates the JSON.
   Read the `-o` file, not stdout. Response must cite every claim from the
-  output as [Title](URL) and end with a Sources section.
+  output as a markdown link to the source URL and end with a Sources section.
 
 ## extract
 

@@ -62,7 +62,7 @@ parallel-cli extract "https://example.com/article" --json -o "/tmp/<name>.json"
 
 Options: `--objective "focus area"`, `-q "keyword"` (repeatable), `--full-content` (complete page body; also retry with this when excerpts come back empty), `--no-excerpts`, `--session-id` to group related search/extract calls. On failure (errors field, empty results, 404/timeout), do NOT fabricate content: report the failure, suggest verifying the URL, retrying with `--full-content`, or locating the current URL via search.
 
-Present the result as **[Page Title](URL)** followed by the content verbatim: preserve every numbered/bulleted item, keep all facts, names, numbers, dates, and quotes; strip only obvious noise (nav menus, footers, ads).
+Present the result as **Page Title** with its URL, followed by the content verbatim: preserve every numbered/bulleted item, keep all facts, names, numbers, dates, and quotes; strip only obvious noise (nav menus, footers, ads).
 
 ### Deep research
 
