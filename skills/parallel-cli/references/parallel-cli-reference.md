@@ -21,12 +21,12 @@ skill set; this consolidated skill replaces those).
 When a command errors with `no such command` / `no such option`, update the
 CLI by its install method (`parallel-cli update` for standalone,
 `uv tool upgrade "parallel-web-tools[cli]"`, `pipx upgrade
-"parallel-web-tools[cli]"`, `npm update -g parallel-web-cli`, or
+parallel-web-tools`, `npm update -g parallel-web-cli`, or
 `brew update && brew upgrade parallel-web/tap/parallel-cli`) and retry.
 
 ## Top-level
 
-```
+```text
 auth        Check authentication status (--json)
 balance     Inspect or top up the org's prepaid credit balance
 completion  Shell completion for bash, zsh, fish
@@ -234,7 +234,8 @@ parallel-cli skills install      # intentionally excluded: installs the official
 parallel-cli skills reinstall    # this consolidated skill replaces those
 parallel-cli skills uninstall    # PARALLEL_SKILLS_INDEX_URL overrides the index
 parallel-cli auth --json
-parallel-cli login --json [--no-browser]                      # device OAuth; streams auth_start/device_code/auth_waiting/auth_success
+parallel-cli login --json
+parallel-cli login --json --no-browser                      # headless sessions; streams auth_start/device_code/auth_waiting/auth_success
 parallel-cli balance --json get
 parallel-cli balance add <AMOUNT_IN_CENTS>
 ```

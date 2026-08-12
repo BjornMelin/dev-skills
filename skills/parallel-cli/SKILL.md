@@ -2,21 +2,21 @@
 name: parallel-cli
 description: "Use the Parallel CLI for web data work: URL extraction, deep research, data enrichment, entity discovery (findall), memory recall, and web monitoring. Web search goes to the parallel-search MCP server (free); escalate to `parallel-cli search` only when MCP is insufficient. Use for deep research, exhaustive investigation, extracting full content from URLs, enriching lists, finding entities, recalling prior runs, tracking web changes, and CLI setup/auth/balance."
 license: MIT
-allowed-tools: Bash(command:*), Bash(brew:*), Bash(uv:*), Bash(npm:*), Bash(pipx:*), Bash(curl:*), Bash(rm:*), Bash(parallel-cli:*)
+allowed-tools: Bash(command:*), Bash(brew:*), Bash(uv:*), Bash(npm:*), Bash(pipx:*), Bash(parallel-cli:*)
 metadata:
   author: parallel
 ---
 
 # Parallel CLI
 
-One interface for Parallel web data work: extract, deep research, enrichment, findall, memory, and monitor. Requires `parallel-cli` installed, authenticated, and funded.
+One interface for Parallel web data work: extract, deep research, enrichment, findall, memory, and monitor. CLI-backed workflows require `parallel-cli` installed, authenticated, and funded; the search routing below avoids the CLI where possible.
 
 ## Routing: MCP first, CLI for depth
 
-- **General web search, quick lookups, fact-checks**: use the `parallel-search` MCP server (`web_search`) when it is configured. It is free. Do not call `parallel-cli search` for these. When the MCP server is absent, use the harness's native web search, or fall back to `parallel-cli search`.
+- **General web search, quick lookups, fact-checks**: use the `parallel-search` MCP server (`web_search`) when it is configured. It is free. Do not call `parallel-cli search` for these. For current official facts (framework/library/API documentation), prefer the harness's native web search per repo convention. When the MCP server is absent, use the harness's native web search, or fall back to `parallel-cli search`.
 - Escalate to `parallel-cli search` only when MCP is insufficient: `--mode advanced` for hard multi-step questions, `--after-date` freshness, `--include-domains` / `--exclude-domains`, `--location` geo-targeting, or high-volume batch queries.
 - **URL content extraction**: `parallel-cli extract` (cleaner than MCP `web_fetch` for PDFs, JS-heavy pages, and long articles).
-- **Deep/exhaustive research** (user says "deep", "exhaustive", "comprehensive report", "thorough investigation"): `research run` + `poll`.
+- **Deep/exhaustive research** (user says "deep", "exhaustive", "comprehensive report", "thorough investigation"): prefer the repository's `deep-researcher` skill for deep cited research when available (repo convention); `research run` + `poll` is the engine and the route when `deep-researcher` is unavailable.
 - **Structured entity lists** ("find all X", "list every Y"): `findall`. **Add fields to a list you already have**: `enrich`.
 - **Recall prior runs**: `memory`. **Continuous change tracking**: `monitor`.
 - Do not use the parallel-task MCP for research or enrichment; the CLI is the tool of record.
@@ -30,7 +30,7 @@ command -v parallel-cli && parallel-cli --version
 # install: brew install parallel-web/tap/parallel-cli (macOS)
 #          uv tool install "parallel-web-tools[cli]"   (pipx: pipx install "parallel-web-tools[cli]" && pipx ensurepath)
 #          npm install -g parallel-web-cli
-# upgrade by install method: parallel-cli update | uv tool upgrade "parallel-web-tools[cli]" | pipx upgrade "parallel-web-tools[cli]" | npm update -g parallel-web-cli | brew update && brew upgrade parallel-web/tap/parallel-cli
+# upgrade by install method: parallel-cli update | uv tool upgrade "parallel-web-tools[cli]" | pipx upgrade parallel-web-tools | npm update -g parallel-web-cli | brew update && brew upgrade parallel-web/tap/parallel-cli
 ```
 
 When the CLI is present but old, detect the install method before upgrading:
@@ -60,9 +60,9 @@ This triggers device OAuth. Wait for `{"event": "auth_success"}`. Then check bal
 parallel-cli extract "https://example.com/article" --json -o "/tmp/<name>.json"
 ```
 
-Options: `--objective "focus area"`, `-q "keyword"` (repeatable), `--full-content` (complete page body; also retry with this when excerpts come back empty), `--no-excerpts`, `--session-id` to group related search/extract calls. On failure (errors field, empty results, 404/timeout), do NOT fabricate content: report the failure, suggest verifying the URL, retrying with `--full-content`, or locating the current URL via search.
+Options: `--objective "focus area"`, `-q "keyword"` (repeatable), `--full-content` (complete page body; also retry with this when excerpts come back empty), `--no-excerpts`, `--session-id` to group related search/extract calls. Use `--full-content` when the user asks for a complete page or long-article reproduction; without it the result reflects the excerpt output. On failure (errors field, empty results, 404/timeout), do NOT fabricate content: report the failure, suggest verifying the URL, retrying with `--full-content`, or locating the current URL via search.
 
-Present the result as **Page Title** with its URL, followed by the content verbatim: preserve every numbered/bulleted item, keep all facts, names, numbers, dates, and quotes; strip only obvious noise (nav menus, footers, ads).
+Present the result as **Page Title** with its URL, followed by the extracted content: preserve every numbered/bulleted item, fact, name, number, date, and quote in the returned content, and reproduce the full page verbatim only when `--full-content` was requested; strip only obvious noise (nav menus, footers, ads).
 
 ### Deep research
 
@@ -95,7 +95,7 @@ parallel-cli enrich poll "<TASKGROUP_ID>" --timeout 540 --output "/tmp/enrichmen
 ### FindAll: entity discovery
 
 ```bash
-parallel-cli findall run "<objective>" --no-wait --json        # comprehensive; {findall_id}
+parallel-cli findall run "<objective>" -n 50 --no-wait --json   # comprehensive; explicit -n (default 10)
 parallel-cli findall poll "<FINDALL_ID>" -o "/tmp/<name>.json" --timeout 540
 parallel-cli findall entity-search "<objective>" -t companies -n 100 -o "/tmp/<name>.json"   # fast, throwaway lists only
 parallel-cli findall enrich "<FINDALL_ID>" '{"properties":{"ceo":{"type":"string"}}}'         # add fields
@@ -103,7 +103,7 @@ parallel-cli findall extend "<FINDALL_ID>" 50                                   
 parallel-cli findall ingest "<objective>" --json   # preview inferred schema before paying for a run
 ```
 
-- `findall run` defaults: generator `core`, match limit `10`. `-g pro` for comprehensive coverage, `-g base` only when the user accepts noise. `-n 5..1000`. Exclusions: `--exclude '[{"name":"Google","url":"google.com"}]'`.
+- `findall run` defaults: generator `core`, match limit `10`. For "find all X" / "list every Y" requests, set `-n` explicitly (5-1000, e.g. `-n 50`) so the result matches the requested completeness. `-g pro` for comprehensive coverage, `-g base` only when the user accepts noise. Exclusions: `--exclude '[{"name":"Google","url":"google.com"}]'`.
 - `entity-search` is synchronous, companies/people only, no exclusions/enrichment, and its `entity_set_id` cannot be used with `enrich`/`extend`. Use only when the user explicitly wants a fast, rough list.
 - Filter noise before presenting: drop entries with empty/missing `url`, names that echo the query, and third-party directory/profile URLs (entity-search's directory links are expected; keep them). Sanity-check `-g base` matches against source URLs for falsifiable criteria.
 - Present matches as a markdown table, lead with the count, cite each entity's URL.
@@ -143,10 +143,12 @@ Long-running work (research poll, enrich poll, findall poll) should run in a bac
 
 - **opencode**: `task` subagent on `opencode-go/deepseek-v4-flash` or luna `high`/`max`, with Bash access only.
 - **Codex**: spawn a fresh thread via `codex exec` (the native multi_agent_v2 tool does not support luna), launched in the background, writing results to a writable path:
+
   ```bash
   codex exec -C "<repo>" -m gpt-5.6-luna -c model_reasoning_effort="max" --sandbox workspace-write --output-last-message "/tmp/codex-out.md" "<self-contained prompt>" &
   # follow-ups: codex exec resume --last "<instruction>"
   ```
+
   The prompt must name the exact `parallel-cli ... -o "/tmp/<name>.json"` command; the thread needs `workspace-write` so its `-o` writes succeed.
 - **Claude Code**: subagent with pinned `model` and `effort`, `tools: Bash`, bounded `maxTurns`, dispatched via Task. Prefer a `model: inherit`-free pin per the repo routing matrix.
 - **Kimi Code**: `Agent` tool spawn with `subagent_type: coder` (or `explore` for read-only), with a model override where the harness router supports one. UNVERIFIED: luna wiring depends on the local Kimi provider/alias configuration.
