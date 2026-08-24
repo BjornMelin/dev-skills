@@ -15,6 +15,7 @@ use audit_gate::{Baseline, GateFinding, GateSeverity, to_sarif};
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{Shell, generate};
 use expo_motion_audit_core::output::{format_catalog_json, format_catalog_markdown};
+use expo_motion_audit_core::rules::ids;
 use expo_motion_audit_core::{
     Category, ScanOptions, Severity, TOOL_NAME, TOOL_VERSION, format_json, format_markdown,
     scan_root,
@@ -92,7 +93,7 @@ enum Commands {
         #[arg(
             long = "write-baseline",
             value_name = "PATH",
-            help = "Write the current findings to a baseline file and exit 0."
+            help = "Write baseline-eligible findings to a baseline file and exit 0."
         )]
         write_baseline: Option<PathBuf>,
     },
@@ -261,7 +262,11 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
              raise --max-files or narrow --root",
             outcome.files_scanned
         );
-        Baseline::from_findings(&to_gate_findings(&outcome.findings)).save(path)?;
+        let findings = to_gate_findings(&outcome.findings)
+            .into_iter()
+            .filter(|finding| finding.id != ids::CONFIG_UNABLE_TO_ANALYZE)
+            .collect::<Vec<_>>();
+        Baseline::from_findings(&findings).save(path)?;
         return Ok(0);
     }
 
@@ -275,7 +280,9 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
             .findings
             .into_iter()
             .zip(unseen)
-            .filter_map(|(finding, keep)| keep.then_some(finding))
+            .filter_map(|(finding, keep)| {
+                (keep || finding.id == ids::CONFIG_UNABLE_TO_ANALYZE).then_some(finding)
+            })
             .collect();
     }
 
@@ -484,6 +491,80 @@ mod tests {
         .unwrap();
 
         assert_eq!(code, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn config_unable_to_analyze_stays_advisory_but_is_not_baselined() {
+        let root = temp_scan_root("dynamic-config-baseline");
+        fs::write(
+            root.join("app.config.ts"),
+            "export default ({ config }) => ({ ...config });\n",
+        )
+        .unwrap();
+        let raw_report = root.join("raw.json");
+
+        let raw_code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("config"),
+            output: Some(raw_report.clone()),
+            max_files: 5000,
+            min_severity: MinSeverity::Low,
+            exclude: &[],
+            baseline: None,
+            write_baseline: None,
+        })
+        .unwrap();
+        let raw: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(raw_report).unwrap()).unwrap();
+
+        assert_eq!(raw_code, 2);
+        assert_eq!(raw["findings"][0]["id"], "config.unable-to-analyze");
+
+        let baseline = root.join("baseline.json");
+        let write_code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("config"),
+            output: None,
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: None,
+            write_baseline: Some(&baseline),
+        })
+        .unwrap();
+
+        assert_eq!(write_code, 0);
+        assert_eq!(
+            fs::read_to_string(&baseline).unwrap(),
+            "{\n  \"schema\": \"audit-gate.baseline.v1\",\n  \"findings\": []\n}\n"
+        );
+        fs::write(
+            &baseline,
+            "{\n  \"schema\": \"audit-gate.baseline.v1\",\n  \"findings\": [\n    \"config.unable-to-analyze::app.config.ts::0\"\n  ]\n}\n",
+        )
+        .unwrap();
+
+        let baseline_report = root.join("baseline-report.json");
+        let baseline_code = run_scan(ScanRequest {
+            root: root.clone(),
+            format: OutputFormat::Json,
+            categories: Some("config"),
+            output: Some(baseline_report.clone()),
+            max_files: 5000,
+            min_severity: MinSeverity::Medium,
+            exclude: &[],
+            baseline: Some(&baseline),
+            write_baseline: None,
+        })
+        .unwrap();
+        let report: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(baseline_report).unwrap()).unwrap();
+
+        assert_eq!(baseline_code, 0);
+        assert_eq!(report["findings"][0]["id"], "config.unable-to-analyze");
         fs::remove_dir_all(root).unwrap();
     }
 

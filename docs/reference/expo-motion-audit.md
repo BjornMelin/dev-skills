@@ -84,8 +84,9 @@ Options:
   separator or wildcard matches any path component, so `--exclude node_modules`
   works as expected.
 - `--baseline <PATH>`: report only findings absent from this baseline file.
-- `--write-baseline <PATH>`: write the current findings to a baseline and exit
-  `0` without gating.
+- `--write-baseline <PATH>`: write the current baseline-eligible findings and
+  exit `0` without gating. The informational `config.unable-to-analyze` finding
+  remains visible in scans but is not accepted as debt in generated baselines.
 
 The walk includes `.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`
 source files plus the supported config files, and skips `node_modules`, `.git`,
@@ -179,7 +180,9 @@ analyses, and report at medium confidence:
   yields an informational low `config.unable-to-analyze` finding rather than a
   false high-severity one. A dynamic `app.config.js`/`.ts`/`.cjs`/`.mjs` is
   likewise reported as informational because only static app-config forms are
-  parsed. Missing `expo.newArchEnabled` is intentionally left for
+  parsed. This analysis limitation remains visible in raw and baseline-mode
+  reports but is omitted by `--write-baseline`, because it is not accepted
+  as implementation debt. Missing `expo.newArchEnabled` is intentionally left for
   target-manifest validation;
   the CLI does not encode an SDK-version threshold.
 
