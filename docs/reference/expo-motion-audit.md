@@ -182,7 +182,7 @@ analyses, and report at medium confidence:
   likewise reported as informational because only static app-config forms are
   parsed. This analysis limitation remains visible in raw and baseline-mode
   reports but is omitted by `--write-baseline`, because it is not accepted
-  implementation debt. Missing `expo.newArchEnabled` is intentionally left for
+  as implementation debt. Missing `expo.newArchEnabled` is intentionally left for
   target-manifest validation;
   the CLI does not encode an SDK-version threshold.
 

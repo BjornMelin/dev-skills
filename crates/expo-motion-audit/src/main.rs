@@ -93,7 +93,7 @@ enum Commands {
         #[arg(
             long = "write-baseline",
             value_name = "PATH",
-            help = "Write the current findings to a baseline file and exit 0."
+            help = "Write baseline-eligible findings to a baseline file and exit 0."
         )]
         write_baseline: Option<PathBuf>,
     },
@@ -280,7 +280,9 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
             .findings
             .into_iter()
             .zip(unseen)
-            .filter_map(|(finding, keep)| keep.then_some(finding))
+            .filter_map(|(finding, keep)| {
+                (keep || finding.id == ids::CONFIG_UNABLE_TO_ANALYZE).then_some(finding)
+            })
             .collect();
     }
 
@@ -539,6 +541,11 @@ mod tests {
             fs::read_to_string(&baseline).unwrap(),
             "{\n  \"schema\": \"audit-gate.baseline.v1\",\n  \"findings\": []\n}\n"
         );
+        fs::write(
+            &baseline,
+            "{\n  \"schema\": \"audit-gate.baseline.v1\",\n  \"findings\": [\n    \"config.unable-to-analyze::app.config.ts::0\"\n  ]\n}\n",
+        )
+        .unwrap();
 
         let baseline_report = root.join("baseline-report.json");
         let baseline_code = run_scan(ScanRequest {
