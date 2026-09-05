@@ -90,9 +90,10 @@ motion-token-audit doctor --format json
 `doctor` is the authoritative source for rule ids, categories, and severities in
 the installed build.
 
-New rules:
+New rules in v0.1.0 (`severity` below is the catalog severity; emitted
+findings report `medium` for token drift and `low` for orphans):
 
-| id | severity | summary |
+| id | catalog severity | summary |
 | --- | --- | --- |
 | `tokens-tailwind.duration-literal` | medium | Detects `duration-[Nms]` and `delay-[Nms]` in Tailwind/NativeWind string and template literals. |
 | `tokens-tailwind.easing-literal` | medium | Detects `ease-[cubic-bezier(...)]` arbitrary values. |

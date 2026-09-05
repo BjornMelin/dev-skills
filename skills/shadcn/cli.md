@@ -2,7 +2,7 @@
 
 Configuration is read from `components.json`.
 
-> **IMPORTANT:** Always run commands using the project's package runner: `bunx --bun shadcn@latest`, `pnpm dlx shadcn@latest`, or `bunx --bun shadcn@latest`. Check `packageManager` from project context to choose the right one. Examples below use `bunx --bun shadcn@latest` but substitute the correct runner for the project.
+> **IMPORTANT:** Always run commands using the project's package runner: `bunx --bun shadcn@latest` (bun), `pnpm dlx shadcn@latest` (pnpm), `npx shadcn@latest` (npm), or `yarn dlx shadcn@latest` (yarn). Check `packageManager` from project context to choose the right one. Examples below use `bunx --bun shadcn@latest` but substitute the correct runner for the project.
 
 > **IMPORTANT:** Only use the flags documented below. Do not invent or guess flags — if a flag isn't listed here, it doesn't exist. The CLI auto-detects the package manager from the project's lockfile; there is no `--package-manager` flag.
 

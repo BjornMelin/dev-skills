@@ -181,7 +181,7 @@ Use these only when installed or when installation is appropriate and allowed:
 gsap-audit scan --root <path>
 motion-token-audit scan --root <path>
 expo-motion-audit scan --root <path>
-npx motionscore <url> --agent --no-upload
+npx motionscore@0.1.2 <url> --agent --no-upload
 ```
 
 The three audit commands are Rust CLIs included in this repository. From a

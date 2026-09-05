@@ -9,13 +9,19 @@
 # every call site back to npx. Run this script instead of updating by hand so
 # the overlay survives each refresh.
 #
-# The overlay is exactly three edits:
+# The overlay is exactly five edits:
 #   1. Bun-first runner   - `npx shadcn@latest` -> `bunx --bun shadcn@latest`
 #   2. Runner guidance    - the >**IMPORTANT:** line, rewritten Bun-first
 #   3. Frontmatter        - broadened allowed-tools, trigger-style description,
 #                           and `user-invocable` dropped so /shadcn works
+#   4. CLI runner mapping - cli.md's >**IMPORTANT:** line repaired from the
+#                           canonical scripts/cli-important.txt (the blind
+#                           pass in edit 1 corrupts its runner list)
+#   5. Layout note        - scripts/layout-note.txt inserted after the
+#                           `## Detailed References` heading, documenting the
+#                           intentional vendored-upstream layout exception
 #
-# Everything else is upstream verbatim. If a diff shows up outside those three,
+# Everything else is upstream verbatim. If a diff shows up outside those five,
 # upstream changed and the overlay may need revisiting.
 #
 # Usage:  skills/shadcn/scripts/apply.sh
@@ -49,7 +55,7 @@ FILES=(
 echo "==> Fetching upstream (${#FILES[@]} files)"
 for f in "${FILES[@]}"; do
   mkdir -p "$TMP/$(dirname "$f")"
-  curl -sSfL -o "$TMP/$f" "$RAW/$f"
+  curl -sSfL --connect-timeout 10 --max-time 120 -o "$TMP/$f" "$RAW/$f"
 done
 
 echo "==> Installing into $SKILL_DIR"
@@ -80,12 +86,37 @@ awk -v fmfile="$SCRIPT_DIR/frontmatter.txt" -v impfile="$SCRIPT_DIR/important.tx
 ' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.overlaid"
 mv "$TMP/SKILL.md.overlaid" "$SKILL_DIR/SKILL.md"
 
+# --- Overlay 5: vendored-layout note ------------------------------------------
+# Required by the repo's skill conventions: the top-level cli.md/registry.md/
+# customization.md/rules/ layout is an intentional upstream exception, and the
+# note must survive refreshes instead of living only in the generated file.
+# The note contains no `npx shadcn@latest` string, so it is safe to insert
+# before the blind runner pass below.
+echo "==> Applying overlay: layout note"
+awk -v notefile="$SCRIPT_DIR/layout-note.txt" '
+  BEGIN { while ((getline line < notefile) > 0) note[++nnote] = line }
+  /^## Detailed References$/ && !done {
+    print
+    print ""
+    for (i = 1; i <= nnote; i++) print note[i]
+    done = 1
+    next
+  }
+  { print }
+' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.noted"
+mv "$TMP/SKILL.md.noted" "$SKILL_DIR/SKILL.md"
+
 # --- Overlay 1: Bun-first runner ---------------------------------------------
 # The frontmatter allowed-tools line deliberately keeps an `npx shadcn@latest`
 # entry, so it is restored afterwards from frontmatter.txt.
+# Portable replacement (no `sed -i`, which needs a backup suffix on BSD/macOS):
+# rewrite each file through a temp file instead of editing in place.
 echo "==> Applying overlay: Bun-first runner"
-find "$SKILL_DIR" -name '*.md' -type f -not -path "$SCRIPT_DIR/*" \
-  -exec sed -i 's|npx shadcn@latest|bunx --bun shadcn@latest|g' {} +
+find "$SKILL_DIR" -name '*.md' -type f -not -path "$SCRIPT_DIR/*" -print0 |
+  while IFS= read -r -d '' md; do
+    sed 's|npx shadcn@latest|bunx --bun shadcn@latest|g' "$md" > "$TMP/overlay.tmp" \
+      && mv "$TMP/overlay.tmp" "$md"
+  done
 
 # Restore the allowed-tools line clobbered by the pass above.
 allowed="$(grep '^allowed-tools:' "$SCRIPT_DIR/frontmatter.txt")"
@@ -95,13 +126,26 @@ awk -v allowed="$allowed" '
 ' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.fixed"
 mv "$TMP/SKILL.md.fixed" "$SKILL_DIR/SKILL.md"
 
+# --- Overlay 4: canonical CLI runner mapping ---------------------------------
+# Runs after the blind pass on purpose: the pass would corrupt the template's
+# own `npx shadcn@latest` (npm) entry back into a duplicate bunx line.
+echo "==> Applying overlay: CLI runner mapping"
+awk -v impfile="$SCRIPT_DIR/cli-important.txt" '
+  BEGIN { while ((getline line < impfile) > 0) imp[++nimp] = line }
+  /^> \*\*IMPORTANT:\*\*/ { for (i = 1; i <= nimp; i++) print imp[i]; next }
+  { print }
+' "$SKILL_DIR/cli.md" > "$TMP/cli.md.overlaid"
+mv "$TMP/cli.md.overlaid" "$SKILL_DIR/cli.md"
+
 # --- Verify -------------------------------------------------------------------
 echo "==> Verifying"
 fail=0
 # `grep` exits 1 on no-match, which `set -o pipefail` would turn into a script
 # abort, so both counts are guarded with `|| true`.
 bunx_count=$( { grep -ro 'bunx --bun shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | wc -l)
-stray_npx=$( { grep -rn 'npx shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | { grep -v 'allowed-tools:' || true; } | wc -l)
+# The canonical cli.md IMPORTANT template intentionally keeps one `npx`
+# entry (npm runner), alongside allowed-tools: in SKILL.md frontmatter.
+stray_npx=$( { grep -rn 'npx shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | { grep -v -e 'allowed-tools:' -e '^[^:]*:[0-9]*:> \*\*IMPORTANT' || true; } | wc -l)
 
 [ "$bunx_count" -gt 0 ] || { echo "FAIL: no bunx runner found"; fail=1; }
 [ "$stray_npx" -eq 0 ] || { echo "FAIL: $stray_npx stray npx outside allowed-tools"; fail=1; }

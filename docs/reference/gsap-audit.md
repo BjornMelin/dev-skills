@@ -100,15 +100,15 @@ an `id | category | severity` table. JSON output is a `{ "rules": [...] }` objec
 where each rule carries `id`, `category`, `severity`, `confidence`, and
 `summary`.
 
-Newly added rules:
+Rules added in v0.1.0:
 
-| id | severity | summary |
+| id | catalog severity | summary |
 | --- | --- | --- |
 | `scrolltrigger.nested-timeline-child` | medium | Flags `scrollTrigger` on a chained timeline child tween instead of the top-level timeline. |
 | `react.tween-in-render` | high | Flags GSAP tween/timeline creation directly in a React component render body. |
 | `performance.will-change-permanent` | medium | Flags `willChange`/`will-change` in tween vars or timeline defaults. |
 | `core.missing-overwrite` | low | Flags event-handler `gsap.to`/`gsap.from` tweens without overwrite protection. |
-| `react.matchmedia-missing-revert` | medium | Flags `gsap.matchMedia()` files with neither `.revert()` nor `useGSAP()` cleanup. |
+| `react.matchmedia-missing-revert` | medium | Flags `gsap.matchMedia()` call sites with neither their own `.revert()` cleanup nor an enclosing `useGSAP()` callback. |
 
 ## completions
 

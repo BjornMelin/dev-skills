@@ -107,6 +107,7 @@ Load only relevant skills that exist in this repository:
 - `repo-modernizer` for dependency upgrades and dependency-native cleanup.
 - `repo-docs-align` or `docs-align` for changed documentation contracts.
 - `vitest-dev` or `pytest-dev` for runner-specific test work.
+- `qa-router` for repository gate selection and validation routing.
 - `grill-me` for an unresolved user-owned product or architecture tradeoff.
 - `pre-mortem` before an irreversible, high-risk decision.
 - `commit`, `ship-branch`, or `gh-pr-review-fix` only when the user explicitly
