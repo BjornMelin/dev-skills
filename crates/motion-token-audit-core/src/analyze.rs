@@ -800,19 +800,23 @@ fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)
     while let Some(offset) = literal[start_at..].find(prefix) {
         let start = start_at + offset;
         let number_start = start + prefix.len();
-        let Some(end_offset) = literal[number_start..].find("ms]") else {
+        // Bound the parse to the current class: the value ends at the first
+        // `]` after the prefix. Searching past it lets one invalid class
+        // swallow a later valid one (`duration-[var(--x)] duration-[200ms]`
+        // would skip the hardcoded duration entirely).
+        let rest = &literal[number_start..];
+        let Some(bracket) = rest.find(']') else {
             break;
         };
-        let number_end = number_start + end_offset;
-        let number = &literal[number_start..number_end];
-        if !number.is_empty()
+        let raw_end = number_start + bracket + 1;
+        if let Some(number) = rest[..bracket].strip_suffix("ms")
+            && !number.is_empty()
             && number.bytes().all(|byte| byte.is_ascii_digit())
             && let Ok(value) = number.parse::<u32>()
         {
-            let raw_end = number_end + "ms]".len();
             out.push((start, value, literal[start..raw_end].to_string()));
         }
-        start_at = number_end + "ms]".len();
+        start_at = raw_end;
     }
     out
 }
@@ -824,16 +828,17 @@ fn tailwind_easing_literals(literal: &str) -> Vec<(usize, Bezier, String)> {
     while let Some(offset) = literal[start_at..].find(prefix) {
         let start = start_at + offset;
         let bezier_start = start + "ease-[".len();
-        let Some(end_offset) = literal[bezier_start..].find(")]") else {
+        // Bound the parse to the current class (same cross-class hazard as
+        // `tailwind_ms_literals`): the value ends at the first `]` ahead.
+        let rest = &literal[bezier_start..];
+        let Some(bracket) = rest.find(']') else {
             break;
         };
-        let bezier_end = bezier_start + end_offset + 1;
-        let raw_bezier = &literal[bezier_start..bezier_end];
-        if let Some(bezier) = parse_cubic_bezier(raw_bezier) {
-            let raw_end = bezier_end + 1;
+        let raw_end = bezier_start + bracket + 1;
+        if let Some(bezier) = parse_cubic_bezier(&rest[..bracket]) {
             out.push((start, bezier, literal[start..raw_end].to_string()));
         }
-        start_at = bezier_end + 1;
+        start_at = raw_end;
     }
     out
 }
