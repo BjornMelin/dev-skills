@@ -1,6 +1,6 @@
 ---
 name: grill-me
-description: Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions "grill me".
+description: "Relentless plan/design interview until shared understanding; resolve each decision branch. Use for “grill me”, grilling, and stress-test requests."
 ---
 
 Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one and applying your deep reasoning and domain expertise. For each question, provide your recommended answer and include custom weighted decision framework scores from 0.0 to 10.0 for all viable options, and target 9.0+ decisions when realistically achievable.

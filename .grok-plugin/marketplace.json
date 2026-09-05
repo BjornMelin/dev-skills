@@ -1,0 +1,34 @@
+{
+  "name": "bjorn-dev-skills",
+  "description": "Reusable development skill plugins from Bjorn Melin's dev-skills repo.",
+  "owner": {
+    "name": "Bjorn Melin",
+    "url": "https://github.com/BjornMelin"
+  },
+  "plugins": [
+    {
+      "name": "web-motion",
+      "description": "Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references.",
+      "version": "0.2.0",
+      "source": { "type": "local", "path": "./plugins/web-motion" },
+      "category": "design",
+      "tags": ["web-motion", "react", "animation", "frontend"]
+    },
+    {
+      "name": "claude-core",
+      "description": "Claude-Code-native orchestration skills: subagent fan-out, custom-agent authoring, PR review-thread resolution, and complexity/perf hotspot optimization.",
+      "version": "0.1.0",
+      "source": { "type": "local", "path": "./plugins/claude-core" },
+      "category": "workflow",
+      "tags": ["claude-code", "subagents", "orchestration", "workflow"]
+    },
+    {
+      "name": "design-motion",
+      "description": "Cross-stack motion and design-system direction: an orchestration router, a motion-quality audit skill, cinematic R3F look-dev, seven specialist motion subagents, and a director output style.",
+      "version": "0.1.0",
+      "source": { "type": "local", "path": "./plugins/design-motion" },
+      "category": "design",
+      "tags": ["design-motion", "motion", "three", "react-three-fiber", "reanimated"]
+    }
+  ]
+}

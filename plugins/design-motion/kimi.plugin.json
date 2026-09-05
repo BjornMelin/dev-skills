@@ -1,0 +1,11 @@
+{
+  "name": "design-motion",
+  "version": "0.1.0",
+  "description": "Cross-stack motion & design-system direction with a router skill, motion-quality audit, cinematic R3F look-dev, seven specialist subagents (including a runtime-proof verifier), and a director output style.",
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "interface": {
+    "displayName": "Design Motion",
+    "shortDescription": "Direct and audit cross-stack motion & design systems."
+  }
+}

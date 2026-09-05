@@ -2,7 +2,7 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "4b712b953e448169c01580477bd7baa95883b2bb",
+  "sourceCommit": "c9575fb5d161cbef467d128aeb81a9431a346857",
   "sourceRef": "main",
   "skillsCount": 78,
   "totalSkillDirectories": 78,
@@ -1674,7 +1674,7 @@
     {
       "name": "firecrawl",
       "slug": "firecrawl",
-      "description": "Firecrawl CLI for web data. Use to search the web, scrape or crawl a site, map URLs, extract structured data, interact with a page, monitor changes, or parse local PDF, DOCX, XLSX and HTML files.",
+      "description": "Firecrawl CLI for search, scrape/crawl, map, extract, interact, monitor, and parse local PDF/DOCX/XLSX/HTML.",
       "license": "ISC",
       "path": "skills/firecrawl",
       "skillMdPath": "skills/firecrawl/SKILL.md",
@@ -1771,7 +1771,7 @@
     {
       "name": "grill-me",
       "slug": "grill-me",
-      "description": "Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions \"grill me\".",
+      "description": "Relentless plan/design interview until shared understanding; resolve each decision branch. Use for “grill me”, grilling, and stress-test requests.",
       "path": "skills/grill-me",
       "skillMdPath": "skills/grill-me/SKILL.md",
       "sourceUrls": {
@@ -2211,7 +2211,7 @@
     {
       "name": "opensrc",
       "slug": "opensrc",
-      "description": "Inspect package/upstream source with opensrc: internals, exact paths, version diffs, and upgrade audits across npm, PyPI, crates, and Git repos; not general web search.",
+      "description": "Inspect package/upstream source with opensrc: internals, exact paths, version diffs, and upgrade audits for npm, PyPI, crates, and Git; not general web.",
       "path": "skills/opensrc",
       "skillMdPath": "skills/opensrc/SKILL.md",
       "sourceUrls": {
