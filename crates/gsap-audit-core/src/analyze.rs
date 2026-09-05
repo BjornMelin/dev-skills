@@ -116,8 +116,10 @@ struct FileFacts {
     /// Local bindings imported from the skill's configured GSAP module pattern
     /// (`lib/gsap`), where registration is centralized before re-export.
     configured_gsap_imports: BTreeSet<String>,
-    /// Identifiers initialized from `gsap.timeline(...)`.
-    timeline_handles: BTreeSet<String>,
+    /// Identifiers initialized from `gsap.timeline(...)`, with their resolved
+    /// declarations so shadowed parameters and locals sharing the spelling
+    /// are not treated as GSAP timelines.
+    timeline_handles: Vec<TimelineHandle>,
     /// Local import aliases for known plugins, keyed by local binding.
     plugin_aliases: BTreeMap<String, String>,
     /// Local import aliases for dev-only helpers, keyed by local binding.
@@ -135,6 +137,30 @@ struct FileFacts {
     reverted_bindings: Vec<RevertRef>,
 }
 
+/// A `gsap.timeline()` result binding with its resolved declaration, so a
+/// shadowed `tl` in another scope is never confused with the timeline.
+struct TimelineHandle {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+}
+
+/// Whether an identifier reference resolves to a recorded timeline handle:
+/// same resolved declaration wins; spelling matches only when either side
+/// is unresolvable.
+fn identifier_is_timeline_handle(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+    facts: &FileFacts,
+) -> bool {
+    let declaration = reference_declaration(semantic, identifier);
+    facts
+        .timeline_handles
+        .iter()
+        .any(|handle| match (declaration, handle.declaration) {
+            (Some(from), Some(to)) => from == to,
+            _ => handle.name == identifier.name.as_str(),
+        })
+}
 /// One `gsap.matchMedia(...)` call site and the cleanup covering it, if any.
 /// A file-wide flag is wrong here: an unrelated `useGSAP(...)` elsewhere
 /// cannot clean up this call's match-media context.
@@ -301,9 +327,13 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                     && let Some(init) = &declarator.init
                     && expression_is_gsap_timeline_call(init, &facts)
                 {
-                    facts
-                        .timeline_handles
-                        .insert(identifier.name.as_str().to_string());
+                    facts.timeline_handles.push(TimelineHandle {
+                        name: identifier.name.as_str().to_string(),
+                        declaration: identifier
+                            .symbol_id
+                            .get()
+                            .map(|symbol| semantic.scoping().symbol_declaration(symbol)),
+                    });
                 }
                 if let Some(identifier) = declarator.id.get_binding_identifier()
                     && let Some(init) = &declarator.init
@@ -1355,7 +1385,7 @@ fn check_call<'a, F>(
             }
         }
 
-        check_nested_timeline_scrolltrigger(call, method, facts, emit);
+        check_nested_timeline_scrolltrigger(call, method, facts, semantic, emit);
         check_missing_overwrite(call, node_id, method, semantic, facts, emit);
     }
     if let Some(vars) = gsap_timeline_vars_object(call, facts) {
@@ -1412,6 +1442,7 @@ fn check_nested_timeline_scrolltrigger<F>(
     call: &CallExpression<'_>,
     method: &str,
     facts: &FileFacts,
+    semantic: &Semantic<'_>,
     emit: &mut F,
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
@@ -1422,7 +1453,7 @@ fn check_nested_timeline_scrolltrigger<F>(
     let receiver_is_timeline = match member.object.without_parentheses() {
         Expression::CallExpression(_) => true,
         Expression::Identifier(identifier) => {
-            facts.timeline_handles.contains(identifier.name.as_str())
+            identifier_is_timeline_handle(semantic, identifier, facts)
         }
         _ => false,
     };
@@ -1575,7 +1606,24 @@ fn function_binding_name(
             .get_binding_identifier()
             .map(|identifier| identifier.name.as_str().to_string()),
         AstKind::ObjectProperty(property) => property_key_name(&property.key).map(str::to_string),
+        // Transparent wrappers preserve the function identity, so the name
+        // lives on the declarator above the call: `const Card = memo(() => ...)`
+        // names the arrow `Card`.
+        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
+            function_binding_name(nodes, parent_id)
+        }
         _ => None,
+    }
+}
+
+/// Whether a call preserves its function argument's identity for naming:
+/// `memo` and `forwardRef` return the function/component.
+fn callee_is_transparent_wrapper(call: &CallExpression<'_>) -> bool {
+    match call.callee.without_parentheses() {
+        Expression::Identifier(identifier) => {
+            matches!(identifier.name.as_str(), "memo" | "forwardRef")
+        }
+        _ => false,
     }
 }
 
@@ -2289,7 +2337,10 @@ fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts
     match expression.without_parentheses() {
         Expression::Identifier(identifier) => {
             is_gsap_identifier(identifier.name.as_str(), facts)
-                || facts.timeline_handles.contains(identifier.name.as_str())
+                || facts
+                    .timeline_handles
+                    .iter()
+                    .any(|handle| handle.name == identifier.name.as_str())
         }
         Expression::CallExpression(call) => {
             is_gsap_member_call(call, facts, "timeline")

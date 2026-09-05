@@ -1647,6 +1647,14 @@ fn rule_nested_timeline_child_scrolltrigger_fires_and_top_level_tween_does_not()
         r#"import { gsap } from "gsap"; const tl = gsap.timeline(); tl.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 });"#,
     );
     assert!(fired(&stored, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
+
+    // Shadowed parameter sharing the spelling is not the timeline handle.
+    let shadowed = analyze(
+        "src/timeline.ts",
+        "ts",
+        r#"import { gsap } from "gsap"; const tl = gsap.timeline(); function render(tl) { tl.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 }); }"#,
+    );
+    assert!(!fired(&shadowed, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
 }
 
 #[test]
@@ -1686,6 +1694,20 @@ export function Card() {
 }"#,
     );
     assert!(fired(&automatic_runtime, ids::REACT_TWEEN_IN_RENDER));
+
+    // Wrapped component: the arrow's name lives on the declarator above
+    // the memo call, so the render-time tween still fires.
+    let wrapped = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { memo } from "react";
+import { gsap } from "gsap";
+const Card = memo(() => {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+});"#,
+    );
+    assert!(fired(&wrapped, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]
