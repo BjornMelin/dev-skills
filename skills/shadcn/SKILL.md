@@ -12,11 +12,17 @@ A framework for building ui, components and design systems. Components are added
 
 ## Current Project Context
 
+Select the package runner using the IMPORTANT line above, then load the
+project config and installed components with `<runner> info --json`. With the
+default Bun runner the context is already injected below:
+
 ```json
 !`bunx --bun shadcn@latest info --json`
 ```
 
-The JSON above contains the project config and installed components. Use `bunx --bun shadcn@latest docs <component>` to get documentation and example URLs for any component.
+The resulting JSON contains the project config and installed components. Use
+`<runner> docs <component>` to get documentation and example URLs for any
+component.
 
 ## Principles
 

@@ -9,7 +9,7 @@
 # every call site back to npx. Run this script instead of updating by hand so
 # the overlay survives each refresh.
 #
-# The overlay is exactly five edits:
+# The overlay is exactly six edits:
 #   1. Bun-first runner   - `npx shadcn@latest` -> `bunx --bun shadcn@latest`
 #   2. Runner guidance    - the >**IMPORTANT:** line, rewritten Bun-first
 #   3. Frontmatter        - broadened allowed-tools, trigger-style description,
@@ -20,8 +20,11 @@
 #   5. Layout note        - scripts/layout-note.txt inserted after the
 #                           `## Detailed References` heading, documenting the
 #                           intentional vendored-upstream layout exception
+#   6. Context block      - `## Current Project Context` rewritten from
+#                           scripts/context-block.txt so runner selection
+#                           precedes the injected `info --json` step
 #
-# Everything else is upstream verbatim. If a diff shows up outside those five,
+# Everything else is upstream verbatim. If a diff shows up outside those six,
 # upstream changed and the overlay may need revisiting.
 #
 # Usage:  skills/shadcn/scripts/apply.sh
@@ -85,6 +88,25 @@ awk -v fmfile="$SCRIPT_DIR/frontmatter.txt" -v impfile="$SCRIPT_DIR/important.tx
   { print }
 ' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.overlaid"
 mv "$TMP/SKILL.md.overlaid" "$SKILL_DIR/SKILL.md"
+
+# --- Overlay 6: runner-first context block ------------------------------------
+# The injected `info --json` step hard-codes a runner, so it runs before the
+# agent can follow the runner-selection guidance. Rewrite the block from the
+# canonical template, which orders runner selection first.
+echo "==> Applying overlay: context block"
+awk -v blockfile="$SCRIPT_DIR/context-block.txt" '
+  BEGIN { while ((getline line < blockfile) > 0) block[++nblock] = line }
+  /^## Current Project Context$/ && !done {
+    for (i = 1; i <= nblock; i++) print block[i]
+    done = 1
+    skip = 1
+    next
+  }
+  skip && /^## Principles$/ { skip = 0 }
+  skip { next }
+  { print }
+' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.context"
+mv "$TMP/SKILL.md.context" "$SKILL_DIR/SKILL.md"
 
 # --- Overlay 5: vendored-layout note ------------------------------------------
 # Required by the repo's skill conventions: the top-level cli.md/registry.md/
