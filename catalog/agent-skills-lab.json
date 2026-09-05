@@ -2,7 +2,7 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "2471a9dfc9193876418ed9f3e6b7c01039fce461",
+  "sourceCommit": "9c8fa4fd49d32942be1b6e9a4fbe7f6020fa817b",
   "sourceRef": "main",
   "skillsCount": 82,
   "totalSkillDirectories": 82,
@@ -1444,15 +1444,16 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -1466,7 +1467,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/design-review.skill",
@@ -1737,15 +1738,16 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -1759,7 +1761,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/finalize-branch.skill",
@@ -2564,15 +2566,16 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_references",
         "has_agents"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_scripts"
       ],
@@ -2586,7 +2589,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/qa-router.skill",
@@ -3210,32 +3213,33 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Resource-rich",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_scripts",
         "has_assets",
         "has_agents",
         "resource_rich"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_references"
       ],
       "resources": {
         "references": 0,
-        "scripts": 5,
+        "scripts": 6,
         "assets": 2,
         "templates": 0,
         "agents": 1,
-        "total": 8
+        "total": 9
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/shadcn.skill",
