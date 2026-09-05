@@ -265,6 +265,11 @@ bunx --bun shadcn@latest view owner/repo/item
 
 ## Detailed References
 
+> **Layout note:** this skill vendors the upstream shadcn skill layout, so long-form
+> material lives in top-level `cli.md`, `registry.md`, `customization.md`, and `rules/`
+> instead of `references/`. This is intentional: it keeps future upstream updates mergeable.
+> Do not "fix" it by moving files into `references/`.
+
 - [rules/forms.md](./rules/forms.md) — FieldGroup, Field, InputGroup, ToggleGroup, FieldSet, validation states
 - [rules/composition.md](./rules/composition.md) — Groups, overlays, Card, Tabs, Avatar, Alert, Empty, Toast, Separator, Skeleton, Badge, Button loading
 - [rules/chat.md](./rules/chat.md) — MessageScroller, Message, Bubble, Attachment, Marker; streaming, anchoring, jump-to-latest
