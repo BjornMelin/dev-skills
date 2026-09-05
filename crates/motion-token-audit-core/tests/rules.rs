@@ -349,6 +349,51 @@ const timed = <motion.div animate={{ opacity: 1, transition: { duration: 0.2 } }
 }
 
 #[test]
+fn motion_jsx_namespace_resolves_through_import_alias() {
+    // Aliased Motion import: the `<m.div>` tag still belongs to Motion.
+    let aliased = analyze_source(
+        "app.tsx",
+        r#"import { motion as m } from "motion/react";
+const card = <m.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&aliased.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "aliased motion namespace should fire: {:?}",
+        ids(&aliased.findings)
+    );
+
+    // Unrelated local namespace sharing the name must not fire.
+    let shadowed = analyze_source(
+        "app.tsx",
+        r#"const motion = { div: "div" };
+const card = <motion.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&shadowed.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "local motion namespace should not fire: {:?}",
+        ids(&shadowed.findings)
+    );
+
+    // framer-motion keeps the previous behavior (same seconds semantics).
+    let legacy = analyze_source(
+        "app.tsx",
+        r#"import { motion } from "framer-motion";
+const card = <motion.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&legacy.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "framer-motion namespace should fire: {:?}",
+        ids(&legacy.findings)
+    );
+}
+
+#[test]
 fn non_motion_transition_objects_do_not_fire_motion_jsx_rules() {
     let analysis = analyze_source(
         "app.tsx",

@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
-    Argument, ArrayExpression, CallExpression, Expression, JSXAttributeName, JSXElementName,
-    JSXMemberExpressionObject, ObjectExpression, ObjectPropertyKind, PropertyKey,
+    Argument, ArrayExpression, CallExpression, Expression, IdentifierReference, JSXAttributeName,
+    JSXElementName, JSXMemberExpressionObject, ObjectExpression, ObjectPropertyKind, PropertyKey,
 };
 use oxc_parser::Parser;
 use oxc_semantic::{Semantic, SemanticBuilder};
@@ -653,7 +653,7 @@ fn jsx_attribute_belongs_to_motion(
             return false;
         }
         if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
-            return jsx_element_is_motion_member(&opening.name);
+            return jsx_element_is_motion_member(&opening.name, semantic);
         }
         current = parent_id;
     }
@@ -667,19 +667,70 @@ fn jsx_attribute_name<'a>(name: &'a JSXAttributeName<'a>) -> Option<&'a str> {
     }
 }
 
-fn jsx_element_is_motion_member(name: &JSXElementName<'_>) -> bool {
+fn jsx_element_is_motion_member(name: &JSXElementName<'_>, semantic: &Semantic<'_>) -> bool {
     let JSXElementName::MemberExpression(member) = name else {
         return false;
     };
-    jsx_member_root_name(&member.object) == Some("motion")
+    let Some(root) = jsx_member_root_reference(&member.object) else {
+        return false;
+    };
+    match motion_import_source(semantic, root) {
+        // Imported binding: only Motion-family modules count, under any local
+        // alias (`import { motion as m }` with `<m.div>`).
+        Some(source) => is_motion_module(source),
+        // Unresolved (global/UMD script): keep the legacy spelling behavior.
+        // A binding that resolves to a local declaration is an unrelated
+        // namespace that merely shares the name.
+        None => root.name.as_str() == "motion" && !resolves_to_symbol(semantic, root),
+    }
 }
 
-fn jsx_member_root_name<'a>(object: &'a JSXMemberExpressionObject<'a>) -> Option<&'a str> {
+/// Whether an import source provides the Motion JSX namespace.
+fn is_motion_module(source: &str) -> bool {
+    source == "motion" || source.starts_with("motion/") || source == "framer-motion"
+}
+
+/// The import source a JSX namespace identifier resolves to, if it resolves
+/// to an import binding at all.
+fn motion_import_source<'a>(
+    semantic: &'a Semantic<'a>,
+    identifier: &IdentifierReference<'_>,
+) -> Option<&'a str> {
+    use oxc_ast::AstKind;
+
+    let reference_id = identifier.reference_id.get()?;
+    let symbol_id = semantic
+        .scoping()
+        .get_reference(reference_id)
+        .symbol_id()?;
+    let declaration = semantic.scoping().symbol_declaration(symbol_id);
+    let parent_id = semantic.nodes().parent_id(declaration);
+    if parent_id == declaration {
+        return None;
+    }
+    match semantic.nodes().kind(parent_id) {
+        AstKind::ImportDeclaration(import) => Some(import.source.value.as_str()),
+        _ => None,
+    }
+}
+
+/// Whether a JSX namespace identifier resolves to any declared symbol.
+fn resolves_to_symbol(semantic: &Semantic<'_>, identifier: &IdentifierReference<'_>) -> bool {
+    identifier
+        .reference_id
+        .get()
+        .and_then(|reference_id| semantic.scoping().get_reference(reference_id).symbol_id())
+        .is_some()
+}
+
+fn jsx_member_root_reference<'a>(
+    object: &'a JSXMemberExpressionObject<'a>,
+) -> Option<&'a IdentifierReference<'a>> {
     match object {
-        JSXMemberExpressionObject::IdentifierReference(identifier) => {
-            Some(identifier.name.as_str())
+        JSXMemberExpressionObject::IdentifierReference(identifier) => Some(identifier),
+        JSXMemberExpressionObject::MemberExpression(member) => {
+            jsx_member_root_reference(&member.object)
         }
-        JSXMemberExpressionObject::MemberExpression(member) => jsx_member_root_name(&member.object),
         JSXMemberExpressionObject::ThisExpression(_) => None,
     }
 }
