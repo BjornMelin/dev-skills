@@ -1777,4 +1777,13 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         r#"import { gsap } from "gsap"; import { useGSAP } from "@gsap/react"; useGSAP(() => { setTimeout(() => { const mm = gsap.matchMedia(); mm.add("(min-width: 800px)", () => {}); }, 100); });"#,
     );
     assert!(fired(&deferred, ids::REACT_MATCHMEDIA_MISSING_REVERT));
+
+    // Lexical shadowing: a revert in one scope must not cover another
+    // scope's binding that merely shares the spelling.
+    let shadowed = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; function a() { const mm = gsap.matchMedia(); } function b() { const mm = gsap.matchMedia(); mm.revert(); }"#,
+    );
+    assert!(fired(&shadowed, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 }

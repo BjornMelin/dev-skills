@@ -129,9 +129,10 @@ struct FileFacts {
     has_jsx: bool,
     /// The file calls `gsap.matchMedia(...)`.
     match_media_calls: Vec<MatchMediaCall>,
-    /// Bindings on which `.revert()` is called, e.g. `mm` in `mm.revert()`.
-    /// Only the match-media binding's own revert covers its call site.
-    reverted_bindings: BTreeSet<String>,
+    /// `.revert()` call receivers, e.g. `mm` in `mm.revert()`. Compared by
+    /// resolved declaration, not spelling, so cleanup in one scope cannot
+    /// cover a shadowed binding in another.
+    reverted_bindings: Vec<RevertRef>,
 }
 
 /// One `gsap.matchMedia(...)` call site and the cleanup covering it, if any.
@@ -142,7 +143,29 @@ struct MatchMediaCall {
     /// match-media state automatically.
     inside_usegsap: bool,
     /// The `mm` in `const mm = gsap.matchMedia()`, when directly assigned.
-    binding: Option<String>,
+    binding: Option<MatchMediaBinding>,
+}
+
+/// A `gsap.matchMedia()` result binding with its resolved declaration, so a
+/// shadowing `mm` in another scope is never confused with this one.
+struct MatchMediaBinding {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+}
+
+/// One `.revert()` receiver with its resolved declaration, if any.
+struct RevertRef {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+}
+
+/// Whether a revert receiver covers a match-media binding: same resolved
+/// declaration wins; spelling matches only when either side is unresolvable.
+fn revert_covers_binding(revert: &RevertRef, binding: &MatchMediaBinding) -> bool {
+    match (revert.declaration, binding.declaration) {
+        (Some(from), Some(to)) => from == to,
+        _ => revert.name == binding.name,
+    }
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -267,9 +290,10 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                     && member.property.name.as_str() == "revert"
                     && let Expression::Identifier(object) = member.object.without_parentheses()
                 {
-                    facts
-                        .reverted_bindings
-                        .insert(object.name.as_str().to_string());
+                    facts.reverted_bindings.push(RevertRef {
+                        name: object.name.as_str().to_string(),
+                        declaration: reference_declaration(semantic, object),
+                    });
                 }
             }
             AstKind::VariableDeclarator(declarator) => {
@@ -1630,17 +1654,40 @@ fn call_inside_usegsap(
 /// The `mm` in `const mm = gsap.matchMedia()`, when the call result is
 /// directly assigned to a binding. Only that binding's own `.revert()` call
 /// proves cleanup; any other object's revert is unrelated.
-fn match_media_binding(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> Option<String> {
+fn match_media_binding(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<MatchMediaBinding> {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
     match nodes.kind(nodes.parent_id(node_id)) {
-        AstKind::VariableDeclarator(declarator) => declarator
-            .id
-            .get_binding_identifier()
-            .map(|identifier| identifier.name.as_str().to_string()),
+        AstKind::VariableDeclarator(declarator) => {
+            declarator
+                .id
+                .get_binding_identifier()
+                .map(|identifier| MatchMediaBinding {
+                    name: identifier.name.as_str().to_string(),
+                    declaration: identifier.symbol_id.get().map(|symbol| {
+                        semantic.scoping().symbol_declaration(symbol)
+                    }),
+                })
+        }
         _ => None,
     }
+}
+
+/// The declaration node an identifier reference resolves to, if any.
+fn reference_declaration(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> Option<oxc_semantic::NodeId> {
+    let reference_id = identifier.reference_id.get()?;
+    let symbol_id = semantic
+        .scoping()
+        .get_reference(reference_id)
+        .symbol_id()?;
+    Some(semantic.scoping().symbol_declaration(symbol_id))
 }
 
 fn function_is_event_handler(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
@@ -1948,10 +1995,12 @@ fn check_file_level(
 
     let match_media_leaks = facts.match_media_calls.iter().any(|call| {
         !call.inside_usegsap
-            && call
-                .binding
-                .as_ref()
-                .is_none_or(|binding| !facts.reverted_bindings.contains(binding))
+            && call.binding.as_ref().is_none_or(|binding| {
+                !facts
+                    .reverted_bindings
+                    .iter()
+                    .any(|revert| revert_covers_binding(revert, binding))
+            })
     });
     if match_media_leaks {
         let span = program.span;
