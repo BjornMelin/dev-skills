@@ -982,7 +982,7 @@ export function C() {
 export function C() {
   const sv = useSharedValue(1);
   const onPressIn = () => { sv.value = 0.97; };
-  return onPressIn;
+  return <Pressable onPressIn={onPressIn} />;
 }"#,
     );
     assert!(!fired(&raw, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));

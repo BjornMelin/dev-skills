@@ -579,7 +579,7 @@ where
             Severity::Medium,
             Confidence::High,
             call.span,
-            format!("`{name}` runs on every frame inside {context}."),
+            format!("`{name}` crosses to JS from {context}, which can run per frame."),
             "Throttle the bridge, or move per-frame work into the worklet and bridge only on end/state change.",
         );
     }
