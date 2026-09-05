@@ -278,6 +278,9 @@ python3 plugins/design-motion/scripts/install_agents.py --target project  # ./.c
 ```
 
 After installing inside an active Claude Code session, run `/reload-plugins`.
+
+For the Grok marketplace and Kimi plugin surfaces, see the
+[Grok and Kimi plugin install cookbook](docs/cookbooks/grok-kimi-plugin-install.md).
 See the [Claude Code motion plugin install cookbook](docs/cookbooks/claude-code-motion-plugins.md)
 for local development and validation commands.
 
