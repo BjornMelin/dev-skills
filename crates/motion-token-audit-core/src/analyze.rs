@@ -901,11 +901,7 @@ fn check_motion_react_object(
     }
 }
 
-fn count_js_token_references(
-    source: &str,
-    semantic: &Semantic<'_>,
-    coverage: &mut [Coverage],
-) {
+fn count_js_token_references(source: &str, semantic: &Semantic<'_>, coverage: &mut [Coverage]) {
     let shared_count = source.matches("motion.duration").count()
         + source.matches("motion.easing").count()
         + source.matches("motion.spring").count()

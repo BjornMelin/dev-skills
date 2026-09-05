@@ -151,11 +151,23 @@ mv "$TMP/SKILL.md.fixed" "$SKILL_DIR/SKILL.md"
 # --- Overlay 4: canonical CLI runner mapping ---------------------------------
 # Runs after the blind pass on purpose: the pass would corrupt the template's
 # own `npx shadcn@latest` (npm) entry back into a duplicate bunx line.
+# Anchored to the runner-guidance sentence: cli.md carries other IMPORTANT
+# admonitions (flags, dry-run preview, preset codes) that must survive.
 echo "==> Applying overlay: CLI runner mapping"
 awk -v impfile="$SCRIPT_DIR/cli-important.txt" '
   BEGIN { while ((getline line < impfile) > 0) imp[++nimp] = line }
-  /^> \*\*IMPORTANT:\*\*/ { for (i = 1; i <= nimp; i++) print imp[i]; next }
+  /^> \*\*IMPORTANT:\*\* Always run commands using the project.s package runner:/ {
+    for (i = 1; i <= nimp; i++) print imp[i]
+    replaced++
+    next
+  }
   { print }
+  END {
+    if (replaced != 1) {
+      print "FAIL: expected exactly 1 runner-guidance line, replaced " (replaced + 0) > "/dev/stderr"
+      exit 1
+    }
+  }
 ' "$SKILL_DIR/cli.md" > "$TMP/cli.md.overlaid"
 mv "$TMP/cli.md.overlaid" "$SKILL_DIR/cli.md"
 
@@ -165,9 +177,11 @@ fail=0
 # `grep` exits 1 on no-match, which `set -o pipefail` would turn into a script
 # abort, so both counts are guarded with `|| true`.
 bunx_count=$( { grep -ro 'bunx --bun shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | wc -l)
-# The canonical cli.md IMPORTANT template intentionally keeps one `npx`
+# The canonical cli.md runner-guidance line intentionally keeps one `npx`
 # entry (npm runner), alongside allowed-tools: in SKILL.md frontmatter.
-stray_npx=$( { grep -rn 'npx shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | { grep -v -e 'allowed-tools:' -e '^[^:]*:[0-9]*:> \*\*IMPORTANT' || true; } | wc -l)
+# Only these two exact lines are exempt; any other `npx shadcn@latest`
+# occurrence (including inside another IMPORTANT block) is stray.
+stray_npx=$( { grep -rn 'npx shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | { grep -v -e 'allowed-tools:' -e 'Always run commands using the project.s package runner:' || true; } | wc -l)
 
 [ "$bunx_count" -gt 0 ] || { echo "FAIL: no bunx runner found"; fail=1; }
 [ "$stray_npx" -eq 0 ] || { echo "FAIL: $stray_npx stray npx outside allowed-tools"; fail=1; }
