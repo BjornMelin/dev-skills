@@ -2022,7 +2022,45 @@ fn object_has_spread(object: &ObjectExpression<'_>) -> bool {
 }
 
 fn object_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
-    object_key_span(object, "willChange").or_else(|| object_key_span(object, "will-change"))
+    ["willChange", "will-change"]
+        .into_iter()
+        .find_map(|name| will_change_hint_span(object, name))
+}
+
+fn will_change_hint_span(object: &ObjectExpression<'_>, name: &str) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return None;
+        };
+        if property_key_name(&inner.key) != Some(name) {
+            return None;
+        }
+        will_change_value_is_hint(&inner.value).then_some(inner.span)
+    })
+}
+
+/// Whether a `will-change` vars value actually requests a compositor layer.
+/// Reset keywords (`auto` and the CSS-wide keywords) release the layer, so
+/// cleanup such as `gsap.set(el, { willChange: "auto" })` is not a finding.
+/// Non-literal values still fire: an undecidable value may hold a layer.
+fn will_change_value_is_hint(value: &Expression<'_>) -> bool {
+    let reset = |text: &str| {
+        matches!(
+            text.trim().to_ascii_lowercase().as_str(),
+            "auto" | "initial" | "inherit" | "unset" | "revert" | "revert-layer" | ""
+        )
+    };
+    match value.without_parentheses() {
+        Expression::StringLiteral(literal) => !reset(literal.value.as_str()),
+        Expression::TemplateLiteral(literal) if literal.expressions.is_empty() => {
+            literal
+                .quasis
+                .first()
+                .and_then(|quasi| quasi.value.cooked.as_ref())
+                .is_none_or(|cooked| !reset(cooked.as_str()))
+        }
+        _ => true,
+    }
 }
 
 fn timeline_defaults_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {

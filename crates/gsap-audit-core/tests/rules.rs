@@ -1696,6 +1696,14 @@ gsap.timeline({ defaults: { willChange: "transform" } });"#,
         r#"const style = { willChange: "transform" }; gsap.to(".box", { x: 10 });"#,
     );
     assert!(!fired(&clean, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+
+    // Reset values release the layer instead of holding it.
+    let cleanup = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.set(".box", { willChange: "auto" }); gsap.set(".other", { "will-change": "AUTO" });"#,
+    );
+    assert!(!fired(&cleanup, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
 }
 
 #[test]
