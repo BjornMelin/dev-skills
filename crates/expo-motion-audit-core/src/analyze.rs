@@ -1149,14 +1149,28 @@ fn function_binding_name(
 ) -> Option<String> {
     use oxc_ast::AstKind;
 
-    match nodes.kind(nodes.parent_id(function_id)) {
+    let parent_id = nodes.parent_id(function_id);
+    match nodes.kind(parent_id) {
         AstKind::VariableDeclarator(declarator) => declarator
             .id
             .get_binding_identifier()
             .map(|identifier| identifier.name.as_str().to_string()),
         AstKind::ObjectProperty(property) => property_key_name(&property.key).map(str::to_string),
+        // Transparent wrappers preserve the function identity, so the name
+        // lives on the declarator above the call: `const renderItem =
+        // useCallback(({ item }) => ...)` names the arrow `renderItem`.
+        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
+            function_binding_name(nodes, parent_id)
+        }
         _ => None,
     }
+}
+
+/// Whether a call preserves its function argument's identity for naming:
+/// `useCallback`, `memo`, and `forwardRef` return the function/component.
+fn callee_is_transparent_wrapper(call: &CallExpression<'_>) -> bool {
+    callee_identifier(call)
+        .is_some_and(|name| matches!(name, "useCallback" | "memo" | "forwardRef"))
 }
 
 fn enclosing_function_id(

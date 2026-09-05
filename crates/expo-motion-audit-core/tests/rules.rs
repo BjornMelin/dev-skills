@@ -1073,4 +1073,20 @@ export function List() { return <FlatList data={data} renderItem={renderItem} />
 export function Card() { return <Animated.View entering={FadeIn} />; }"#,
     );
     assert!(!fired(&clean, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
+
+    // Memoized render callback: the arrow is wrapped in useCallback, so its
+    // name lives on the declarator above the wrapper call.
+    let memoized = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import { useCallback } from "react";
+import { FlatList } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+const renderItem = useCallback(({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>, []);
+export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
+    );
+    assert!(fired(
+        &memoized,
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
+    ));
 }
