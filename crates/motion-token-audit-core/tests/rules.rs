@@ -328,6 +328,27 @@ const exit = <motion.div exit={{ opacity: 0, transition: { duration: 0.237 } }} 
 }
 
 #[test]
+fn motion_jsx_animation_targets_are_not_transition_options() {
+    // `duration` as an animation target inside `animate` is not timing and
+    // must not fire; the nested `transition` object still does.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const custom = <motion.custom animate={{ duration: 3 }} />;
+const timed = <motion.div animate={{ opacity: 1, transition: { duration: 0.2 } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
 fn non_motion_transition_objects_do_not_fire_motion_jsx_rules() {
     let analysis = analyze_source(
         "app.tsx",

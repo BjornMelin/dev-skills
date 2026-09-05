@@ -547,14 +547,9 @@ fn check_motion_jsx_object(
             coverage,
         ),
         "animate" | "exit" | "initial" => {
-            emit_motion_transition_literals(
-                object,
-                relative_path,
-                line_index,
-                tokens,
-                findings,
-                coverage,
-            );
+            // The outer object holds animation targets, not transition
+            // options: a target named `duration` or `ease` is not timing.
+            // Only the nested `transition` object carries timing options.
             if let Some(transition) = object_property_object(object, "transition") {
                 emit_motion_transition_literals(
                     transition,
