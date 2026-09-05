@@ -1085,8 +1085,5 @@ import Animated, { FadeIn } from "react-native-reanimated";
 const renderItem = useCallback(({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>, []);
 export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
     );
-    assert!(fired(
-        &memoized,
-        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
-    ));
+    assert!(fired(&memoized, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
 }

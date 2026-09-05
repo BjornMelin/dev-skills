@@ -1612,10 +1612,7 @@ fn call_inside_usegsap(
 /// The `mm` in `const mm = gsap.matchMedia()`, when the call result is
 /// directly assigned to a binding. Only that binding's own `.revert()` call
 /// proves cleanup; any other object's revert is unrelated.
-fn match_media_binding(
-    semantic: &Semantic<'_>,
-    node_id: oxc_semantic::NodeId,
-) -> Option<String> {
+fn match_media_binding(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> Option<String> {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
@@ -2052,13 +2049,11 @@ fn will_change_value_is_hint(value: &Expression<'_>) -> bool {
     };
     match value.without_parentheses() {
         Expression::StringLiteral(literal) => !reset(literal.value.as_str()),
-        Expression::TemplateLiteral(literal) if literal.expressions.is_empty() => {
-            literal
-                .quasis
-                .first()
-                .and_then(|quasi| quasi.value.cooked.as_ref())
-                .is_none_or(|cooked| !reset(cooked.as_str()))
-        }
+        Expression::TemplateLiteral(literal) if literal.expressions.is_empty() => literal
+            .quasis
+            .first()
+            .and_then(|quasi| quasi.value.cooked.as_ref())
+            .is_none_or(|cooked| !reset(cooked.as_str())),
         _ => true,
     }
 }

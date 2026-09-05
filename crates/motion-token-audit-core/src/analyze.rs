@@ -699,10 +699,7 @@ fn motion_import_source<'a>(
     use oxc_ast::AstKind;
 
     let reference_id = identifier.reference_id.get()?;
-    let symbol_id = semantic
-        .scoping()
-        .get_reference(reference_id)
-        .symbol_id()?;
+    let symbol_id = semantic.scoping().get_reference(reference_id).symbol_id()?;
     let declaration = semantic.scoping().symbol_declaration(symbol_id);
     let parent_id = semantic.nodes().parent_id(declaration);
     if parent_id == declaration {

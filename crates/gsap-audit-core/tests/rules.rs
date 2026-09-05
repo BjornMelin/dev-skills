@@ -1756,10 +1756,7 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         "tsx",
         r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); const ctx = gsap.context(() => {}); ctx.revert();"#,
     );
-    assert!(fired(
-        &foreign_revert,
-        ids::REACT_MATCHMEDIA_MISSING_REVERT
-    ));
+    assert!(fired(&foreign_revert, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 
     // matchMedia created inside the useGSAP callback is auto-cleaned.
     let inside_usegsap = analyze(
