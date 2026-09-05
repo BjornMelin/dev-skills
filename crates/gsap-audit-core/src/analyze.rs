@@ -125,11 +125,21 @@ struct FileFacts {
     /// The file imports React, making capitalized functions plausible components.
     has_react_import: bool,
     /// The file calls `gsap.matchMedia(...)`.
-    has_match_media_call: bool,
-    /// The file contains any `.revert(...)` cleanup call.
-    has_revert_call: bool,
-    /// The file calls `useGSAP(...)`, whose context handles cleanup automatically.
-    has_usegsap_call: bool,
+    match_media_calls: Vec<MatchMediaCall>,
+    /// Bindings on which `.revert()` is called, e.g. `mm` in `mm.revert()`.
+    /// Only the match-media binding's own revert covers its call site.
+    reverted_bindings: BTreeSet<String>,
+}
+
+/// One `gsap.matchMedia(...)` call site and the cleanup covering it, if any.
+/// A file-wide flag is wrong here: an unrelated `useGSAP(...)` elsewhere
+/// cannot clean up this call's match-media context.
+struct MatchMediaCall {
+    /// The call sits inside a `useGSAP(...)` callback, whose context reverts
+    /// match-media state automatically.
+    inside_usegsap: bool,
+    /// The `mm` in `const mm = gsap.matchMedia()`, when directly assigned.
+    binding: Option<String>,
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -239,17 +249,21 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 record_register(call, &mut facts);
                 if is_usegsap_call(call, &facts) {
                     facts.uses_gsap_surface = true;
-                    facts.has_usegsap_call = true;
                 }
                 if is_gsap_member_call(call, &facts, "matchMedia") {
-                    facts.has_match_media_call = true;
+                    facts.match_media_calls.push(MatchMediaCall {
+                        inside_usegsap: call_inside_usegsap(semantic, node.id(), &facts),
+                        binding: match_media_binding(semantic, node.id()),
+                    });
                 }
-                if matches!(
-                    call.callee.without_parentheses(),
-                    Expression::StaticMemberExpression(member)
-                        if member.property.name.as_str() == "revert"
-                ) {
-                    facts.has_revert_call = true;
+                if let Expression::StaticMemberExpression(member) =
+                    call.callee.without_parentheses()
+                    && member.property.name.as_str() == "revert"
+                    && let Expression::Identifier(object) = member.object.without_parentheses()
+                {
+                    facts
+                        .reverted_bindings
+                        .insert(object.name.as_str().to_string());
                 }
             }
             AstKind::VariableDeclarator(declarator) => {
@@ -1562,6 +1576,52 @@ fn function_is_hook_callback(
     false
 }
 
+/// Whether a `gsap.matchMedia(...)` call node sits inside a `useGSAP(...)`
+/// callback, whose context reverts match-media state on cleanup. Only
+/// ancestors count: a sibling `useGSAP(...)` elsewhere in the file cannot
+/// clean up this call.
+fn call_inside_usegsap(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if let AstKind::CallExpression(call) = nodes.kind(parent_id)
+            && is_usegsap_call(call, facts)
+        {
+            return true;
+        }
+        current = parent_id;
+    }
+}
+
+/// The `mm` in `const mm = gsap.matchMedia()`, when the call result is
+/// directly assigned to a binding. Only that binding's own `.revert()` call
+/// proves cleanup; any other object's revert is unrelated.
+fn match_media_binding(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    match nodes.kind(nodes.parent_id(node_id)) {
+        AstKind::VariableDeclarator(declarator) => declarator
+            .id
+            .get_binding_identifier()
+            .map(|identifier| identifier.name.as_str().to_string()),
+        _ => None,
+    }
+}
+
 fn function_is_event_handler(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
     use oxc_ast::AstKind;
 
@@ -1865,7 +1925,14 @@ fn check_file_level(
         });
     }
 
-    if facts.has_match_media_call && !facts.has_revert_call && !facts.has_usegsap_call {
+    let match_media_leaks = facts.match_media_calls.iter().any(|call| {
+        !call.inside_usegsap
+            && call
+                .binding
+                .as_ref()
+                .is_none_or(|binding| !facts.reverted_bindings.contains(binding))
+    });
+    if match_media_leaks {
         let span = program.span;
         let (line, column) = line_index.line_col(span.start);
         findings.push(Finding {

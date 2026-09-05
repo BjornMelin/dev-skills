@@ -1718,4 +1718,37 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); useEffect(() => () => mm.revert(), []);"#,
     );
     assert!(!fired(&clean, ids::REACT_MATCHMEDIA_MISSING_REVERT));
+
+    // An unrelated useGSAP call elsewhere cannot clean up this context.
+    let sibling_usegsap = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; import { useGSAP } from "@gsap/react"; const mm = gsap.matchMedia(); useGSAP(() => { gsap.to(".x", { x: 1 }); });"#,
+    );
+    assert!(fired(
+        &sibling_usegsap,
+        ids::REACT_MATCHMEDIA_MISSING_REVERT
+    ));
+
+    // A revert on any other object is not cleanup for this binding.
+    let foreign_revert = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); const ctx = gsap.context(() => {}); ctx.revert();"#,
+    );
+    assert!(fired(
+        &foreign_revert,
+        ids::REACT_MATCHMEDIA_MISSING_REVERT
+    ));
+
+    // matchMedia created inside the useGSAP callback is auto-cleaned.
+    let inside_usegsap = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; import { useGSAP } from "@gsap/react"; useGSAP(() => { const mm = gsap.matchMedia(); mm.add("(min-width: 800px)", () => {}); });"#,
+    );
+    assert!(!fired(
+        &inside_usegsap,
+        ids::REACT_MATCHMEDIA_MISSING_REVERT
+    ));
 }
