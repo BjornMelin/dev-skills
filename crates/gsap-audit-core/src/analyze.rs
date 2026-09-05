@@ -1582,9 +1582,12 @@ fn function_is_hook_callback(
     false
 }
 
-/// Whether a `gsap.matchMedia(...)` call node sits inside a `useGSAP(...)`
-/// callback, whose context reverts match-media state on cleanup. Only
-/// ancestors count: a sibling `useGSAP(...)` elsewhere in the file cannot
+/// Whether a `gsap.matchMedia(...)` call node executes while a `useGSAP(...)`
+/// context is active: its nearest enclosing function must be passed directly
+/// as a `useGSAP(...)` argument. Lexical nesting alone is not enough: a call
+/// inside a deferred callback (`setTimeout(() => gsap.matchMedia())`) runs
+/// after the `useGSAP` callback returns, so the context never registers it.
+/// Only ancestors count: a sibling `useGSAP(...)` elsewhere in the file cannot
 /// clean up this call.
 fn call_inside_usegsap(
     semantic: &Semantic<'_>,
@@ -1594,19 +1597,34 @@ fn call_inside_usegsap(
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
+    // Nearest enclosing function: crossing it means deferred execution.
     let mut current = node_id;
-    loop {
+    let function_id = loop {
         let parent_id = nodes.parent_id(current);
         if parent_id == current {
             return false;
         }
-        if let AstKind::CallExpression(call) = nodes.kind(parent_id)
-            && is_usegsap_call(call, facts)
-        {
-            return true;
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            break parent_id;
         }
         current = parent_id;
+    };
+    // Covered only when that function is a direct `useGSAP(...)` argument.
+    // (A `useGSAP` callee is always an identifier, so a function parented
+    // directly under the call can only sit in argument position.)
+    let call_id = nodes.parent_id(function_id);
+    if call_id == function_id {
+        return false;
     }
+    if let AstKind::CallExpression(call) = nodes.kind(call_id)
+        && is_usegsap_call(call, facts)
+    {
+        return true;
+    }
+    false
 }
 
 /// The `mm` in `const mm = gsap.matchMedia()`, when the call result is

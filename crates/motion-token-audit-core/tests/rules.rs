@@ -304,6 +304,25 @@ fn tailwind_invalid_arbitrary_class_does_not_swallow_later_ones() {
 }
 
 #[test]
+fn tailwind_unclosed_arbitrary_class_does_not_swallow_later_ones() {
+    // The unclosed first class must not consume the valid second one.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-[200 duration-[300ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("300ms"));
+}
+
+#[test]
 fn tailwind_named_motion_classes_do_not_fire_arbitrary_value_rules() {
     let analysis = analyze_source(
         "app.tsx",

@@ -1768,4 +1768,13 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         &inside_usegsap,
         ids::REACT_MATCHMEDIA_MISSING_REVERT
     ));
+
+    // Deferred creation runs after the useGSAP callback returns, so the
+    // context never registers it: still a leak without mm.revert().
+    let deferred = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; import { useGSAP } from "@gsap/react"; useGSAP(() => { setTimeout(() => { const mm = gsap.matchMedia(); mm.add("(min-width: 800px)", () => {}); }, 100); });"#,
+    );
+    assert!(fired(&deferred, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 }

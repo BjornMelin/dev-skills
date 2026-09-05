@@ -812,8 +812,12 @@ fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)
             && let Ok(value) = number.parse::<u32>()
         {
             out.push((start, value, literal[start..raw_end].to_string()));
+            start_at = raw_end;
+        } else {
+            // Rejected (e.g. an unclosed class): resume after this prefix so
+            // a later valid class is still scanned.
+            start_at = start + prefix.len();
         }
-        start_at = raw_end;
     }
     out
 }
@@ -834,8 +838,11 @@ fn tailwind_easing_literals(literal: &str) -> Vec<(usize, Bezier, String)> {
         let raw_end = bezier_start + bracket + 1;
         if let Some(bezier) = parse_cubic_bezier(&rest[..bracket]) {
             out.push((start, bezier, literal[start..raw_end].to_string()));
+            start_at = raw_end;
+        } else {
+            // Rejected value: resume after this prefix like above.
+            start_at = start + prefix.len();
         }
-        start_at = raw_end;
     }
     out
 }
