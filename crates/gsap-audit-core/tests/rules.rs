@@ -1666,6 +1666,18 @@ export function Card() {
 }"#,
     );
     assert!(!fired(&clean, ids::REACT_TWEEN_IN_RENDER));
+
+    // Automatic JSX runtime: no React import, but JSX marks the component.
+    let automatic_runtime = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export function Card() {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+}"#,
+    );
+    assert!(fired(&automatic_runtime, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]

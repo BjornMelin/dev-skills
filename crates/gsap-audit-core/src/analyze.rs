@@ -124,6 +124,9 @@ struct FileFacts {
     dev_only_aliases: BTreeMap<String, String>,
     /// The file imports React, making capitalized functions plausible components.
     has_react_import: bool,
+    /// The file contains JSX, which marks component files under the automatic
+    /// JSX runtime even without an explicit React import.
+    has_jsx: bool,
     /// The file calls `gsap.matchMedia(...)`.
     match_media_calls: Vec<MatchMediaCall>,
     /// Bindings on which `.revert()` is called, e.g. `mm` in `mm.revert()`.
@@ -235,6 +238,9 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             }
             AstKind::ImportExpression(import) => {
                 record_configured_gsap_dynamic_import(import, semantic, node.id(), &mut facts);
+            }
+            AstKind::JSXElement(_) | AstKind::JSXFragment(_) => {
+                facts.has_jsx = true;
             }
             AstKind::IdentifierReference(identifier)
                 if plugin_name_for_identifier(identifier.name.as_str(), &facts).is_some()
@@ -1416,7 +1422,7 @@ fn check_tween_in_render<F>(
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
-    if !facts.has_react_import {
+    if !facts.has_react_import && !facts.has_jsx {
         return;
     }
     let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
