@@ -1,6 +1,6 @@
 ---
 name: opensrc
-description: "Inspect package/upstream source with opensrc: internals, exact paths, version diffs, and upgrade audits across npm, PyPI, crates, and Git repos; not general web search."
+description: "Inspect package/upstream source with opensrc: internals, exact paths, version diffs, and upgrade audits for npm, PyPI, crates, and Git; not general web."
 allowed-tools: Bash(opensrc:*)
 ---
 
