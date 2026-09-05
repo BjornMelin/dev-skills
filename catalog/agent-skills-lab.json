@@ -2,7 +2,7 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "2969ce6759b495ac5ba2111c45ca818d04a5d111",
+  "sourceCommit": "c9575fb5d161cbef467d128aeb81a9431a346857",
   "sourceRef": "main",
   "skillsCount": 78,
   "totalSkillDirectories": 78,
@@ -1771,7 +1771,7 @@
     {
       "name": "grill-me",
       "slug": "grill-me",
-      "description": "Relentless plan/design interview until shared understanding; resolve each decision branch. Use for explicit “grill me” requests.",
+      "description": "Relentless plan/design interview until shared understanding; resolve each decision branch. Use for “grill me”, grilling, and stress-test requests.",
       "path": "skills/grill-me",
       "skillMdPath": "skills/grill-me/SKILL.md",
       "sourceUrls": {
