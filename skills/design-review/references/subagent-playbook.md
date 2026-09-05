@@ -10,7 +10,9 @@ verdict.
 Use the host's native read-only agent mechanism:
 
 - Claude Code may load project roles from `.claude/agents`.
-- Codex may load roles from `.codex/agents`.
+- Codex may load roles from `.codex/agents`, but route spawning through
+  `skills/subspawn`, using `skills/subspawn/scripts/subspawn_plan.py` for
+  nontrivial multi-lane batches.
 - OpenCode may use task subagents with lane-specific prompts.
 
 Role files are optional. The durable pattern is: bounded scope, non-mutating
