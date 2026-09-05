@@ -410,7 +410,7 @@ fn check_call<'a, F>(
     check_missing_worklet(call, semantic, facts, emit);
 
     // Rule 5: bridge call inside a gesture hot-path callback.
-    check_bridge_in_hot_path(call, semantic, emit);
+    check_bridge_in_hot_path(call, semantic, facts, emit);
 
     // Rule 7: withRepeat(anim, -1, ...) in a file with no reduced-motion ref.
     check_infinite_repeat(call, facts, emit);
@@ -556,8 +556,12 @@ fn check_value_access_on_js<'a, F>(
 
 /// Rule 5: a JS-bridge call (`scheduleOnRN`/`runOnJS`) inside a gesture
 /// `onUpdate`/`onChange` (a per-frame hot path).
-fn check_bridge_in_hot_path<'a, F>(call: &CallExpression<'a>, semantic: &Semantic<'a>, emit: &mut F)
-where
+fn check_bridge_in_hot_path<'a, F>(
+    call: &CallExpression<'a>,
+    semantic: &Semantic<'a>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     let Some(name) = callee_identifier(call) else {
@@ -573,7 +577,7 @@ where
     ) else {
         return;
     };
-    if let Some(context) = enclosing_hot_path_context(semantic, call_node_id) {
+    if let Some(context) = enclosing_hot_path_context(semantic, call_node_id, facts) {
         emit(
             ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH,
             Severity::Medium,
@@ -683,6 +687,7 @@ fn check_layout_animation_in_list<F>(
         return;
     };
     if !matches!(name, "entering" | "exiting" | "layout")
+        || !jsx_attribute_is_reanimated_layout_prop(node_id, semantic, facts)
         || !function_is_used_as_render_item(semantic, node_id, facts)
             && !enclosing_function_name(semantic, node_id)
                 .is_some_and(|name| facts.list_cell_components.contains(&name))
@@ -1389,6 +1394,7 @@ fn is_item_or_row_component(name: &str) -> bool {
 fn enclosing_hot_path_context(
     semantic: &Semantic<'_>,
     node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
 ) -> Option<&'static str> {
     use oxc_ast::AstKind;
 
@@ -1405,7 +1411,7 @@ fn enclosing_hot_path_context(
                 passed_through_function = true;
             }
             AstKind::CallExpression(call) if passed_through_function => {
-                if callee_identifier(call) == Some("useAnimatedReaction") {
+                if callee_is_reanimated_hook(call, "useAnimatedReaction", facts) {
                     return Some("a useAnimatedReaction callback");
                 }
                 if let Expression::StaticMemberExpression(member) =
@@ -1419,6 +1425,23 @@ fn enclosing_hot_path_context(
         }
         current = parent_id;
     }
+}
+
+/// Whether a call's callee is a Reanimated hook, resolving import aliases:
+/// `import { useAnimatedReaction as useReaction }` still counts when the
+/// canonical name is requested. Falls back to spelling for unimported calls.
+fn callee_is_reanimated_hook(
+    call: &CallExpression<'_>,
+    canonical: &str,
+    facts: &FileFacts,
+) -> bool {
+    callee_identifier(call).is_some_and(|name| {
+        facts
+            .reanimated_imports
+            .get(name)
+            .is_some_and(|imported| imported == canonical)
+            || (!facts.reanimated_imports.contains_key(name) && name == canonical)
+    })
 }
 
 /// Find a node id whose kind matches a predicate and whose span equals `span`.

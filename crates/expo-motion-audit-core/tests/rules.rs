@@ -331,6 +331,15 @@ fn rule_bridge_in_hot_path_fires_and_outside_does_not() {
 });",
     );
     assert!(!fired(&clean, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+
+    // Aliased hook import resolves to the same hot path.
+    let aliased = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction as useReaction } from "react-native-reanimated";
+useReaction(() => prepared.value, (current) => { scheduleOnRN(setX, current); });"#,
+    );
+    assert!(fired(&aliased, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
 }
 
 // ---------------------------------------------------------------------------
@@ -1100,6 +1109,19 @@ export function List() { return <Animated.FlatList data={data} renderItem={({ it
     );
     assert!(fired(
         &animated_list,
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
+    ));
+
+    // Ordinary component prop sharing the name is not a layout animation.
+    let custom_prop = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import { FlatList } from "react-native";
+const renderItem = ({ item }) => <Row layout="compact">{item.name}</Row>;
+export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
+    );
+    assert!(!fired(
+        &custom_prop,
         ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
     ));
 
