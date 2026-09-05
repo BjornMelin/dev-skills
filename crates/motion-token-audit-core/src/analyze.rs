@@ -227,7 +227,7 @@ pub fn analyze_source(
     let line_index = LineIndex::new(source);
     let mut findings = Vec::new();
     let mut coverage = empty_coverage();
-    count_js_token_references(source, &mut coverage);
+    count_js_token_references(source, &semantic, &mut coverage);
 
     for node in semantic.nodes() {
         match node.kind() {
@@ -901,19 +901,39 @@ fn check_motion_react_object(
     }
 }
 
-fn count_js_token_references(source: &str, coverage: &mut [Coverage]) {
+fn count_js_token_references(
+    source: &str,
+    semantic: &Semantic<'_>,
+    coverage: &mut [Coverage],
+) {
     let shared_count = source.matches("motion.duration").count()
         + source.matches("motion.easing").count()
         + source.matches("motion.spring").count()
         + source.matches("motionTokens.").count();
-    for category in js_stack_categories(source) {
+    for category in js_stack_categories(source, has_motion_jsx(semantic)) {
         coverage_for(category, coverage).tokenized_references += shared_count;
     }
     coverage_for(Category::TokensReanimated, coverage).tokenized_references +=
         source.matches("reanimatedMotion.").count();
 }
 
-fn js_stack_categories(source: &str) -> Vec<Category> {
+/// Whether the file renders Motion JSX under any namespace spelling,
+/// including import aliases (`import { motion as m }` with `<m.div>`).
+/// Coverage classification must follow the resolved binding like the JSX
+/// rule does, not the literal `<motion.` text.
+fn has_motion_jsx(semantic: &Semantic<'_>) -> bool {
+    use oxc_ast::AstKind;
+
+    semantic.nodes().iter().any(|node| {
+        if let AstKind::JSXOpeningElement(opening) = node.kind() {
+            jsx_element_is_motion_member(&opening.name, semantic)
+        } else {
+            false
+        }
+    })
+}
+
+fn js_stack_categories(source: &str, motion_jsx: bool) -> Vec<Category> {
     let mut categories = Vec::new();
     if source.contains("withTiming")
         || source.contains("withDelay")
@@ -926,7 +946,7 @@ fn js_stack_categories(source: &str) -> Vec<Category> {
     if source.contains("gsap.") {
         categories.push(Category::TokensGsap);
     }
-    if source.contains("<motion.") {
+    if source.contains("<motion.") || motion_jsx {
         categories.push(Category::TokensMotion);
     } else if source.contains("transition") {
         categories.push(Category::TokensReact);

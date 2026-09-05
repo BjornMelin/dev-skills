@@ -432,6 +432,30 @@ const card = <motion.div transition={{ duration: 0.2 }} />;"#,
 }
 
 #[test]
+fn aliased_motion_jsx_credits_tokens_motion_coverage() {
+    // `motionTokens.*` references alongside aliased `<m.div>` JSX belong to
+    // the motion stack, not tokens-react, even with a `transition` prop.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"import { motion as m } from "motion/react";
+const style = { duration: motionTokens.fast };
+const card = <m.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let refs = |stack: &str| {
+        analysis
+            .coverage
+            .iter()
+            .find(|entry| entry.stack == stack)
+            .map_or(0, |entry| entry.tokenized_references)
+    };
+    assert_eq!(refs("motion"), 1);
+    assert_eq!(refs("react"), 0);
+}
+
+#[test]
 fn non_motion_transition_objects_do_not_fire_motion_jsx_rules() {
     let analysis = analyze_source(
         "app.tsx",
