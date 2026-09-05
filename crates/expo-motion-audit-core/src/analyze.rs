@@ -1122,8 +1122,8 @@ fn function_is_default_exported(
             AstKind::ExportDefaultDeclaration(_) => return true,
             // `export default memo(() => {})`-style wrappers are not a bare
             // default export; only direct position counts.
-            AstKind::CallExpression(_) => return false,
-            AstKind::VariableDeclarator(_)
+            AstKind::CallExpression(_)
+            | AstKind::VariableDeclarator(_)
             | AstKind::Function(_)
             | AstKind::ArrowFunctionExpression(_) => return false,
             _ => current = parent_id,
