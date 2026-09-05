@@ -2,10 +2,10 @@
   "schemaVersion": "agent_skills_lab_catalog.v1",
   "generatedAt": "2026-08-05T02:04:56.917791793Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "c9575fb5d161cbef467d128aeb81a9431a346857",
+  "sourceCommit": "9756a3517c75af906de53e72f9323a86800ed4ec",
   "sourceRef": "main",
-  "skillsCount": 78,
-  "totalSkillDirectories": 78,
+  "skillsCount": 82,
+  "totalSkillDirectories": 82,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -1427,6 +1427,54 @@
       }
     },
     {
+      "name": "design-review",
+      "slug": "design-review",
+      "description": "Adversarial design, frontend, and motion review for web or mobile branches. Use to inspect a dirty UI worktree, prove behavior in a real browser or device, measure motion, performance, and accessibility, and implement one canonical end state.",
+      "license": "MIT",
+      "path": "skills/design-review",
+      "skillMdPath": "skills/design-review/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/design-review",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/design-review/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill design-review -g -a codex -y && npx skills add BjornMelin/dev-skills --skill better-interface -g -a codex -y && npx skills add BjornMelin/dev-skills --skill design-motion-audit -g -a codex -y && npx skills add BjornMelin/dev-skills --skill improve-ui -g -a codex -y && npx skills add BjornMelin/dev-skills --skill wcag-audit-patterns -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill design-review -a codex && npx skills add BjornMelin/dev-skills --skill better-interface -a codex && npx skills add BjornMelin/dev-skills --skill design-motion-audit -a codex && npx skills add BjornMelin/dev-skills --skill improve-ui -a codex && npx skills add BjornMelin/dev-skills --skill wcag-audit-patterns -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill design-review && npx skills add BjornMelin/dev-skills --agent '*' --skill better-interface && npx skills add BjornMelin/dev-skills --agent '*' --skill design-motion-audit && npx skills add BjornMelin/dev-skills --agent '*' --skill improve-ui && npx skills add BjornMelin/dev-skills --agent '*' --skill wcag-audit-patterns"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 2
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/design-review.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
       "name": "dmc-best-practices",
       "slug": "dmc-best-practices",
       "description": "Dash Mantine Components (DMC) best practices and performance optimization guidelines.\nUse this skill when writing, reviewing, or refactoring Dash apps with DMC to ensure\noptimal patterns. Triggers on: DMC components, Mantine styling, Dash callbacks,\ndcc.Store, theming, or performance optimization in Plotly Dash applications.",
@@ -1667,6 +1715,54 @@
       },
       "package": {
         "path": "skills/dist/expo-motion.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "finalize-branch",
+      "slug": "finalize-branch",
+      "description": "Pre-merge branch and PR closeout. Use to identify and implement follow-up work, hard cuts, dependency-native simplification, validation coverage, docs alignment, and merge-readiness fixes.",
+      "license": "MIT",
+      "path": "skills/finalize-branch",
+      "skillMdPath": "skills/finalize-branch/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/finalize-branch",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/finalize-branch/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill finalize-branch -g -a codex -y && npx skills add BjornMelin/dev-skills --skill autoreview -g -a codex -y && npx skills add BjornMelin/dev-skills --skill repo-modernizer -g -a codex -y && npx skills add BjornMelin/dev-skills --skill repo-docs-align -g -a codex -y && npx skills add BjornMelin/dev-skills --skill qa-router -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill finalize-branch -a codex && npx skills add BjornMelin/dev-skills --skill autoreview -a codex && npx skills add BjornMelin/dev-skills --skill repo-modernizer -a codex && npx skills add BjornMelin/dev-skills --skill repo-docs-align -a codex && npx skills add BjornMelin/dev-skills --skill qa-router -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill finalize-branch && npx skills add BjornMelin/dev-skills --agent '*' --skill autoreview && npx skills add BjornMelin/dev-skills --agent '*' --skill repo-modernizer && npx skills add BjornMelin/dev-skills --agent '*' --skill repo-docs-align && npx skills add BjornMelin/dev-skills --agent '*' --skill qa-router"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 2
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/finalize-branch.skill",
         "present": false,
         "rejected": false
       }
@@ -2451,6 +2547,54 @@
       }
     },
     {
+      "name": "qa-router",
+      "slug": "qa-router",
+      "description": "Validation routing and test-failure triage for any repository. Use to select the right gates, author deterministic tests, reproduce CI failures, or diagnose flaky suites.",
+      "license": "MIT",
+      "path": "skills/qa-router",
+      "skillMdPath": "skills/qa-router/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/qa-router",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/qa-router/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill qa-router -g -a codex -y && npx skills add BjornMelin/dev-skills --skill vitest-dev -g -a codex -y && npx skills add BjornMelin/dev-skills --skill pytest-dev -g -a codex -y && npx skills add BjornMelin/dev-skills --skill bun-dev -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill qa-router -a codex && npx skills add BjornMelin/dev-skills --skill vitest-dev -a codex && npx skills add BjornMelin/dev-skills --skill pytest-dev -a codex && npx skills add BjornMelin/dev-skills --skill bun-dev -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill qa-router && npx skills add BjornMelin/dev-skills --agent '*' --skill vitest-dev && npx skills add BjornMelin/dev-skills --agent '*' --skill pytest-dev && npx skills add BjornMelin/dev-skills --agent '*' --skill bun-dev"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_references",
+        "has_agents"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_scripts"
+      ],
+      "resources": {
+        "references": 2,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 1,
+        "total": 3
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/qa-router.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
       "name": "r3f-scene-polish",
       "slug": "r3f-scene-polish",
       "description": "Art-directs an existing three.js or React Three Fiber scene to cinematic quality with postprocessing, HDRI and PBR lighting, contact shadows, transmission materials, and camera choreography. Use for look-development once the scene renders, not for scene setup or lifecycle.",
@@ -3045,6 +3189,56 @@
       },
       "package": {
         "path": "skills/dist/sentry-cli-fix-issues.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "shadcn",
+      "slug": "shadcn",
+      "description": "Manage shadcn/ui components: add, search, fix, style and compose, with registry and component docs. Applies to any project with a components.json. Triggers on \\\"shadcn init\\\" or a --preset code.",
+      "path": "skills/shadcn",
+      "skillMdPath": "skills/shadcn/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/shadcn",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/shadcn/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill shadcn -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill shadcn -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill shadcn"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Resource-rich",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "has_scripts",
+        "has_assets",
+        "has_agents",
+        "resource_rich"
+      ],
+      "improvementSignals": [
+        "missing_docs_index_exposure",
+        "missing_dist_package",
+        "missing_references"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 3,
+        "assets": 2,
+        "templates": 0,
+        "agents": 1,
+        "total": 6
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": false
+      },
+      "package": {
+        "path": "skills/dist/shadcn.skill",
         "present": false,
         "rejected": false
       }
