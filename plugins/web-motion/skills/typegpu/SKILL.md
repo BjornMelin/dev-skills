@@ -29,10 +29,9 @@ target repo's installed package versions before editing.
 
 - Do not trigger for raw WebGPU without TypeGPU imports.
 - Use [`web-three-r3f`](../web-three-r3f/SKILL.md) for Three/R3F scenes.
-- Use [`expo-motion`](../../../../skills/expo-motion/SKILL.md) for React Native GPU surfaces.
-- Use [`motion`](../../../../skills/motion/SKILL.md) for general Motion/CSS API work and
-  [`design-motion-audit`](../../../design-motion/skills/design-motion-audit/SKILL.md) for
-  cross-stack motion audits.
+- For React Native GPU surfaces, general Motion/CSS API work, or cross-stack
+  motion audits, prefer `expo-motion`, `motion`, or `design-motion-audit` when
+  installed; otherwise proceed with the guidance here.
 
 ## Workflow
 

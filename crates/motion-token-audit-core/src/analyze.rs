@@ -283,15 +283,21 @@ pub fn analyze_source(
                 );
             }
             oxc_ast::AstKind::TemplateLiteral(template) => {
-                check_tailwind_literal(
-                    template.span,
-                    source,
-                    relative_path,
-                    &line_index,
-                    tokens,
-                    &mut findings,
-                    &mut coverage,
-                );
+                // Scan only the static quasis: the full template span
+                // overlaps StringLiteral visits for embedded expressions
+                // (e.g. `${cond ? "duration-[200ms]" : ""}`), which would
+                // double findings and coverage counts.
+                for quasi in &template.quasis {
+                    check_tailwind_literal(
+                        quasi.span,
+                        source,
+                        relative_path,
+                        &line_index,
+                        tokens,
+                        &mut findings,
+                        &mut coverage,
+                    );
+                }
             }
             _ => {}
         }

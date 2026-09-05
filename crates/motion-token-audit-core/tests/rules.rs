@@ -255,6 +255,25 @@ fn doctor_catalog_lists_every_rule() {
 }
 
 #[test]
+fn tailwind_template_expression_strings_are_not_double_counted() {
+    // The string inside the expression gets its own StringLiteral visit;
+    // the template scan must cover only the static quasis.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const dynamic = `${active ? "duration-[200ms]" : ""}`;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+}
+
+#[test]
 fn tailwind_arbitrary_motion_values_classify_drift_and_orphan() {
     let analysis = analyze_source(
         "app.tsx",
