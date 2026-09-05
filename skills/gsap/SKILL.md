@@ -159,7 +159,7 @@ useGSAP(() => {
 ## Optional power tool: `gsap-audit` CLI
 
 This repo ships a Rust CLI, `gsap-audit`, that statically audits GSAP usage in JS/TS/JSX/TSX.
-The [rule catalog](../../crates/gsap-audit-core/src/rules.rs) is authoritative; `doctor` shows the
+The rule catalog at `crates/gsap-audit-core/src/rules.rs` is authoritative; `doctor` shows the
 exact installed build. It is optional. If it is not installed, proceed with the guidance above.
 
 | Rule ID | Lead |

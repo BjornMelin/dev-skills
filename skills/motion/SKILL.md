@@ -39,7 +39,7 @@ either way; a static list of what is installed rots the moment the estate change
 
 ## Modern React
 
-[`web-motion-react`](../../plugins/web-motion/skills/web-motion-react/SKILL.md) is the
+`web-motion-react` (`plugins/web-motion/skills/web-motion-react/SKILL.md`) is the
 canonical owner for Motion React API detail. Use `MotionConfig reducedMotion="user"` for
 subtree policy and `useReducedMotion()` for local branches. Start with `motion/react`; when a
 measured bundle budget needs it, pair `LazyMotion` with `m` from `motion/react-m`:

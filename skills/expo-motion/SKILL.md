@@ -137,7 +137,7 @@ large virtualized lists need a static/reduced-motion branch.
 
 This repo ships a Rust CLI, `expo-motion-audit`, that statically audits Expo/RN motion
 source and config. It does not check package compatibility; keep that target-manifest concern
-with the install gate above. The [rule catalog](../../crates/expo-motion-audit-core/src/rules.rs)
+with the install gate above. The rule catalog at `crates/expo-motion-audit-core/src/rules.rs`
 is authoritative. Use the exact IDs below in reports and baselines; abbreviated descriptions are
 not CLI IDs. Optional. If it is not installed, proceed with the guidance above.
 
