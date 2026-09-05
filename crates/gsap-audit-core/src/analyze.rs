@@ -1355,7 +1355,7 @@ fn check_call<'a, F>(
             }
         }
 
-        check_nested_timeline_scrolltrigger(call, method, emit);
+        check_nested_timeline_scrolltrigger(call, method, facts, emit);
         check_missing_overwrite(call, node_id, method, semantic, facts, emit);
     }
     if let Some(vars) = gsap_timeline_vars_object(call, facts) {
@@ -1404,19 +1404,29 @@ fn check_call<'a, F>(
 }
 
 /// ScrollTrigger belongs on a timeline itself, not on a child tween in a
-/// fluent chain. A call-expression receiver is the precise signal for the
-/// chained form (`tl.from(...).to(...)` or `gsap.timeline().to(...)`).
-fn check_nested_timeline_scrolltrigger<F>(call: &CallExpression<'_>, method: &str, emit: &mut F)
-where
+/// fluent chain or on a stored timeline handle. A call-expression receiver is
+/// the precise signal for the chained form (`tl.from(...).to(...)` or
+/// `gsap.timeline().to(...)`); an identifier receiver counts when it resolves
+/// to a recorded `gsap.timeline(...)` handle (`const tl = gsap.timeline()`).
+fn check_nested_timeline_scrolltrigger<F>(
+    call: &CallExpression<'_>,
+    method: &str,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return;
     };
-    if !matches!(
-        member.object.without_parentheses(),
-        Expression::CallExpression(_)
-    ) {
+    let receiver_is_timeline = match member.object.without_parentheses() {
+        Expression::CallExpression(_) => true,
+        Expression::Identifier(identifier) => {
+            facts.timeline_handles.contains(identifier.name.as_str())
+        }
+        _ => false,
+    };
+    if !receiver_is_timeline {
         return;
     }
     for vars in tween_vars_objects(call, method) {
@@ -1668,9 +1678,10 @@ fn match_media_binding(
                 .get_binding_identifier()
                 .map(|identifier| MatchMediaBinding {
                     name: identifier.name.as_str().to_string(),
-                    declaration: identifier.symbol_id.get().map(|symbol| {
-                        semantic.scoping().symbol_declaration(symbol)
-                    }),
+                    declaration: identifier
+                        .symbol_id
+                        .get()
+                        .map(|symbol| semantic.scoping().symbol_declaration(symbol)),
                 })
         }
         _ => None,
@@ -1683,10 +1694,7 @@ fn reference_declaration(
     identifier: &oxc_ast::ast::IdentifierReference<'_>,
 ) -> Option<oxc_semantic::NodeId> {
     let reference_id = identifier.reference_id.get()?;
-    let symbol_id = semantic
-        .scoping()
-        .get_reference(reference_id)
-        .symbol_id()?;
+    let symbol_id = semantic.scoping().get_reference(reference_id).symbol_id()?;
     Some(semantic.scoping().symbol_declaration(symbol_id))
 }
 

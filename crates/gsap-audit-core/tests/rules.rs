@@ -1639,6 +1639,14 @@ fn rule_nested_timeline_child_scrolltrigger_fires_and_top_level_tween_does_not()
         r#"gsap.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 });"#,
     );
     assert!(!fired(&clean, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
+
+    // Stored timeline handle: still a child tween, still misplaced.
+    let stored = analyze(
+        "src/timeline.ts",
+        "ts",
+        r#"import { gsap } from "gsap"; const tl = gsap.timeline(); tl.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 });"#,
+    );
+    assert!(fired(&stored, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
 }
 
 #[test]
