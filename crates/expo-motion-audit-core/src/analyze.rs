@@ -668,7 +668,15 @@ fn check_layout_animation_in_list<F>(
 ) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
-    if facts.list_bindings.is_empty() {
+    // No plain FlatList/SectionList import and no Animated namespace import
+    // means no virtualized list can appear; Animated.FlatList needs the
+    // Reanimated Animated binding, so check both maps.
+    if facts.list_bindings.is_empty()
+        && !facts
+            .reanimated_imports
+            .values()
+            .any(|canonical| matches!(canonical.as_str(), "default" | "namespace" | "Animated"))
+    {
         return;
     }
     let Some(name) = jsx_attribute_name(&attribute.name) else {
@@ -1082,12 +1090,81 @@ fn function_is_component_render(
     semantic: &Semantic<'_>,
     function_id: oxc_semantic::NodeId,
 ) -> bool {
-    let Some(name) = function_node_name(semantic, function_id) else {
+    if function_is_callback_context(semantic, function_id) {
         return false;
-    };
-    starts_with_ascii_uppercase(&name)
-        && !starts_with_event_handler_prefix(&name)
-        && !function_is_callback_context(semantic, function_id)
+    }
+    if let Some(name) = function_node_name(semantic, function_id) {
+        return starts_with_ascii_uppercase(&name) && !starts_with_event_handler_prefix(&name);
+    }
+    // Anonymous function directly exported as default and returning JSX is a
+    // component (`export default () => { ... return <Text/>; }`); a name test
+    // is impossible, so the default-export position plus JSX decides.
+    function_is_default_exported(semantic, function_id)
+        && function_returns_jsx(semantic, function_id)
+}
+
+/// Whether a function node is the declaration of an `export default`
+/// (`export default function () {}` or `export default () => {}`).
+fn function_is_default_exported(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..3 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::ExportDefaultDeclaration(_) => return true,
+            // `export default memo(() => {})`-style wrappers are not a bare
+            // default export; only direct position counts.
+            AstKind::CallExpression(_) => return false,
+            AstKind::VariableDeclarator(_)
+            | AstKind::Function(_)
+            | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+/// Whether a function subtree contains a JSX element or fragment, marking it
+/// as rendering UI rather than running plain logic.
+fn function_returns_jsx(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    nodes.iter().any(|node| {
+        if !matches!(
+            node.kind(),
+            AstKind::JSXElement(_) | AstKind::JSXFragment(_)
+        ) {
+            return false;
+        }
+        let mut current = node.id();
+        loop {
+            let parent_id = nodes.parent_id(current);
+            if parent_id == current {
+                return false;
+            }
+            if parent_id == function_id {
+                return true;
+            }
+            // A nested function boundary means the JSX belongs to the inner
+            // function, not the candidate component.
+            if matches!(
+                nodes.kind(parent_id),
+                AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+            ) {
+                return false;
+            }
+            current = parent_id;
+        }
+    })
 }
 
 fn function_is_callback_context(
@@ -1273,12 +1350,28 @@ fn jsx_attribute_belongs_to_list(
             return false;
         }
         if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
-            return simple_jsx_element_name(&opening.name)
-                .is_some_and(|name| facts.list_bindings.contains(name));
+            return jsx_opening_is_list(&opening.name, facts);
         }
         current = parent_id;
     }
     false
+}
+
+/// Whether a JSX opening element is a virtualized list: a plain
+/// `FlatList`/`SectionList` identifier, or `<Animated.FlatList>` /
+/// `<Animated.SectionList>` where the root resolves to the Reanimated
+/// `Animated` namespace.
+fn jsx_opening_is_list(name: &JSXElementName<'_>, facts: &FileFacts) -> bool {
+    match name {
+        JSXElementName::Identifier(identifier) => {
+            facts.list_bindings.contains(identifier.name.as_str())
+        }
+        JSXElementName::MemberExpression(member) => {
+            matches!(member.property.name.as_str(), "FlatList" | "SectionList")
+                && jsx_element_name_is_reanimated_animated(name, facts)
+        }
+        _ => false,
+    }
 }
 
 fn simple_jsx_element_name<'a>(name: &'a JSXElementName<'a>) -> Option<&'a str> {

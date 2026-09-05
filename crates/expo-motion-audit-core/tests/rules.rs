@@ -1012,6 +1012,22 @@ export function Card() {
 }"#,
     );
     assert!(!fired(&clean, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    // Anonymous default-exported component returning JSX is a component
+    // context even though no name exists to test.
+    let anonymous = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export default () => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+};"#,
+    );
+    assert!(fired(
+        &anonymous,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
 }
 
 #[test]
@@ -1073,6 +1089,19 @@ export function List() { return <FlatList data={data} renderItem={renderItem} />
 export function Card() { return <Animated.View entering={FadeIn} />; }"#,
     );
     assert!(!fired(&clean, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
+
+    // Animated.FlatList render path: member-expression list element whose
+    // root resolves to the Reanimated Animated namespace.
+    let animated_list = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import Animated, { FadeIn } from "react-native-reanimated";
+export function List() { return <Animated.FlatList data={data} renderItem={({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>} />; }"#,
+    );
+    assert!(fired(
+        &animated_list,
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
+    ));
 
     // Memoized render callback: the arrow is wrapped in useCallback, so its
     // name lives on the declarator above the wrapper call.
