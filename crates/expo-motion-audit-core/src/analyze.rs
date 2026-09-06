@@ -1094,9 +1094,20 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
                 {
                     return false;
                 }
+                // `useMemo` factories execute during render, so a read inside
+                // one belongs to the owning component, not the callback.
+                if is_usememo_callback(nodes, parent_id) {
+                    current = parent_id;
+                    continue;
+                }
                 return function_is_component_render(semantic, parent_id);
             }
             AstKind::ArrowFunctionExpression(_) => {
+                // Same render-time reasoning as above for arrow factories.
+                if is_usememo_callback(nodes, parent_id) {
+                    current = parent_id;
+                    continue;
+                }
                 return function_is_component_render(semantic, parent_id);
             }
             AstKind::FunctionBody(body) if function_body_has_worklet_directive(body) => {
@@ -1106,6 +1117,25 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
         }
         current = parent_id;
     }
+}
+
+/// Whether a function node is the factory passed directly to `useMemo(...)`.
+/// Unlike `useCallback` or effects, the factory executes during render, so
+/// render-time rules must look through it to the owning component.
+fn is_usememo_callback(
+    nodes: &oxc_semantic::AstNodes<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let call_id = nodes.parent_id(function_id);
+    if call_id == function_id {
+        return false;
+    }
+    matches!(
+        nodes.kind(call_id),
+        AstKind::CallExpression(call) if callee_identifier(call) == Some("useMemo")
+    )
 }
 
 fn function_is_component_render(

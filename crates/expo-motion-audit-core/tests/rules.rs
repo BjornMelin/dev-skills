@@ -1035,6 +1035,21 @@ export function C() {
 }"#,
     );
     assert!(!fired(&raw, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    // useMemo factories execute during render: a read inside one belongs to
+    // the owning component.
+    let memo = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useMemo } from "react";
+import { useSharedValue } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(0);
+  const v = useMemo(() => sv.value, [sv]);
+  return <Text>{v}</Text>;
+}"#,
+    );
+    assert!(fired(&memo, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
 
 #[test]
