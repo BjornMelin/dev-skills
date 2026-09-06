@@ -1655,6 +1655,18 @@ fn rule_nested_timeline_child_scrolltrigger_fires_and_top_level_tween_does_not()
         r#"import { gsap } from "gsap"; const tl = gsap.timeline(); function render(tl) { tl.to(".b", { scrollTrigger: { trigger: ".b" }, x: 10 }); }"#,
     );
     assert!(!fired(&shadowed, ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD));
+
+    // The shadowed receiver is not a GSAP tween owner anywhere: no
+    // will-change finding for the unrelated object.
+    let shadowed_vars = analyze(
+        "src/timeline.ts",
+        "ts",
+        r#"import { gsap } from "gsap"; const tl = gsap.timeline(); function helper(tl) { tl.to(x, { willChange: "transform" }); }"#,
+    );
+    assert!(!fired(
+        &shadowed_vars,
+        ids::PERFORMANCE_WILL_CHANGE_PERMANENT
+    ));
 }
 
 #[test]
@@ -1806,6 +1818,14 @@ fn rule_event_tween_missing_overwrite_fires_and_protected_tween_does_not() {
         r#"const view = <button onPointerEnter={() => gsap.to(button, { scale: 1.05, overwrite: "auto" })} />;"#,
     );
     assert!(!fired(&clean, ids::CORE_MISSING_OVERWRITE));
+
+    // Named handler referenced from a JSX event prop gets the same check.
+    let named = analyze(
+        "src/Button.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const handlePointerMove = () => gsap.to(target, { x: 5 }); const view = <div onPointerMove={handlePointerMove} />;"#,
+    );
+    assert!(fired(&named, ids::CORE_MISSING_OVERWRITE));
 }
 
 #[test]
@@ -1823,6 +1843,14 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); useEffect(() => () => mm.revert(), []);"#,
     );
     assert!(!fired(&clean, ids::REACT_MATCHMEDIA_MISSING_REVERT));
+
+    // React-namespace effect cleanup counts the same as the bare hook.
+    let namespaced = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; React.useEffect(() => { const mm = gsap.matchMedia(); return () => mm.revert(); }, []);"#,
+    );
+    assert!(!fired(&namespaced, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 
     // An unrelated useGSAP call elsewhere cannot clean up this context.
     let sibling_usegsap = analyze(
