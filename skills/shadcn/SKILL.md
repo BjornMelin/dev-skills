@@ -1,7 +1,7 @@
 ---
 name: shadcn
 description: "Manage shadcn/ui components: add, search, fix, style and compose, with registry and component docs. Applies to any project with a components.json. Triggers on \"shadcn init\" or a --preset code."
-allowed-tools: Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *)
+allowed-tools: Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(yarn *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *), Bash(yarn dlx shadcn@latest *)
 ---
 
 # shadcn/ui
@@ -25,7 +25,6 @@ the injected result below is an error (e.g. Bun is not installed), run
 `<runner> info --json` with your selected runner instead. Use
 `<runner> docs <component>` to get documentation and example URLs for any
 component.
-
 ## Principles
 
 1. **Use existing components first.** Use `bunx --bun shadcn@latest search` to check registries before writing custom UI. Check community registries too.

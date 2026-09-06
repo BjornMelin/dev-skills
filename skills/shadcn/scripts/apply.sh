@@ -7,9 +7,11 @@
 # Why this exists: upstream ships `npx shadcn@latest` throughout. Bun-first
 # repos need `bunx --bun shadcn@latest`, and a plain reinstall silently reverts
 # every call site back to npx. Run this script instead of updating by hand so
-# the overlay survives each refresh.
+# the overlay survives each refresh. Upstream files land in a staging tree
+# first; tracked files are replaced only after every overlay assertion and
+# verifier check passes.
 #
-# The overlay is exactly six edits:
+# The overlay is exactly seven edits:
 #   1. Bun-first runner   - `npx shadcn@latest` -> `bunx --bun shadcn@latest`
 #   2. Runner guidance    - the >**IMPORTANT:** line, rewritten Bun-first
 #   3. Frontmatter        - broadened allowed-tools, trigger-style description,
@@ -23,8 +25,10 @@
 #   6. Context block      - `## Current Project Context` rewritten from
 #                           scripts/context-block.txt so runner selection
 #                           precedes the injected `info --json` step
+#   7. info --json row    - the `info` table gains its missing `--json` row
+#                           (the workflow's mandatory flag)
 #
-# Everything else is upstream verbatim. If a diff shows up outside those six,
+# Everything else is upstream verbatim. If a diff shows up outside those seven,
 # upstream changed and the overlay may need revisiting.
 #
 # Usage:  skills/shadcn/scripts/apply.sh
@@ -37,6 +41,9 @@ RAW="https://raw.githubusercontent.com/shadcn-ui/ui/main/skills/shadcn"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# Overlays apply and verify inside STAGE; tracked files under SKILL_DIR are
+# replaced only after every overlay assertion and verifier check passes, so
+# a failed refresh never leaves a partially overlaid skill behind.
 
 FILES=(
   SKILL.md
@@ -55,16 +62,18 @@ FILES=(
   assets/shadcn-small.png
 )
 
+STAGE="$TMP/stage"
+
 echo "==> Fetching upstream (${#FILES[@]} files)"
 for f in "${FILES[@]}"; do
   mkdir -p "$TMP/$(dirname "$f")"
   curl -sSfL --connect-timeout 10 --max-time 120 -o "$TMP/$f" "$RAW/$f"
 done
 
-echo "==> Installing into $SKILL_DIR"
+echo "==> Staging upstream files"
 for f in "${FILES[@]}"; do
-  mkdir -p "$SKILL_DIR/$(dirname "$f")"
-  cp "$TMP/$f" "$SKILL_DIR/$f"
+  mkdir -p "$STAGE/$(dirname "$f")"
+  cp "$TMP/$f" "$STAGE/$f"
 done
 
 # NOTE: agents/openai.yaml is deliberately NOT refreshed from upstream. Upstream
@@ -86,8 +95,8 @@ awk -v fmfile="$SCRIPT_DIR/frontmatter.txt" -v impfile="$SCRIPT_DIR/important.tx
   infm                   { next }
   /^> \*\*IMPORTANT:\*\*/ { for (i = 1; i <= nimp; i++) print imp[i]; next }
   { print }
-' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.overlaid"
-mv "$TMP/SKILL.md.overlaid" "$SKILL_DIR/SKILL.md"
+' "$STAGE/SKILL.md" > "$TMP/SKILL.md.overlaid"
+mv "$TMP/SKILL.md.overlaid" "$STAGE/SKILL.md"
 
 # --- Overlay 6: runner-first context block ------------------------------------
 # The injected `info --json` step hard-codes a runner, so it runs before the
@@ -111,8 +120,8 @@ awk -v blockfile="$SCRIPT_DIR/context-block.txt" '
       exit 1
     }
   }
-' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.context"
-mv "$TMP/SKILL.md.context" "$SKILL_DIR/SKILL.md"
+' "$STAGE/SKILL.md" > "$TMP/SKILL.md.context"
+mv "$TMP/SKILL.md.context" "$STAGE/SKILL.md"
 
 # --- Overlay 5: vendored-layout note ------------------------------------------
 # Required by the repo's skill conventions: the top-level cli.md/registry.md/
@@ -137,8 +146,8 @@ awk -v notefile="$SCRIPT_DIR/layout-note.txt" '
       exit 1
     }
   }
-' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.noted"
-mv "$TMP/SKILL.md.noted" "$SKILL_DIR/SKILL.md"
+' "$STAGE/SKILL.md" > "$TMP/SKILL.md.noted"
+mv "$TMP/SKILL.md.noted" "$STAGE/SKILL.md"
 
 # --- Overlay 1: Bun-first runner ---------------------------------------------
 # The frontmatter allowed-tools line deliberately keeps an `npx shadcn@latest`
@@ -146,7 +155,7 @@ mv "$TMP/SKILL.md.noted" "$SKILL_DIR/SKILL.md"
 # Portable replacement (no `sed -i`, which needs a backup suffix on BSD/macOS):
 # rewrite each file through a temp file instead of editing in place.
 echo "==> Applying overlay: Bun-first runner"
-find "$SKILL_DIR" -name '*.md' -type f -not -path "$SCRIPT_DIR/*" -print0 |
+find "$STAGE" -name '*.md' -type f -print0 |
   while IFS= read -r -d '' md; do
     sed 's|npx shadcn@latest|bunx --bun shadcn@latest|g' "$md" > "$TMP/overlay.tmp" \
       && mv "$TMP/overlay.tmp" "$md"
@@ -157,8 +166,32 @@ allowed="$(grep '^allowed-tools:' "$SCRIPT_DIR/frontmatter.txt")"
 awk -v allowed="$allowed" '
   /^allowed-tools:/ && !done { print allowed; done = 1; next }
   { print }
-' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.fixed"
-mv "$TMP/SKILL.md.fixed" "$SKILL_DIR/SKILL.md"
+' "$STAGE/SKILL.md" > "$TMP/SKILL.md.fixed"
+mv "$TMP/SKILL.md.fixed" "$STAGE/SKILL.md"
+
+# --- Overlay 7: info --json table row ------------------------------------------
+# The workflow's mandatory `info --json` flag is missing from the `info`
+# option table while the table claims exhaustiveness. Insert the row once,
+# scoped to the info section so other tables' --cwd rows are untouched.
+echo "==> Applying overlay: info --json row"
+awk '
+  /^### `info` / { in_info = 1 }
+  /^### / && !/^### `info` / { in_info = 0 }
+  in_info && /^\| `--cwd <cwd>`/ && !done {
+    print
+    print "| `--json`      |       | Output as JSON    | `false` |"
+    done = 1
+    next
+  }
+  { print }
+  END {
+    if (done != 1) {
+      print "FAIL: info --json anchor not found" > "/dev/stderr"
+      exit 1
+    }
+  }
+' "$STAGE/cli.md" > "$TMP/cli.md.info"
+mv "$TMP/cli.md.info" "$STAGE/cli.md"
 
 # --- Overlay 4: canonical CLI runner mapping ---------------------------------
 # Runs after the blind pass on purpose: the pass would corrupt the template's
@@ -180,30 +213,35 @@ awk -v impfile="$SCRIPT_DIR/cli-important.txt" '
       exit 1
     }
   }
-' "$SKILL_DIR/cli.md" > "$TMP/cli.md.overlaid"
-mv "$TMP/cli.md.overlaid" "$SKILL_DIR/cli.md"
+' "$STAGE/cli.md" > "$TMP/cli.md.overlaid"
+mv "$TMP/cli.md.overlaid" "$STAGE/cli.md"
 
 # --- Verify -------------------------------------------------------------------
 echo "==> Verifying"
 fail=0
 # `grep` exits 1 on no-match, which `set -o pipefail` would turn into a script
 # abort, so both counts are guarded with `|| true`.
-bunx_count=$( { grep -ro 'bunx --bun shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | wc -l)
+bunx_count=$( { grep -ro 'bunx --bun shadcn@latest' "$STAGE" --include='*.md' || true; } | wc -l)
 # The canonical cli.md runner-guidance line intentionally keeps one `npx`
 # entry (npm runner), alongside allowed-tools: in SKILL.md frontmatter.
 # Only these two exact lines are exempt; any other `npx shadcn@latest`
 # occurrence (including inside another IMPORTANT block) is stray.
-stray_npx=$( { grep -rn 'npx shadcn@latest' "$SKILL_DIR" --include='*.md' || true; } | { grep -v -e 'allowed-tools:' -e 'Always run commands using the project.s package runner:' || true; } | wc -l)
+stray_npx=$( { grep -rn 'npx shadcn@latest' "$STAGE" --include='*.md' || true; } | { grep -v -e 'allowed-tools:' -e 'Always run commands using the project.s package runner:' || true; } | wc -l)
 
 [ "$bunx_count" -gt 0 ] || { echo "FAIL: no bunx runner found"; fail=1; }
 [ "$stray_npx" -eq 0 ] || { echo "FAIL: $stray_npx stray npx outside allowed-tools"; fail=1; }
-if grep -q '^user-invocable:' "$SKILL_DIR/SKILL.md"; then echo "FAIL: user-invocable survived"; fail=1; fi
-grep -q 'Default shadcn runner' "$SKILL_DIR/SKILL.md" || { echo "FAIL: IMPORTANT line missing"; fail=1; }
-grep -q '^name: shadcn$' "$SKILL_DIR/SKILL.md" || { echo "FAIL: frontmatter name missing"; fail=1; }
+if grep -q '^user-invocable:' "$STAGE/SKILL.md"; then echo "FAIL: user-invocable survived"; fail=1; fi
+grep -q 'Default shadcn runner' "$STAGE/SKILL.md" || { echo "FAIL: IMPORTANT line missing"; fail=1; }
+grep -q '^name: shadcn$' "$STAGE/SKILL.md" || { echo "FAIL: frontmatter name missing"; fail=1; }
 
 if [ "$fail" -eq 0 ]; then
+  echo "==> Installing into $SKILL_DIR"
+  for f in "${FILES[@]}"; do
+    mkdir -p "$SKILL_DIR/$(dirname "$f")"
+    cp "$STAGE/$f" "$SKILL_DIR/$f"
+  done
   echo "OK: upstream refreshed, overlay applied ($bunx_count bunx call sites)"
 else
-  echo "Overlay verification FAILED - inspect $SKILL_DIR before use" >&2
+  echo "Overlay verification FAILED - tracked files untouched" >&2
   exit 1
 fi

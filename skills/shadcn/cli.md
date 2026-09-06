@@ -196,6 +196,7 @@ Displays project info and `components.json` configuration. Run this first to dis
 | Flag          | Short | Description       | Default |
 | ------------- | ----- | ----------------- | ------- |
 | `--cwd <cwd>` | `-c`  | Working directory | current |
+| `--json`      |       | Output as JSON    | `false` |
 
 **Project Info fields:**
 
