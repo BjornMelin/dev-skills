@@ -274,6 +274,28 @@ fn tailwind_template_expression_strings_are_not_double_counted() {
 }
 
 #[test]
+fn tailwind_named_token_classes_count_as_tokenized_coverage() {
+    // Named classes matching known tokens credit the Tailwind stack, so a
+    // file mixing token names with one arbitrary duration does not report
+    // 0% Tailwind coverage. token_source() defines `short: 200`.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-short duration-[200ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let refs = |stack: &str| {
+        analysis
+            .coverage
+            .iter()
+            .find(|entry| entry.stack == stack)
+            .map_or(0, |entry| entry.tokenized_references)
+    };
+    assert_eq!(refs("tailwind"), 1);
+}
+
+#[test]
 fn tailwind_arbitrary_motion_values_classify_drift_and_orphan() {
     let analysis = analyze_source(
         "app.tsx",

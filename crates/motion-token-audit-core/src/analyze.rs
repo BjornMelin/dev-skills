@@ -68,6 +68,24 @@ impl MotionTokens {
     fn has_spring(&self, value: Spring) -> bool {
         self.springs.values().any(|known| *known == value)
     }
+
+    /// Whether a Tailwind class name references a known token: named
+    /// durations/delays (`duration-fast`), named easings (`ease-out`), or
+    /// arbitrary values. Variant prefixes (`hover:`) are stripped first.
+    #[must_use]
+    fn has_tailwind_token_class(&self, class: &str) -> bool {
+        let base = class.rsplit(':').next().unwrap_or(class);
+        if let Some(name) = base
+            .strip_prefix("duration-")
+            .or_else(|| base.strip_prefix("delay-"))
+        {
+            return !name.starts_with('[') && self.durations.contains_key(name);
+        }
+        if let Some(name) = base.strip_prefix("ease-") {
+            return !name.starts_with('[') && self.easings.contains_key(name);
+        }
+        false
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -757,6 +775,31 @@ fn check_tailwind_literal(
         return;
     };
 
+    // Named token classes (`duration-fast`) count as tokenized references so
+    // the Tailwind stack coverage reflects token usage, not just literals.
+    // Strip one layer of quotes: the span covers the literal verbatim.
+    let unquoted = literal
+        .strip_prefix('"')
+        .and_then(|text| text.strip_suffix('"'))
+        .or_else(|| {
+            literal
+                .strip_prefix('\'')
+                .and_then(|text| text.strip_suffix('\''))
+        })
+        .or_else(|| {
+            literal
+                .strip_prefix('`')
+                .and_then(|text| text.strip_suffix('`'))
+        })
+        .unwrap_or(literal);
+    let named_refs = unquoted
+        .split_whitespace()
+        .filter(|class| tokens.has_tailwind_token_class(class))
+        .count();
+    if named_refs > 0 {
+        coverage_for(Category::TokensTailwind, coverage).tokenized_references += named_refs;
+    }
+
     for prefix in ["duration-[", "delay-["] {
         for (offset, value, raw) in tailwind_ms_literals(literal, prefix) {
             let absolute = span
@@ -955,6 +998,9 @@ fn js_stack_categories(source: &str, motion_jsx: bool) -> Vec<Category> {
     }
     if source.contains("@react-three/fiber") || source.contains("useFrame") {
         categories.push(Category::TokensR3f);
+    }
+    if source.contains("duration-[") || source.contains("delay-[") || source.contains("ease-[") {
+        categories.push(Category::TokensTailwind);
     }
     if categories.is_empty() && source.contains("motionTokens.") {
         categories.push(Category::TokensReact);
