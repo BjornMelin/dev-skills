@@ -1036,19 +1036,63 @@ fn check_tailwind_literal(
     }
 }
 
+/// Split a class string into `(byte_offset, token)` pairs on ASCII
+/// whitespace. Offsets keep finding spans exact.
+fn split_class_tokens(literal: &str) -> Vec<(usize, &str)> {
+    let bytes = literal.as_bytes();
+    let mut tokens = Vec::new();
+    let mut index = 0;
+    while index < bytes.len() {
+        while index < bytes.len() && bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        let start = index;
+        while index < bytes.len() && !bytes[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if start < index {
+            tokens.push((start, &literal[start..index]));
+        }
+    }
+    tokens
+}
+
+/// Strip variant prefixes (`hover:`, `md:dark:`) to the utility itself.
+fn strip_variant_prefixes(class: &str) -> &str {
+    class.rsplit(':').next().unwrap_or(class)
+}
+
+/// Resolve a raw class token to the utility text and its byte offset:
+/// surrounding quotes and variant prefixes are stripped with the offset
+/// adjusted so finding spans stay exact.
+fn utility_text(token_start: usize, token: &str) -> (usize, &str) {
+    let is_quote = |candidate: char| candidate == '\'' || candidate == '"' || candidate == '`';
+    let unquoted_leading = token.trim_start_matches(is_quote);
+    let mut start = token_start + (token.len() - unquoted_leading.len());
+    let unquoted = unquoted_leading.trim_end_matches(is_quote);
+    let class = strip_variant_prefixes(unquoted);
+    start += unquoted.len() - class.len();
+    (start, class)
+}
+
 fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)> {
     let mut out = Vec::new();
-    let mut start_at = 0;
-    while let Some(offset) = literal[start_at..].find(prefix) {
-        let start = start_at + offset;
-        let number_start = start + prefix.len();
+    // Parse per whitespace-separated class whose utility starts with the
+    // prefix: a substring match would misread `my-duration-[200ms]`, which
+    // Tailwind never interprets as a duration utility.
+    for (token_start, token) in split_class_tokens(literal) {
+        let (class_start, class) = utility_text(token_start, token);
+        let Some(rest) = class.strip_prefix(prefix) else {
+            continue;
+        };
+        let number_start = class_start + prefix.len();
         // Bound the parse to the current class: the value ends at the first
         // `]` after the prefix. Searching past it lets one invalid class
         // swallow a later valid one (`duration-[var(--x)] duration-[200ms]`
         // would skip the hardcoded duration entirely).
         let rest = &literal[number_start..];
         let Some(bracket) = rest.find(']') else {
-            break;
+            continue;
         };
         let raw_end = number_start + bracket + 1;
         if let Some(number) = rest[..bracket].strip_suffix("ms")
@@ -1056,12 +1100,11 @@ fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)
             && number.bytes().all(|byte| byte.is_ascii_digit())
             && let Ok(value) = number.parse::<u32>()
         {
-            out.push((start, value, literal[start..raw_end].to_string()));
-            start_at = raw_end;
-        } else {
-            // Rejected (e.g. an unclosed class): resume after this prefix so
-            // a later valid class is still scanned.
-            start_at = start + prefix.len();
+            out.push((
+                class_start,
+                value,
+                literal[class_start..raw_end].to_string(),
+            ));
         }
     }
     out
@@ -1070,23 +1113,26 @@ fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)
 fn tailwind_easing_literals(literal: &str) -> Vec<(usize, Bezier, String)> {
     let prefix = "ease-[cubic-bezier(";
     let mut out = Vec::new();
-    let mut start_at = 0;
-    while let Some(offset) = literal[start_at..].find(prefix) {
-        let start = start_at + offset;
-        let bezier_start = start + "ease-[".len();
-        // Bound the parse to the current class (same cross-class hazard as
-        // `tailwind_ms_literals`): the value ends at the first `]` ahead.
-        let rest = &literal[bezier_start..];
+    // Same per-class discipline as `tailwind_ms_literals`: only utilities
+    // starting with the prefix count, after variant stripping.
+    for (token_start, token) in split_class_tokens(literal) {
+        let (class_start, class) = utility_text(token_start, token);
+        if class.strip_prefix(prefix).is_none() {
+            continue;
+        }
+        // Bound the parse to the current class: the value ends at the first
+        // `]` ahead.
+        let rest = &literal[class_start + "ease-[".len()..];
         let Some(bracket) = rest.find(']') else {
-            break;
+            continue;
         };
-        let raw_end = bezier_start + bracket + 1;
+        let raw_end = class_start + "ease-[".len() + bracket + 1;
         if let Some(bezier) = parse_cubic_bezier(&rest[..bracket]) {
-            out.push((start, bezier, literal[start..raw_end].to_string()));
-            start_at = raw_end;
-        } else {
-            // Rejected value: resume after this prefix like above.
-            start_at = start + prefix.len();
+            out.push((
+                class_start,
+                bezier,
+                literal[class_start..raw_end].to_string(),
+            ));
         }
     }
     out

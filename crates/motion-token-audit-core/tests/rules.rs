@@ -272,6 +272,26 @@ const msg = `animation runs for duration-[300ms] total`;"#,
 }
 
 #[test]
+fn tailwind_substring_classes_do_not_fire() {
+    // `my-duration-[200ms]` is not a Tailwind utility: only tokens whose
+    // utility starts with the supported prefix count, after variants.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="my-duration-[200ms] hover:duration-[200ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
 fn tailwind_template_expression_strings_are_not_double_counted() {
     // The string inside the expression gets its own StringLiteral visit;
     // the template scan must cover only the static quasis.
