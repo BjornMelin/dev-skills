@@ -20,7 +20,9 @@ default Bun runner the context is already injected below:
 !`bunx --bun shadcn@latest info --json`
 ```
 
-The resulting JSON contains the project config and installed components. Use
+The resulting JSON contains the project config and installed components. If
+the injected result below is an error (e.g. Bun is not installed), run
+`<runner> info --json` with your selected runner instead. Use
 `<runner> docs <component>` to get documentation and example URLs for any
 component.
 
