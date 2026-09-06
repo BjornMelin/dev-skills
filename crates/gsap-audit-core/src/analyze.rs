@@ -186,11 +186,19 @@ struct MatchMediaBinding {
 struct RevertRef {
     name: String,
     declaration: Option<oxc_semantic::NodeId>,
+    /// The revert runs in a cleanup path: inside a function returned from an
+    /// effect-style hook callback. A revert wired to an event handler or run
+    /// inline does not prove unmount cleanup.
+    in_cleanup: bool,
 }
 
 /// Whether a revert receiver covers a match-media binding: same resolved
 /// declaration wins; spelling matches only when either side is unresolvable.
+/// Either way the revert must run in a cleanup path.
 fn revert_covers_binding(revert: &RevertRef, binding: &MatchMediaBinding) -> bool {
+    if !revert.in_cleanup {
+        return false;
+    }
     match (revert.declaration, binding.declaration) {
         (Some(from), Some(to)) => from == to,
         _ => revert.name == binding.name,
@@ -323,6 +331,7 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                     facts.reverted_bindings.push(RevertRef {
                         name: object.name.as_str().to_string(),
                         declaration: reference_declaration(semantic, object),
+                        in_cleanup: revert_in_cleanup(semantic, node.id(), &facts),
                     });
                 }
             }
@@ -1497,6 +1506,14 @@ fn check_tween_in_render<F>(
     let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
         return;
     };
+    // `useMemo` factories execute during render: attribute the tween to the
+    // owning component rather than the anonymous factory callback.
+    let function_id = if is_usememo_callback(semantic, function_id) {
+        let call_id = semantic.nodes().parent_id(function_id);
+        nearest_enclosing_function(semantic, call_id).unwrap_or(function_id)
+    } else {
+        function_id
+    };
     if function_is_hook_callback(semantic, function_id, facts)
         || function_is_event_handler(semantic, function_id)
     {
@@ -1595,6 +1612,27 @@ fn nearest_enclosing_function(
         }
         current = parent_id;
     }
+}
+
+/// Whether a function node is the factory passed directly to `useMemo(...)`.
+/// Unlike `useCallback` or effects, the factory executes during render, so
+/// render-time rules must look through it to the owning component.
+fn is_usememo_callback(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let call_id = nodes.parent_id(function_id);
+    if call_id == function_id {
+        return false;
+    }
+    matches!(
+        nodes.kind(call_id),
+        AstKind::CallExpression(call)
+            if matches!(
+                call.callee.without_parentheses(),
+                Expression::Identifier(identifier) if identifier.name.as_str() == "useMemo"
+            )
+    )
 }
 
 fn enclosing_function_name(
@@ -1756,6 +1794,103 @@ fn match_media_binding(
         }
         _ => None,
     }
+}
+
+/// Whether a `.revert()` call runs in a cleanup path: inside a function that
+/// is returned from an effect-style hook callback (`useEffect(() => () =>
+/// mm.revert())`, including block bodies with an explicit `return`). A
+/// revert wired to an event handler or run inline in an effect body proves
+/// no unmount cleanup.
+fn revert_in_cleanup(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    // Nearest enclosing function of the revert call.
+    let mut current = node_id;
+    let returned_function = loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            break parent_id;
+        }
+        current = parent_id;
+    };
+    // That function must sit in return position of a hook callback: either
+    // behind an explicit `return`, or as the concise body of an arrow that
+    // is itself returned (a single-expression body).
+    let parent_id = nodes.parent_id(returned_function);
+    if parent_id == returned_function {
+        return false;
+    }
+    let returned = match nodes.kind(parent_id) {
+        AstKind::ReturnStatement(_) => true,
+        AstKind::ExpressionStatement(_) => {
+            let body_id = nodes.parent_id(parent_id);
+            if body_id == parent_id {
+                return false;
+            }
+            matches!(nodes.kind(body_id), AstKind::FunctionBody(_)) && {
+                let arrow_id = nodes.parent_id(body_id);
+                arrow_id != body_id
+                    && matches!(nodes.kind(arrow_id), AstKind::ArrowFunctionExpression(_))
+            }
+        }
+        _ => false,
+    };
+    if !returned {
+        return false;
+    }
+    // The receiving callback must be an effect-style hook.
+    let mut current = parent_id;
+    loop {
+        let next_id = nodes.parent_id(current);
+        if next_id == current {
+            return false;
+        }
+        match nodes.kind(next_id) {
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => {
+                return function_is_cleanup_hook(semantic, next_id, facts);
+            }
+            _ => current = next_id,
+        }
+    }
+}
+
+/// Whether a function node is the callback of an effect-style hook whose
+/// returned function runs as cleanup.
+fn function_is_cleanup_hook(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(function_id);
+    if parent_id == function_id {
+        return false;
+    }
+    if let AstKind::CallExpression(call) = nodes.kind(parent_id) {
+        return match call.callee.without_parentheses() {
+            Expression::Identifier(identifier) => {
+                matches!(
+                    identifier.name.as_str(),
+                    "useEffect" | "useLayoutEffect" | "useInsertionEffect" | "useGSAP"
+                ) || facts.usegsap_bindings.contains(identifier.name.as_str())
+            }
+            _ => false,
+        };
+    }
+    false
 }
 
 /// The declaration node an identifier reference resolves to, if any.

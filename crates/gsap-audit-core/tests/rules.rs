@@ -1734,6 +1734,20 @@ export default memo(() => {
 });"#,
     );
     assert!(fired(&wrapped_default, ids::REACT_TWEEN_IN_RENDER));
+
+    // useMemo factories execute during render: attribute the tween to the
+    // owning component rather than the anonymous factory callback.
+    let memo_tween = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { useMemo } from "react";
+import { gsap } from "gsap";
+export function Card() {
+  useMemo(() => gsap.to(ref.current, { x: 10 }), []);
+  return <div />;
+}"#,
+    );
+    assert!(fired(&memo_tween, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]
@@ -1866,4 +1880,12 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         r#"import { gsap } from "gsap"; const a = gsap.matchMedia(); const b = gsap.matchMedia();"#,
     );
     assert_eq!(count(&two_leaks, ids::REACT_MATCHMEDIA_MISSING_REVERT), 2);
+
+    // A revert wired only to an event handler is not unmount cleanup.
+    let click_revert = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const mm = gsap.matchMedia(); export function Card() { return <button onClick={() => mm.revert()} />; }"#,
+    );
+    assert!(fired(&click_revert, ids::REACT_MATCHMEDIA_MISSING_REVERT));
 }
