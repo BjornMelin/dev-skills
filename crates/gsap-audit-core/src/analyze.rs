@@ -165,6 +165,9 @@ fn identifier_is_timeline_handle(
 /// A file-wide flag is wrong here: an unrelated `useGSAP(...)` elsewhere
 /// cannot clean up this call's match-media context.
 struct MatchMediaCall {
+    /// Source span of the `gsap.matchMedia(...)` call, so each uncovered
+    /// call gets its own finding instead of one file-level finding.
+    span: Span,
     /// The call sits inside a `useGSAP(...)` callback, whose context reverts
     /// match-media state automatically.
     inside_usegsap: bool,
@@ -307,6 +310,7 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 }
                 if is_gsap_member_call(call, &facts, "matchMedia") {
                     facts.match_media_calls.push(MatchMediaCall {
+                        span: call.span,
                         inside_usegsap: call_inside_usegsap(semantic, node.id(), &facts),
                         binding: match_media_binding(semantic, node.id()),
                     });
@@ -1499,6 +1503,24 @@ fn check_tween_in_render<F>(
         return;
     }
     let Some(name) = enclosing_function_name(semantic, function_id) else {
+        // Anonymous function directly exported as default and returning JSX
+        // is a component (`export default () => { ... return <div />; }`); a
+        // name test is impossible, so the default-export position plus JSX
+        // decides, mirroring the expo-motion analyzer.
+        if function_is_default_exported(semantic, function_id)
+            && function_returns_jsx(semantic, function_id)
+        {
+            emit(
+                ids::REACT_TWEEN_IN_RENDER,
+                Severity::High,
+                Confidence::Medium,
+                call.span,
+                format!(
+                    "`{method}` creates a GSAP animation during a default-exported component render."
+                ),
+                "Create the animation in useGSAP, useLayoutEffect, or useEffect so it runs after render and cleans up.",
+            );
+        }
         return;
     };
     if !starts_with_ascii_uppercase(&name) {
@@ -1787,6 +1809,70 @@ fn starts_with_ascii_uppercase(name: &str) -> bool {
         .is_some_and(|character| character.is_ascii_uppercase())
 }
 
+/// Whether a function node is the declaration of an `export default`
+/// (`export default function () {}` or `export default () => {}`).
+fn function_is_default_exported(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..3 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::ExportDefaultDeclaration(_) => return true,
+            // `export default memo(() => {})`-style wrappers are not a bare
+            // default export; only direct position counts.
+            AstKind::CallExpression(_)
+            | AstKind::VariableDeclarator(_)
+            | AstKind::Function(_)
+            | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+/// Whether a function subtree contains a JSX element or fragment, marking it
+/// as rendering UI rather than running plain logic.
+fn function_returns_jsx(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    nodes.iter().any(|node| {
+        if !matches!(
+            node.kind(),
+            AstKind::JSXElement(_) | AstKind::JSXFragment(_)
+        ) {
+            return false;
+        }
+        let mut current = node.id();
+        loop {
+            let parent_id = nodes.parent_id(current);
+            if parent_id == current {
+                return false;
+            }
+            if parent_id == function_id {
+                return true;
+            }
+            // A nested function boundary means the JSX belongs to the inner
+            // function, not the candidate component.
+            if matches!(
+                nodes.kind(parent_id),
+                AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+            ) {
+                return false;
+            }
+            current = parent_id;
+        }
+    })
+}
+
 /// Rule 8: a known plugin identifier is *used* (member object or bare ref in a
 /// call argument context) but never registered in this file.
 fn check_plugin_used_without_register<F>(call: &CallExpression<'_>, facts: &FileFacts, emit: &mut F)
@@ -2049,7 +2135,9 @@ fn check_file_level(
         });
     }
 
-    let match_media_leaks = facts.match_media_calls.iter().any(|call| {
+    // One finding per uncovered call site: collapsing to a single file-level
+    // finding lets a new leak hide behind an already-baselined one.
+    for call in facts.match_media_calls.iter().filter(|call| {
         !call.inside_usegsap
             && call.binding.as_ref().is_none_or(|binding| {
                 !facts
@@ -2057,10 +2145,8 @@ fn check_file_level(
                     .iter()
                     .any(|revert| revert_covers_binding(revert, binding))
             })
-    });
-    if match_media_leaks {
-        let span = program.span;
-        let (line, column) = line_index.line_col(span.start);
+    }) {
+        let (line, column) = line_index.line_col(call.span.start);
         findings.push(Finding {
             id: ids::REACT_MATCHMEDIA_MISSING_REVERT.to_string(),
             category: Category::React,
@@ -2155,7 +2241,39 @@ fn will_change_hint_span(object: &ObjectExpression<'_>, name: &str) -> Option<Sp
         if property_key_name(&inner.key) != Some(name) {
             return None;
         }
-        will_change_value_is_hint(&inner.value).then_some(inner.span)
+        if !will_change_value_is_hint(&inner.value) {
+            return None;
+        }
+        // `clearProps` in the same vars object removes the hint when the
+        // tween completes, so the layer is not permanently retained.
+        if object_clears_will_change(object) {
+            return None;
+        }
+        Some(inner.span)
+    })
+}
+
+/// Whether a vars object clears `willChange` on complete via `clearProps`:
+/// `clearProps: "all"`, or a list naming `willChange`/`will-change`.
+fn object_clears_will_change(object: &ObjectExpression<'_>) -> bool {
+    object.properties.iter().any(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return false;
+        };
+        if property_key_name(&inner.key) != Some("clearProps") {
+            return false;
+        }
+        match inner.value.without_parentheses() {
+            Expression::StringLiteral(literal) => {
+                let value = literal.value.as_str();
+                value.trim() == "all"
+                    || value
+                        .split(',')
+                        .map(str::trim)
+                        .any(|part| matches!(part, "willChange" | "will-change"))
+            }
+            _ => false,
+        }
     })
 }
 

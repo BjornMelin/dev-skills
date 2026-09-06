@@ -1708,6 +1708,19 @@ const Card = memo(() => {
 });"#,
     );
     assert!(fired(&wrapped, ids::REACT_TWEEN_IN_RENDER));
+
+    // Anonymous default-exported component returning JSX is a component
+    // context even though no name exists to test.
+    let anonymous = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export default () => {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+};"#,
+    );
+    assert!(fired(&anonymous, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]
@@ -1734,6 +1747,21 @@ gsap.timeline({ defaults: { willChange: "transform" } });"#,
         r#"gsap.set(".box", { willChange: "auto" }); gsap.set(".other", { "will-change": "AUTO" });"#,
     );
     assert!(!fired(&cleanup, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+
+    // clearProps in the same vars object removes the hint on complete.
+    let cleared = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.to(".box", { willChange: "transform", x: 100, clearProps: "willChange" });"#,
+    );
+    assert!(!fired(&cleared, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+
+    let cleared_all = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.to(".box", { willChange: "transform", x: 100, clearProps: "all" });"#,
+    );
+    assert!(!fired(&cleared_all, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
 }
 
 #[test]
@@ -1816,4 +1844,13 @@ fn rule_matchmedia_missing_revert_fires_and_cleanup_does_not() {
         r#"import { gsap } from "gsap"; function a() { const mm = gsap.matchMedia(); } function b() { const mm = gsap.matchMedia(); mm.revert(); }"#,
     );
     assert!(fired(&shadowed, ids::REACT_MATCHMEDIA_MISSING_REVERT));
+
+    // Each uncovered call gets its own finding so a new leak cannot hide
+    // behind an already-baselined one.
+    let two_leaks = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap"; const a = gsap.matchMedia(); const b = gsap.matchMedia();"#,
+    );
+    assert_eq!(count(&two_leaks, ids::REACT_MATCHMEDIA_MISSING_REVERT), 2);
 }
