@@ -353,6 +353,19 @@ useAnimatedReaction(() => prepared.value, (current) => { notify(setX, current); 
         &aliased_bridge,
         ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
     ));
+
+    // Shadowing parameter sharing the alias spelling is not the bridge.
+    let shadowed_bridge = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { scheduleOnRN as notify } from "react-native-worklets";
+import { useAnimatedReaction } from "react-native-reanimated";
+function setup(notify) { useAnimatedReaction(() => prepared.value, (current) => { notify(current); }); }"#,
+    );
+    assert!(!fired(
+        &shadowed_bridge,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -529,6 +542,20 @@ function C() {
         &no_animation,
         ids::ACCESSIBILITY_MISSING_REDUCED_MOTION
     ));
+
+    // A matching substring in an unrelated identifier or comment is not a
+    // reduced-motion guard.
+    let substring = analyze(
+        "src/Fade.tsx",
+        "tsx",
+        r"// TODO: consider reduceMotion handling later
+function C() {
+  const reduceMotionDuration = 200;
+  sv.value = withTiming(1);
+  return <Animated.View entering={FadeIn} />;
+}",
+    );
+    assert!(fired(&substring, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
 }
 
 // ---------------------------------------------------------------------------

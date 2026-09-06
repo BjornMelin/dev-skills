@@ -219,6 +219,16 @@ fn collect_file_facts(source: &str, semantic: &Semantic<'_>) -> FileFacts {
                     facts.has_cancel_animation_ref = true;
                 }
             }
+            AstKind::StaticMemberExpression(member) => {
+                // Reanimated option reads (`config.reduceMotion`,
+                // `ReduceMotion.System`): the property side is not an
+                // identifier reference, so match it explicitly.
+                if member.property.name.as_str() == "reduceMotion"
+                    || REDUCED_MOTION_TOKENS.contains(&member.property.name.as_str())
+                {
+                    facts.has_reduced_motion_ref = true;
+                }
+            }
             AstKind::CallExpression(call) => {
                 if let Expression::Identifier(callee) = call.callee.without_parentheses() {
                     let name = callee.name.as_str();
@@ -262,12 +272,18 @@ fn collect_file_facts(source: &str, semantic: &Semantic<'_>) -> FileFacts {
     // fallback for tokens that may only appear in import specifiers or JSX, also
     // scan the raw source for the literal tokens. This keeps the heuristic
     // robust without a second AST pass.
+    //
+    // The generic lowercase `reduceMotion` is deliberately excluded from the
+    // substring scan: it matches unrelated identifiers (`reduceMotionDuration`)
+    // and comments. That token is still recognized as an exact identifier
+    // reference or member-expression property above.
     if !facts.has_cancel_animation_ref && source.contains("cancelAnimation") {
         facts.has_cancel_animation_ref = true;
     }
     if !facts.has_reduced_motion_ref
         && REDUCED_MOTION_TOKENS
             .iter()
+            .filter(|token| **token != "reduceMotion")
             .any(|token| source.contains(token))
     {
         facts.has_reduced_motion_ref = true;
@@ -567,7 +583,7 @@ fn check_bridge_in_hot_path<'a, F>(
     let Some(name) = callee_identifier(call) else {
         return;
     };
-    let bridge = bridge_helper_canonical(name, facts);
+    let bridge = bridge_helper_canonical(semantic, call, name, facts);
     if !matches!(bridge.as_str(), "scheduleOnRN" | "runOnJS") {
         return;
     }
@@ -584,10 +600,7 @@ fn check_bridge_in_hot_path<'a, F>(
             Severity::Medium,
             Confidence::High,
             call.span,
-            format!(
-                "`{}` crosses to JS from {context}, which can run per frame.",
-                bridge
-            ),
+            format!("`{bridge}` crosses to JS from {context}, which can run per frame."),
             "Throttle the bridge, or move per-frame work into the worklet and bridge only on end/state change.",
         );
     }
@@ -1450,16 +1463,58 @@ fn callee_is_reanimated_hook(
 
 /// Canonical bridge-helper name for a callee, resolving Worklets import
 /// aliases (`import { scheduleOnRN as notify }` still counts as
-/// `scheduleOnRN`). Falls back to spelling for unimported calls.
-fn bridge_helper_canonical(name: &str, facts: &FileFacts) -> String {
-    if facts.reanimated_imports.contains_key(name) {
-        facts
-            .reanimated_imports
-            .get(name)
-            .cloned()
-            .unwrap_or_default()
+/// `scheduleOnRN`). The map is trusted only when the callee reference
+/// resolves to that import: a shadowing parameter or local keeps its
+/// spelling, so an unrelated `notify` never counts as a bridge call.
+/// Falls back to spelling for unimported calls.
+fn bridge_helper_canonical(
+    semantic: &Semantic<'_>,
+    call: &CallExpression<'_>,
+    name: &str,
+    facts: &FileFacts,
+) -> String {
+    use oxc_ast::ast::Expression;
+
+    let Some(canonical) = facts.reanimated_imports.get(name) else {
+        return name.to_string();
+    };
+    let Expression::Identifier(identifier) = call.callee.without_parentheses() else {
+        return name.to_string();
+    };
+    if reference_resolves_to_import(semantic, identifier) {
+        canonical.clone()
     } else {
         name.to_string()
+    }
+}
+
+/// Whether an identifier reference resolves to an import binding from the
+/// Reanimated or Worklets modules (as opposed to a shadowing parameter,
+/// a local, an import from another module, or an unresolvable name).
+fn reference_resolves_to_import(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let Some(reference_id) = identifier.reference_id.get() else {
+        return false;
+    };
+    let Some(symbol_id) = semantic.scoping().get_reference(reference_id).symbol_id() else {
+        return false;
+    };
+    let declaration = semantic.scoping().symbol_declaration(symbol_id);
+    let parent_id = semantic.nodes().parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = semantic.nodes().kind(parent_id) {
+        matches!(
+            import.source.value.as_str(),
+            REANIMATED_MODULE | WORKLETS_MODULE
+        )
+    } else {
+        false
     }
 }
 
