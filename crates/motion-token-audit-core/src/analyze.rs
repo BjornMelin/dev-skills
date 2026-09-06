@@ -290,21 +290,26 @@ pub fn analyze_source(
                 }
             }
             oxc_ast::AstKind::StringLiteral(string) => {
-                check_tailwind_literal(
-                    string.span,
-                    source,
-                    relative_path,
-                    &line_index,
-                    tokens,
-                    &mut findings,
-                    &mut coverage,
-                );
+                if literal_in_class_position(&semantic, node.id()) {
+                    check_tailwind_literal(
+                        string.span,
+                        source,
+                        relative_path,
+                        &line_index,
+                        tokens,
+                        &mut findings,
+                        &mut coverage,
+                    );
+                }
             }
             oxc_ast::AstKind::TemplateLiteral(template) => {
                 // Scan only the static quasis: the full template span
                 // overlaps StringLiteral visits for embedded expressions
                 // (e.g. `${cond ? "duration-[200ms]" : ""}`), which would
                 // double findings and coverage counts.
+                if !literal_in_class_position(&semantic, node.id()) {
+                    continue;
+                }
                 for quasi in &template.quasis {
                     check_tailwind_literal(
                         quasi.span,
@@ -696,8 +701,8 @@ fn jsx_attribute_belongs_to_motion(
         if parent_id == current {
             return false;
         }
-        if let AstKind::JSXOpeningElement(opening) = nodes.kind(parent_id) {
-            return jsx_element_is_motion_member(&opening.name, semantic);
+        if let AstKind::JSXOpeningElement(_) = nodes.kind(parent_id) {
+            return jsx_element_is_motion_member(semantic, parent_id);
         }
         current = parent_id;
     }
@@ -711,22 +716,81 @@ fn jsx_attribute_name<'a>(name: &'a JSXAttributeName<'a>) -> Option<&'a str> {
     }
 }
 
-fn jsx_element_is_motion_member(name: &JSXElementName<'_>, semantic: &Semantic<'_>) -> bool {
-    let JSXElementName::MemberExpression(member) = name else {
+fn jsx_element_is_motion_member(semantic: &Semantic<'_>, opening_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let AstKind::JSXOpeningElement(opening) = nodes.kind(opening_id) else {
         return false;
     };
-    let Some(root) = jsx_member_root_reference(&member.object) else {
-        return false;
-    };
-    match motion_import_source(semantic, root) {
-        // Imported binding: only Motion-family modules count, under any local
-        // alias (`import { motion as m }` with `<m.div>`).
-        Some(source) => is_motion_module(source),
-        // Unresolved (global/UMD script): keep the legacy spelling behavior.
-        // A binding that resolves to a local declaration is an unrelated
-        // namespace that merely shares the name.
-        None => root.name.as_str() == "motion" && !resolves_to_symbol(semantic, root),
+    match &opening.name {
+        JSXElementName::MemberExpression(member) => {
+            let Some(root) = jsx_member_root_reference(&member.object) else {
+                return false;
+            };
+            match motion_import_source(semantic, root) {
+                // Imported binding: only Motion-family modules count, under any local
+                // alias (`import { motion as m }` with `<m.div>`).
+                Some(source) => is_motion_module(source),
+                // Unresolved (global/UMD script): keep the legacy spelling behavior.
+                // A binding that resolves to a local declaration is an unrelated
+                // namespace that merely shares the name.
+                None => root.name.as_str() == "motion" && !resolves_to_symbol(semantic, root),
+            }
+        }
+        // Component stored in an identifier (`const MotionDiv = motion.div`):
+        // resolves when the declarator initializes it from the Motion namespace.
+        JSXElementName::IdentifierReference(identifier) => {
+            jsx_identifier_is_motion_component(semantic, identifier.as_ref())
+        }
+        _ => false,
     }
+}
+
+/// Whether a JSX identifier component (e.g. `MotionDiv`) is initialized from
+/// the imported Motion namespace (`const MotionDiv = motion.div`).
+fn jsx_identifier_is_motion_component(
+    semantic: &Semantic<'_>,
+    identifier: &IdentifierReference<'_>,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let Some(reference_id) = identifier.reference_id.get() else {
+        return false;
+    };
+    let Some(symbol_id) = semantic.scoping().get_reference(reference_id).symbol_id() else {
+        return false;
+    };
+    let declaration = semantic.scoping().symbol_declaration(symbol_id);
+    let nodes = semantic.nodes();
+    // The declaration may be the declarator itself or the bound identifier,
+    // so climb at most two levels to the enclosing declarator.
+    let mut declarator_id = declaration;
+    for _ in 0..2 {
+        if matches!(nodes.kind(declarator_id), AstKind::VariableDeclarator(_)) {
+            break;
+        }
+        let parent_id = nodes.parent_id(declarator_id);
+        if parent_id == declarator_id {
+            return false;
+        }
+        declarator_id = parent_id;
+    }
+    let AstKind::VariableDeclarator(declarator) = nodes.kind(declarator_id) else {
+        return false;
+    };
+    let Some(init) = &declarator.init else {
+        return false;
+    };
+    // The initializer must be `<namespace>.<member>` on a Motion import.
+    // `motion(Component)` HOC shapes stay out of scope.
+    let Expression::StaticMemberExpression(member) = init.without_parentheses() else {
+        return false;
+    };
+    let Expression::Identifier(object) = member.object.without_parentheses() else {
+        return false;
+    };
+    motion_import_source(semantic, object).is_some_and(is_motion_module)
 }
 
 /// Whether an import source provides the Motion JSX namespace.
@@ -774,6 +838,53 @@ fn jsx_member_root_reference<'a>(
         }
         JSXMemberExpressionObject::ThisExpression(_) => None,
     }
+}
+
+/// Class-composition calls whose string arguments become classes.
+const CLASS_COMPOSITION_CALLS: &[&str] = &[
+    "clsx",
+    "cn",
+    "cx",
+    "classNames",
+    "twMerge",
+    "twJoin",
+    "cva",
+    "tv",
+];
+
+/// Whether a string/template literal sits in class position: a
+/// `className`/`class` JSX attribute, or an argument of a recognized
+/// class-composition call. Unrelated strings (docs, fixtures, messages)
+/// never become classes and must not produce Tailwind findings.
+fn literal_in_class_position(semantic: &Semantic<'_>, node_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    for _ in 0..8 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::JSXAttribute(attribute) => {
+                return matches!(
+                    jsx_attribute_name(&attribute.name),
+                    Some("className" | "class")
+                );
+            }
+            AstKind::CallExpression(call) => {
+                if let Expression::Identifier(identifier) = call.callee.without_parentheses() {
+                    if CLASS_COMPOSITION_CALLS.contains(&identifier.name.as_str()) {
+                        return true;
+                    }
+                }
+            }
+            _ => {}
+        }
+        current = parent_id;
+    }
+    false
 }
 
 /// Scan a string/template literal for Tailwind/NativeWind arbitrary motion
@@ -990,8 +1101,8 @@ fn has_motion_jsx(semantic: &Semantic<'_>) -> bool {
     use oxc_ast::AstKind;
 
     semantic.nodes().iter().any(|node| {
-        if let AstKind::JSXOpeningElement(opening) = node.kind() {
-            jsx_element_is_motion_member(&opening.name, semantic)
+        if let AstKind::JSXOpeningElement(_) = node.kind() {
+            jsx_element_is_motion_member(semantic, node.id())
         } else {
             false
         }

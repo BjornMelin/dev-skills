@@ -255,12 +255,29 @@ fn doctor_catalog_lists_every_rule() {
 }
 
 #[test]
+fn tailwind_non_class_strings_are_not_scanned() {
+    // Documentation snippets, fixtures, and messages never become classes.
+    let analysis = analyze_source(
+        "app.ts",
+        r#"const example = "duration-[200ms]";
+const msg = `animation runs for duration-[300ms] total`;"#,
+        source_type_for_extension("ts"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&analysis.findings).contains(&ids::TAILWIND_DURATION_LITERAL.to_string()),
+        "non-class strings should not fire: {:?}",
+        ids(&analysis.findings)
+    );
+}
+
+#[test]
 fn tailwind_template_expression_strings_are_not_double_counted() {
     // The string inside the expression gets its own StringLiteral visit;
     // the template scan must cover only the static quasis.
     let analysis = analyze_source(
         "app.tsx",
-        r#"const dynamic = `${active ? "duration-[200ms]" : ""}`;"#,
+        r#"const dynamic = <View className={`${active ? "duration-[200ms]" : ""}`} />;"#,
         source_type_for_extension("tsx"),
         &tokens(),
     );
@@ -300,7 +317,7 @@ fn tailwind_arbitrary_motion_values_classify_drift_and_orphan() {
     let analysis = analyze_source(
         "app.tsx",
         r#"const card = <View className="duration-[200ms] delay-[237ms] ease-[cubic-bezier(0.16,1,0.3,1)]" />;
-const dynamic = `hover:duration-[360ms] ${className}`;"#,
+const dynamic = <View className={`hover:duration-[360ms] ${className}`} />;"#,
         source_type_for_extension("tsx"),
         &tokens(),
     );
@@ -494,6 +511,39 @@ const card = <motion.div transition={{ duration: 0.2 }} />;"#,
         ids(&legacy.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
         "framer-motion namespace should fire: {:?}",
         ids(&legacy.findings)
+    );
+}
+
+#[test]
+fn motion_identifier_component_resolves_through_motion_namespace() {
+    // `const MotionDiv = motion.div` keeps the Motion rules and coverage.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"import { motion } from "motion/react";
+const MotionDiv = motion.div;
+const card = <MotionDiv transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&analysis.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "identifier component should fire: {:?}",
+        ids(&analysis.findings)
+    );
+
+    // An identifier initialized outside the Motion namespace stays out.
+    let other = analyze_source(
+        "app.tsx",
+        r#"import { widgets } from "./widgets";
+const MotionDiv = widgets.div;
+const card = <MotionDiv transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&other.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "non-motion identifier should not fire: {:?}",
+        ids(&other.findings)
     );
 }
 
