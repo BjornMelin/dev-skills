@@ -39,7 +39,9 @@ source before reporting it.
 | `gsap-audit` | GSAP/ScrollTrigger and React source | [rules](https://github.com/BjornMelin/dev-skills/blob/main/crates/gsap-audit-core/src/rules.rs) |
 
 ```bash
-# Install from this checkout.
+# From a dev-skills checkout only. Standalone skill installs lack the
+# crates tree, so these commands fail there: skip this section and work
+# from the audit dimensions below (static-only mode).
 cargo install --path crates/motion-token-audit --locked --force
 cargo install --path crates/expo-motion-audit --locked --force
 cargo install --path crates/gsap-audit --locked --force
