@@ -470,6 +470,27 @@ fn motion_jsx_value_specific_transitions_fire() {
 }
 
 #[test]
+fn motion_transition_identifier_resolves_to_declarator() {
+    // Reusable config held in a variable is audited as the motion prop that
+    // consumes it.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const transition = { duration: 0.2 };
+const card = <motion.div transition={transition} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
 fn motion_jsx_namespace_resolves_through_import_alias() {
     // Aliased Motion import: the `<m.div>` tag still belongs to Motion.
     let aliased = analyze_source(

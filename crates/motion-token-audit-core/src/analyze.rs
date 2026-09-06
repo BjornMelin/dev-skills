@@ -663,6 +663,19 @@ fn motion_jsx_attribute_for_object<'a>(
     semantic: &'a Semantic<'a>,
     node_id: oxc_semantic::NodeId,
 ) -> Option<&'a str> {
+    if let Some(attribute) = direct_motion_jsx_attribute(semantic, node_id) {
+        return Some(attribute);
+    }
+    // Reusable config (`const transition = { duration: 0.2 };
+    // <motion.div transition={transition} />`): the declaration has no JSX
+    // ancestor, so resolve it through references to a motion prop instead.
+    resolve_transition_prop_reference(semantic, node_id)
+}
+
+fn direct_motion_jsx_attribute<'a>(
+    semantic: &'a Semantic<'a>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<&'a str> {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
@@ -684,6 +697,58 @@ fn motion_jsx_attribute_for_object<'a>(
             AstKind::ObjectProperty(_) | AstKind::ObjectExpression(_) => return None,
             _ => current = parent_id,
         }
+    }
+    None
+}
+
+/// Resolve an object literal held in a variable to the motion prop that
+/// consumes it, if any. Only direct declarator initializers qualify, so a
+/// nested object is never reported twice (once directly, once by reference).
+fn resolve_transition_prop_reference<'a>(
+    semantic: &'a Semantic<'a>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<&'a str> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(node_id);
+    if parent_id == node_id {
+        return None;
+    }
+    let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) else {
+        return None;
+    };
+    let symbol_id = declarator.id.get_binding_identifier()?.symbol_id.get()?;
+    semantic
+        .scoping()
+        .get_resolved_reference_ids(symbol_id)
+        .iter()
+        .find_map(|reference_id| reference_motion_prop(semantic, *reference_id))
+}
+
+/// Whether a variable reference sits in a motion JSX transition-style prop
+/// value, returning that prop name.
+fn reference_motion_prop<'a>(
+    semantic: &'a Semantic<'a>,
+    reference_id: oxc_semantic::ReferenceId,
+) -> Option<&'a str> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = semantic.scoping().get_reference(reference_id).node_id();
+    for _ in 0..5 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        if let AstKind::JSXAttribute(attribute) = nodes.kind(parent_id) {
+            let name = jsx_attribute_name(&attribute.name)?;
+            if !matches!(name, "transition" | "animate" | "exit" | "initial") {
+                return None;
+            }
+            return jsx_attribute_belongs_to_motion(semantic, parent_id).then_some(name);
+        }
+        current = parent_id;
     }
     None
 }
