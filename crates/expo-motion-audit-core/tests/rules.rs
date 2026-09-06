@@ -340,6 +340,19 @@ fn rule_bridge_in_hot_path_fires_and_outside_does_not() {
 useReaction(() => prepared.value, (current) => { scheduleOnRN(setX, current); });"#,
     );
     assert!(fired(&aliased, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+
+    // Aliased bridge helper import resolves to the same call.
+    let aliased_bridge = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { scheduleOnRN as notify } from "react-native-worklets";
+import { useAnimatedReaction } from "react-native-reanimated";
+useAnimatedReaction(() => prepared.value, (current) => { notify(setX, current); });"#,
+    );
+    assert!(fired(
+        &aliased_bridge,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
 }
 
 // ---------------------------------------------------------------------------

@@ -567,7 +567,8 @@ fn check_bridge_in_hot_path<'a, F>(
     let Some(name) = callee_identifier(call) else {
         return;
     };
-    if !matches!(name, "scheduleOnRN" | "runOnJS") {
+    let bridge = bridge_helper_canonical(name, facts);
+    if !matches!(bridge.as_str(), "scheduleOnRN" | "runOnJS") {
         return;
     }
     let Some(call_node_id) = find_node_id_for_span(
@@ -583,7 +584,10 @@ fn check_bridge_in_hot_path<'a, F>(
             Severity::Medium,
             Confidence::High,
             call.span,
-            format!("`{name}` crosses to JS from {context}, which can run per frame."),
+            format!(
+                "`{}` crosses to JS from {context}, which can run per frame.",
+                bridge
+            ),
             "Throttle the bridge, or move per-frame work into the worklet and bridge only on end/state change.",
         );
     }
@@ -1442,6 +1446,21 @@ fn callee_is_reanimated_hook(
             .is_some_and(|imported| imported == canonical)
             || (!facts.reanimated_imports.contains_key(name) && name == canonical)
     })
+}
+
+/// Canonical bridge-helper name for a callee, resolving Worklets import
+/// aliases (`import { scheduleOnRN as notify }` still counts as
+/// `scheduleOnRN`). Falls back to spelling for unimported calls.
+fn bridge_helper_canonical(name: &str, facts: &FileFacts) -> String {
+    if facts.reanimated_imports.contains_key(name) {
+        facts
+            .reanimated_imports
+            .get(name)
+            .cloned()
+            .unwrap_or_default()
+    } else {
+        name.to_string()
+    }
 }
 
 /// Find a node id whose kind matches a predicate and whose span equals `span`.
