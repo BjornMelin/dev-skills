@@ -1467,7 +1467,7 @@ fn enclosing_hot_path_context(
                 passed_through_function = true;
             }
             AstKind::CallExpression(call) if passed_through_function => {
-                if callee_is_reanimated_hook(call, "useAnimatedReaction", facts) {
+                if callee_is_reanimated_hook(semantic, call, "useAnimatedReaction", facts) {
                     return Some("a useAnimatedReaction callback");
                 }
                 if let Expression::StaticMemberExpression(member) =
@@ -1485,19 +1485,47 @@ fn enclosing_hot_path_context(
 
 /// Whether a call's callee is a Reanimated hook, resolving import aliases:
 /// `import { useAnimatedReaction as useReaction }` still counts when the
-/// canonical name is requested. Falls back to spelling for unimported calls.
+/// canonical name is requested. The map is trusted only when the callee
+/// reference resolves to that import: a shadowing parameter or local keeps
+/// its spelling, so an unrelated `useReaction` never counts as the hook.
+/// Falls back to spelling for unimported calls.
 fn callee_is_reanimated_hook(
+    semantic: &Semantic<'_>,
     call: &CallExpression<'_>,
     canonical: &str,
     facts: &FileFacts,
 ) -> bool {
-    callee_identifier(call).is_some_and(|name| {
-        facts
-            .reanimated_imports
-            .get(name)
-            .is_some_and(|imported| imported == canonical)
-            || (!facts.reanimated_imports.contains_key(name) && name == canonical)
-    })
+    use oxc_ast::ast::Expression;
+
+    let Some(name) = callee_identifier(call) else {
+        return false;
+    };
+    let Expression::Identifier(identifier) = call.callee.without_parentheses() else {
+        return false;
+    };
+    match facts.reanimated_imports.get(name) {
+        // Imported under this name: canonical must match and the reference
+        // must resolve to that import (no shadowing).
+        Some(imported) => {
+            imported == canonical && reference_resolves_to_import(semantic, identifier)
+        }
+        // No import under this name: legacy spelling match, unless the name
+        // resolves to a local declaration or a foreign import.
+        None => name == canonical && !resolves_to_any_symbol(semantic, identifier),
+    }
+}
+
+/// Whether an identifier reference resolves to any declared symbol, as
+/// opposed to an unresolvable (e.g. global) name.
+fn resolves_to_any_symbol(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> bool {
+    identifier
+        .reference_id
+        .get()
+        .and_then(|reference_id| semantic.scoping().get_reference(reference_id).symbol_id())
+        .is_some()
 }
 
 /// Canonical bridge-helper name for a callee, resolving Worklets import

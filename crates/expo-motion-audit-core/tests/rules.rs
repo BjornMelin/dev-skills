@@ -366,6 +366,19 @@ function setup(notify) { useAnimatedReaction(() => prepared.value, (current) => 
         &shadowed_bridge,
         ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
     ));
+
+    // Shadowing the hook alias itself is not the hot path either.
+    let shadowed_hook = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction as useReaction } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+function setup(useReaction) { useReaction(() => prepared.value, (current) => { scheduleOnRN(setX, current); }); }"#,
+    );
+    assert!(!fired(
+        &shadowed_hook,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
 }
 
 // ---------------------------------------------------------------------------
