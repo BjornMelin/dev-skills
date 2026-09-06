@@ -632,6 +632,26 @@ fn emit_motion_transition_literals(
         };
         emit_easing(findings, coverage, tokens, &context);
     }
+    // Value-specific transition objects (`transition={{ opacity: { duration:
+    // 0.2 } }}`) carry the same hardcoded timings one level down.
+    for property in &object.properties {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            continue;
+        };
+        if matches!(property_key_name(&property.key), Some("duration" | "ease")) {
+            continue;
+        }
+        if let Some(nested) = object_expression(&property.value) {
+            emit_motion_transition_literals(
+                nested,
+                relative_path,
+                line_index,
+                tokens,
+                findings,
+                coverage,
+            );
+        }
+    }
 }
 
 fn motion_jsx_attribute_for_object<'a>(

@@ -428,6 +428,31 @@ const timed = <motion.div animate={{ opacity: 1, transition: { duration: 0.2 } }
 }
 
 #[test]
+fn motion_jsx_value_specific_transitions_fire() {
+    // Per-value option objects carry the same hardcoded timings one level
+    // down and must be audited like top-level transition options.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const card = <motion.div transition={{ opacity: { duration: 0.2, ease: [0.1, 0.2, 0.3, 1] } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+    assert!(
+        ids(&analysis.findings).contains(&ids::MOTION_EASING_LITERAL.to_string()),
+        "nested ease array should fire: {:?}",
+        ids(&analysis.findings)
+    );
+}
+
+#[test]
 fn motion_jsx_namespace_resolves_through_import_alias() {
     // Aliased Motion import: the `<m.div>` tag still belongs to Motion.
     let aliased = analyze_source(
