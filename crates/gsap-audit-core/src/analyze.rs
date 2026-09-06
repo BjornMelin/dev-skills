@@ -308,15 +308,15 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             {
                 facts.uses_gsap_surface = true;
             }
-            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member, &facts) => {
+            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member, semantic) => {
                 facts.uses_gsap_surface = true;
             }
             AstKind::CallExpression(call) => {
-                record_register(call, &mut facts);
+                record_register(call, &mut facts, semantic);
                 if is_usegsap_call(call, &facts) {
                     facts.uses_gsap_surface = true;
                 }
-                if is_gsap_member_call(call, &facts, "matchMedia") {
+                if is_gsap_member_call(call, &facts, semantic, "matchMedia") {
                     facts.match_media_calls.push(MatchMediaCall {
                         span: call.span,
                         inside_usegsap: call_inside_usegsap(semantic, node.id(), &facts),
@@ -338,7 +338,7 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             AstKind::VariableDeclarator(declarator) => {
                 if let Some(identifier) = declarator.id.get_binding_identifier()
                     && let Some(init) = &declarator.init
-                    && expression_is_gsap_timeline_call(init, &facts)
+                    && expression_is_gsap_timeline_call(init, &facts, semantic)
                 {
                     facts.timeline_handles.push(TimelineHandle {
                         name: identifier.name.as_str().to_string(),
@@ -691,7 +691,7 @@ fn enclosing_call_is_gsap(
                 // plugin_aliases already records the local binding, so resolve
                 // through it rather than matching the literal property chain.
                 Expression::StaticMemberExpression(member) => {
-                    member_object_is_gsap(member, facts)
+                    member_object_is_gsap(member, semantic)
                         || member_object_resolves_to_plugin(member, facts)
                 }
                 Expression::Identifier(identifier) => {
@@ -1059,11 +1059,11 @@ fn reference_is_ts_type_position(semantic: &Semantic<'_>, node_id: oxc_semantic:
 /// Whether a static member expression's object is the `gsap` identifier.
 fn member_object_is_gsap(
     member: &oxc_ast::ast::StaticMemberExpression<'_>,
-    facts: &FileFacts,
+    semantic: &Semantic<'_>,
 ) -> bool {
     matches!(
         member.object.without_parentheses(),
-        Expression::Identifier(object) if is_gsap_identifier(object.name.as_str(), facts)
+        Expression::Identifier(object) if identifier_is_gsap_object(semantic, object)
     )
 }
 
@@ -1187,8 +1187,31 @@ fn dev_only_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Opti
     }
 }
 
-fn is_gsap_identifier(name: &str, facts: &FileFacts) -> bool {
-    name == "gsap" || facts.gsap_bindings.contains(name)
+/// Whether an identifier reference is the GSAP object: an import from the
+/// GSAP package or a configured GSAP entrypoint, or the unresolved global
+/// `gsap`. Parameters and locals that merely share the spelling resolve to
+/// their own declarations and do not count.
+fn identifier_is_gsap_object(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let name = identifier.name.as_str();
+    let Some(declaration) = reference_declaration(semantic, identifier) else {
+        return name == "gsap";
+    };
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = nodes.kind(parent_id) {
+        let source = import.source.value.as_str();
+        return import_source_is_gsap_package(source)
+            || import_source_is_configured_gsap_module(source);
+    }
+    false
 }
 
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
@@ -1198,8 +1221,8 @@ fn is_gsap_identifier(name: &str, facts: &FileFacts) -> bool {
 /// - anything that cannot be resolved statically (a spread `...plugins`, a call
 ///   result): this sets `registration_unknown`,
 ///   which suppresses the used-without-register check for the whole file.
-fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
-    if !is_gsap_member_call(call, facts, "registerPlugin") {
+fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts, semantic: &Semantic<'_>) {
+    if !is_gsap_member_call(call, facts, semantic, "registerPlugin") {
         return;
     }
     for argument in &call.arguments {
@@ -1339,7 +1362,7 @@ fn check_call<'a, F>(
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     // Rule 6: lagSmoothing(0) / lagSmoothing(false).
-    if is_ticker_lag_smoothing_disabled(call, facts) {
+    if is_ticker_lag_smoothing_disabled(call, facts, semantic) {
         emit(
             ids::PERFORMANCE_LAG_SMOOTHING_DISABLED,
             Severity::Medium,
@@ -1409,7 +1432,7 @@ fn check_call<'a, F>(
         check_nested_timeline_scrolltrigger(call, method, facts, semantic, emit);
         check_missing_overwrite(call, node_id, method, semantic, facts, emit);
     }
-    if let Some(vars) = gsap_timeline_vars_object(call, facts) {
+    if let Some(vars) = gsap_timeline_vars_object(call, facts, semantic) {
         check_nested_scrolltrigger_configs(vars, emit);
         if let Some(span) = timeline_defaults_will_change_span(vars) {
             emit(
@@ -1423,7 +1446,7 @@ fn check_call<'a, F>(
             );
         }
     }
-    if is_gsap_member_call(call, facts, "timeline") {
+    if is_gsap_member_call(call, facts, semantic, "timeline") {
         check_tween_in_render(call, node_id, "timeline", semantic, facts, emit);
     }
 
@@ -1446,10 +1469,10 @@ fn check_call<'a, F>(
     check_plugin_used_without_register(call, facts, semantic, emit);
 
     // Rules 11 & 12 hang off useGSAP / gsap.context calls.
-    if is_gsap_member_call(call, facts, "context") || is_usegsap_call(call, facts) {
+    if is_gsap_member_call(call, facts, semantic, "context") || is_usegsap_call(call, facts) {
         check_unscoped_selectors(call, facts, semantic, emit);
     }
-    if is_gsap_member_call(call, facts, "context") {
+    if is_gsap_member_call(call, facts, semantic, "context") {
         check_context_missing_revert(call, semantic, emit);
     }
 }
@@ -2614,7 +2637,12 @@ fn argument_is_numeric_literal(argument: &Argument<'_>) -> bool {
     )
 }
 
-fn is_gsap_member_call(call: &CallExpression<'_>, facts: &FileFacts, method: &str) -> bool {
+fn is_gsap_member_call(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+    method: &str,
+) -> bool {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return false;
     };
@@ -2623,7 +2651,7 @@ fn is_gsap_member_call(call: &CallExpression<'_>, facts: &FileFacts, method: &st
     }
     matches!(
         member.object.without_parentheses(),
-        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
+        Expression::Identifier(identifier) if identifier_is_gsap_object(semantic, identifier)
     )
 }
 
@@ -2686,8 +2714,10 @@ fn scrolltrigger_config_span<'a>(
     let vars_objects: Vec<&'a ObjectExpression<'a>> =
         if let Some(method) = gsap_tween_method(call, facts, semantic) {
             tween_vars_objects(call, method)
-        } else if is_gsap_member_call(call, facts, "timeline") {
-            gsap_timeline_vars_object(call, facts).into_iter().collect()
+        } else if is_gsap_member_call(call, facts, semantic, "timeline") {
+            gsap_timeline_vars_object(call, facts, semantic)
+                .into_iter()
+                .collect()
         } else {
             return None;
         };
@@ -2725,8 +2755,9 @@ fn plugin_vars_key_span<'a>(
 fn gsap_timeline_vars_object<'a>(
     call: &'a CallExpression<'a>,
     facts: &FileFacts,
+    semantic: &Semantic<'_>,
 ) -> Option<&'a ObjectExpression<'a>> {
-    if !is_gsap_member_call(call, facts, "timeline") {
+    if !is_gsap_member_call(call, facts, semantic, "timeline") {
         return None;
     }
     match call
@@ -2747,11 +2778,11 @@ fn expression_is_gsap_tween_owner(
 ) -> bool {
     match expression.without_parentheses() {
         Expression::Identifier(identifier) => {
-            is_gsap_identifier(identifier.name.as_str(), facts)
+            identifier_is_gsap_object(semantic, identifier)
                 || identifier_is_timeline_handle(semantic, identifier, facts)
         }
         Expression::CallExpression(call) => {
-            is_gsap_member_call(call, facts, "timeline")
+            is_gsap_member_call(call, facts, semantic, "timeline")
                 || gsap_tween_method(call, facts, semantic).is_some()
                 || timeline_chain_method_returns_timeline(call, facts, semantic)
         }
@@ -2771,10 +2802,14 @@ fn timeline_chain_method_returns_timeline(
         && expression_is_gsap_tween_owner(&member.object, facts, semantic)
 }
 
-fn expression_is_gsap_timeline_call(expression: &Expression<'_>, facts: &FileFacts) -> bool {
+fn expression_is_gsap_timeline_call(
+    expression: &Expression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     matches!(
         expression.without_parentheses(),
-        Expression::CallExpression(call) if is_gsap_member_call(call, facts, "timeline")
+        Expression::CallExpression(call) if is_gsap_member_call(call, facts, semantic, "timeline")
     )
 }
 
@@ -2840,7 +2875,11 @@ fn object_animates_layout_prop(object: &ObjectExpression<'_>) -> Option<Span> {
 }
 
 /// Whether a call is `gsap.ticker.lagSmoothing(0|false)`.
-fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
+fn is_ticker_lag_smoothing_disabled(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     let Expression::StaticMemberExpression(outer) = call.callee.without_parentheses() else {
         return false;
     };
@@ -2856,7 +2895,7 @@ fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>, facts: &FileFacts
     }
     let is_gsap = matches!(
         inner.object.without_parentheses(),
-        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
+        Expression::Identifier(identifier) if identifier_is_gsap_object(semantic, identifier)
     );
     if !is_gsap {
         return false;

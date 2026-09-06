@@ -1747,6 +1747,19 @@ export default memo(() => {
     );
     assert!(fired(&wrapped_default, ids::REACT_TWEEN_IN_RENDER));
 
+    // Shadowed `gsap` parameter is not the GSAP object: no tween, no render
+    // finding.
+    let shadowed_gsap = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { gsap } from "gsap";
+export function Card(gsap) {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+}"#,
+    );
+    assert!(!fired(&shadowed_gsap, ids::REACT_TWEEN_IN_RENDER));
+
     // useMemo factories execute during render: attribute the tween to the
     // owning component rather than the anonymous factory callback.
     let memo_tween = analyze(
