@@ -27,9 +27,13 @@ target repo's installed package versions before editing.
 
 ## Decision Boundaries
 
-- Use native-lottie for React Native.
+- Use [`expo-motion`](../../../../skills/expo-motion/SKILL.md) for React Native.
 - Use Rive for interactive state machines.
 - Use CSS/WAAPI for simple UI motion that does not need designer-authored assets.
+- Route general Motion/CSS API work to [`motion`](../../../../skills/motion/SKILL.md),
+  cross-stack audits to
+  [`design-motion-audit`](../../../design-motion/skills/design-motion-audit/SKILL.md), and web
+  R3F to [`web-three-r3f`](../web-three-r3f/SKILL.md).
 
 ## Workflow
 

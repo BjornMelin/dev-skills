@@ -1,4 +1,8 @@
-use crate::*;
+use crate::{
+    Context7Command, ProviderKind, ResearchConfig, Result, SourceCacheInsert, attach_source_to_run,
+    context7_send, http_client, init_db, json, maybe_debit, merge_metadata, metadata_text,
+    print_json, record_source_cache, required_env, research_paths, track_provider_result,
+};
 
 pub(crate) async fn handle_context7(
     command: Context7Command,
@@ -123,7 +127,7 @@ pub(crate) async fn handle_context7(
             raw_body_stored: false,
             metadata: merge_metadata(
                 metadata,
-                json!({ "cache_ttl_hours": config.providers.context7.cache_ttl_hours }),
+                &json!({ "cache_ttl_hours": config.providers.context7.cache_ttl_hours }),
             ),
             redact_query_secrets: config.privacy.redact_query_secrets,
         },

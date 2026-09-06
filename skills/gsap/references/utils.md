@@ -1,6 +1,8 @@
 # GSAP Utilities (gsap.utils)
 
-`gsap.utils` is a set of pure helper functions for math, value mapping, randomness, snapping, unit parsing, and collection handling. They ship with the core `gsap` package (v3.13+, fully free and open) and need **no plugin registration** — call any helper as `gsap.utils.clamp()`, etc.
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
+`gsap.utils` is a set of pure helper functions for math, value mapping, randomness, snapping, unit parsing, and collection handling. They ship with the core `gsap` package and need **no plugin registration**. Call any helper as `gsap.utils.clamp()`, etc.
 
 ## Contents
 

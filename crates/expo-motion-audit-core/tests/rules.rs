@@ -32,14 +32,14 @@ fn rule_layout_prop_animation_fires_and_clean_does_not() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const style = useAnimatedStyle(() => ({ width: w.value, height: 10 }));"#,
+        r"const style = useAnimatedStyle(() => ({ width: w.value, height: 10 }));",
     );
     assert!(fired(&bad, ids::REANIMATED_CORE_LAYOUT_PROP_ANIMATION));
 
     let bad_block = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const style = useAnimatedStyle(() => { return { marginTop: m.value }; });"#,
+        r"const style = useAnimatedStyle(() => { return { marginTop: m.value }; });",
     );
     assert!(fired(
         &bad_block,
@@ -49,7 +49,7 @@ fn rule_layout_prop_animation_fires_and_clean_does_not() {
     let clean = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));"#,
+        r"const style = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));",
     );
     assert!(!fired(&clean, ids::REANIMATED_CORE_LAYOUT_PROP_ANIMATION));
 }
@@ -63,22 +63,22 @@ fn rule_shared_value_reassign_fires_and_value_write_does_not() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   sv = 5;
   return null;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::REANIMATED_CORE_SHARED_VALUE_REASSIGN));
 
     let clean = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   sv.value = 5;
   return null;
-}"#,
+}",
     );
     assert!(!fired(&clean, ids::REANIMATED_CORE_SHARED_VALUE_REASSIGN));
 
@@ -86,11 +86,11 @@ fn rule_shared_value_reassign_fires_and_value_write_does_not() {
     let unrelated = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   let count = 0;
   count = 5;
   return null;
-}"#,
+}",
     );
     assert!(!fired(
         &unrelated,
@@ -100,7 +100,7 @@ fn rule_shared_value_reassign_fires_and_value_write_does_not() {
     let shadowed = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function A() {
+        r"function A() {
   const sv = useSharedValue(0);
   return null;
 }
@@ -108,7 +108,7 @@ function B() {
   let sv = 0;
   sv = 1;
   return sv;
-}"#,
+}",
     );
     assert!(!fired(
         &shadowed,
@@ -170,11 +170,11 @@ fn rule_value_access_on_js_fires_at_render_scope() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   const current = sv.value;
   return null;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
@@ -185,11 +185,11 @@ fn rule_value_access_inside_worklet_does_not_fire() {
     let clean_hook = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   const style = useAnimatedStyle(() => ({ opacity: sv.value }));
   return null;
-}"#,
+}",
     );
     assert!(!fired(
         &clean_hook,
@@ -200,14 +200,14 @@ fn rule_value_access_inside_worklet_does_not_fire() {
     let clean_worklet = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   const compute = () => {
     'worklet';
     return sv.value + 1;
   };
   return null;
-}"#,
+}",
     );
     assert!(!fired(
         &clean_worklet,
@@ -218,13 +218,13 @@ fn rule_value_access_inside_worklet_does_not_fire() {
     let clean_effect = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   useEffect(() => {
     console.log(sv.value);
   }, []);
   return null;
-}"#,
+}",
     );
     assert!(!fired(
         &clean_effect,
@@ -237,11 +237,11 @@ fn rule_value_access_in_non_callback_arguments_still_fires() {
     let animated_arg = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   useAnimatedStyle(makeStyle(sv.value));
   return null;
-}"#,
+}",
     );
     assert!(fired(
         &animated_arg,
@@ -251,11 +251,11 @@ fn rule_value_access_in_non_callback_arguments_still_fires() {
     let effect_deps = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   useEffect(() => {}, [sv.value]);
   return null;
-}"#,
+}",
     );
     assert!(fired(
         &effect_deps,
@@ -265,11 +265,11 @@ fn rule_value_access_in_non_callback_arguments_still_fires() {
     let schedule_arg = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   scheduleOnUI(worklet, sv.value);
   return null;
-}"#,
+}",
     );
     assert!(fired(
         &schedule_arg,
@@ -284,10 +284,10 @@ fn rule_value_access_in_jsx_event_handler_does_not_fire() {
     let clean = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   return <Pressable onPress={() => { sv.value = withTiming(1); }} />;
-}"#,
+}",
     );
     assert!(!fired(&clean, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
@@ -299,10 +299,10 @@ fn rule_value_access_in_jsx_render_expression_still_fires() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   const sv = useSharedValue(0);
   return <View style={{ width: sv.value }} />;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
@@ -316,9 +316,9 @@ fn rule_bridge_in_hot_path_fires_and_outside_does_not() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const g = Gesture.Pan().onUpdate((e) => {
+        r"const g = Gesture.Pan().onUpdate((e) => {
   scheduleOnRN(setX, e.translationX);
-});"#,
+});",
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
 
@@ -326,11 +326,59 @@ fn rule_bridge_in_hot_path_fires_and_outside_does_not() {
     let clean = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const g = Gesture.Pan().onEnd((e) => {
+        r"const g = Gesture.Pan().onEnd((e) => {
   scheduleOnRN(setX, e.translationX);
-});"#,
+});",
     );
     assert!(!fired(&clean, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+
+    // Aliased hook import resolves to the same hot path.
+    let aliased = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction as useReaction } from "react-native-reanimated";
+useReaction(() => prepared.value, (current) => { scheduleOnRN(setX, current); });"#,
+    );
+    assert!(fired(&aliased, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+
+    // Aliased bridge helper import resolves to the same call.
+    let aliased_bridge = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { scheduleOnRN as notify } from "react-native-worklets";
+import { useAnimatedReaction } from "react-native-reanimated";
+useAnimatedReaction(() => prepared.value, (current) => { notify(setX, current); });"#,
+    );
+    assert!(fired(
+        &aliased_bridge,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
+
+    // Shadowing parameter sharing the alias spelling is not the bridge.
+    let shadowed_bridge = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { scheduleOnRN as notify } from "react-native-worklets";
+import { useAnimatedReaction } from "react-native-reanimated";
+function setup(notify) { useAnimatedReaction(() => prepared.value, (current) => { notify(current); }); }"#,
+    );
+    assert!(!fired(
+        &shadowed_bridge,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
+
+    // Shadowing the hook alias itself is not the hot path either.
+    let shadowed_hook = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction as useReaction } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+function setup(useReaction) { useReaction(() => prepared.value, (current) => { scheduleOnRN(setX, current); }); }"#,
+    );
+    assert!(!fired(
+        &shadowed_hook,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
 }
 
 // ---------------------------------------------------------------------------
@@ -342,18 +390,18 @@ fn rule_missing_worklet_fires_for_extracted_functions_and_inline_is_clean() {
     let bad = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function compute() {
+        r"function compute() {
   return sv.value * 2;
 }
-const d = useDerivedValue(compute);"#,
+const d = useDerivedValue(compute);",
     );
     assert!(fired(&bad, ids::WORKLETS_THREADING_MISSING_WORKLET));
 
     let bad_arrow = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const compute = () => sv.value * 2;
-const d = useDerivedValue(compute);"#,
+        r"const compute = () => sv.value * 2;
+const d = useDerivedValue(compute);",
     );
     assert!(fired(&bad_arrow, ids::WORKLETS_THREADING_MISSING_WORKLET));
 
@@ -361,7 +409,7 @@ const d = useDerivedValue(compute);"#,
     let clean_arrow = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const d = useDerivedValue(() => sv.value * 2);"#,
+        r"const d = useDerivedValue(() => sv.value * 2);",
     );
     assert!(!fired(
         &clean_arrow,
@@ -371,9 +419,9 @@ const d = useDerivedValue(compute);"#,
     let clean_function_expression = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const d = useDerivedValue(function compute() {
+        r"const d = useDerivedValue(function compute() {
   return sv.value * 2;
-});"#,
+});",
     );
     assert!(!fired(
         &clean_function_expression,
@@ -384,11 +432,11 @@ const d = useDerivedValue(compute);"#,
     let clean_worklet = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"function compute() {
+        r"function compute() {
   'worklet';
   return sv.value * 2;
 }
-const d = useDerivedValue(compute);"#,
+const d = useDerivedValue(compute);",
     );
     assert!(!fired(
         &clean_worklet,
@@ -398,11 +446,11 @@ const d = useDerivedValue(compute);"#,
     let clean_worklet_arrow = analyze(
         "src/Box.tsx",
         "tsx",
-        r#"const compute = () => {
+        r"const compute = () => {
   'worklet';
   return sv.value * 2;
 };
-const d = useDerivedValue(compute);"#,
+const d = useDerivedValue(compute);",
     );
     assert!(!fired(
         &clean_worklet_arrow,
@@ -419,7 +467,7 @@ fn rule_infinite_repeat_fires_and_guarded_does_not() {
     let bad = analyze(
         "src/Spinner.tsx",
         "tsx",
-        r#"sv.value = withRepeat(withTiming(1), -1, true);"#,
+        r"sv.value = withRepeat(withTiming(1), -1, true);",
     );
     assert!(fired(&bad, ids::LAYOUT_INFINITE_REPEAT_NO_REDUCED_MOTION));
 
@@ -440,7 +488,7 @@ sv.value = withRepeat(withTiming(1), -1, true);"#,
     let finite = analyze(
         "src/Spinner.tsx",
         "tsx",
-        r#"sv.value = withRepeat(withTiming(1), 3, true);"#,
+        r"sv.value = withRepeat(withTiming(1), 3, true);",
     );
     assert!(!fired(
         &finite,
@@ -457,10 +505,10 @@ fn rule_missing_reduced_motion_fires_and_referenced_does_not() {
     let bad = analyze(
         "src/Fade.tsx",
         "tsx",
-        r#"function C() {
+        r"function C() {
   sv.value = withTiming(1);
   return <Animated.View entering={FadeIn} />;
-}"#,
+}",
     );
     assert!(fired(&bad, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
 
@@ -502,11 +550,25 @@ function C() {
     assert!(!fired(&clean, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
 
     // A file with no animation at all -> does not fire.
-    let no_animation = analyze("src/Plain.tsx", "tsx", r#"const value = 1;"#);
+    let no_animation = analyze("src/Plain.tsx", "tsx", r"const value = 1;");
     assert!(!fired(
         &no_animation,
         ids::ACCESSIBILITY_MISSING_REDUCED_MOTION
     ));
+
+    // A matching substring in an unrelated identifier or comment is not a
+    // reduced-motion guard.
+    let substring = analyze(
+        "src/Fade.tsx",
+        "tsx",
+        r"// TODO: consider reduceMotion handling later
+function C() {
+  const reduceMotionDuration = 200;
+  sv.value = withTiming(1);
+  return <Animated.View entering={FadeIn} />;
+}",
+    );
+    assert!(fired(&substring, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
 }
 
 // ---------------------------------------------------------------------------
@@ -646,7 +708,7 @@ fn babel_config_deprecated_reanimated_plugin_fires() {
 
 #[test]
 fn babel_config_dynamic_export_is_informational() {
-    let dynamic = analyze_babel_config("babel.config.js", r#"module.exports = buildConfig();"#);
+    let dynamic = analyze_babel_config("babel.config.js", r"module.exports = buildConfig();");
     assert!(fired(&dynamic, ids::CONFIG_UNABLE_TO_ANALYZE));
 }
 
@@ -774,7 +836,7 @@ module.exports = { plugins: ["react-native-worklets/plugin", ...extra] };"#,
 #[test]
 fn babel_config_no_presets_no_plugins_still_fires_missing() {
     // No presets and no plugins at all -> missing fires.
-    let empty = analyze_babel_config("babel.config.js", r#"module.exports = {};"#);
+    let empty = analyze_babel_config("babel.config.js", r"module.exports = {};");
     assert!(fired(
         &empty,
         ids::CONFIG_WORKLETS_PLUGIN_MISSING_OR_NOT_LAST
@@ -836,8 +898,7 @@ fn scan_dynamic_app_config_js_emits_unable_to_analyze() {
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or(0)
+            .map_or(0, |elapsed| elapsed.as_nanos())
     ));
     std::fs::create_dir_all(&dir).expect("create temp scan dir");
 
@@ -975,7 +1036,7 @@ export function C() {
         ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
     ));
 
-    // The raw `.value` property on the JS thread still fires.
+    // An event-handler function runs outside render and is deliberately clean.
     let raw = analyze(
         "src/a.tsx",
         "tsx",
@@ -983,8 +1044,197 @@ export function C() {
 export function C() {
   const sv = useSharedValue(1);
   const onPressIn = () => { sv.value = 0.97; };
-  return onPressIn;
+  return <Pressable onPressIn={onPressIn} />;
 }"#,
     );
-    assert!(fired(&raw, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+    assert!(!fired(&raw, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    // useMemo factories execute during render: a read inside one belongs to
+    // the owning component.
+    let memo = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import { useMemo } from "react";
+import { useSharedValue } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(0);
+  const v = useMemo(() => sv.value, [sv]);
+  return <Text>{v}</Text>;
+}"#,
+    );
+    assert!(fired(&memo, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+}
+
+#[test]
+fn rule_value_access_is_limited_to_component_render() {
+    let bad = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export function Card() {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+}"#,
+    );
+    assert!(fired(&bad, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    let clean = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export function Card() {
+  const progress = useSharedValue(0);
+  const onPress = () => { progress.value = 1; };
+  return <Pressable onPress={onPress} />;
+}"#,
+    );
+    assert!(!fired(&clean, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    // Anonymous default-exported component returning JSX is a component
+    // context even though no name exists to test.
+    let anonymous = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { useSharedValue } from "react-native-reanimated";
+export default () => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+};"#,
+    );
+    assert!(fired(
+        &anonymous,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+
+    // Wrapped anonymous default export composes both supported forms.
+    let wrapped_default = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { memo } from "react";
+import { useSharedValue } from "react-native-reanimated";
+export default memo(() => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+});"#,
+    );
+    assert!(fired(
+        &wrapped_default,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+
+    // React-namespace wrapper composes like the bare form.
+    let react_wrapped = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React from "react";
+import { useSharedValue } from "react-native-reanimated";
+const Card = React.memo(() => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+});"#,
+    );
+    assert!(fired(
+        &react_wrapped,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
+}
+
+#[test]
+fn rule_missing_reduced_motion_recognizes_config_and_per_animation_option() {
+    let bad = analyze(
+        "src/Fade.tsx",
+        "tsx",
+        r#"import { withDelay, withTiming } from "react-native-reanimated";
+const animation = withDelay(100, withTiming(1));"#,
+    );
+    assert!(fired(&bad, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
+
+    let clean = analyze(
+        "src/Fade.tsx",
+        "tsx",
+        r#"import { ReduceMotion, ReducedMotionConfig, withTiming } from "react-native-reanimated";
+const config = <ReducedMotionConfig mode={ReduceMotion.System} />;
+const animation = withTiming(1, { reduceMotion: ReduceMotion.System });"#,
+    );
+    assert!(!fired(&clean, ids::ACCESSIBILITY_MISSING_REDUCED_MOTION));
+}
+
+#[test]
+fn rule_bridge_in_animated_reaction_fires_and_event_bridge_does_not() {
+    let bad = analyze(
+        "src/Reaction.tsx",
+        "tsx",
+        r"useAnimatedReaction(
+  () => progress.value,
+  (value) => { runOnJS(report)(value); }
+);",
+    );
+    assert!(fired(&bad, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+
+    let clean = analyze(
+        "src/Reaction.tsx",
+        "tsx",
+        r"const onPress = () => { runOnJS(report)(progress.value); };",
+    );
+    assert!(!fired(&clean, ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH));
+}
+
+#[test]
+fn rule_layout_animation_in_list_fires_and_non_list_component_does_not() {
+    let bad = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import { FlatList } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+const renderItem = ({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>;
+export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
+    );
+    assert!(fired(&bad, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
+
+    let clean = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import Animated, { FadeIn } from "react-native-reanimated";
+export function Card() { return <Animated.View entering={FadeIn} />; }"#,
+    );
+    assert!(!fired(&clean, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
+
+    // Animated.FlatList render path: member-expression list element whose
+    // root resolves to the Reanimated Animated namespace.
+    let animated_list = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import Animated, { FadeIn } from "react-native-reanimated";
+export function List() { return <Animated.FlatList data={data} renderItem={({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>} />; }"#,
+    );
+    assert!(fired(
+        &animated_list,
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
+    ));
+
+    // Ordinary component prop sharing the name is not a layout animation.
+    let custom_prop = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import { FlatList } from "react-native";
+const renderItem = ({ item }) => <Row layout="compact">{item.name}</Row>;
+export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
+    );
+    assert!(!fired(
+        &custom_prop,
+        ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST
+    ));
+
+    // Memoized render callback: the arrow is wrapped in useCallback, so its
+    // name lives on the declarator above the wrapper call.
+    let memoized = analyze(
+        "src/List.tsx",
+        "tsx",
+        r#"import { useCallback } from "react";
+import { FlatList } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+const renderItem = useCallback(({ item }) => <Animated.View entering={FadeIn}>{item.name}</Animated.View>, []);
+export function List() { return <FlatList data={data} renderItem={renderItem} />; }"#,
+    );
+    assert!(fired(&memoized, ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST));
 }

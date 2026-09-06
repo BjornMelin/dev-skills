@@ -1,4 +1,7 @@
-use crate::*;
+use crate::{
+    Context, ProbeReport, RANGE, ResearchConfig, ResearchPlan, ResearchProfile, Result, Route,
+    Serialize, TopicKind, apply_route_memory, is_github_url, profile_budget, strip_tags,
+};
 
 pub(crate) fn build_plan(
     query: &str,
@@ -87,27 +90,24 @@ pub(crate) async fn probe_url(
     }
 
     let fetched = direct_fetch(client, url, max_bytes).await;
-    match fetched {
-        Ok(fetched) => {
-            let mut report = classify_body(
-                url,
-                fetched.content_type.as_deref(),
-                content_length,
-                &fetched.body,
-            );
-            report.status = Some(fetched.status);
-            if report.content_type.is_none() {
-                report.content_type = content_type;
-            }
-            apply_route_memory(url, &mut report)?;
-            Ok(report)
+    if let Ok(fetched) = fetched {
+        let mut report = classify_body(
+            url,
+            fetched.content_type.as_deref(),
+            content_length,
+            &fetched.body,
+        );
+        report.status = Some(fetched.status);
+        if report.content_type.is_none() {
+            report.content_type = content_type;
         }
-        Err(_) => {
-            let mut report = classify_body(url, content_type.as_deref(), content_length, "");
-            report.status = status;
-            apply_route_memory(url, &mut report)?;
-            Ok(report)
-        }
+        apply_route_memory(url, &mut report)?;
+        Ok(report)
+    } else {
+        let mut report = classify_body(url, content_type.as_deref(), content_length, "");
+        report.status = status;
+        apply_route_memory(url, &mut report)?;
+        Ok(report)
     }
 }
 

@@ -13,6 +13,10 @@ pub mod ids {
     pub const GSAP_EASING_LITERAL: &str = "tokens-gsap.easing-literal";
     pub const REACT_DURATION_LITERAL: &str = "tokens-react.duration-literal";
     pub const REACT_EASING_LITERAL: &str = "tokens-react.easing-literal";
+    pub const TAILWIND_DURATION_LITERAL: &str = "tokens-tailwind.duration-literal";
+    pub const TAILWIND_EASING_LITERAL: &str = "tokens-tailwind.easing-literal";
+    pub const MOTION_DURATION_LITERAL: &str = "tokens-motion.duration-literal";
+    pub const MOTION_EASING_LITERAL: &str = "tokens-motion.easing-literal";
 }
 
 pub const CATALOG: &[RuleDescriptor] = &[
@@ -85,6 +89,34 @@ pub const CATALOG: &[RuleDescriptor] = &[
         severity: Severity::Medium,
         confidence: Confidence::Medium,
         summary: "Motion React transition object uses a hardcoded ease literal.",
+    },
+    RuleDescriptor {
+        id: ids::TAILWIND_DURATION_LITERAL,
+        category: Category::TokensTailwind,
+        severity: Severity::Medium,
+        confidence: Confidence::High,
+        summary: "Tailwind/NativeWind arbitrary duration or delay uses a hardcoded millisecond literal.",
+    },
+    RuleDescriptor {
+        id: ids::TAILWIND_EASING_LITERAL,
+        category: Category::TokensTailwind,
+        severity: Severity::Medium,
+        confidence: Confidence::High,
+        summary: "Tailwind/NativeWind arbitrary ease uses a hardcoded cubic-bezier literal.",
+    },
+    RuleDescriptor {
+        id: ids::MOTION_DURATION_LITERAL,
+        category: Category::TokensMotion,
+        severity: Severity::Medium,
+        confidence: Confidence::High,
+        summary: "Motion 12 JSX transition props use a hardcoded duration literal.",
+    },
+    RuleDescriptor {
+        id: ids::MOTION_EASING_LITERAL,
+        category: Category::TokensMotion,
+        severity: Severity::Medium,
+        confidence: Confidence::High,
+        summary: "Motion 12 JSX transition props use a hardcoded cubic-bezier array.",
     },
 ];
 

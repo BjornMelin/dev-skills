@@ -1,4 +1,10 @@
-use crate::*;
+use std::fmt::Write as _;
+
+use crate::{
+    ClaimRecord, Context, File, LedgerCommand, LedgerRecord, ReportArgs, Result, SourceRecord, Utc,
+    append_ledger_record, bail, cached_source, ensure_parent, fs, init_db, json, print_json,
+    read_ledger_records, research_paths, short_hash,
+};
 
 pub(crate) fn handle_ledger(command: LedgerCommand, json_out: bool) -> Result<()> {
     match command {
@@ -128,15 +134,18 @@ pub(crate) fn render_report(args: ReportArgs, json_out: bool) -> Result<()> {
         output.push_str("No claims recorded.\n\n");
     }
     for claim in &claims {
-        output.push_str(&format!(
-            "- `{}` confidence {:.2}: {}\n",
+        writeln!(
+            output,
+            "- `{}` confidence {:.2}: {}",
             claim.id, claim.confidence, claim.text
-        ));
+        )
+        .expect("writing to a String is infallible");
         if !claim.sources.is_empty() {
-            output.push_str(&format!("  sources: {}\n", claim.sources.join(", ")));
+            writeln!(output, "  sources: {}", claim.sources.join(", "))
+                .expect("writing to a String is infallible");
         }
         if let Some(note) = &claim.note {
-            output.push_str(&format!("  note: {note}\n"));
+            writeln!(output, "  note: {note}").expect("writing to a String is infallible");
         }
     }
     output.push_str("\n## Sources\n\n");
@@ -145,10 +154,12 @@ pub(crate) fn render_report(args: ReportArgs, json_out: bool) -> Result<()> {
     }
     for source in &sources {
         let title = source.title.as_deref().unwrap_or(&source.url);
-        output.push_str(&format!(
-            "- `{}` [{}]({}) via {}\n",
+        writeln!(
+            output,
+            "- `{}` [{}]({}) via {}",
             source.id, title, source.url, source.provider
-        ));
+        )
+        .expect("writing to a String is infallible");
     }
 
     if let Some(out) = args.out {

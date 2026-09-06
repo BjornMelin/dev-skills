@@ -1,0 +1,6 @@
+interface:
+  display_name: "Design Review"
+  short_description: "Adversarial UI and motion review"
+  default_prompt: "Use $design-review to inspect the current UI branch, prove behavior at runtime, implement confirmed findings when requested, and return an evidence-backed verdict."
+policy:
+  allow_implicit_invocation: true

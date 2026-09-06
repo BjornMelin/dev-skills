@@ -8,6 +8,7 @@
 //! detected by anything. The tool exists so the next drift is loud.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -188,9 +189,8 @@ fn skill_files(root: &Path) -> Vec<(String, PathBuf)> {
     if !root.exists() {
         return out;
     }
-    let entries = match fs::read_dir(root) {
-        Ok(e) => e,
-        Err(_) => return out,
+    let Ok(entries) = fs::read_dir(root) else {
+        return out;
     };
     for entry in entries.flatten() {
         let dir = entry.path();
@@ -403,7 +403,7 @@ fn scan(
             let Ok(text) = fs::read_to_string(&file) else {
                 continue;
             };
-            let bytes = fs::metadata(&file).map(|m| m.len()).unwrap_or(0);
+            let bytes = fs::metadata(&file).map_or(0, |m| m.len());
             let lines = text.lines().count();
 
             if bytes > SKILL_MAX_BYTES {
@@ -778,19 +778,23 @@ fn scan(
 
 fn render_markdown(report: &Report) -> String {
     let mut out = String::new();
-    out.push_str(&format!(
+    write!(
+        out,
         "# claude-config-audit\n\n{} finding(s). Listing: ~{} tokens across {} skills.\n\n",
         report.summary.total, report.summary.listing_tokens, report.summary.skills_listed
-    ));
+    )
+    .expect("writing to a String is infallible");
     if report.findings.is_empty() {
         out.push_str("No drift detected.\n");
         return out;
     }
     for f in &report.findings {
-        out.push_str(&format!(
-            "- **{:?}** `{}` — {}\n  - {}\n  - {}\n",
+        writeln!(
+            out,
+            "- **{:?}** `{}` — {}\n  - {}\n  - {}",
             f.severity, f.id, f.subject, f.message, f.suggestion
-        ));
+        )
+        .expect("writing to a String is infallible");
     }
     out
 }

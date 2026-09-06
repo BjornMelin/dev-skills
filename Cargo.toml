@@ -21,3 +21,64 @@ edition = "2024"
 rust-version = "1.96"
 license = "MIT"
 repository = "https://github.com/BjornMelin/dev-skills"
+
+[workspace.dependencies]
+# Internal crates
+audit-gate = { path = "crates/audit-gate" }
+bun-platform-core = { path = "crates/bun-platform-core" }
+codex-dev-core = { version = "0.1.0", path = "crates/codex-dev-core" }
+expo-motion-audit-core = { path = "crates/expo-motion-audit-core" }
+gsap-audit-core = { path = "crates/gsap-audit-core" }
+motion-token-audit-core = { path = "crates/motion-token-audit-core" }
+# Shared external crates (single source of truth for versions)
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.6"
+clap_mangen = "0.3"
+crossterm = "0.29"
+directories = "6.0"
+dirs = "6.0"
+jsonc-parser = { version = "0.33", features = ["serde"] }
+libc = "0.2"
+oxc_allocator = "0.137.0"
+oxc_ast = "0.137.0"
+oxc_ast_visit = "0.137.0"
+oxc_parser = "0.137.0"
+oxc_semantic = "0.137.0"
+oxc_span = "0.137.0"
+ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
+regex = "1.12"
+reqwest = { version = "0.13", features = ["json", "query", "rustls"] }
+rusqlite = { version = "0.39", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml_ng = "0.10"
+sha2 = "0.10"
+time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "process"] }
+toml = "0.8"
+url = "2.5"
+walkdir = "2.5"
+
+[workspace.lints.rust]
+# `deny` (not `forbid`) so the two justified FFI/test-env sites can carry a
+# targeted `#[allow(unsafe_code)]` with a comment; any NEW unsafe fails.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+# Workspace-wide quality floor. Keep the allow-list curated; every allow needs
+# a reason. The repo gate runs `cargo clippy --workspace --all-targets
+# --all-features --locked -- -D warnings`, so warn here means fail there.
+pedantic = { level = "warn", priority = -1 }
+# Curated allows: low signal in this codebase or too noisy for the value.
+cast_possible_truncation = "allow" # bounded AST spans and counts; usize->u32 is intentional
+cast_precision_loss = "allow" # no float math where precision matters
+cast_sign_loss = "allow" # same bounded-domain rationale as truncation
+doc_markdown = "allow" # doc prose uses CLI names that are not rustdoc items
+missing_errors_doc = "allow" # error docs live in the type, not per-function prose
+missing_panics_doc = "allow" # panics are documented invariants, not API surface
+module_name_repetitions = "allow" # domain-prefixed names are clearer than the repetition
+must_use_candidate = "allow" # noisy on small helpers; call sites are internal
+similar_names = "allow" # domain vocabulary repeats across near identifiers
+too_many_lines = "allow" # rule engines are long match tables; length is not complexity here

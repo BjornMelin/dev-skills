@@ -1,0 +1,6 @@
+interface:
+  display_name: "Finalize Branch"
+  short_description: "Pre-merge branch and PR closeout"
+  default_prompt: "Use $finalize-branch to inspect the current branch, resolve merge blockers and hard-cut debt when requested, run applicable validation, and report merge readiness."
+policy:
+  allow_implicit_invocation: true

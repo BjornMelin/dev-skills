@@ -14,11 +14,11 @@ use motion_token_audit_core::{
 };
 
 fn token_source() -> &'static str {
-    r#"export const motion = {
+    r"export const motion = {
   duration: { instant: 0, short: 200, medium: 360 },
   easing: { out: [0.16, 1, 0.3, 1] },
   spring: { snappy: { stiffness: 520, damping: 42, mass: 1 } },
-} as const;"#
+} as const;"
 }
 
 fn tokens() -> MotionTokens {
@@ -39,10 +39,10 @@ fn discovers_ssot_from_motion_ts_shape() {
 #[test]
 fn discovers_ssot_from_css_custom_properties() {
     let tokens = discover_css_tokens(
-        r#":root {
+        r":root {
   --motion-duration-short: 0.2s;
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-}"#,
+}",
     );
     assert!(tokens.has_duration_ms(200));
     assert!(!tokens.is_empty());
@@ -252,6 +252,377 @@ fn doctor_catalog_lists_every_rule() {
     for rule in CATALOG {
         assert!(rules.iter().any(|value| value["id"] == rule.id));
     }
+}
+
+#[test]
+fn tailwind_non_class_strings_are_not_scanned() {
+    // Documentation snippets, fixtures, and messages never become classes.
+    let analysis = analyze_source(
+        "app.ts",
+        r#"const example = "duration-[200ms]";
+const msg = `animation runs for duration-[300ms] total`;"#,
+        source_type_for_extension("ts"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&analysis.findings).contains(&ids::TAILWIND_DURATION_LITERAL.to_string()),
+        "non-class strings should not fire: {:?}",
+        ids(&analysis.findings)
+    );
+}
+
+#[test]
+fn tailwind_substring_classes_do_not_fire() {
+    // `my-duration-[200ms]` is not a Tailwind utility: only tokens whose
+    // utility starts with the supported prefix count, after variants.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="my-duration-[200ms] hover:duration-[200ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
+fn tailwind_template_expression_strings_are_not_double_counted() {
+    // The string inside the expression gets its own StringLiteral visit;
+    // the template scan must cover only the static quasis.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const dynamic = <View className={`${active ? "duration-[200ms]" : ""}`} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+}
+
+#[test]
+fn tailwind_named_token_classes_count_as_tokenized_coverage() {
+    // Named classes matching known tokens credit the Tailwind stack, so a
+    // file mixing token names with one arbitrary duration does not report
+    // 0% Tailwind coverage. token_source() defines `short: 200`.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-short duration-[200ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let refs = |stack: &str| {
+        analysis
+            .coverage
+            .iter()
+            .find(|entry| entry.stack == stack)
+            .map_or(0, |entry| entry.tokenized_references)
+    };
+    assert_eq!(refs("tailwind"), 1);
+}
+
+#[test]
+fn tailwind_arbitrary_motion_values_classify_drift_and_orphan() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-[200ms] delay-[237ms] ease-[cubic-bezier(0.16,1,0.3,1)]" />;
+const dynamic = <View className={`hover:duration-[360ms] ${className}`} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 3);
+    assert!(
+        duration_findings
+            .iter()
+            .any(|finding| finding.message.starts_with("orphan:"))
+    );
+    assert!(
+        analysis
+            .findings
+            .iter()
+            .any(|finding| finding.id == ids::TAILWIND_EASING_LITERAL
+                && finding.message.starts_with("drift:"))
+    );
+}
+
+#[test]
+fn tailwind_invalid_arbitrary_class_does_not_swallow_later_ones() {
+    // The non-numeric first class must not consume the valid second one.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-[var(--motion-duration)] duration-[200ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
+fn tailwind_unclosed_arbitrary_class_does_not_swallow_later_ones() {
+    // The unclosed first class must not consume the valid second one.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-[200 duration-[300ms]" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::TAILWIND_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("300ms"));
+}
+
+#[test]
+fn tailwind_named_motion_classes_do_not_fire_arbitrary_value_rules() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"const card = <View className="duration-fast delay-none ease-out" />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(!ids(&analysis.findings).contains(&ids::TAILWIND_DURATION_LITERAL.to_string()));
+    assert!(!ids(&analysis.findings).contains(&ids::TAILWIND_EASING_LITERAL.to_string()));
+}
+
+#[test]
+fn motion_jsx_transition_literals_use_seconds_and_bezier_tokens() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const card = <motion.div transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }} />;
+const exit = <motion.div exit={{ opacity: 0, transition: { duration: 0.237 } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 2);
+    assert!(
+        duration_findings
+            .iter()
+            .any(|finding| finding.message.contains("200ms")
+                && finding.message.starts_with("drift:"))
+    );
+    assert!(
+        analysis
+            .findings
+            .iter()
+            .any(|finding| finding.id == ids::MOTION_EASING_LITERAL
+                && finding.message.starts_with("drift:"))
+    );
+}
+
+#[test]
+fn motion_jsx_animation_targets_are_not_transition_options() {
+    // `duration` as an animation target inside `animate` is not timing and
+    // must not fire; the nested `transition` object still does.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const custom = <motion.custom animate={{ duration: 3 }} />;
+const timed = <motion.div animate={{ opacity: 1, transition: { duration: 0.2 } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
+fn motion_jsx_value_specific_transitions_fire() {
+    // Per-value option objects carry the same hardcoded timings one level
+    // down and must be audited like top-level transition options.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const card = <motion.div transition={{ opacity: { duration: 0.2, ease: [0.1, 0.2, 0.3, 1] } }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+    assert!(
+        ids(&analysis.findings).contains(&ids::MOTION_EASING_LITERAL.to_string()),
+        "nested ease array should fire: {:?}",
+        ids(&analysis.findings)
+    );
+}
+
+#[test]
+fn motion_transition_identifier_resolves_to_declarator() {
+    // Reusable config held in a variable is audited as the motion prop that
+    // consumes it.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const transition = { duration: 0.2 };
+const card = <motion.div transition={transition} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let duration_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(duration_findings.len(), 1);
+    assert!(duration_findings[0].message.contains("200ms"));
+}
+
+#[test]
+fn motion_jsx_namespace_resolves_through_import_alias() {
+    // Aliased Motion import: the `<m.div>` tag still belongs to Motion.
+    let aliased = analyze_source(
+        "app.tsx",
+        r#"import { motion as m } from "motion/react";
+const card = <m.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&aliased.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "aliased motion namespace should fire: {:?}",
+        ids(&aliased.findings)
+    );
+
+    // Unrelated local namespace sharing the name must not fire.
+    let shadowed = analyze_source(
+        "app.tsx",
+        r#"const motion = { div: "div" };
+const card = <motion.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&shadowed.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "local motion namespace should not fire: {:?}",
+        ids(&shadowed.findings)
+    );
+
+    // framer-motion keeps the previous behavior (same seconds semantics).
+    let legacy = analyze_source(
+        "app.tsx",
+        r#"import { motion } from "framer-motion";
+const card = <motion.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&legacy.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "framer-motion namespace should fire: {:?}",
+        ids(&legacy.findings)
+    );
+}
+
+#[test]
+fn motion_identifier_component_resolves_through_motion_namespace() {
+    // `const MotionDiv = motion.div` keeps the Motion rules and coverage.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"import { motion } from "motion/react";
+const MotionDiv = motion.div;
+const card = <MotionDiv transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        ids(&analysis.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "identifier component should fire: {:?}",
+        ids(&analysis.findings)
+    );
+
+    // An identifier initialized outside the Motion namespace stays out.
+    let other = analyze_source(
+        "app.tsx",
+        r#"import { widgets } from "./widgets";
+const MotionDiv = widgets.div;
+const card = <MotionDiv transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(
+        !ids(&other.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()),
+        "non-motion identifier should not fire: {:?}",
+        ids(&other.findings)
+    );
+}
+
+#[test]
+fn aliased_motion_jsx_credits_tokens_motion_coverage() {
+    // `motionTokens.*` references alongside aliased `<m.div>` JSX belong to
+    // the motion stack, not tokens-react, even with a `transition` prop.
+    let analysis = analyze_source(
+        "app.tsx",
+        r#"import { motion as m } from "motion/react";
+const style = { duration: motionTokens.fast };
+const card = <m.div transition={{ duration: 0.2 }} />;"#,
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let refs = |stack: &str| {
+        analysis
+            .coverage
+            .iter()
+            .find(|entry| entry.stack == stack)
+            .map_or(0, |entry| entry.tokenized_references)
+    };
+    assert_eq!(refs("motion"), 1);
+    assert_eq!(refs("react"), 0);
+}
+
+#[test]
+fn non_motion_transition_objects_do_not_fire_motion_jsx_rules() {
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const options = { transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] } };
+const card = <Card transition={{ duration: 0.2 }} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+    assert!(!ids(&analysis.findings).contains(&ids::MOTION_DURATION_LITERAL.to_string()));
+    assert!(!ids(&analysis.findings).contains(&ids::MOTION_EASING_LITERAL.to_string()));
 }
 
 fn temp_scan_root(name: &str) -> PathBuf {

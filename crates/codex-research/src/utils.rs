@@ -1,4 +1,7 @@
-use crate::*;
+use crate::{
+    Context, Digest, ProbeReport, Result, Route, Serialize, Sha256, Value, bail, init_db, json,
+    research_paths, route_memory_for_url,
+};
 
 pub(crate) fn apply_route_memory(url: &str, report: &mut ProbeReport) -> Result<()> {
     if report.route == Route::Github {
@@ -93,7 +96,7 @@ pub(crate) fn normalize_compare(mut value: Value) -> Value {
     value
 }
 
-pub(crate) fn merge_metadata(mut left: Value, right: Value) -> Value {
+pub(crate) fn merge_metadata(mut left: Value, right: &Value) -> Value {
     if let (Some(left), Some(right)) = (left.as_object_mut(), right.as_object()) {
         for (key, value) in right {
             left.insert(key.clone(), value.clone());

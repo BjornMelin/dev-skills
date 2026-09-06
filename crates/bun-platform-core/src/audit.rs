@@ -83,10 +83,10 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
     let signals = infer_signals(&snapshot)?;
     let mut findings = Vec::new();
     let package_json_path = root.join("package.json");
-    let package_json = snapshot.read_json::<PackageJson>(&package_json_path)?;
-    let tsconfig = snapshot.read_jsonc::<TsConfig>(&root.join("tsconfig.json"))?;
-    let bunfig = snapshot.read_text(&root.join("bunfig.toml"))?;
-    let gitignore = snapshot.read_text(&root.join(".gitignore"))?;
+    let package_json = RepoSnapshot::read_json::<PackageJson>(&package_json_path)?;
+    let tsconfig = RepoSnapshot::read_jsonc::<TsConfig>(&root.join("tsconfig.json"))?;
+    let bunfig = RepoSnapshot::read_text(&root.join("bunfig.toml"))?;
+    let gitignore = RepoSnapshot::read_text(&root.join(".gitignore"))?;
 
     let lockfiles = [
         "bun.lockb",
@@ -97,7 +97,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
     ]
     .iter()
     .filter(|name| root.join(name).is_file())
-    .map(|name| name.to_string())
+    .map(std::string::ToString::to_string)
     .collect::<Vec<_>>();
     if lockfiles.len() > 1 {
         findings.push(create_finding(
@@ -249,8 +249,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
         let has_bun_types = package_json
             .dev_dependencies
             .as_ref()
-            .map(|deps| deps.contains_key("@types/bun"))
-            .unwrap_or(false);
+            .is_some_and(|deps| deps.contains_key("@types/bun"));
         if let Some(tsconfig) = tsconfig.as_ref() {
             let compiler_options = tsconfig.compiler_options.clone().unwrap_or_default();
             if let Some(module_resolution) = compiler_options
@@ -276,8 +275,7 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                 if compiler_options
                     .get(key)
                     .and_then(|value| value.as_str())
-                    .map(|value| !value.eq_ignore_ascii_case(expected))
-                    .unwrap_or(true)
+                    .is_none_or(|value| !value.eq_ignore_ascii_case(expected))
                 {
                     missing.push(format!("{key}: \"{expected}\""));
                 }
@@ -287,7 +285,11 @@ pub fn run_audit(root: &Path, config: &AuditConfig, paths: &PlatformPaths) -> Re
                 "verbatimModuleSyntax",
                 "noEmit",
             ] {
-                if compiler_options.get(key).and_then(|value| value.as_bool()) != Some(true) {
+                if compiler_options
+                    .get(key)
+                    .and_then(serde_json::Value::as_bool)
+                    != Some(true)
+                {
                     missing.push(format!("{key}: true"));
                 }
             }
@@ -457,8 +459,7 @@ fn create_finding(
 ) -> Finding {
     let relative = file
         .strip_prefix(root)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|_| file.to_path_buf());
+        .map_or_else(|_| file.to_path_buf(), Path::to_path_buf);
     Finding {
         rule_id: rule_id.to_string(),
         category: get_rule_category(rule_id).to_string(),
@@ -491,8 +492,8 @@ fn get_rule_category(rule_id: &str) -> &'static str {
     }
 }
 
-impl<'a> RepoSnapshot<'a> {
-    fn read_text(&self, path: &Path) -> Result<Option<String>> {
+impl RepoSnapshot<'_> {
+    fn read_text(path: &Path) -> Result<Option<String>> {
         match fs::read_to_string(path) {
             Ok(text) => Ok(Some(text)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -500,8 +501,8 @@ impl<'a> RepoSnapshot<'a> {
         }
     }
 
-    fn read_json<T: DeserializeOwned>(&self, path: &Path) -> Result<Option<T>> {
-        let Some(text) = self.read_text(path)? else {
+    fn read_json<T: DeserializeOwned>(path: &Path) -> Result<Option<T>> {
+        let Some(text) = Self::read_text(path)? else {
             return Ok(None);
         };
         Ok(Some(serde_json::from_str::<T>(&text).with_context(
@@ -509,8 +510,8 @@ impl<'a> RepoSnapshot<'a> {
         )?))
     }
 
-    fn read_jsonc<T: DeserializeOwned>(&self, path: &Path) -> Result<Option<T>> {
-        let Some(text) = self.read_text(path)? else {
+    fn read_jsonc<T: DeserializeOwned>(path: &Path) -> Result<Option<T>> {
+        let Some(text) = Self::read_text(path)? else {
             return Ok(None);
         };
         let options = jsonc_parser::ParseOptions {
@@ -627,8 +628,7 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
             .modified()
             .ok()
             .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
-            .map(|value| value.as_millis())
-            .unwrap_or(0);
+            .map_or(0, |value| value.as_millis());
         hasher.update(
             path.strip_prefix(snapshot.root)
                 .unwrap_or(&path)
@@ -643,8 +643,7 @@ fn build_repo_fingerprint(snapshot: &RepoSnapshot<'_>) -> Result<String> {
 }
 
 fn infer_signals(snapshot: &RepoSnapshot<'_>) -> Result<RepoSignals> {
-    let package_json = snapshot
-        .read_json::<PackageJson>(&snapshot.root.join("package.json"))
+    let package_json = RepoSnapshot::read_json::<PackageJson>(&snapshot.root.join("package.json"))
         .ok()
         .flatten();
     let vercel_bun_enabled = detect_vercel_bun_enabled(snapshot)?;
@@ -657,14 +656,12 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> Result<RepoSignals> {
     let has_workspaces = package_json
         .as_ref()
         .and_then(|pkg| pkg.workspaces.clone())
-        .map(|value| !value.is_null())
-        .unwrap_or(false);
+        .is_some_and(|value| !value.is_null());
     let bun_first = has_bun_lockfile(snapshot.root)
         || package_json
             .as_ref()
             .and_then(|pkg| pkg.package_manager.as_deref())
-            .map(|value| value.starts_with("bun@"))
-            .unwrap_or(false)
+            .is_some_and(|value| value.starts_with("bun@"))
         || vercel_bun_enabled
         || scripts.iter().any(|value| BUN_COMMAND_RE.is_match(value));
     Ok(RepoSignals {
@@ -676,12 +673,10 @@ fn infer_signals(snapshot: &RepoSnapshot<'_>) -> Result<RepoSignals> {
 
 fn detect_vercel_bun_enabled(snapshot: &RepoSnapshot<'_>) -> Result<bool> {
     let vercel_json_path = snapshot.root.join("vercel.json");
-    match snapshot.read_json::<serde_json::Value>(&vercel_json_path)? {
+    match RepoSnapshot::read_json::<serde_json::Value>(&vercel_json_path)? {
         Some(json) => Ok(contains_bun_runtime_config(&json)),
-        None => Ok(snapshot
-            .read_text(&snapshot.root.join("vercel.ts"))?
-            .map(|text| vercel_ts_has_bun_runtime(&text))
-            .unwrap_or(false)),
+        None => Ok(RepoSnapshot::read_text(&snapshot.root.join("vercel.ts"))?
+            .is_some_and(|text| vercel_ts_has_bun_runtime(&text))),
     }
 }
 
@@ -770,7 +765,7 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
     let mut findings = Vec::new();
     let root = snapshot.root;
     let vercel_json_path = root.join("vercel.json");
-    if let Some(vercel_json) = snapshot.read_json::<serde_json::Value>(&vercel_json_path)? {
+    if let Some(vercel_json) = RepoSnapshot::read_json::<serde_json::Value>(&vercel_json_path)? {
         if let Some(version) = vercel_json
             .get("bunVersion")
             .and_then(|value| value.as_str())
@@ -810,7 +805,7 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
     }
 
     if signals.vercel_bun_enabled
-        && let Some(middleware) = snapshot.read_text(&root.join("middleware.ts"))?
+        && let Some(middleware) = RepoSnapshot::read_text(&root.join("middleware.ts"))?
         && !Regex::new(r#"runtime\s*=\s*['"]nodejs['"]"#)?.is_match(&middleware)
     {
         findings.push(create_finding(
@@ -832,7 +827,7 @@ fn run_vercel_adapter(snapshot: &RepoSnapshot<'_>, signals: &RepoSignals) -> Res
             if !is_js_like(&file) {
                 continue;
             }
-            let Some(content) = snapshot.read_text(&file)? else {
+            let Some(content) = RepoSnapshot::read_text(&file)? else {
                 continue;
             };
             if let Some(hit) = find_first(&content, &bun_serve) {
@@ -874,14 +869,12 @@ fn run_github_actions_adapter(
         if !path.starts_with(&workflow_dir) {
             continue;
         }
-        let name = path
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or_default();
-        if !name.ends_with(".yml") && !name.ends_with(".yaml") {
+        if !path.extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("yml") || extension.eq_ignore_ascii_case("yaml")
+        }) {
             continue;
         }
-        let Some(content) = snapshot.read_text(path)? else {
+        let Some(content) = RepoSnapshot::read_text(path)? else {
             continue;
         };
         if signals.bun_first && install_re.is_match(&content) {
@@ -937,7 +930,7 @@ fn run_docker_adapter(
         if !is_dockerfile(file) {
             continue;
         }
-        let Some(content) = snapshot.read_text(file)? else {
+        let Some(content) = RepoSnapshot::read_text(file)? else {
             continue;
         };
         if signals.bun_first && node_from_re.is_match(&content) {
@@ -986,7 +979,7 @@ fn run_docker_adapter(
 fn run_monorepo_adapter(snapshot: &RepoSnapshot<'_>) -> Result<Vec<Finding>> {
     let mut findings = Vec::new();
     let filter_re = Regex::new(r"--filter|--workspaces")?;
-    let package_json = snapshot.read_json::<PackageJson>(&snapshot.root.join("package.json"))?;
+    let package_json = RepoSnapshot::read_json::<PackageJson>(&snapshot.root.join("package.json"))?;
     for (name, command) in package_json.and_then(|pkg| pkg.scripts).unwrap_or_default() {
         if !["build", "test", "lint", "typecheck"].contains(&name.as_str()) {
             continue;
@@ -1016,8 +1009,7 @@ fn run_monorepo_adapter(snapshot: &RepoSnapshot<'_>) -> Result<Vec<Finding>> {
 fn is_dockerfile(path: &Path) -> bool {
     path.file_name()
         .and_then(|value| value.to_str())
-        .map(|value| value.starts_with("Dockerfile"))
-        .unwrap_or(false)
+        .is_some_and(|value| value.starts_with("Dockerfile"))
 }
 
 fn has_bun_lockfile(root: &Path) -> bool {
@@ -1088,14 +1080,10 @@ fn find_first(content: &str, regex: &Regex) -> Option<MatchHit> {
     let matched = regex.find(content)?;
     let index = matched.start();
     let line = content[..index].chars().filter(|ch| *ch == '\n').count() + 1;
-    let last_line_start = content[..index]
-        .rfind('\n')
-        .map(|value| value + 1)
-        .unwrap_or(0);
+    let last_line_start = content[..index].rfind('\n').map_or(0, |value| value + 1);
     let next_line_end = content[index..]
         .find('\n')
-        .map(|value| index + value)
-        .unwrap_or(content.len());
+        .map_or(content.len(), |value| index + value);
     Some(MatchHit {
         line,
         column: index - last_line_start + 1,
@@ -1126,11 +1114,10 @@ fn find_first_unfrozen_bun_install(
         let block = extract_command_block(content, start);
         if !bun_frozen_re.is_match(block) {
             let line_num = content[..start].chars().filter(|&c| c == '\n').count() + 1;
-            let line_start = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            let line_start = content[..start].rfind('\n').map_or(0, |i| i + 1);
             let line_end = content[start..]
                 .find('\n')
-                .map(|i| start + i)
-                .unwrap_or(content.len());
+                .map_or(content.len(), |i| start + i);
             let line = &content[line_start..line_end];
             return Some(FindingOptions {
                 line: Some(line_num),
@@ -1144,11 +1131,10 @@ fn find_first_unfrozen_bun_install(
 }
 
 fn extract_command_block(content: &str, start: usize) -> &str {
-    let line_start = content[..start].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_start = content[..start].rfind('\n').map_or(0, |i| i + 1);
     let mut block_end = content[start..]
         .find('\n')
-        .map(|i| start + i)
-        .unwrap_or(content.len());
+        .map_or(content.len(), |i| start + i);
     loop {
         let trimmed = content[line_start..block_end].trim_end();
         if !trimmed.ends_with('\\') || block_end >= content.len() {

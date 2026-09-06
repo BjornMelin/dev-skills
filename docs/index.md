@@ -134,6 +134,18 @@ out of version control.
   skill packaging rules.
 - [Skill and Subagent Eval Lab](reference/skill-subagent-eval-lab.md)
 - [TanStack Current Authority](reference/tanstack-current-authority.md)
+- [Design Review Skill](../skills/design-review/SKILL.md): adversarial design,
+  frontend, and motion review for web or mobile branches, proven in a real
+  browser or device with motion, performance, and accessibility measurement.
+- [Finalize Branch Skill](../skills/finalize-branch/SKILL.md): pre-merge
+  branch and PR closeout covering follow-up work, hard cuts, validation
+  coverage, docs alignment, and merge-readiness fixes.
+- [QA Router Skill](../skills/qa-router/SKILL.md): validation routing and
+  test-failure triage, including gate selection, deterministic tests, CI
+  failure reproduction, and flaky-suite diagnosis.
+- [shadcn Skill](../skills/shadcn/SKILL.md): shadcn/ui component workflows
+  (add, search, fix, style, compose) with registry and component docs,
+  Bun-first with pnpm/npm fallbacks.
 
 ## Cookbooks
 

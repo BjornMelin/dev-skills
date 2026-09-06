@@ -138,8 +138,7 @@ pub fn analyze_babel_config(relative_path: &str, source: &str) -> Vec<Finding> {
     // Rule 10: worklets plugin missing or not last.
     let last_is_worklets = plugin_names
         .last()
-        .map(|name| name.as_deref() == Some(WORKLETS_PLUGIN))
-        .unwrap_or(false);
+        .is_some_and(|name| name.as_deref() == Some(WORKLETS_PLUGIN));
     let has_worklets = plugin_names
         .iter()
         .any(|name| name.as_deref() == Some(WORKLETS_PLUGIN));

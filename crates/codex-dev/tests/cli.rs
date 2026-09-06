@@ -648,7 +648,7 @@ fn write_skill_inventory_repo(root: &std::path::Path) -> std::path::PathBuf {
     std::fs::write(
         alpha.join("SKILL.md"),
         format!(
-            r#"---
+            r"---
 name: alpha-skill
 description: |
   Alpha skill description.{}
@@ -661,7 +661,7 @@ metadata:
 ---
 
 # Alpha
-"#,
+",
             '\u{2014}'
         ),
     )
@@ -679,13 +679,13 @@ metadata:
     std::fs::create_dir_all(&beta).expect("beta dir");
     std::fs::write(
         beta.join("SKILL.md"),
-        r#"---
+        r"---
 name: beta-skill
 description: Beta skill description.
 ---
 
 # Beta
-"#,
+",
     )
     .expect("beta skill");
     repo
@@ -702,13 +702,13 @@ fn write_archived_skill(
     std::fs::write(
         archived.join("SKILL.md"),
         format!(
-            r#"---
+            r"---
 name: {skill_name}
 description: Archived test skill.
 ---
 
 # Archived
-"#
+"
         ),
     )
     .expect("archived skill");
@@ -925,7 +925,7 @@ fn skills_audit_reports_hygiene_findings() {
     let beta = repo.join("skills/beta-skill");
     std::fs::write(
         beta.join("SKILL.md"),
-        r#"---
+        r"---
 name: beta-skill
 description: Beta skill description.
 ---
@@ -933,7 +933,7 @@ description: Beta skill description.
 # Beta
 
 Run /path/to/beta-skill/scripts/check.py when needed.
-"#,
+",
     )
     .expect("beta stale path skill");
     std::fs::create_dir_all(beta.join("scripts/__pycache__")).expect("beta pycache");
@@ -1713,7 +1713,7 @@ fn skills_catalog_chains_companion_skill_installs() {
     std::fs::create_dir_all(&orchestrator).expect("orchestrator dir");
     std::fs::write(
         orchestrator.join("SKILL.md"),
-        r#"---
+        r"---
 name: orchestrator-skill
 description: Coordinates its companion skills.
 metadata:
@@ -1723,7 +1723,7 @@ metadata:
 ---
 
 # Orchestrator
-"#,
+",
     )
     .expect("orchestrator skill");
     let out = temp.path().join("agent-skills-lab.json");
@@ -2114,27 +2114,27 @@ fn skills_inventory_reports_invalid_frontmatter() {
     std::fs::create_dir_all(&invalid).expect("invalid skill dir");
     std::fs::write(
         invalid.join("SKILL.md"),
-        r#"---
+        r"---
 name: different-name
 description: Invalid skill.
 extra: nope
 ---
 
 # Invalid
-"#,
+",
     )
     .expect("invalid skill");
     let numeric = repo.join("skills/numeric-skill");
     std::fs::create_dir_all(&numeric).expect("numeric skill dir");
     std::fs::write(
         numeric.join("SKILL.md"),
-        r#"---
+        r"---
 name: 123
 description: 456
 ---
 
 # Numeric
-"#,
+",
     )
     .expect("numeric skill");
     let malformed = repo.join("skills/malformed-skill");
@@ -2154,39 +2154,39 @@ description: "unterminated
     std::fs::create_dir_all(&traversal).expect("traversal skill dir");
     std::fs::write(
         traversal.join("SKILL.md"),
-        r#"---
+        r"---
 name: ../outside
 description: Traversal skill.
 ---
 
 # Traversal
-"#,
+",
     )
     .expect("traversal skill");
     let boolean_alias = repo.join("skills/boolean-alias-skill");
     std::fs::create_dir_all(&boolean_alias).expect("boolean alias skill dir");
     std::fs::write(
         boolean_alias.join("SKILL.md"),
-        r#"---
+        r"---
 name: on
 description: yes
 ---
 
 # Boolean Alias
-"#,
+",
     )
     .expect("boolean alias skill");
     let timestamp = repo.join("skills/timestamp-skill");
     std::fs::create_dir_all(&timestamp).expect("timestamp skill dir");
     std::fs::write(
         timestamp.join("SKILL.md"),
-        r#"---
+        r"---
 name: timestamp-skill
 description: 2026-05-12
 ---
 
 # Timestamp
-"#,
+",
     )
     .expect("timestamp skill");
 
@@ -2304,14 +2304,14 @@ fn skills_inventory_accepts_yaml_inline_comments_in_scalars() {
     std::fs::create_dir_all(&commented).expect("commented skill dir");
     std::fs::write(
         commented.join("SKILL.md"),
-        r#"---
+        r"---
 name: commented-skill # catalog identity
 description: Commented skill description. # human note
 allowed-tools: [bash, python3] # common shells
 ---
 
 # Commented
-"#,
+",
     )
     .expect("commented skill");
     let quoted = repo.join("skills/quoted-comment-skill");
@@ -2463,7 +2463,7 @@ fn skills_inventory_accepts_indented_frontmatter_keys() {
     std::fs::create_dir_all(&indented).expect("indented skill dir");
     std::fs::write(
         indented.join("SKILL.md"),
-        r#"---
+        r"---
   name: indented-skill
   description: Indented skill description.
   metadata:
@@ -2471,7 +2471,7 @@ fn skills_inventory_accepts_indented_frontmatter_keys() {
 ---
 
 # Indented
-"#,
+",
     )
     .expect("indented skill");
 
@@ -2515,13 +2515,13 @@ fn skills_inventory_ignores_symlinked_skill_and_resource_paths() {
     std::fs::create_dir_all(&external_skill).expect("external skill dir");
     std::fs::write(
         external_skill.join("SKILL.md"),
-        r#"---
+        r"---
 name: linked-skill
 description: Linked skill.
 ---
 
 # Linked
-"#,
+",
     )
     .expect("external skill");
     symlink(&external_skill, repo.join("skills/linked-skill")).expect("skill symlink");
@@ -3551,8 +3551,8 @@ fn write_pr_review_edge_blank_suggestion_fixture(source_dir: &std::path::Path) {
     .expect("write edge-blank suggestion threads");
 }
 
-fn write_pr_suggestion_worklist(path: &std::path::Path, items: Value) {
-    let item_values = items.as_array().cloned().unwrap_or_default();
+fn write_pr_suggestion_worklist(path: &std::path::Path, items: &Value) {
+    let item_values = items.as_array().map_or(&[][..], Vec::as_slice);
     let unresolved_threads = item_values
         .iter()
         .filter(|item| item["status"].as_str() != Some("resolved"))
@@ -5540,7 +5540,7 @@ fn pr_review_apply_suggestions_preserves_crlf_line_endings() {
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-suggestion",
@@ -5840,7 +5840,7 @@ fn pr_review_apply_suggestions_does_not_reindent_replacement() {
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-suggestion",
@@ -5903,7 +5903,7 @@ fn pr_review_apply_suggestions_preserves_trailing_blank_original_line() {
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-suggestion",
@@ -5962,7 +5962,7 @@ fn pr_review_apply_suggestions_rejects_paths_outside_repo_root() {
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-absolute",
@@ -6050,7 +6050,7 @@ fn pr_review_apply_suggestions_applies_same_file_suggestions_from_bottom_to_top(
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-top",
@@ -6129,7 +6129,7 @@ fn pr_review_apply_suggestions_skips_outdated_items_by_default() {
     let worklist = temp.path().join("worklist.json");
     write_pr_suggestion_worklist(
         &worklist,
-        json!([
+        &json!([
             {
                 "id": "item-001",
                 "thread_id": "thread-live",

@@ -25,6 +25,7 @@ pub mod ids {
     pub const CONFIG_DEPRECATED_REANIMATED_PLUGIN: &str = "config.deprecated-reanimated-plugin";
     pub const CONFIG_NEW_ARCH_DISABLED: &str = "config.new-arch-disabled";
     pub const CONFIG_UNABLE_TO_ANALYZE: &str = "config.unable-to-analyze";
+    pub const PERFORMANCE_LAYOUT_ANIMATION_IN_LIST: &str = "performance.layout-animation-in-list";
 }
 
 /// The full, ordered rule catalog. Order here drives `doctor` output order.
@@ -54,15 +55,15 @@ pub const CATALOG: &[RuleDescriptor] = &[
         id: ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS,
         category: Category::WorkletsThreading,
         severity: Severity::High,
-        confidence: Confidence::Medium,
-        summary: "Reading/writing a shared value's `.value` on the JS thread (module scope or render).",
+        confidence: Confidence::High,
+        summary: "Reading/writing a shared value's `.value` directly during component render.",
     },
     RuleDescriptor {
         id: ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH,
         category: Category::WorkletsThreading,
         severity: Severity::Medium,
-        confidence: Confidence::Medium,
-        summary: "scheduleOnRN/runOnJS called inside a gesture onUpdate/onChange or per-frame callback.",
+        confidence: Confidence::High,
+        summary: "scheduleOnRN/runOnJS called inside an animated reaction or gesture onUpdate/onChange callback.",
     },
     RuleDescriptor {
         id: ids::WORKLETS_THREADING_MISSING_WORKLET,
@@ -119,6 +120,13 @@ pub const CATALOG: &[RuleDescriptor] = &[
         severity: Severity::Low,
         confidence: Confidence::Low,
         summary: "A config file is too dynamic to analyze statically (informational).",
+    },
+    RuleDescriptor {
+        id: ids::PERFORMANCE_LAYOUT_ANIMATION_IN_LIST,
+        category: Category::Performance,
+        severity: Severity::Low,
+        confidence: Confidence::Medium,
+        summary: "A FlatList/SectionList cell applies entering, exiting, or layout animation per item.",
     },
 ];
 

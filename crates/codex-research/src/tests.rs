@@ -571,7 +571,7 @@ fn evidence_bundle_command_non_strict_reports_failures_without_error() -> Result
         strict: false,
     };
     let (bundle, _) = build_evidence_bundle(&args, generated_at)?;
-    let result = build_evidence_bundle_command(args, false);
+    let result = build_evidence_bundle_command(&args, false);
     fs::remove_dir_all(&dir)?;
 
     assert_eq!(bundle.status, "failed");

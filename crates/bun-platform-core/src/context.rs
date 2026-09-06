@@ -37,17 +37,23 @@ impl SkillContext {
     }
 
     pub fn list_rule_ids(&self) -> Result<Vec<String>> {
-        let mut rule_ids = fs::read_dir(&self.rules_dir)?
-            .filter_map(|entry| entry.ok())
-            .filter_map(|entry| {
-                let path = entry.path();
-                let name = path.file_name()?.to_str()?;
-                if !name.ends_with(".md") || name == "_index.md" {
-                    return None;
-                }
-                Some(name.trim_end_matches(".md").to_string())
-            })
-            .collect::<Vec<_>>();
+        let mut rule_ids = Vec::new();
+        for entry in fs::read_dir(&self.rules_dir)? {
+            let path = entry?.path();
+            if !path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+            {
+                continue;
+            }
+            let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+                continue;
+            };
+            if stem == "_index" {
+                continue;
+            }
+            rule_ids.push(stem.to_string());
+        }
         rule_ids.sort();
         Ok(rule_ids)
     }

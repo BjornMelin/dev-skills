@@ -16,8 +16,8 @@ Based on the user's input, call the appropriate MCP tool.
 
 For spring-based easing, call `mcp__motion__visualise-spring`:
 
--   **bounce** (number, -1 to 1): How bouncy the spring is
--   **duration** (number, seconds): Duration of the spring animation
+Use the shared [spring parameters](../css-spring/index.md#parameters): `bounce` is `0` to `1`,
+and `duration` is the perceptual duration in seconds.
 
 Or raw physics parameters:
 

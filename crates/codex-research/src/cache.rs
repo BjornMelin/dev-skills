@@ -1,4 +1,7 @@
-use crate::*;
+use crate::{
+    CacheCommand, Connection, Context, Result, cached_source, count_blobs, init_db, json,
+    list_cached_sources, list_route_memory, print_json, prune_cache, research_paths,
+};
 
 pub(crate) fn handle_cache(command: CacheCommand, json_out: bool) -> Result<()> {
     let paths = research_paths()?;

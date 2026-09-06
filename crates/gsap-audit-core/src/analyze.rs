@@ -92,6 +92,7 @@ const LAYOUT_PROPS: &[&str] = &[
 
 /// File-scoped facts gathered in a single pre-pass and shared by heuristic
 /// rules that need a whole-file view (imports, registrations, directives).
+#[allow(clippy::struct_excessive_bools)] // file-fact accumulator; named flags keep rule reads explicit
 #[derive(Default)]
 struct FileFacts {
     /// Identifiers passed to any `gsap.registerPlugin(...)` call in the file,
@@ -115,12 +116,93 @@ struct FileFacts {
     /// Local bindings imported from the skill's configured GSAP module pattern
     /// (`lib/gsap`), where registration is centralized before re-export.
     configured_gsap_imports: BTreeSet<String>,
-    /// Identifiers initialized from `gsap.timeline(...)`.
-    timeline_handles: BTreeSet<String>,
+    /// Identifiers initialized from `gsap.timeline(...)`, with their resolved
+    /// declarations so shadowed parameters and locals sharing the spelling
+    /// are not treated as GSAP timelines.
+    timeline_handles: Vec<TimelineHandle>,
     /// Local import aliases for known plugins, keyed by local binding.
     plugin_aliases: BTreeMap<String, String>,
     /// Local import aliases for dev-only helpers, keyed by local binding.
     dev_only_aliases: BTreeMap<String, String>,
+    /// The file imports React, making capitalized functions plausible components.
+    has_react_import: bool,
+    /// The file contains JSX, which marks component files under the automatic
+    /// JSX runtime even without an explicit React import.
+    has_jsx: bool,
+    /// The file calls `gsap.matchMedia(...)`.
+    match_media_calls: Vec<MatchMediaCall>,
+    /// `.revert()` call receivers, e.g. `mm` in `mm.revert()`. Compared by
+    /// resolved declaration, not spelling, so cleanup in one scope cannot
+    /// cover a shadowed binding in another.
+    reverted_bindings: Vec<RevertRef>,
+}
+
+/// A `gsap.timeline()` result binding with its resolved declaration, so a
+/// shadowed `tl` in another scope is never confused with the timeline.
+struct TimelineHandle {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+}
+
+/// Whether an identifier reference resolves to a recorded timeline handle:
+/// same resolved declaration wins; spelling matches only when either side
+/// is unresolvable.
+fn identifier_is_timeline_handle(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+    facts: &FileFacts,
+) -> bool {
+    let declaration = reference_declaration(semantic, identifier);
+    facts
+        .timeline_handles
+        .iter()
+        .any(|handle| match (declaration, handle.declaration) {
+            (Some(from), Some(to)) => from == to,
+            _ => handle.name == identifier.name.as_str(),
+        })
+}
+/// One `gsap.matchMedia(...)` call site and the cleanup covering it, if any.
+/// A file-wide flag is wrong here: an unrelated `useGSAP(...)` elsewhere
+/// cannot clean up this call's match-media context.
+struct MatchMediaCall {
+    /// Source span of the `gsap.matchMedia(...)` call, so each uncovered
+    /// call gets its own finding instead of one file-level finding.
+    span: Span,
+    /// The call sits inside a `useGSAP(...)` callback, whose context reverts
+    /// match-media state automatically.
+    inside_usegsap: bool,
+    /// The `mm` in `const mm = gsap.matchMedia()`, when directly assigned.
+    binding: Option<MatchMediaBinding>,
+}
+
+/// A `gsap.matchMedia()` result binding with its resolved declaration, so a
+/// shadowing `mm` in another scope is never confused with this one.
+struct MatchMediaBinding {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+}
+
+/// One `.revert()` receiver with its resolved declaration, if any.
+struct RevertRef {
+    name: String,
+    declaration: Option<oxc_semantic::NodeId>,
+    /// The revert runs in a cleanup path: inside a function returned from an
+    /// effect-style hook callback. A revert wired to an event handler or run
+    /// inline does not prove unmount cleanup.
+    in_cleanup: bool,
+}
+
+/// Whether a revert receiver covers a match-media binding: same resolved
+/// declaration wins; spelling matches only when either side is unresolvable.
+/// Either way the revert must run in a cleanup path.
+fn revert_covers_binding(revert: &RevertRef, binding: &MatchMediaBinding) -> bool {
+    if !revert.in_cleanup {
+        return false;
+    }
+    match (revert.declaration, binding.declaration) {
+        (Some(from), Some(to)) => from == to,
+        _ => revert.name == binding.name,
+    }
 }
 
 /// Parse and analyze a single source string, returning owned findings.
@@ -210,9 +292,15 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
                 record_usegsap_import_bindings(import, &mut facts);
                 record_plugin_import_aliases(import, &mut facts);
                 record_configured_gsap_imports(import, &mut facts);
+                if !import.import_kind.is_type() && import.source.value.as_str() == "react" {
+                    facts.has_react_import = true;
+                }
             }
             AstKind::ImportExpression(import) => {
                 record_configured_gsap_dynamic_import(import, semantic, node.id(), &mut facts);
+            }
+            AstKind::JSXElement(_) | AstKind::JSXFragment(_) => {
+                facts.has_jsx = true;
             }
             AstKind::IdentifierReference(identifier)
                 if plugin_name_for_identifier(identifier.name.as_str(), &facts).is_some()
@@ -220,23 +308,45 @@ fn collect_file_facts<'a>(program: &Program<'a>, semantic: &Semantic<'a>) -> Fil
             {
                 facts.uses_gsap_surface = true;
             }
-            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member, &facts) => {
+            AstKind::StaticMemberExpression(member) if member_object_is_gsap(member, semantic) => {
                 facts.uses_gsap_surface = true;
             }
             AstKind::CallExpression(call) => {
-                record_register(call, &mut facts);
+                record_register(call, &mut facts, semantic);
                 if is_usegsap_call(call, &facts) {
                     facts.uses_gsap_surface = true;
+                }
+                if is_gsap_member_call(call, &facts, semantic, "matchMedia") {
+                    facts.match_media_calls.push(MatchMediaCall {
+                        span: call.span,
+                        inside_usegsap: call_inside_usegsap(semantic, node.id(), &facts),
+                        binding: match_media_binding(semantic, node.id()),
+                    });
+                }
+                if let Expression::StaticMemberExpression(member) =
+                    call.callee.without_parentheses()
+                    && member.property.name.as_str() == "revert"
+                    && let Expression::Identifier(object) = member.object.without_parentheses()
+                {
+                    facts.reverted_bindings.push(RevertRef {
+                        name: object.name.as_str().to_string(),
+                        declaration: reference_declaration(semantic, object),
+                        in_cleanup: revert_in_cleanup(semantic, node.id(), &facts),
+                    });
                 }
             }
             AstKind::VariableDeclarator(declarator) => {
                 if let Some(identifier) = declarator.id.get_binding_identifier()
                     && let Some(init) = &declarator.init
-                    && expression_is_gsap_timeline_call(init, &facts)
+                    && expression_is_gsap_timeline_call(init, &facts, semantic)
                 {
-                    facts
-                        .timeline_handles
-                        .insert(identifier.name.as_str().to_string());
+                    facts.timeline_handles.push(TimelineHandle {
+                        name: identifier.name.as_str().to_string(),
+                        declaration: identifier
+                            .symbol_id
+                            .get()
+                            .map(|symbol| semantic.scoping().symbol_declaration(symbol)),
+                    });
                 }
                 if let Some(identifier) = declarator.id.get_binding_identifier()
                     && let Some(init) = &declarator.init
@@ -581,7 +691,7 @@ fn enclosing_call_is_gsap(
                 // plugin_aliases already records the local binding, so resolve
                 // through it rather than matching the literal property chain.
                 Expression::StaticMemberExpression(member) => {
-                    member_object_is_gsap(member, facts)
+                    member_object_is_gsap(member, semantic)
                         || member_object_resolves_to_plugin(member, facts)
                 }
                 Expression::Identifier(identifier) => {
@@ -650,11 +760,9 @@ fn function_reschedules_animation_frame(
             Some(Expression::Identifier(argument)) => {
                 self_name.as_deref() == Some(argument.name.as_str())
             }
-            // An inline callback that itself contains a frame request is the
-            // recursive-arrow idiom; requiring a name would miss it.
-            Some(Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_)) => {
-                false
-            }
+            // Anything else cannot be proven to reschedule THIS named callback.
+            // Inline arrow/function callbacks that re-request a frame (the
+            // recursive-arrow idiom) land here too — an accepted false negative.
             _ => false,
         }
     })
@@ -951,11 +1059,11 @@ fn reference_is_ts_type_position(semantic: &Semantic<'_>, node_id: oxc_semantic:
 /// Whether a static member expression's object is the `gsap` identifier.
 fn member_object_is_gsap(
     member: &oxc_ast::ast::StaticMemberExpression<'_>,
-    facts: &FileFacts,
+    semantic: &Semantic<'_>,
 ) -> bool {
     matches!(
         member.object.without_parentheses(),
-        Expression::Identifier(object) if is_gsap_identifier(object.name.as_str(), facts)
+        Expression::Identifier(object) if identifier_is_gsap_object(semantic, object)
     )
 }
 
@@ -1079,8 +1187,31 @@ fn dev_only_name_for_identifier<'a>(name: &'a str, facts: &'a FileFacts) -> Opti
     }
 }
 
-fn is_gsap_identifier(name: &str, facts: &FileFacts) -> bool {
-    name == "gsap" || facts.gsap_bindings.contains(name)
+/// Whether an identifier reference is the GSAP object: an import from the
+/// GSAP package or a configured GSAP entrypoint, or the unresolved global
+/// `gsap`. Parameters and locals that merely share the spelling resolve to
+/// their own declarations and do not count.
+fn identifier_is_gsap_object(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let name = identifier.name.as_str();
+    let Some(declaration) = reference_declaration(semantic, identifier) else {
+        return name == "gsap";
+    };
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = nodes.kind(parent_id) {
+        let source = import.source.value.as_str();
+        return import_source_is_gsap_package(source)
+            || import_source_is_configured_gsap_module(source);
+    }
+    false
 }
 
 /// Record identifiers passed to `gsap.registerPlugin(...)`.
@@ -1090,8 +1221,8 @@ fn is_gsap_identifier(name: &str, facts: &FileFacts) -> bool {
 /// - anything that cannot be resolved statically (a spread `...plugins`, a call
 ///   result): this sets `registration_unknown`,
 ///   which suppresses the used-without-register check for the whole file.
-fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts) {
-    if !is_gsap_member_call(call, facts, "registerPlugin") {
+fn record_register(call: &CallExpression<'_>, facts: &mut FileFacts, semantic: &Semantic<'_>) {
+    if !is_gsap_member_call(call, facts, semantic, "registerPlugin") {
         return;
     }
     for argument in &call.arguments {
@@ -1142,7 +1273,7 @@ fn check_node<'a, F>(
             );
         }
         AstKind::CallExpression(call) => {
-            check_call(call, semantic, facts, emit);
+            check_call(call, node.id(), semantic, facts, emit);
             check_state_in_continuous_motion(call, node.id(), semantic, facts, emit);
         }
         // Rule 2: dev-only helpers referenced in non-test source. Skip TS
@@ -1223,6 +1354,7 @@ where
 /// Call-expression rules.
 fn check_call<'a, F>(
     call: &CallExpression<'a>,
+    node_id: oxc_semantic::NodeId,
     semantic: &Semantic<'a>,
     facts: &FileFacts,
     emit: &mut F,
@@ -1230,7 +1362,7 @@ fn check_call<'a, F>(
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     // Rule 6: lagSmoothing(0) / lagSmoothing(false).
-    if is_ticker_lag_smoothing_disabled(call, facts) {
+    if is_ticker_lag_smoothing_disabled(call, facts, semantic) {
         emit(
             ids::PERFORMANCE_LAG_SMOOTHING_DISABLED,
             Severity::Medium,
@@ -1242,7 +1374,9 @@ fn check_call<'a, F>(
     }
 
     // Tween-factory rules: gsap.to/from/fromTo/set(...) and timeline variants.
-    if let Some(method) = gsap_tween_method(call, facts) {
+    if let Some(method) = gsap_tween_method(call, facts, semantic) {
+        check_tween_in_render(call, node_id, method, semantic, facts, emit);
+
         // Rule 5: GSAP-2 signature gsap.to(target, <number>, {...}).
         if matches!(method, "to" | "from" | "fromTo")
             && call.arguments.len() >= 2
@@ -1260,7 +1394,15 @@ fn check_call<'a, F>(
 
         // Layout-prop and ScrollTrigger-config rules run over each vars object.
         // `fromTo` carries two vars objects (fromVars + toVars); scan both.
-        for vars in tween_vars_objects(call, method) {
+        // The destination vars release what the source sets, so a fromVars
+        // hint cleared by toVars `clearProps` is not permanent.
+        let vars_list = tween_vars_objects(call, method);
+        for (index, vars) in vars_list.iter().enumerate() {
+            let paired = if method == "fromTo" && index == 0 {
+                vars_list.get(1).copied()
+            } else {
+                None
+            };
             // Rule 7: layout-prop animation in the vars object.
             if let Some(prop_span) = object_animates_layout_prop(vars) {
                 emit(
@@ -1274,10 +1416,38 @@ fn check_call<'a, F>(
             }
             // Rules 3 & 4 only apply inside nested `scrollTrigger:` configs.
             check_nested_scrolltrigger_configs(vars, emit);
+
+            if let Some(span) = object_will_change_span_paired(vars, paired) {
+                emit(
+                    ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
+                    Severity::Medium,
+                    Confidence::Medium,
+                    span,
+                    "GSAP vars set `will-change` for the animation's full lifetime.".to_string(),
+                    "will-change holds a compositor layer permanently; toggle it around the animation or scope it in CSS with removal.",
+                );
+            }
+        }
+
+        check_nested_timeline_scrolltrigger(call, method, facts, semantic, emit);
+        check_missing_overwrite(call, node_id, method, semantic, facts, emit);
+    }
+    if let Some(vars) = gsap_timeline_vars_object(call, facts, semantic) {
+        check_nested_scrolltrigger_configs(vars, emit);
+        if let Some(span) = timeline_defaults_will_change_span(vars) {
+            emit(
+                ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
+                Severity::Medium,
+                Confidence::Medium,
+                span,
+                "GSAP timeline defaults set `will-change` for the animation's full lifetime."
+                    .to_string(),
+                "will-change holds a compositor layer permanently; toggle it around the animation or scope it in CSS with removal.",
+            );
         }
     }
-    if let Some(vars) = gsap_timeline_vars_object(call, facts) {
-        check_nested_scrolltrigger_configs(vars, emit);
+    if is_gsap_member_call(call, facts, semantic, "timeline") {
+        check_tween_in_render(call, node_id, "timeline", semantic, facts, emit);
     }
 
     // ScrollTrigger.create({...}): the argument is a ScrollTrigger config.
@@ -1296,21 +1466,714 @@ fn check_call<'a, F>(
     }
 
     // Rule 8: plugin used without registration.
-    check_plugin_used_without_register(call, facts, emit);
+    check_plugin_used_without_register(call, facts, semantic, emit);
 
     // Rules 11 & 12 hang off useGSAP / gsap.context calls.
-    if is_gsap_member_call(call, facts, "context") || is_usegsap_call(call, facts) {
-        check_unscoped_selectors(call, facts, emit);
+    if is_gsap_member_call(call, facts, semantic, "context") || is_usegsap_call(call, facts) {
+        check_unscoped_selectors(call, facts, semantic, emit);
     }
-    if is_gsap_member_call(call, facts, "context") {
+    if is_gsap_member_call(call, facts, semantic, "context") {
         check_context_missing_revert(call, semantic, emit);
     }
 }
 
+/// ScrollTrigger belongs on a timeline itself, not on a child tween in a
+/// fluent chain or on a stored timeline handle. A call-expression receiver is
+/// the precise signal for the chained form (`tl.from(...).to(...)` or
+/// `gsap.timeline().to(...)`); an identifier receiver counts when it resolves
+/// to a recorded `gsap.timeline(...)` handle (`const tl = gsap.timeline()`).
+fn check_nested_timeline_scrolltrigger<F>(
+    call: &CallExpression<'_>,
+    method: &str,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
+        return;
+    };
+    let receiver_is_timeline = match member.object.without_parentheses() {
+        Expression::CallExpression(_) => true,
+        Expression::Identifier(identifier) => {
+            identifier_is_timeline_handle(semantic, identifier, facts)
+        }
+        _ => false,
+    };
+    if !receiver_is_timeline {
+        return;
+    }
+    for vars in tween_vars_objects(call, method) {
+        if let Some(span) = object_key_span(vars, "scrollTrigger") {
+            emit(
+                ids::SCROLLTRIGGER_NESTED_TIMELINE_CHILD,
+                Severity::Medium,
+                Confidence::High,
+                span,
+                "ScrollTrigger only belongs on the top-level animation, never on timeline children."
+                    .to_string(),
+                "Move the scrollTrigger config to gsap.timeline({ scrollTrigger: ... }).",
+            );
+        }
+    }
+}
+
+/// A tween created directly in a capitalized React component function runs on
+/// every render. Hook callbacks and event handlers are deliberately excluded.
+fn check_tween_in_render<F>(
+    call: &CallExpression<'_>,
+    node_id: oxc_semantic::NodeId,
+    method: &str,
+    semantic: &Semantic<'_>,
+    facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    if !facts.has_react_import && !facts.has_jsx {
+        return;
+    }
+    let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
+        return;
+    };
+    // `useMemo` factories execute during render: attribute the tween to the
+    // owning component rather than the anonymous factory callback.
+    let function_id = if is_usememo_callback(semantic, function_id) {
+        let call_id = semantic.nodes().parent_id(function_id);
+        nearest_enclosing_function(semantic, call_id).unwrap_or(function_id)
+    } else {
+        function_id
+    };
+    if function_is_hook_callback(semantic, function_id, facts)
+        || function_is_event_handler(semantic, function_id)
+    {
+        return;
+    }
+    let Some(name) = enclosing_function_name(semantic, function_id) else {
+        // Anonymous function directly exported as default and returning JSX
+        // is a component (`export default () => { ... return <div />; }`); a
+        // name test is impossible, so the default-export position plus JSX
+        // decides, mirroring the expo-motion analyzer.
+        if function_is_default_exported(semantic, function_id)
+            && function_returns_jsx(semantic, function_id)
+        {
+            emit(
+                ids::REACT_TWEEN_IN_RENDER,
+                Severity::High,
+                Confidence::Medium,
+                call.span,
+                format!(
+                    "`{method}` creates a GSAP animation during a default-exported component render."
+                ),
+                "Create the animation in useGSAP, useLayoutEffect, or useEffect so it runs after render and cleans up.",
+            );
+        }
+        return;
+    };
+    if !starts_with_ascii_uppercase(&name) {
+        return;
+    }
+    emit(
+        ids::REACT_TWEEN_IN_RENDER,
+        Severity::High,
+        Confidence::Medium,
+        call.span,
+        format!("`{method}` creates a GSAP animation during `{name}` render."),
+        "Create the animation in useGSAP, useLayoutEffect, or useEffect so it runs after render and cleans up.",
+    );
+}
+
+/// Event-driven tweens can stack when interactions arrive faster than they
+/// finish. Only literal vars objects are checked; a spread may already carry an
+/// overwrite policy and is therefore suppressed.
+fn check_missing_overwrite<F>(
+    call: &CallExpression<'_>,
+    node_id: oxc_semantic::NodeId,
+    method: &str,
+    semantic: &Semantic<'_>,
+    _facts: &FileFacts,
+    emit: &mut F,
+) where
+    F: FnMut(&str, Severity, Confidence, Span, String, &str),
+{
+    if !matches!(method, "to" | "from") {
+        return;
+    }
+    let Some(function_id) = nearest_enclosing_function(semantic, node_id) else {
+        return;
+    };
+    if !function_is_event_handler(semantic, function_id) {
+        return;
+    }
+    let Some(vars) = tween_vars_objects(call, method).into_iter().next() else {
+        return;
+    };
+    if object_has_key(vars, "overwrite") || object_has_spread(vars) {
+        return;
+    }
+    emit(
+        ids::CORE_MISSING_OVERWRITE,
+        Severity::Low,
+        Confidence::Medium,
+        vars.span,
+        format!("Event-handler `gsap.{method}` tween has no overwrite policy."),
+        "Add `overwrite: \"auto\"` or use gsap.quickTo for repeated interactions.",
+    );
+}
+
+fn nearest_enclosing_function(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<oxc_semantic::NodeId> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = node_id;
+    loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return None;
+        }
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            return Some(parent_id);
+        }
+        current = parent_id;
+    }
+}
+
+/// Whether a function node is the factory passed directly to `useMemo(...)`.
+/// Unlike `useCallback` or effects, the factory executes during render, so
+/// render-time rules must look through it to the owning component.
+fn is_usememo_callback(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let call_id = nodes.parent_id(function_id);
+    if call_id == function_id {
+        return false;
+    }
+    matches!(
+        nodes.kind(call_id),
+        AstKind::CallExpression(call)
+            if matches!(
+                call.callee.without_parentheses(),
+                Expression::Identifier(identifier) if identifier.name.as_str() == "useMemo"
+            )
+    )
+}
+
+fn enclosing_function_name(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    match nodes.kind(function_id) {
+        AstKind::Function(function) => function
+            .id
+            .as_ref()
+            .map(|identifier| identifier.name.as_str().to_string())
+            .or_else(|| function_binding_name(semantic, function_id)),
+        AstKind::ArrowFunctionExpression(_) => function_binding_name(semantic, function_id),
+        _ => None,
+    }
+}
+
+fn function_binding_name(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> Option<String> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(function_id);
+    match nodes.kind(parent_id) {
+        AstKind::VariableDeclarator(declarator) => declarator
+            .id
+            .get_binding_identifier()
+            .map(|identifier| identifier.name.as_str().to_string()),
+        AstKind::ObjectProperty(property) => property_key_name(&property.key).map(str::to_string),
+        // Transparent wrappers preserve the function identity, so the name
+        // lives on the declarator above the call: `const Card = memo(() => ...)`
+        // names the arrow `Card`.
+        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call, semantic) => {
+            function_binding_name(semantic, parent_id)
+        }
+        _ => None,
+    }
+}
+
+/// Whether a call preserves its function argument's identity for naming:
+/// `memo` and `forwardRef` return the function/component, including the
+/// `React.memo` / `React.forwardRef` namespace forms with the React binding
+/// resolved to the React import (or the unresolved global).
+fn callee_is_transparent_wrapper(call: &CallExpression<'_>, semantic: &Semantic<'_>) -> bool {
+    match call.callee.without_parentheses() {
+        Expression::Identifier(identifier) => {
+            matches!(identifier.name.as_str(), "memo" | "forwardRef")
+        }
+        Expression::StaticMemberExpression(member) => {
+            matches!(member.property.name.as_str(), "memo" | "forwardRef")
+                && react_namespace_object(semantic, &member.object)
+        }
+        _ => false,
+    }
+}
+
+/// Whether an expression is the `React` namespace: the unresolved global,
+/// or a binding imported from `react`. Anything else sharing the spelling
+/// does not count.
+fn react_namespace_object(semantic: &Semantic<'_>, object: &Expression<'_>) -> bool {
+    use oxc_ast::AstKind;
+
+    let Expression::Identifier(identifier) = object.without_parentheses() else {
+        return false;
+    };
+    if identifier.name.as_str() != "React" {
+        return false;
+    }
+    let Some(declaration) = reference_declaration(semantic, identifier) else {
+        return true;
+    };
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = nodes.kind(parent_id) {
+        return import.source.value.as_str() == "react";
+    }
+    false
+}
+
+fn function_is_hook_callback(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::CallExpression(call) => {
+                return match call.callee.without_parentheses() {
+                    Expression::Identifier(identifier) => {
+                        matches!(
+                            identifier.name.as_str(),
+                            "useEffect" | "useLayoutEffect" | "useGSAP"
+                        ) || facts.usegsap_bindings.contains(identifier.name.as_str())
+                    }
+                    Expression::StaticMemberExpression(member) => matches!(
+                        member.property.name.as_str(),
+                        "useEffect" | "useLayoutEffect"
+                    ),
+                    _ => false,
+                };
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+/// Whether a `gsap.matchMedia(...)` call node executes while a `useGSAP(...)`
+/// context is active: its nearest enclosing function must be passed directly
+/// as a `useGSAP(...)` argument. Lexical nesting alone is not enough: a call
+/// inside a deferred callback (`setTimeout(() => gsap.matchMedia())`) runs
+/// after the `useGSAP` callback returns, so the context never registers it.
+/// Only ancestors count: a sibling `useGSAP(...)` elsewhere in the file cannot
+/// clean up this call.
+fn call_inside_usegsap(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    // Nearest enclosing function: crossing it means deferred execution.
+    let mut current = node_id;
+    let function_id = loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            break parent_id;
+        }
+        current = parent_id;
+    };
+    // Covered only when that function is a direct `useGSAP(...)` argument.
+    // (A `useGSAP` callee is always an identifier, so a function parented
+    // directly under the call can only sit in argument position.)
+    let call_id = nodes.parent_id(function_id);
+    if call_id == function_id {
+        return false;
+    }
+    if let AstKind::CallExpression(call) = nodes.kind(call_id)
+        && is_usegsap_call(call, facts)
+    {
+        return true;
+    }
+    false
+}
+
+/// The `mm` in `const mm = gsap.matchMedia()`, when the call result is
+/// directly assigned to a binding. Only that binding's own `.revert()` call
+/// proves cleanup; any other object's revert is unrelated.
+fn match_media_binding(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+) -> Option<MatchMediaBinding> {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    match nodes.kind(nodes.parent_id(node_id)) {
+        AstKind::VariableDeclarator(declarator) => {
+            declarator
+                .id
+                .get_binding_identifier()
+                .map(|identifier| MatchMediaBinding {
+                    name: identifier.name.as_str().to_string(),
+                    declaration: identifier
+                        .symbol_id
+                        .get()
+                        .map(|symbol| semantic.scoping().symbol_declaration(symbol)),
+                })
+        }
+        _ => None,
+    }
+}
+
+/// Whether a `.revert()` call runs in a cleanup path: inside a function that
+/// is returned from an effect-style hook callback (`useEffect(() => () =>
+/// mm.revert())`, including block bodies with an explicit `return`). A
+/// revert wired to an event handler or run inline in an effect body proves
+/// no unmount cleanup.
+fn revert_in_cleanup(
+    semantic: &Semantic<'_>,
+    node_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    // Nearest enclosing function of the revert call.
+    let mut current = node_id;
+    let returned_function = loop {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        if matches!(
+            nodes.kind(parent_id),
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+        ) {
+            break parent_id;
+        }
+        current = parent_id;
+    };
+    // That function must sit in return position of a hook callback: either
+    // behind an explicit `return`, or as the concise body of an arrow that
+    // is itself returned (a single-expression body).
+    let parent_id = nodes.parent_id(returned_function);
+    if parent_id == returned_function {
+        return false;
+    }
+    let returned = match nodes.kind(parent_id) {
+        AstKind::ReturnStatement(_) => true,
+        AstKind::ExpressionStatement(_) => {
+            let body_id = nodes.parent_id(parent_id);
+            if body_id == parent_id {
+                return false;
+            }
+            matches!(nodes.kind(body_id), AstKind::FunctionBody(_)) && {
+                let arrow_id = nodes.parent_id(body_id);
+                arrow_id != body_id
+                    && matches!(nodes.kind(arrow_id), AstKind::ArrowFunctionExpression(_))
+            }
+        }
+        _ => false,
+    };
+    if !returned {
+        return false;
+    }
+    // The receiving callback must be an effect-style hook.
+    let mut current = parent_id;
+    loop {
+        let next_id = nodes.parent_id(current);
+        if next_id == current {
+            return false;
+        }
+        match nodes.kind(next_id) {
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => {
+                return function_is_cleanup_hook(semantic, next_id, facts);
+            }
+            _ => current = next_id,
+        }
+    }
+}
+
+/// Whether a function node is the callback of an effect-style hook whose
+/// returned function runs as cleanup.
+fn function_is_cleanup_hook(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+    facts: &FileFacts,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(function_id);
+    if parent_id == function_id {
+        return false;
+    }
+    if let AstKind::CallExpression(call) = nodes.kind(parent_id) {
+        return match call.callee.without_parentheses() {
+            Expression::Identifier(identifier) => {
+                matches!(
+                    identifier.name.as_str(),
+                    "useEffect" | "useLayoutEffect" | "useInsertionEffect" | "useGSAP"
+                ) || facts.usegsap_bindings.contains(identifier.name.as_str())
+            }
+            // `React.useEffect(...)` namespace form, mirroring the
+            // hook-callback detection nearby.
+            Expression::StaticMemberExpression(member) => {
+                matches!(
+                    member.property.name.as_str(),
+                    "useEffect" | "useLayoutEffect" | "useInsertionEffect"
+                ) && matches!(
+                    member.object.without_parentheses(),
+                    Expression::Identifier(object) if object.name.as_str() == "React"
+                )
+            }
+            _ => false,
+        };
+    }
+    false
+}
+
+/// The declaration node an identifier reference resolves to, if any.
+fn reference_declaration(
+    semantic: &Semantic<'_>,
+    identifier: &oxc_ast::ast::IdentifierReference<'_>,
+) -> Option<oxc_semantic::NodeId> {
+    let reference_id = identifier.reference_id.get()?;
+    let symbol_id = semantic.scoping().get_reference(reference_id).symbol_id()?;
+    Some(semantic.scoping().symbol_declaration(symbol_id))
+}
+
+fn function_is_event_handler(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    if enclosing_function_name(semantic, function_id)
+        .is_some_and(|name| starts_with_event_handler_prefix(&name))
+    {
+        return true;
+    }
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..6 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            break;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::JSXAttribute(attribute) => {
+                return attribute
+                    .name
+                    .as_identifier()
+                    .is_some_and(|name| starts_with_event_handler_prefix(name.name.as_str()));
+            }
+            AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    // Named handlers referenced from JSX event props or addEventListener
+    // (`const handleMove = () => ...; <div onPointerMove={handleMove} />`)
+    // are event handlers even without the `onX` prefix or nesting.
+    function_referenced_by_event_prop(semantic, function_id)
+}
+
+/// Whether a function is referenced as an event callback: passed to a JSX
+/// event prop or registered via `addEventListener`. Covers named handlers
+/// the `onX` prefix and lexical-nesting checks miss.
+fn function_referenced_by_event_prop(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let symbol_id = (|| match nodes.kind(function_id) {
+        AstKind::ArrowFunctionExpression(_) => {
+            let parent_id = nodes.parent_id(function_id);
+            if let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) {
+                declarator.id.get_binding_identifier()?.symbol_id.get()
+            } else {
+                None
+            }
+        }
+        AstKind::Function(function) => {
+            if let Some(identifier) = function.id.as_ref() {
+                identifier.symbol_id.get()
+            } else {
+                let parent_id = nodes.parent_id(function_id);
+                if let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) {
+                    declarator.id.get_binding_identifier()?.symbol_id.get()
+                } else {
+                    None
+                }
+            }
+        }
+        _ => None,
+    })();
+    let Some(symbol_id) = symbol_id else {
+        return false;
+    };
+    semantic
+        .scoping()
+        .get_resolved_reference_ids(symbol_id)
+        .iter()
+        .any(|reference_id| {
+            let node_id = semantic.scoping().get_reference(*reference_id).node_id();
+            let node_span = nodes.get_node(node_id).span();
+            let mut current = node_id;
+            for _ in 0..5 {
+                let parent_id = nodes.parent_id(current);
+                if parent_id == current {
+                    return false;
+                }
+                match nodes.kind(parent_id) {
+                    AstKind::JSXAttribute(attribute) => {
+                        return attribute.name.as_identifier().is_some_and(|name| {
+                            starts_with_event_handler_prefix(name.name.as_str())
+                        });
+                    }
+                    AstKind::CallExpression(call) => {
+                        // `addEventListener("move", handler)`: the reference
+                        // must sit inside the arguments, not the callee.
+                        if let Expression::StaticMemberExpression(member) =
+                            call.callee.without_parentheses()
+                            && member.property.name.as_str() == "addEventListener"
+                            && call.arguments.iter().any(|argument| {
+                                let span = argument.span();
+                                span.start <= node_span.start && node_span.end <= span.end
+                            })
+                        {
+                            return true;
+                        }
+                    }
+                    _ => {}
+                }
+                current = parent_id;
+            }
+            false
+        })
+}
+
+fn starts_with_event_handler_prefix(name: &str) -> bool {
+    name.strip_prefix("on")
+        .and_then(|rest| rest.chars().next())
+        .is_some_and(|character| character.is_ascii_uppercase())
+}
+
+fn starts_with_ascii_uppercase(name: &str) -> bool {
+    name.chars()
+        .next()
+        .is_some_and(|character| character.is_ascii_uppercase())
+}
+
+/// Whether a function node is the declaration of an `export default`
+/// (`export default function () {}` or `export default () => {}`).
+fn function_is_default_exported(
+    semantic: &Semantic<'_>,
+    function_id: oxc_semantic::NodeId,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    let mut current = function_id;
+    for _ in 0..3 {
+        let parent_id = nodes.parent_id(current);
+        if parent_id == current {
+            return false;
+        }
+        match nodes.kind(parent_id) {
+            AstKind::ExportDefaultDeclaration(_) => return true,
+            // Known transparent wrappers (`export default memo(() => {})`)
+            // preserve the component; only direct position counts otherwise.
+            AstKind::CallExpression(call) if callee_is_transparent_wrapper(call, semantic) => {
+                current = parent_id;
+            }
+            AstKind::CallExpression(_)
+            | AstKind::VariableDeclarator(_)
+            | AstKind::Function(_)
+            | AstKind::ArrowFunctionExpression(_) => return false,
+            _ => current = parent_id,
+        }
+    }
+    false
+}
+
+/// Whether a function subtree contains a JSX element or fragment, marking it
+/// as rendering UI rather than running plain logic.
+fn function_returns_jsx(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
+    use oxc_ast::AstKind;
+
+    let nodes = semantic.nodes();
+    nodes.iter().any(|node| {
+        if !matches!(
+            node.kind(),
+            AstKind::JSXElement(_) | AstKind::JSXFragment(_)
+        ) {
+            return false;
+        }
+        let mut current = node.id();
+        loop {
+            let parent_id = nodes.parent_id(current);
+            if parent_id == current {
+                return false;
+            }
+            if parent_id == function_id {
+                return true;
+            }
+            // A nested function boundary means the JSX belongs to the inner
+            // function, not the candidate component.
+            if matches!(
+                nodes.kind(parent_id),
+                AstKind::Function(_) | AstKind::ArrowFunctionExpression(_)
+            ) {
+                return false;
+            }
+            current = parent_id;
+        }
+    })
+}
+
 /// Rule 8: a known plugin identifier is *used* (member object or bare ref in a
 /// call argument context) but never registered in this file.
-fn check_plugin_used_without_register<F>(call: &CallExpression<'_>, facts: &FileFacts, emit: &mut F)
-where
+fn check_plugin_used_without_register<F>(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+    emit: &mut F,
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     // If any registerPlugin argument could not be resolved statically (a spread
@@ -1345,7 +2208,7 @@ where
     if !facts.registered.contains("ScrollTrigger")
         && !facts.configured_gsap_imports.contains("ScrollTrigger")
         && !facts.configured_gsap_imports.contains("gsap")
-        && let Some(span) = scrolltrigger_config_span(call, facts)
+        && let Some(span) = scrolltrigger_config_span(call, facts, semantic)
     {
         emit(
             ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
@@ -1365,7 +2228,7 @@ where
         {
             continue;
         }
-        if let Some(span) = plugin_vars_key_span(call, facts, vars_key) {
+        if let Some(span) = plugin_vars_key_span(call, facts, vars_key, semantic) {
             emit(
                 ids::PLUGINS_PLUGIN_USED_WITHOUT_REGISTER,
                 Severity::High,
@@ -1384,8 +2247,12 @@ where
 /// no scope is supplied. Uses argument structure (semantic-aware traversal of
 /// the callback body via the node walk would double-report, so we inspect the
 /// call's own arguments here).
-fn check_unscoped_selectors<F>(call: &CallExpression<'_>, facts: &FileFacts, emit: &mut F)
-where
+fn check_unscoped_selectors<F>(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+    emit: &mut F,
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     let scoped = call_has_scope(call, facts);
@@ -1397,7 +2264,7 @@ where
     let Some(first) = call.arguments.first().and_then(argument_expression) else {
         return;
     };
-    if let Some(span) = first_string_selector_in_callback(first, facts) {
+    if let Some(span) = first_string_selector_in_callback(first, facts, semantic) {
         emit(
             ids::REACT_UNSCOPED_SELECTOR,
             Severity::Medium,
@@ -1568,6 +2435,33 @@ fn check_file_level(
                 .to_string(),
         });
     }
+
+    // One finding per uncovered call site: collapsing to a single file-level
+    // finding lets a new leak hide behind an already-baselined one.
+    for call in facts.match_media_calls.iter().filter(|call| {
+        !call.inside_usegsap
+            && call.binding.as_ref().is_none_or(|binding| {
+                !facts
+                    .reverted_bindings
+                    .iter()
+                    .any(|revert| revert_covers_binding(revert, binding))
+            })
+    }) {
+        let (line, column) = line_index.line_col(call.span.start);
+        findings.push(Finding {
+            id: ids::REACT_MATCHMEDIA_MISSING_REVERT.to_string(),
+            category: Category::React,
+            severity: Severity::Medium,
+            confidence: Confidence::Medium,
+            file: relative_path.to_string(),
+            line,
+            column,
+            message: "gsap.matchMedia() is used without revert cleanup or useGSAP auto-cleanup."
+                .to_string(),
+            suggestion: "matchMedia contexts leak on unmount outside useGSAP auto-cleanup; call mm.revert() in cleanup."
+                .to_string(),
+        });
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1618,6 +2512,142 @@ fn object_has_key(object: &ObjectExpression<'_>, name: &str) -> bool {
     })
 }
 
+fn object_key_span(object: &ObjectExpression<'_>, name: &str) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return None;
+        };
+        (property_key_name(&inner.key) == Some(name)).then_some(inner.span)
+    })
+}
+
+fn object_has_spread(object: &ObjectExpression<'_>) -> bool {
+    object
+        .properties
+        .iter()
+        .any(|property| matches!(property, ObjectPropertyKind::SpreadProperty(_)))
+}
+
+fn object_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
+    object_will_change_span_paired(object, None)
+}
+
+/// will-change span honoring a paired vars object: `fromTo` destination vars
+/// release what the source sets, so a hint cleared there is not permanent.
+fn object_will_change_span_paired(
+    object: &ObjectExpression<'_>,
+    paired: Option<&ObjectExpression<'_>>,
+) -> Option<Span> {
+    ["willChange", "will-change"]
+        .into_iter()
+        .find_map(|name| will_change_hint_span(object, name, paired))
+}
+
+fn will_change_hint_span(
+    object: &ObjectExpression<'_>,
+    name: &str,
+    paired: Option<&ObjectExpression<'_>>,
+) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return None;
+        };
+        if property_key_name(&inner.key) != Some(name) {
+            return None;
+        }
+        if !will_change_value_is_hint(&inner.value) {
+            return None;
+        }
+        // `clearProps` in the same vars object removes the hint when the
+        // tween completes, so the layer is not permanently retained.
+        if object_clears_will_change(object) {
+            return None;
+        }
+        // Paired `fromTo` destination vars release what the source sets.
+        if paired.is_some_and(object_releases_will_change) {
+            return None;
+        }
+        Some(inner.span)
+    })
+}
+
+/// Whether a vars object releases a `willChange` hint: `clearProps` covering
+/// it, or a reset value (`auto` and friends) that ends the hint.
+fn object_releases_will_change(object: &ObjectExpression<'_>) -> bool {
+    if object_clears_will_change(object) {
+        return true;
+    }
+    ["willChange", "will-change"].iter().any(|name| {
+        object.properties.iter().any(|property| {
+            let ObjectPropertyKind::ObjectProperty(inner) = property else {
+                return false;
+            };
+            property_key_name(&inner.key) == Some(name) && !will_change_value_is_hint(&inner.value)
+        })
+    })
+}
+
+/// Whether a vars object clears `willChange` on complete via `clearProps`:
+/// `clearProps: "all"`, or a list naming `willChange`/`will-change`.
+fn object_clears_will_change(object: &ObjectExpression<'_>) -> bool {
+    object.properties.iter().any(|property| {
+        let ObjectPropertyKind::ObjectProperty(inner) = property else {
+            return false;
+        };
+        if property_key_name(&inner.key) != Some("clearProps") {
+            return false;
+        }
+        match inner.value.without_parentheses() {
+            Expression::StringLiteral(literal) => {
+                let value = literal.value.as_str();
+                value.trim() == "all"
+                    || value
+                        .split(',')
+                        .map(str::trim)
+                        .any(|part| matches!(part, "willChange" | "will-change"))
+            }
+            _ => false,
+        }
+    })
+}
+
+/// Whether a `will-change` vars value actually requests a compositor layer.
+/// Reset keywords (`auto` and the CSS-wide keywords) release the layer, so
+/// cleanup such as `gsap.set(el, { willChange: "auto" })` is not a finding.
+/// Non-literal values still fire: an undecidable value may hold a layer.
+fn will_change_value_is_hint(value: &Expression<'_>) -> bool {
+    let reset = |text: &str| {
+        matches!(
+            text.trim().to_ascii_lowercase().as_str(),
+            "auto" | "initial" | "inherit" | "unset" | "revert" | "revert-layer" | ""
+        )
+    };
+    match value.without_parentheses() {
+        Expression::StringLiteral(literal) => !reset(literal.value.as_str()),
+        Expression::TemplateLiteral(literal) if literal.expressions.is_empty() => literal
+            .quasis
+            .first()
+            .and_then(|quasi| quasi.value.cooked.as_ref())
+            .is_none_or(|cooked| !reset(cooked.as_str())),
+        _ => true,
+    }
+}
+
+fn timeline_defaults_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
+    object.properties.iter().find_map(|property| {
+        let ObjectPropertyKind::ObjectProperty(property) = property else {
+            return None;
+        };
+        if property_key_name(&property.key) != Some("defaults") {
+            return None;
+        }
+        let Expression::ObjectExpression(defaults) = property.value.without_parentheses() else {
+            return None;
+        };
+        object_will_change_span(defaults)
+    })
+}
+
 /// Whether an expression is the boolean literal `true`.
 fn expression_is_true(expression: &Expression<'_>) -> bool {
     matches!(expression.without_parentheses(), Expression::BooleanLiteral(boolean) if boolean.value)
@@ -1640,7 +2670,12 @@ fn argument_is_numeric_literal(argument: &Argument<'_>) -> bool {
     )
 }
 
-fn is_gsap_member_call(call: &CallExpression<'_>, facts: &FileFacts, method: &str) -> bool {
+fn is_gsap_member_call(
+    call: &CallExpression<'_>,
+    _facts: &FileFacts,
+    semantic: &Semantic<'_>,
+    method: &str,
+) -> bool {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return false;
     };
@@ -1649,7 +2684,7 @@ fn is_gsap_member_call(call: &CallExpression<'_>, facts: &FileFacts, method: &st
     }
     matches!(
         member.object.without_parentheses(),
-        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
+        Expression::Identifier(identifier) if identifier_is_gsap_object(semantic, identifier)
     )
 }
 
@@ -1683,12 +2718,18 @@ fn is_usegsap_call(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
 
 /// If the call is a GSAP tween factory (`gsap.to`, `tl.to`,
 /// `gsap.timeline().to`, etc.), return the method.
-fn gsap_tween_method<'a>(call: &'a CallExpression<'a>, facts: &FileFacts) -> Option<&'a str> {
+fn gsap_tween_method<'a>(
+    call: &'a CallExpression<'a>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> Option<&'a str> {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return None;
     };
     let method = member.property.name.as_str();
-    if TWEEN_METHODS.contains(&method) && expression_is_gsap_tween_owner(&member.object, facts) {
+    if TWEEN_METHODS.contains(&method)
+        && expression_is_gsap_tween_owner(&member.object, facts, semantic)
+    {
         Some(method)
     } else {
         None
@@ -1698,12 +2739,18 @@ fn gsap_tween_method<'a>(call: &'a CallExpression<'a>, facts: &FileFacts) -> Opt
 /// If the call uses ScrollTrigger implicitly via a `scrollTrigger:` config
 /// object — `gsap.to/from/fromTo/set(target, { scrollTrigger: {...} })` or
 /// `gsap.timeline({ scrollTrigger: {...} })` — return that property's span.
-fn scrolltrigger_config_span<'a>(call: &'a CallExpression<'a>, facts: &FileFacts) -> Option<Span> {
+fn scrolltrigger_config_span<'a>(
+    call: &'a CallExpression<'a>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> Option<Span> {
     let vars_objects: Vec<&'a ObjectExpression<'a>> =
-        if let Some(method) = gsap_tween_method(call, facts) {
+        if let Some(method) = gsap_tween_method(call, facts, semantic) {
             tween_vars_objects(call, method)
-        } else if is_gsap_member_call(call, facts, "timeline") {
-            gsap_timeline_vars_object(call, facts).into_iter().collect()
+        } else if is_gsap_member_call(call, facts, semantic, "timeline") {
+            gsap_timeline_vars_object(call, facts, semantic)
+                .into_iter()
+                .collect()
         } else {
             return None;
         };
@@ -1723,8 +2770,9 @@ fn plugin_vars_key_span<'a>(
     call: &'a CallExpression<'a>,
     facts: &FileFacts,
     vars_key: &str,
+    semantic: &Semantic<'_>,
 ) -> Option<Span> {
-    let method = gsap_tween_method(call, facts)?;
+    let method = gsap_tween_method(call, facts, semantic)?;
     for vars in tween_vars_objects(call, method) {
         for property in &vars.properties {
             if let ObjectPropertyKind::ObjectProperty(inner) = property
@@ -1740,8 +2788,9 @@ fn plugin_vars_key_span<'a>(
 fn gsap_timeline_vars_object<'a>(
     call: &'a CallExpression<'a>,
     facts: &FileFacts,
+    semantic: &Semantic<'_>,
 ) -> Option<&'a ObjectExpression<'a>> {
-    if !is_gsap_member_call(call, facts, "timeline") {
+    if !is_gsap_member_call(call, facts, semantic, "timeline") {
         return None;
     }
     match call
@@ -1755,33 +2804,45 @@ fn gsap_timeline_vars_object<'a>(
     }
 }
 
-fn expression_is_gsap_tween_owner(expression: &Expression<'_>, facts: &FileFacts) -> bool {
+fn expression_is_gsap_tween_owner(
+    expression: &Expression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     match expression.without_parentheses() {
         Expression::Identifier(identifier) => {
-            is_gsap_identifier(identifier.name.as_str(), facts)
-                || facts.timeline_handles.contains(identifier.name.as_str())
+            identifier_is_gsap_object(semantic, identifier)
+                || identifier_is_timeline_handle(semantic, identifier, facts)
         }
         Expression::CallExpression(call) => {
-            is_gsap_member_call(call, facts, "timeline")
-                || gsap_tween_method(call, facts).is_some()
-                || timeline_chain_method_returns_timeline(call, facts)
+            is_gsap_member_call(call, facts, semantic, "timeline")
+                || gsap_tween_method(call, facts, semantic).is_some()
+                || timeline_chain_method_returns_timeline(call, facts, semantic)
         }
         _ => false,
     }
 }
 
-fn timeline_chain_method_returns_timeline(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
+fn timeline_chain_method_returns_timeline(
+    call: &CallExpression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() else {
         return false;
     };
     TIMELINE_CHAIN_METHODS.contains(&member.property.name.as_str())
-        && expression_is_gsap_tween_owner(&member.object, facts)
+        && expression_is_gsap_tween_owner(&member.object, facts, semantic)
 }
 
-fn expression_is_gsap_timeline_call(expression: &Expression<'_>, facts: &FileFacts) -> bool {
+fn expression_is_gsap_timeline_call(
+    expression: &Expression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     matches!(
         expression.without_parentheses(),
-        Expression::CallExpression(call) if is_gsap_member_call(call, facts, "timeline")
+        Expression::CallExpression(call) if is_gsap_member_call(call, facts, semantic, "timeline")
     )
 }
 
@@ -1847,7 +2908,11 @@ fn object_animates_layout_prop(object: &ObjectExpression<'_>) -> Option<Span> {
 }
 
 /// Whether a call is `gsap.ticker.lagSmoothing(0|false)`.
-fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
+fn is_ticker_lag_smoothing_disabled(
+    call: &CallExpression<'_>,
+    _facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> bool {
     let Expression::StaticMemberExpression(outer) = call.callee.without_parentheses() else {
         return false;
     };
@@ -1863,7 +2928,7 @@ fn is_ticker_lag_smoothing_disabled(call: &CallExpression<'_>, facts: &FileFacts
     }
     let is_gsap = matches!(
         inner.object.without_parentheses(),
-        Expression::Identifier(identifier) if is_gsap_identifier(identifier.name.as_str(), facts)
+        Expression::Identifier(identifier) if identifier_is_gsap_object(semantic, identifier)
     );
     if !is_gsap {
         return false;
@@ -1921,7 +2986,11 @@ fn call_has_scope(call: &CallExpression<'_>, facts: &FileFacts) -> bool {
 
 /// Find the first string-literal selector passed to a gsap tween inside a
 /// callback expression (an arrow or function expression). Returns its span.
-fn first_string_selector_in_callback(callback: &Expression<'_>, facts: &FileFacts) -> Option<Span> {
+fn first_string_selector_in_callback(
+    callback: &Expression<'_>,
+    facts: &FileFacts,
+    semantic: &Semantic<'_>,
+) -> Option<Span> {
     let mut found: Option<Span> = None;
 
     let mut inspect = |expression: &Expression<'_>| {
@@ -1929,7 +2998,7 @@ fn first_string_selector_in_callback(callback: &Expression<'_>, facts: &FileFact
             return;
         }
         if let Expression::CallExpression(call) = expression
-            && gsap_tween_method(call, facts).is_some()
+            && gsap_tween_method(call, facts, semantic).is_some()
             && let Some(first) = call.arguments.first().and_then(argument_expression)
             && let Expression::StringLiteral(string) = first.without_parentheses()
         {
