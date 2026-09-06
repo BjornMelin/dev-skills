@@ -1371,7 +1371,15 @@ fn check_call<'a, F>(
 
         // Layout-prop and ScrollTrigger-config rules run over each vars object.
         // `fromTo` carries two vars objects (fromVars + toVars); scan both.
-        for vars in tween_vars_objects(call, method) {
+        // The destination vars release what the source sets, so a fromVars
+        // hint cleared by toVars `clearProps` is not permanent.
+        let vars_list = tween_vars_objects(call, method);
+        for (index, vars) in vars_list.iter().enumerate() {
+            let paired = if method == "fromTo" && index == 0 {
+                vars_list.get(1).copied()
+            } else {
+                None
+            };
             // Rule 7: layout-prop animation in the vars object.
             if let Some(prop_span) = object_animates_layout_prop(vars) {
                 emit(
@@ -1386,7 +1394,7 @@ fn check_call<'a, F>(
             // Rules 3 & 4 only apply inside nested `scrollTrigger:` configs.
             check_nested_scrolltrigger_configs(vars, emit);
 
-            if let Some(span) = object_will_change_span(vars) {
+            if let Some(span) = object_will_change_span_paired(vars, paired) {
                 emit(
                     ids::PERFORMANCE_WILL_CHANGE_PERMANENT,
                     Severity::Medium,
@@ -1982,7 +1990,6 @@ fn function_referenced_by_event_prop(
     let Some(symbol_id) = symbol_id else {
         return false;
     };
-    let refs = semantic.scoping().get_resolved_reference_ids(symbol_id);
     semantic
         .scoping()
         .get_resolved_reference_ids(symbol_id)
@@ -2466,12 +2473,25 @@ fn object_has_spread(object: &ObjectExpression<'_>) -> bool {
 }
 
 fn object_will_change_span(object: &ObjectExpression<'_>) -> Option<Span> {
-    ["willChange", "will-change"]
-        .into_iter()
-        .find_map(|name| will_change_hint_span(object, name))
+    object_will_change_span_paired(object, None)
 }
 
-fn will_change_hint_span(object: &ObjectExpression<'_>, name: &str) -> Option<Span> {
+/// will-change span honoring a paired vars object: `fromTo` destination vars
+/// release what the source sets, so a hint cleared there is not permanent.
+fn object_will_change_span_paired(
+    object: &ObjectExpression<'_>,
+    paired: Option<&ObjectExpression<'_>>,
+) -> Option<Span> {
+    ["willChange", "will-change"]
+        .into_iter()
+        .find_map(|name| will_change_hint_span(object, name, paired))
+}
+
+fn will_change_hint_span(
+    object: &ObjectExpression<'_>,
+    name: &str,
+    paired: Option<&ObjectExpression<'_>>,
+) -> Option<Span> {
     object.properties.iter().find_map(|property| {
         let ObjectPropertyKind::ObjectProperty(inner) = property else {
             return None;
@@ -2487,7 +2507,27 @@ fn will_change_hint_span(object: &ObjectExpression<'_>, name: &str) -> Option<Sp
         if object_clears_will_change(object) {
             return None;
         }
+        // Paired `fromTo` destination vars release what the source sets.
+        if paired.is_some_and(object_releases_will_change) {
+            return None;
+        }
         Some(inner.span)
+    })
+}
+
+/// Whether a vars object releases a `willChange` hint: `clearProps` covering
+/// it, or a reset value (`auto` and friends) that ends the hint.
+fn object_releases_will_change(object: &ObjectExpression<'_>) -> bool {
+    if object_clears_will_change(object) {
+        return true;
+    }
+    ["willChange", "will-change"].iter().any(|name| {
+        object.properties.iter().any(|property| {
+            let ObjectPropertyKind::ObjectProperty(inner) = property else {
+                return false;
+            };
+            property_key_name(&inner.key) == Some(name) && !will_change_value_is_hint(&inner.value)
+        })
     })
 }
 

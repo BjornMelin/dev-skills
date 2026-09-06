@@ -1801,6 +1801,14 @@ gsap.timeline({ defaults: { willChange: "transform" } });"#,
         r#"gsap.to(".box", { willChange: "transform", x: 100, clearProps: "all" });"#,
     );
     assert!(!fired(&cleared_all, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
+
+    // fromTo destination vars release what the source sets.
+    let from_to = analyze(
+        "src/a.ts",
+        "ts",
+        r#"gsap.fromTo(".box", { willChange: "transform" }, { willChange: "auto" });"#,
+    );
+    assert!(!fired(&from_to, ids::PERFORMANCE_WILL_CHANGE_PERMANENT));
 }
 
 #[test]
