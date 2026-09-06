@@ -874,10 +874,10 @@ fn literal_in_class_position(semantic: &Semantic<'_>, node_id: oxc_semantic::Nod
                 );
             }
             AstKind::CallExpression(call) => {
-                if let Expression::Identifier(identifier) = call.callee.without_parentheses() {
-                    if CLASS_COMPOSITION_CALLS.contains(&identifier.name.as_str()) {
-                        return true;
-                    }
+                if let Expression::Identifier(identifier) = call.callee.without_parentheses()
+                    && CLASS_COMPOSITION_CALLS.contains(&identifier.name.as_str())
+                {
+                    return true;
                 }
             }
             _ => {}
