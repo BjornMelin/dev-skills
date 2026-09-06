@@ -1826,8 +1826,11 @@ fn function_is_default_exported(
         }
         match nodes.kind(parent_id) {
             AstKind::ExportDefaultDeclaration(_) => return true,
-            // `export default memo(() => {})`-style wrappers are not a bare
-            // default export; only direct position counts.
+            // Known transparent wrappers (`export default memo(() => {})`)
+            // preserve the component; only direct position counts otherwise.
+            AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
+                current = parent_id;
+            }
             AstKind::CallExpression(_)
             | AstKind::VariableDeclarator(_)
             | AstKind::Function(_)

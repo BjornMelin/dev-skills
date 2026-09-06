@@ -1721,6 +1721,19 @@ export default () => {
 };"#,
     );
     assert!(fired(&anonymous, ids::REACT_TWEEN_IN_RENDER));
+
+    // Wrapped anonymous default export composes both supported forms.
+    let wrapped_default = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { memo } from "react";
+import { gsap } from "gsap";
+export default memo(() => {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+});"#,
+    );
+    assert!(fired(&wrapped_default, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]
