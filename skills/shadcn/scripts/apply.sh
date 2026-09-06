@@ -105,6 +105,12 @@ awk -v blockfile="$SCRIPT_DIR/context-block.txt" '
   skip && /^## Principles$/ { skip = 0 }
   skip { next }
   { print }
+  END {
+    if (done != 1) {
+      print "FAIL: context-block anchor not found" > "/dev/stderr"
+      exit 1
+    }
+  }
 ' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.context"
 mv "$TMP/SKILL.md.context" "$SKILL_DIR/SKILL.md"
 
@@ -125,6 +131,12 @@ awk -v notefile="$SCRIPT_DIR/layout-note.txt" '
     next
   }
   { print }
+  END {
+    if (done != 1) {
+      print "FAIL: layout-note anchor not found" > "/dev/stderr"
+      exit 1
+    }
+  }
 ' "$SKILL_DIR/SKILL.md" > "$TMP/SKILL.md.noted"
 mv "$TMP/SKILL.md.noted" "$SKILL_DIR/SKILL.md"
 
