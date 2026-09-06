@@ -46,9 +46,9 @@ npm, uv, Cargo, Make, or another tool from file extensions alone.
 - Never weaken an assertion, add retries, serialize a suite, or increase a
   timeout until the nondeterminism is understood.
 - Official runner docs and source are authority for configuration or current
-  API behavior. Refresh them through `context7-research` or `opensrc` before
-  changing runner configuration; use `deep-researcher` only for broader,
-  evidence-heavy uncertainty.
+  API behavior. Refresh them through `context7-research` or `opensrc` when
+  installed (otherwise use the runner's local docs, `--help`, and source);
+  use `deep-researcher` only for broader, evidence-heavy uncertainty.
 - Preserve authorization, denied-path, tenant/account-isolation, destructive,
   migration, and public-contract coverage.
 

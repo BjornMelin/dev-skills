@@ -1,7 +1,7 @@
 ---
 name: shadcn
 description: "Manage shadcn/ui components: add, search, fix, style and compose, with registry and component docs. Applies to any project with a components.json. Triggers on \"shadcn init\" or a --preset code."
-allowed-tools: Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(yarn *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *), Bash(yarn dlx shadcn@latest *)
+allowed-tools: Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(yarn *), Bash(curl *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *), Bash(yarn dlx shadcn@latest *)
 ---
 
 # shadcn/ui
