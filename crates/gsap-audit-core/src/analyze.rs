@@ -1956,38 +1956,28 @@ fn function_referenced_by_event_prop(
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();
-    let symbol_id = (|| {
-        match nodes.kind(function_id) {
-            AstKind::ArrowFunctionExpression(_) => {
+    let symbol_id = (|| match nodes.kind(function_id) {
+        AstKind::ArrowFunctionExpression(_) => {
+            let parent_id = nodes.parent_id(function_id);
+            if let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) {
+                declarator.id.get_binding_identifier()?.symbol_id.get()
+            } else {
+                None
+            }
+        }
+        AstKind::Function(function) => {
+            if let Some(identifier) = function.id.as_ref() {
+                identifier.symbol_id.get()
+            } else {
                 let parent_id = nodes.parent_id(function_id);
                 if let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) {
-                    declarator
-                        .id
-                        .get_binding_identifier()?
-                        .symbol_id
-                        .get()
+                    declarator.id.get_binding_identifier()?.symbol_id.get()
                 } else {
                     None
                 }
             }
-            AstKind::Function(function) => {
-                if let Some(identifier) = function.id.as_ref() {
-                    identifier.symbol_id.get()
-                } else {
-                    let parent_id = nodes.parent_id(function_id);
-                    if let AstKind::VariableDeclarator(declarator) = nodes.kind(parent_id) {
-                        declarator
-                            .id
-                            .get_binding_identifier()?
-                            .symbol_id
-                            .get()
-                    } else {
-                        None
-                    }
-                }
-            }
-            _ => None,
         }
+        _ => None,
     })();
     let Some(symbol_id) = symbol_id else {
         return false;
@@ -2120,8 +2110,7 @@ fn check_plugin_used_without_register<F>(
     facts: &FileFacts,
     semantic: &Semantic<'_>,
     emit: &mut F,
-)
-where
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     // If any registerPlugin argument could not be resolved statically (a spread
@@ -2200,8 +2189,7 @@ fn check_unscoped_selectors<F>(
     facts: &FileFacts,
     semantic: &Semantic<'_>,
     emit: &mut F,
-)
-where
+) where
     F: FnMut(&str, Severity, Confidence, Span, String, &str),
 {
     let scoped = call_has_scope(call, facts);
