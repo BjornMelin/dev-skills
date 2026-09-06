@@ -1760,6 +1760,19 @@ export function Card(gsap) {
     );
     assert!(!fired(&shadowed_gsap, ids::REACT_TWEEN_IN_RENDER));
 
+    // React-namespace wrapper composes like the bare form.
+    let react_wrapped = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React from "react";
+import { gsap } from "gsap";
+const Card = React.memo(() => {
+  gsap.to(ref.current, { x: 10 });
+  return <div />;
+});"#,
+    );
+    assert!(fired(&react_wrapped, ids::REACT_TWEEN_IN_RENDER));
+
     // useMemo factories execute during render: attribute the tween to the
     // owning component rather than the anonymous factory callback.
     let memo_tween = analyze(

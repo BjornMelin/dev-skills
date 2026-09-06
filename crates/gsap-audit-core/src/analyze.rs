@@ -1678,18 +1678,19 @@ fn enclosing_function_name(
             .id
             .as_ref()
             .map(|identifier| identifier.name.as_str().to_string())
-            .or_else(|| function_binding_name(nodes, function_id)),
-        AstKind::ArrowFunctionExpression(_) => function_binding_name(nodes, function_id),
+            .or_else(|| function_binding_name(semantic, function_id)),
+        AstKind::ArrowFunctionExpression(_) => function_binding_name(semantic, function_id),
         _ => None,
     }
 }
 
 fn function_binding_name(
-    nodes: &oxc_semantic::AstNodes<'_>,
+    semantic: &Semantic<'_>,
     function_id: oxc_semantic::NodeId,
 ) -> Option<String> {
     use oxc_ast::AstKind;
 
+    let nodes = semantic.nodes();
     let parent_id = nodes.parent_id(function_id);
     match nodes.kind(parent_id) {
         AstKind::VariableDeclarator(declarator) => declarator
@@ -1700,22 +1701,54 @@ fn function_binding_name(
         // Transparent wrappers preserve the function identity, so the name
         // lives on the declarator above the call: `const Card = memo(() => ...)`
         // names the arrow `Card`.
-        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
-            function_binding_name(nodes, parent_id)
+        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call, semantic) => {
+            function_binding_name(semantic, parent_id)
         }
         _ => None,
     }
 }
 
 /// Whether a call preserves its function argument's identity for naming:
-/// `memo` and `forwardRef` return the function/component.
-fn callee_is_transparent_wrapper(call: &CallExpression<'_>) -> bool {
+/// `memo` and `forwardRef` return the function/component, including the
+/// `React.memo` / `React.forwardRef` namespace forms with the React binding
+/// resolved to the React import (or the unresolved global).
+fn callee_is_transparent_wrapper(call: &CallExpression<'_>, semantic: &Semantic<'_>) -> bool {
     match call.callee.without_parentheses() {
         Expression::Identifier(identifier) => {
             matches!(identifier.name.as_str(), "memo" | "forwardRef")
         }
+        Expression::StaticMemberExpression(member) => {
+            matches!(member.property.name.as_str(), "memo" | "forwardRef")
+                && react_namespace_object(semantic, &member.object)
+        }
         _ => false,
     }
+}
+
+/// Whether an expression is the `React` namespace: the unresolved global,
+/// or a binding imported from `react`. Anything else sharing the spelling
+/// does not count.
+fn react_namespace_object(semantic: &Semantic<'_>, object: &Expression<'_>) -> bool {
+    use oxc_ast::AstKind;
+
+    let Expression::Identifier(identifier) = object.without_parentheses() else {
+        return false;
+    };
+    if identifier.name.as_str() != "React" {
+        return false;
+    }
+    let Some(declaration) = reference_declaration(semantic, identifier) else {
+        return true;
+    };
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = nodes.kind(parent_id) {
+        return import.source.value.as_str() == "react";
+    }
+    false
 }
 
 fn function_is_hook_callback(
@@ -2085,7 +2118,7 @@ fn function_is_default_exported(
             AstKind::ExportDefaultDeclaration(_) => return true,
             // Known transparent wrappers (`export default memo(() => {})`)
             // preserve the component; only direct position counts otherwise.
-            AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
+            AstKind::CallExpression(call) if callee_is_transparent_wrapper(call, semantic) => {
                 current = parent_id;
             }
             AstKind::CallExpression(_)
@@ -2639,7 +2672,7 @@ fn argument_is_numeric_literal(argument: &Argument<'_>) -> bool {
 
 fn is_gsap_member_call(
     call: &CallExpression<'_>,
-    facts: &FileFacts,
+    _facts: &FileFacts,
     semantic: &Semantic<'_>,
     method: &str,
 ) -> bool {
@@ -2877,7 +2910,7 @@ fn object_animates_layout_prop(object: &ObjectExpression<'_>) -> Option<Span> {
 /// Whether a call is `gsap.ticker.lagSmoothing(0|false)`.
 fn is_ticker_lag_smoothing_disabled(
     call: &CallExpression<'_>,
-    facts: &FileFacts,
+    _facts: &FileFacts,
     semantic: &Semantic<'_>,
 ) -> bool {
     let Expression::StaticMemberExpression(outer) = call.callee.without_parentheses() else {
