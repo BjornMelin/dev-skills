@@ -1077,6 +1077,22 @@ export default () => {
         &anonymous,
         ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
     ));
+
+    // Wrapped anonymous default export composes both supported forms.
+    let wrapped_default = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import { memo } from "react";
+import { useSharedValue } from "react-native-reanimated";
+export default memo(() => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+});"#,
+    );
+    assert!(fired(
+        &wrapped_default,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
 }
 
 #[test]
