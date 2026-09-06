@@ -1082,9 +1082,9 @@ fn tailwind_ms_literals(literal: &str, prefix: &str) -> Vec<(usize, u32, String)
     // Tailwind never interprets as a duration utility.
     for (token_start, token) in split_class_tokens(literal) {
         let (class_start, class) = utility_text(token_start, token);
-        let Some(rest) = class.strip_prefix(prefix) else {
+        if class.strip_prefix(prefix).is_none() {
             continue;
-        };
+        }
         let number_start = class_start + prefix.len();
         // Bound the parse to the current class: the value ends at the first
         // `]` after the prefix. Searching past it lets one invalid class
