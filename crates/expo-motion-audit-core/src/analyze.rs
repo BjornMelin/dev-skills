@@ -1174,7 +1174,7 @@ fn function_is_default_exported(
             AstKind::ExportDefaultDeclaration(_) => return true,
             // Known transparent wrappers (`export default memo(() => {})`)
             // preserve the component; only direct position counts otherwise.
-            AstKind::CallExpression(call) if callee_is_component_wrapper(call) => {
+            AstKind::CallExpression(call) if callee_is_component_wrapper(call, semantic) => {
                 current = parent_id;
             }
             AstKind::CallExpression(_)
@@ -1269,18 +1269,19 @@ fn function_node_name(
             .id
             .as_ref()
             .map(|identifier| identifier.name.as_str().to_string())
-            .or_else(|| function_binding_name(nodes, function_id)),
-        AstKind::ArrowFunctionExpression(_) => function_binding_name(nodes, function_id),
+            .or_else(|| function_binding_name(semantic, function_id)),
+        AstKind::ArrowFunctionExpression(_) => function_binding_name(semantic, function_id),
         _ => None,
     }
 }
 
 fn function_binding_name(
-    nodes: &oxc_semantic::AstNodes<'_>,
+    semantic: &Semantic<'_>,
     function_id: oxc_semantic::NodeId,
 ) -> Option<String> {
     use oxc_ast::AstKind;
 
+    let nodes = semantic.nodes();
     let parent_id = nodes.parent_id(function_id);
     match nodes.kind(parent_id) {
         AstKind::VariableDeclarator(declarator) => declarator
@@ -1291,24 +1292,79 @@ fn function_binding_name(
         // Transparent wrappers preserve the function identity, so the name
         // lives on the declarator above the call: `const renderItem =
         // useCallback(({ item }) => ...)` names the arrow `renderItem`.
-        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call) => {
-            function_binding_name(nodes, parent_id)
+        AstKind::CallExpression(call) if callee_is_transparent_wrapper(call, semantic) => {
+            function_binding_name(semantic, parent_id)
         }
         _ => None,
     }
 }
 
 /// Whether a call preserves its function argument's identity:
-/// `useCallback`, `memo`, and `forwardRef` return the function/component.
-fn callee_is_transparent_wrapper(call: &CallExpression<'_>) -> bool {
-    callee_identifier(call)
-        .is_some_and(|name| matches!(name, "useCallback" | "memo" | "forwardRef"))
+/// `useCallback`, `memo`, and `forwardRef` return the function/component,
+/// including the `React.memo` / `React.forwardRef` namespace forms with the
+/// React binding resolved.
+fn callee_is_transparent_wrapper(call: &CallExpression<'_>, semantic: &Semantic<'_>) -> bool {
+    use oxc_ast::ast::Expression;
+
+    match call.callee.without_parentheses() {
+        Expression::Identifier(identifier) => {
+            matches!(
+                identifier.name.as_str(),
+                "useCallback" | "memo" | "forwardRef"
+            )
+        }
+        Expression::StaticMemberExpression(member) => {
+            matches!(member.property.name.as_str(), "memo" | "forwardRef")
+                && react_namespace_object(semantic, &member.object)
+        }
+        _ => false,
+    }
+}
+
+/// Whether an expression is the `React` namespace: the unresolved global,
+/// or a binding imported from `react`.
+fn react_namespace_object(semantic: &Semantic<'_>, object: &Expression<'_>) -> bool {
+    use oxc_ast::AstKind;
+
+    let Expression::Identifier(identifier) = object.without_parentheses() else {
+        return false;
+    };
+    if identifier.name.as_str() != "React" {
+        return false;
+    }
+    let Some(reference_id) = identifier.reference_id.get() else {
+        return true;
+    };
+    let Some(symbol_id) = semantic.scoping().get_reference(reference_id).symbol_id() else {
+        return true;
+    };
+    let declaration = semantic.scoping().symbol_declaration(symbol_id);
+    let nodes = semantic.nodes();
+    let parent_id = nodes.parent_id(declaration);
+    if parent_id == declaration {
+        return false;
+    }
+    if let AstKind::ImportDeclaration(import) = nodes.kind(parent_id) {
+        return import.source.value.as_str() == "react";
+    }
+    false
 }
 
 /// Whether a call preserves a component's identity through a default export:
 /// `export default memo(() => {})` keeps the anonymous arrow a component.
-fn callee_is_component_wrapper(call: &CallExpression<'_>) -> bool {
-    callee_identifier(call).is_some_and(|name| matches!(name, "memo" | "forwardRef"))
+fn callee_is_component_wrapper(call: &CallExpression<'_>, semantic: &Semantic<'_>) -> bool {
+    use oxc_ast::ast::Expression;
+
+    match call.callee.without_parentheses() {
+        Expression::Identifier(_) => {
+            callee_identifier(call).is_some_and(|name| matches!(name, "memo" | "forwardRef"))
+        }
+        Expression::StaticMemberExpression(member) => {
+            matches!(member.property.name.as_str(), "memo" | "forwardRef")
+                && react_namespace_object(semantic, &member.object)
+        }
+        _ => false,
+    }
 }
 
 fn enclosing_function_id(

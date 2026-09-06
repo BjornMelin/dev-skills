@@ -1121,6 +1121,22 @@ export default memo(() => {
         &wrapped_default,
         ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
     ));
+
+    // React-namespace wrapper composes like the bare form.
+    let react_wrapped = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React from "react";
+import { useSharedValue } from "react-native-reanimated";
+const Card = React.memo(() => {
+  const progress = useSharedValue(0);
+  return <Text>{progress.value}</Text>;
+});"#,
+    );
+    assert!(fired(
+        &react_wrapped,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
 }
 
 #[test]
