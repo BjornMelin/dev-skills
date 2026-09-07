@@ -1513,6 +1513,9 @@ fn enclosing_hot_path_context(
     let nodes = semantic.nodes();
     let mut current = node_id;
     let mut passed_through_function = false;
+    // Nearest function containing the bridge call. A bridge nested deeper
+    // only runs per frame when that function executes in the hot path.
+    let mut inner_function: Option<oxc_semantic::NodeId> = None;
     loop {
         let parent_id = nodes.parent_id(current);
         if parent_id == current {
@@ -1521,22 +1524,67 @@ fn enclosing_hot_path_context(
         match nodes.kind(parent_id) {
             AstKind::Function(_) | AstKind::ArrowFunctionExpression(_) => {
                 passed_through_function = true;
+                if inner_function.is_none() {
+                    inner_function = Some(parent_id);
+                }
             }
             AstKind::CallExpression(call) if passed_through_function => {
                 if callee_is_reanimated_hook(semantic, call, "useAnimatedReaction", facts) {
-                    return Some("a useAnimatedReaction callback");
+                    if bridge_executes_in_hot_path(semantic, call, inner_function) {
+                        return Some("a useAnimatedReaction callback");
+                    }
+                    return None;
                 }
                 if let Expression::StaticMemberExpression(member) =
                     call.callee.without_parentheses()
                     && HOT_PATH_METHODS.contains(&member.property.name.as_str())
                 {
-                    return Some("a gesture onUpdate/onChange callback");
+                    if bridge_executes_in_hot_path(semantic, call, inner_function) {
+                        return Some("a gesture onUpdate/onChange callback");
+                    }
+                    return None;
                 }
             }
             _ => {}
         }
         current = parent_id;
     }
+}
+
+/// Whether a bridge call nested inside `inner_function` executes when the
+/// hot-path callback `call` runs: directly inside it, passed as a callback,
+/// or invoked by name within its subtree. A merely declared, never-invoked
+/// helper does not run per frame.
+fn bridge_executes_in_hot_path(
+    semantic: &Semantic<'_>,
+    call: &CallExpression<'_>,
+    inner_function: Option<oxc_semantic::NodeId>,
+) -> bool {
+    use oxc_ast::AstKind;
+
+    let Some(function_id) = inner_function else {
+        // Bridge passed directly as the callback: invoked by the hot path.
+        return true;
+    };
+    let nodes = semantic.nodes();
+    // Passed as a callback argument (e.g. `items.forEach(() => bridge())`):
+    // presumed invoked by the callee.
+    if let AstKind::CallExpression(_) = nodes.kind(nodes.parent_id(function_id)) {
+        return true;
+    }
+    // Otherwise the function must be invoked by name inside the hot path.
+    let Some(name) = function_node_name(semantic, function_id) else {
+        return false;
+    };
+    semantic.nodes().iter().any(|node| {
+        if let AstKind::CallExpression(inner) = node.kind() {
+            if inner.span.start < call.span.start || inner.span.end > call.span.end {
+                return false;
+            }
+            return callee_identifier(inner).is_some_and(|callee| callee == name);
+        }
+        false
+    })
 }
 
 /// Whether a call's callee is a Reanimated hook, resolving import aliases:

@@ -379,6 +379,32 @@ function setup(useReaction) { useReaction(() => prepared.value, (current) => { s
         &shadowed_hook,
         ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
     ));
+
+    // Declared but never invoked inside the reaction: not per-frame.
+    let declared_only = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+useAnimatedReaction(() => { const later = () => scheduleOnRN(report); return sv.value; });"#,
+    );
+    assert!(!fired(
+        &declared_only,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
+
+    // Invoked nested helper does run in the hot path.
+    let invoked_nested = analyze(
+        "src/Box.tsx",
+        "tsx",
+        r#"import { useAnimatedReaction } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
+useAnimatedReaction(() => { const later = () => scheduleOnRN(report); later(); return sv.value; });"#,
+    );
+    assert!(fired(
+        &invoked_nested,
+        ids::WORKLETS_THREADING_BRIDGE_IN_HOT_PATH
+    ));
 }
 
 // ---------------------------------------------------------------------------
