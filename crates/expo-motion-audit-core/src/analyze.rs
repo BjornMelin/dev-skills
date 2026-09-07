@@ -1122,10 +1122,7 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
 /// Whether a function node is the factory passed directly to `useMemo(...)`.
 /// Unlike `useCallback` or effects, the factory executes during render, so
 /// render-time rules must look through it to the owning component.
-fn is_usememo_callback(
-    semantic: &Semantic<'_>,
-    function_id: oxc_semantic::NodeId,
-) -> bool {
+fn is_usememo_callback(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeId) -> bool {
     use oxc_ast::AstKind;
 
     let nodes = semantic.nodes();

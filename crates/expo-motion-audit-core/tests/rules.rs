@@ -1102,7 +1102,10 @@ export function C() {
   return <Text>{v}</Text>;
 }"#,
     );
-    assert!(fired(&react_memo, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+    assert!(fired(
+        &react_memo,
+        ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS
+    ));
 }
 
 #[test]
