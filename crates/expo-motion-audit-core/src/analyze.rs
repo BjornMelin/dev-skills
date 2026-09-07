@@ -1096,7 +1096,7 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
                 }
                 // `useMemo` factories execute during render, so a read inside
                 // one belongs to the owning component, not the callback.
-                if is_usememo_callback(nodes, parent_id) {
+                if is_usememo_callback(semantic, parent_id) {
                     current = parent_id;
                     continue;
                 }
@@ -1104,7 +1104,7 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
             }
             AstKind::ArrowFunctionExpression(_) => {
                 // Same render-time reasoning as above for arrow factories.
-                if is_usememo_callback(nodes, parent_id) {
+                if is_usememo_callback(semantic, parent_id) {
                     current = parent_id;
                     continue;
                 }
@@ -1123,19 +1123,33 @@ fn access_is_in_component_render(semantic: &Semantic<'_>, node_id: oxc_semantic:
 /// Unlike `useCallback` or effects, the factory executes during render, so
 /// render-time rules must look through it to the owning component.
 fn is_usememo_callback(
-    nodes: &oxc_semantic::AstNodes<'_>,
+    semantic: &Semantic<'_>,
     function_id: oxc_semantic::NodeId,
 ) -> bool {
     use oxc_ast::AstKind;
 
+    let nodes = semantic.nodes();
     let call_id = nodes.parent_id(function_id);
     if call_id == function_id {
         return false;
     }
     matches!(
         nodes.kind(call_id),
-        AstKind::CallExpression(call) if callee_identifier(call) == Some("useMemo")
+        AstKind::CallExpression(call)
+            if callee_identifier(call) == Some("useMemo")
+                || is_react_usememo_member(semantic, call)
     )
+}
+
+/// Whether a call is `React.useMemo(...)` with the React binding resolved.
+fn is_react_usememo_member(semantic: &Semantic<'_>, call: &CallExpression<'_>) -> bool {
+    use oxc_ast::ast::Expression;
+
+    if let Expression::StaticMemberExpression(member) = call.callee.without_parentheses() {
+        return member.property.name.as_str() == "useMemo"
+            && react_namespace_object(semantic, &member.object);
+    }
+    false
 }
 
 fn function_is_component_render(

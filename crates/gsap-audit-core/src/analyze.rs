@@ -1662,6 +1662,11 @@ fn is_usememo_callback(semantic: &Semantic<'_>, function_id: oxc_semantic::NodeI
             if matches!(
                 call.callee.without_parentheses(),
                 Expression::Identifier(identifier) if identifier.name.as_str() == "useMemo"
+            ) || matches!(
+                call.callee.without_parentheses(),
+                Expression::StaticMemberExpression(member)
+                    if member.property.name.as_str() == "useMemo"
+                        && react_namespace_object(semantic, &member.object)
             )
     )
 }

@@ -1089,6 +1089,20 @@ export function C() {
 }"#,
     );
     assert!(fired(&memo, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
+
+    // React-namespace factory composes like the bare form.
+    let react_memo = analyze(
+        "src/a.tsx",
+        "tsx",
+        r#"import React from "react";
+import { useSharedValue } from "react-native-reanimated";
+export function C() {
+  const sv = useSharedValue(0);
+  const v = React.useMemo(() => sv.value, [sv]);
+  return <Text>{v}</Text>;
+}"#,
+    );
+    assert!(fired(&react_memo, ids::WORKLETS_THREADING_VALUE_ACCESS_ON_JS));
 }
 
 #[test]

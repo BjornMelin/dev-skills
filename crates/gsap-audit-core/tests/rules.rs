@@ -1786,6 +1786,19 @@ export function Card() {
 }"#,
     );
     assert!(fired(&memo_tween, ids::REACT_TWEEN_IN_RENDER));
+
+    // React-namespace factory composes like the bare form.
+    let react_memo_tween = analyze(
+        "src/Card.tsx",
+        "tsx",
+        r#"import React from "react";
+import { gsap } from "gsap";
+export function Card() {
+  React.useMemo(() => gsap.to(ref.current, { x: 10 }), []);
+  return <div />;
+}"#,
+    );
+    assert!(fired(&react_memo_tween, ids::REACT_TWEEN_IN_RENDER));
 }
 
 #[test]
