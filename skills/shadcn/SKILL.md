@@ -1,14 +1,14 @@
 ---
 name: shadcn
 description: "Manage shadcn/ui components: add, search, fix, style and compose, with registry and component docs. Applies to any project with a components.json. Triggers on \"shadcn init\" or a --preset code."
-allowed-tools: Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(yarn *), Bash(curl *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *), Bash(yarn dlx shadcn@latest *)
+allowed-tools: Read, Edit, Write, Bash(npm *), Bash(pnpm *), Bash(bun *), Bash(yarn *), Bash(curl *), Bash(npx shadcn@latest *), Bash(pnpm dlx shadcn@latest *), Bash(bunx --bun shadcn@latest *), Bash(yarn dlx shadcn@latest *)
 ---
 
 # shadcn/ui
 
 A framework for building ui, components and design systems. Components are added as source code to the user's project via the CLI.
 
-> **IMPORTANT:** Default shadcn runner: `bunx --bun shadcn@latest`. In pnpm repos, use `pnpm dlx shadcn@latest`. Detect via `packageManager`, then lockfile. Examples use Bun; substitute pnpm runner when repo is pnpm.
+> **IMPORTANT:** Default shadcn runner: `bunx --bun shadcn@latest`. In pnpm repos, use `pnpm dlx shadcn@latest`; with npm, `npx shadcn@latest`; with Yarn, `yarn dlx shadcn@latest`. Detect via `packageManager`, then lockfile. Examples use Bun; substitute the project runner throughout, including the `info --json` step below.
 
 ## Current Project Context
 

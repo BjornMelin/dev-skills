@@ -27,13 +27,13 @@ target repo's installed package versions before editing.
 
 ## Decision Boundaries
 
-- Use [`expo-motion`](../../../../skills/expo-motion/SKILL.md) for React Native.
+- For React Native, prefer `expo-motion` when installed; otherwise proceed
+  with the guidance here.
 - Use Rive for interactive state machines.
 - Use CSS/WAAPI for simple UI motion that does not need designer-authored assets.
-- Route general Motion/CSS API work to [`motion`](../../../../skills/motion/SKILL.md),
-  cross-stack audits to
-  [`design-motion-audit`](../../../design-motion/skills/design-motion-audit/SKILL.md), and web
-  R3F to [`web-three-r3f`](../web-three-r3f/SKILL.md).
+- For general Motion/CSS API work or cross-stack audits, prefer `motion` or
+  `design-motion-audit` when installed; otherwise proceed with the guidance
+  here. Web R3F stays in-bundle via [`web-three-r3f`](../web-three-r3f/SKILL.md).
 
 ## Workflow
 
