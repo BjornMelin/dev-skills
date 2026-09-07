@@ -719,11 +719,20 @@ fn resolve_transition_prop_reference<'a>(
         return None;
     };
     let symbol_id = declarator.id.get_binding_identifier()?.symbol_id.get()?;
-    semantic
+    // Prefer a `transition` use: an object shared between `animate` and
+    // `transition` props carries timing configuration in the latter, while
+    // its bare keys are animation targets in the former.
+    let references: Vec<_> = semantic
         .scoping()
         .get_resolved_reference_ids(symbol_id)
         .iter()
-        .find_map(|reference_id| reference_motion_prop(semantic, *reference_id))
+        .filter_map(|reference_id| reference_motion_prop(semantic, *reference_id))
+        .collect();
+    references
+        .iter()
+        .find(|prop| **prop == "transition")
+        .or_else(|| references.first())
+        .copied()
 }
 
 /// Whether a variable reference sits in a motion JSX transition-style prop

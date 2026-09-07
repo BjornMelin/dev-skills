@@ -511,6 +511,28 @@ const card = <motion.div transition={transition} />;",
 }
 
 #[test]
+fn motion_shared_object_prefers_transition_use() {
+    // Shared between `animate` (targets) and `transition` (timing): the
+    // timing reading wins so the hardcoded duration cannot bypass the audit.
+    let analysis = analyze_source(
+        "app.tsx",
+        r"const opts = { duration: 0.2 };
+const a = <motion.div animate={opts} />;
+const card = <motion.div transition={opts} />;",
+        source_type_for_extension("tsx"),
+        &tokens(),
+    );
+
+    let shared_findings: Vec<_> = analysis
+        .findings
+        .iter()
+        .filter(|finding| finding.id == ids::MOTION_DURATION_LITERAL)
+        .collect();
+    assert_eq!(shared_findings.len(), 1);
+    assert!(shared_findings[0].message.contains("200ms"));
+}
+
+#[test]
 fn motion_jsx_namespace_resolves_through_import_alias() {
     // Aliased Motion import: the `<m.div>` tag still belongs to Motion.
     let aliased = analyze_source(
