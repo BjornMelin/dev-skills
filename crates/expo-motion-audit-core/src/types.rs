@@ -71,6 +71,7 @@ pub enum Category {
     Layout,
     Accessibility,
     Lifecycle,
+    Performance,
     Config,
 }
 
@@ -86,6 +87,7 @@ impl Category {
             Category::Layout => "layout",
             Category::Accessibility => "accessibility",
             Category::Lifecycle => "lifecycle",
+            Category::Performance => "performance",
             Category::Config => "config",
         }
     }
@@ -100,6 +102,7 @@ impl Category {
             Category::Layout,
             Category::Accessibility,
             Category::Lifecycle,
+            Category::Performance,
             Category::Config,
         ]
     }
@@ -114,6 +117,7 @@ impl Category {
             "layout" => Some(Category::Layout),
             "accessibility" => Some(Category::Accessibility),
             "lifecycle" => Some(Category::Lifecycle),
+            "performance" => Some(Category::Performance),
             "config" => Some(Category::Config),
             _ => None,
         }

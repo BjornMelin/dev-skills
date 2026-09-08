@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsString;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Read;
 use std::io::Write;
@@ -466,6 +467,10 @@ pub struct PrAgentActionArgs {
 }
 
 #[derive(Args, Clone, Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent CLI flags are intentionally composable"
+)]
 pub struct PrReadinessArgs {
     #[arg(long, value_name = "CAPSULE_DIR")]
     pub capsule: PathBuf,
@@ -1002,6 +1007,10 @@ pub struct PolicyDocsCheckArgs {
 }
 
 #[derive(Args, Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent CLI flags control gate execution"
+)]
 pub struct PolicyRunArgs {
     #[arg(long, value_name = "CAPSULE_DIR")]
     pub capsule: PathBuf,
@@ -1133,6 +1142,10 @@ pub struct SkillsAuditArgs {
 
 /// Arguments for syncing Kimi Code skill discovery to Codex enabled skills.
 #[derive(Args, Clone, Debug)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "independent CLI flags control optional sync steps"
+)]
 pub struct SkillsSyncKimiArgs {
     /// Print the planned mirror without writing it.
     #[arg(long, conflicts_with = "apply")]
@@ -1685,7 +1698,7 @@ struct CommandOutput {
 }
 
 impl CommandOutput {
-    fn error(command: &'static str, message: String) -> Self {
+    fn error(command: &'static str, message: &str) -> Self {
         Self {
             ok: false,
             command,
@@ -1705,7 +1718,10 @@ pub fn run() -> Result<ExitCode> {
     let command = cli.command_name();
     let output = match handle_cli(cli) {
         Ok(output) => output,
-        Err(error) if json => CommandOutput::error(command, format!("{error:#}")),
+        Err(error) if json => {
+            let message = format!("{error:#}");
+            CommandOutput::error(command, &message)
+        }
         Err(error) => return Err(error),
     };
     let ok = output.ok;
@@ -1728,7 +1744,10 @@ where
     let command = cli.command_name();
     let output = match handle_cli(cli) {
         Ok(output) => output,
-        Err(error) if json => CommandOutput::error(command, format!("{error:#}")),
+        Err(error) if json => {
+            let message = format!("{error:#}");
+            CommandOutput::error(command, &message)
+        }
         Err(error) => return Err(error),
     };
     render_output(output, json)
@@ -1879,7 +1898,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 })
             }
             SubagentsCommand::Synthesis(args) => {
-                let result = record_subagent_synthesis(args.into_core())?;
+                let result = record_subagent_synthesis(&args.into_core())?;
                 Ok(CommandOutput {
                     ok: true,
                     command: "subagents record-synthesis",
@@ -1925,7 +1944,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                 let capsule = core_args.capsule.clone();
                 let batch_id = core_args.batch_id.clone();
                 let checked_at = core_args.recorded_at;
-                record_subagent_synthesis(core_args)?;
+                record_subagent_synthesis(&core_args)?;
                 let report = orchestration_run(
                     &capsule,
                     &batch_id,
@@ -1962,7 +1981,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
             PolicyCommand::Explain(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-                let result = policy_explain(args, checked_at)?;
+                let result = policy_explain(&args, checked_at)?;
                 let missing = result.missing_local_prerequisites.len();
                 let human = if missing == 0 {
                     format!(
@@ -2087,7 +2106,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
                         fs::create_dir_all(parent)
                             .with_context(|| format!("failed to create {}", parent.display()))?;
                     }
-                    write_json(out, &result)?;
+                    write_json(&out, &result)?;
                 }
                 let human = format!(
                     "generated Agent Skills Lab catalog with {} skill(s)",
@@ -2148,7 +2167,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
         Commands::Bootstrap { command } => match command {
             BootstrapCommand::Status(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-                let result = bootstrap_status(args, checked_at)?;
+                let result = bootstrap_status(&args, checked_at)?;
                 let human = format!(
                     "checked {} bootstrap pack(s): {} valid, {} invalid",
                     result.total, result.valid, result.invalid
@@ -2248,7 +2267,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
         Commands::Pr { command } => match command {
             PrCommand::Agent(args) => {
                 let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-                let result = run_pr_agent_state(args, checked_at)?;
+                let result = run_pr_agent_state(&args, checked_at)?;
                 let blocking = result
                     .diagnostics
                     .iter()
@@ -2276,7 +2295,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
             PrCommand::AgentAction(args) => {
                 let generated_at = args.checked_at.unwrap_or_else(Utc::now);
-                let result = run_pr_agent_hosted_action(args, generated_at)?;
+                let result = run_pr_agent_hosted_action(&args, generated_at)?;
                 let failed = result
                     .execution
                     .as_ref()
@@ -2306,7 +2325,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
             PrCommand::Readiness(args) => {
                 let generated_at = args.checked_at.unwrap_or_else(Utc::now);
-                let result = run_pr_readiness_loop(args, generated_at)?;
+                let result = run_pr_readiness_loop(&args, generated_at)?;
                 let human = format!(
                     "PR readiness for {}#{} is {:?} after {} attempt(s)",
                     result.repository,
@@ -2329,7 +2348,7 @@ fn handle_cli(cli: Cli) -> Result<CommandOutput> {
             }
             PrCommand::Plan(args) => {
                 let generated_at = args.generated_at.unwrap_or_else(Utc::now);
-                let result = pr_control_plan(args.repo, args.number, generated_at)?;
+                let result = pr_control_plan(&args.repo, args.number, generated_at)?;
                 Ok(CommandOutput {
                     ok: true,
                     command: "pr plan",
@@ -2396,10 +2415,10 @@ fn render_manpage() -> Result<String> {
 }
 
 fn shell_name(shell: Shell) -> String {
-    shell
-        .to_possible_value()
-        .map(|value| value.get_name().to_string())
-        .unwrap_or_else(|| format!("{shell:?}").to_ascii_lowercase())
+    shell.to_possible_value().map_or_else(
+        || format!("{shell:?}").to_ascii_lowercase(),
+        |value| value.get_name().to_string(),
+    )
 }
 
 fn handle_skills_sync_kimi(args: SkillsSyncKimiArgs, json_output: bool) -> Result<CommandOutput> {
@@ -2461,10 +2480,7 @@ fn install_kimi_wrapper(wrapper_path: Option<&Path>) -> Result<()> {
         Some(path) => path.to_path_buf(),
         None => default_wrapper_path()?,
     };
-    if fs::symlink_metadata(&path)
-        .map(|metadata| metadata.file_type().is_symlink())
-        .unwrap_or(false)
-    {
+    if fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
         bail!(
             "refusing to overwrite symlink wrapper path: {}",
             path.display()
@@ -2642,7 +2658,7 @@ fn orchestration_output(
 pub fn skills_inventory(
     args: SkillsInventoryArgs,
 ) -> Result<codex_dev_core::SkillsInventoryReport> {
-    codex_dev_core::skills_inventory(codex_dev_core::SkillInventoryArgs {
+    codex_dev_core::skills_inventory(&codex_dev_core::SkillInventoryArgs {
         repo_root: args.repo_root,
         skills_root: args.skills_root,
         checked_at: args.checked_at,
@@ -2651,7 +2667,7 @@ pub fn skills_inventory(
 
 /// Build a read-only validation report for skill folders.
 pub fn skills_validate(args: SkillsValidateArgs) -> Result<codex_dev_core::SkillsInventoryReport> {
-    codex_dev_core::skills_inventory(codex_dev_core::SkillInventoryArgs {
+    codex_dev_core::skills_inventory(&codex_dev_core::SkillInventoryArgs {
         repo_root: args.repo_root,
         skills_root: args.skills_root,
         checked_at: args.checked_at,
@@ -2670,7 +2686,7 @@ pub fn skills_audit(args: SkillsAuditArgs) -> Result<codex_dev_core::SkillsAudit
 
 /// Build a read-only machine-readable bootstrap pack status report.
 pub fn bootstrap_status(
-    args: BootstrapStatusArgs,
+    args: &BootstrapStatusArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<BootstrapStatusReport> {
     let repo_root = resolve_policy_docs_repo_root(args.repo_root.as_deref())?;
@@ -2717,7 +2733,7 @@ pub fn bootstrap_plan(
 ) -> Result<BootstrapPlanReport> {
     let repo_root = resolve_policy_docs_repo_root(args.repo_root.as_deref())?;
     let mut status = bootstrap_status(
-        BootstrapStatusArgs {
+        &BootstrapStatusArgs {
             repo_root: Some(repo_root.clone()),
             pack: Some(args.pack.clone()),
             include_local_paths: args.include_local_paths,
@@ -3366,9 +3382,10 @@ fn bootstrap_local_path_display(path: &Path, include_local_paths: bool) -> Strin
 }
 
 fn repo_relative_string(repo_root: &Path, path: &Path) -> String {
-    path.strip_prefix(repo_root)
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|_| path.display().to_string())
+    path.strip_prefix(repo_root).map_or_else(
+        |_| path.display().to_string(),
+        |path| path.to_string_lossy().replace('\\', "/"),
+    )
 }
 
 fn bootstrap_error(code: &str, message: String) -> BootstrapDiagnostic {
@@ -3545,9 +3562,8 @@ fn local_github_status() -> LocalGithubStatus {
         .filter(|name| non_empty_env_var(name))
         .map(|name| (*name).to_string())
         .collect::<Vec<_>>();
-    let config_present = gh_config_dir()
-        .map(|config_dir| config_dir.join("hosts.yml").is_file())
-        .unwrap_or(false);
+    let config_present =
+        gh_config_dir().is_some_and(|config_dir| config_dir.join("hosts.yml").is_file());
     let auth_class = if !token_sources.is_empty() {
         "env_token"
     } else if config_present {
@@ -3757,9 +3773,7 @@ fn is_executable_file(path: &Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        fs::metadata(path)
-            .map(|metadata| metadata.permissions().mode() & 0o111 != 0)
-            .unwrap_or(false)
+        fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
     }
     #[cfg(not(unix))]
     {
@@ -3913,7 +3927,7 @@ pub fn policy_docs_check(explicit_repo_root: Option<&Path>) -> Result<PolicyDocs
 }
 
 pub fn policy_explain(
-    args: PolicyExplainArgs,
+    args: &PolicyExplainArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<PolicyExplainReport> {
     let include_local_paths = args.include_local_paths;
@@ -3922,7 +3936,7 @@ pub fn policy_explain(
 }
 
 fn policy_explain_inner(
-    args: PolicyExplainArgs,
+    args: &PolicyExplainArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<PolicyExplainReport> {
     let selected_profile = args.profile;
@@ -4506,11 +4520,11 @@ fn policy_explain_command(profile: PolicyProfile) -> String {
 }
 
 pub fn pr_control_plan(
-    repository: String,
+    repository: &str,
     number: u64,
     generated_at: DateTime<Utc>,
 ) -> Result<PrControlPlan> {
-    let (owner, name) = parse_github_repository(&repository)?;
+    let (owner, name) = parse_github_repository(repository)?;
     let owner_arg = format!("owner={owner}");
     let name_arg = format!("name={name}");
     let number_arg = format!("number={number}");
@@ -4520,7 +4534,7 @@ pub fn pr_control_plan(
 
     Ok(PrControlPlan {
         schema: PR_CONTROL_PLAN_SCHEMA.to_string(),
-        repository: repository.clone(),
+        repository: repository.to_string(),
         number,
         generated_at,
         commands: vec![
@@ -4533,7 +4547,7 @@ pub fn pr_control_plan(
                     "view",
                     &number.to_string(),
                     "--repo",
-                    &repository,
+                    repository,
                     "--json",
                     GH_PR_VIEW_JSON_FIELDS,
                 ],
@@ -4547,7 +4561,7 @@ pub fn pr_control_plan(
                     "checks",
                     &number.to_string(),
                     "--repo",
-                    &repository,
+                    repository,
                     "--json",
                     "bucket,completedAt,description,event,link,name,startedAt,state,workflow",
                 ],
@@ -4591,7 +4605,7 @@ pub fn pr_control_plan(
                     "review",
                     "start",
                     "--repo",
-                    &repository,
+                    repository,
                     "--number",
                     &number.to_string(),
                     "--fresh",
@@ -4620,7 +4634,7 @@ pub fn pr_control_plan(
                     "review",
                     "closeout",
                     "--repo",
-                    &repository,
+                    repository,
                     "--number",
                     &number.to_string(),
                     "--worklist",
@@ -4639,7 +4653,7 @@ pub fn pr_control_plan(
 }
 
 pub fn run_pr_agent_state(
-    args: PrAgentArgs,
+    args: &PrAgentArgs,
     checked_at: DateTime<Utc>,
 ) -> Result<PrAgentStateReport> {
     let (owner, name) = parse_github_repository(&args.repo)?;
@@ -4655,12 +4669,12 @@ pub fn run_pr_agent_state(
 
     let output_dir = prepare_pr_agent_output_dir(&args.capsule, checked_at)?;
 
-    let agent_command = render_pr_agent_command(&args, checked_at);
+    let agent_command = render_pr_agent_command(args, checked_at);
     let mut diagnostics = Vec::new();
     let mut sources = Vec::new();
 
     for spec in pr_agent_source_specs(&args.repo, owner, name, args.number) {
-        let capture = capture_pr_agent_source(&args, &spec, &output_dir, checked_at)?;
+        let capture = capture_pr_agent_source(args, &spec, &output_dir, checked_at)?;
         sources.push(capture.source.clone());
         diagnostics.extend(capture.diagnostics);
 
@@ -4731,7 +4745,7 @@ pub fn run_pr_agent_state(
     };
     let report_path = args.capsule.join("pr-agent-state.json");
     ensure_pr_agent_report_path_safe(&report_path)?;
-    write_json(report_path, &report)?;
+    write_json(&report_path, &report)?;
 
     append_evidence(AppendEvidenceArgs {
         capsule: args.capsule.clone(),
@@ -4748,17 +4762,12 @@ pub fn run_pr_agent_state(
                 report.actions.len()
             ),
             command: Some(agent_command),
-            exit_code: Some(
-                if report
+            exit_code: Some(i32::from(
+                report
                     .diagnostics
                     .iter()
-                    .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error)
-                {
-                    1
-                } else {
-                    0
-                },
-            ),
+                    .any(|diagnostic| diagnostic.severity == PrAgentSeverity::Error),
+            )),
             source_ids: Vec::new(),
             actor: None,
             tool: Some("codex-dev".to_string()),
@@ -4779,7 +4788,7 @@ pub fn run_pr_agent_state(
 }
 
 pub fn run_pr_readiness_loop(
-    args: PrReadinessArgs,
+    args: &PrReadinessArgs,
     generated_at: DateTime<Utc>,
 ) -> Result<PrAgentReadinessReport> {
     if args.poll_attempts == 0 {
@@ -4810,7 +4819,7 @@ pub fn run_pr_readiness_loop(
         let checked_at =
             readiness_attempt_checked_at(generated_at, attempt, args.poll_interval_seconds)?;
         let state = run_pr_agent_state(
-            PrAgentArgs {
+            &PrAgentArgs {
                 capsule: args.capsule.clone(),
                 repo: args.repo.clone(),
                 number: args.number,
@@ -4838,14 +4847,14 @@ pub fn run_pr_readiness_loop(
 
     if args.rerun_failed {
         actions.extend(plan_or_apply_failed_check_reruns(
-            &args,
+            args,
             state,
             final_attempt,
         )?);
     }
     if args.merge {
         actions.push(plan_or_apply_merge(
-            &args,
+            args,
             state,
             final_attempt,
             generated_at,
@@ -4887,7 +4896,7 @@ pub fn run_pr_readiness_loop(
         report_path: report_path.display().to_string(),
     };
     let markdown = render_pr_readiness_markdown(&report);
-    write_json(report_path.clone(), &report)?;
+    write_json(&report_path, &report)?;
     fs::write(&markdown_path, markdown)
         .with_context(|| format!("failed to write {}", markdown_path.display()))?;
 
@@ -4904,18 +4913,13 @@ pub fn run_pr_readiness_loop(
                 report.final_status,
                 report.attempts.len()
             ),
-            command: Some(render_pr_readiness_command(&args)),
-            exit_code: Some(
-                if report
+            command: Some(render_pr_readiness_command(args)),
+            exit_code: Some(i32::from(
+                report
                     .actions
                     .iter()
-                    .any(|action| action.status == PrAgentReadinessActionStatus::Failed)
-                {
-                    1
-                } else {
-                    0
-                },
-            ),
+                    .any(|action| action.status == PrAgentReadinessActionStatus::Failed),
+            )),
             source_ids: Vec::new(),
             actor: None,
             tool: Some("codex-dev".to_string()),
@@ -4978,7 +4982,7 @@ fn evaluate_pr_readiness_attempt(
     let pr = &state.pr;
     match pr.state.as_str() {
         "merged" => {
-            return readiness_attempt(
+            return Ok(readiness_attempt(
                 attempt,
                 state,
                 ReadinessAttemptParts {
@@ -4991,11 +4995,11 @@ fn evaluate_pr_readiness_attempt(
                     active_review_comments,
                     outdated_review_comments,
                 },
-            );
+            ));
         }
         "closed" => {
             blockers.push("pull request is closed without a merge".to_string());
-            return readiness_attempt(
+            return Ok(readiness_attempt(
                 attempt,
                 state,
                 ReadinessAttemptParts {
@@ -5008,7 +5012,7 @@ fn evaluate_pr_readiness_attempt(
                     active_review_comments,
                     outdated_review_comments,
                 },
-            );
+            ));
         }
         "open" | "draft" => {}
         other => wait_reasons.push(format!("pull request state is {other}; expected open")),
@@ -5158,7 +5162,7 @@ fn evaluate_pr_readiness_attempt(
         PrAgentReadinessStatus::Ready
     };
 
-    readiness_attempt(
+    Ok(readiness_attempt(
         attempt,
         state,
         ReadinessAttemptParts {
@@ -5171,7 +5175,7 @@ fn evaluate_pr_readiness_attempt(
             active_review_comments,
             outdated_review_comments,
         },
-    )
+    ))
 }
 
 struct ReadinessAttemptParts {
@@ -5189,8 +5193,8 @@ fn readiness_attempt(
     attempt: u64,
     state: &PrAgentStateReport,
     parts: ReadinessAttemptParts,
-) -> Result<PrAgentReadinessAttempt> {
-    Ok(PrAgentReadinessAttempt {
+) -> PrAgentReadinessAttempt {
+    PrAgentReadinessAttempt {
         attempt,
         checked_at: state.checked_at,
         status: parts.status,
@@ -5203,7 +5207,7 @@ fn readiness_attempt(
         active_review_comments: parts.active_review_comments,
         outdated_review_comments: parts.outdated_review_comments,
         diagnostics: state.diagnostics.clone(),
-    })
+    }
 }
 
 fn check_is_failure(status: &str, conclusion: Option<&str>) -> bool {
@@ -5272,7 +5276,7 @@ fn extract_github_actions_run_id_for_repo(url: &str, repository: &str) -> Option
     let start = marker.0 + marker.1.len();
     let digits = lower_url[start..]
         .chars()
-        .take_while(|character| character.is_ascii_digit())
+        .take_while(char::is_ascii_digit)
         .collect::<String>();
     digits.parse().ok()
 }
@@ -5375,14 +5379,14 @@ fn plan_or_apply_failed_check_reruns(
             let action_checked_at = action_args
                 .checked_at
                 .expect("readiness rerun checked_at should be set");
-            let action_report = run_pr_agent_hosted_action(action_args, action_checked_at)?;
+            let action_report = run_pr_agent_hosted_action(&action_args, action_checked_at)?;
             let execution = action_report.execution.as_ref();
             actions.push(PrAgentReadinessAction {
                 id: action_report.plan_id,
                 kind: "rerun_failed_jobs".to_string(),
-                status: execution
-                    .map(|execution| readiness_action_status(execution.status))
-                    .unwrap_or(PrAgentReadinessActionStatus::Failed),
+                status: execution.map_or(PrAgentReadinessActionStatus::Failed, |execution| {
+                    readiness_action_status(execution.status)
+                }),
                 reason: "apply-gated rerun of failed GitHub Actions jobs".to_string(),
                 command: execution
                     .map(|execution| execution.command.clone())
@@ -5463,7 +5467,7 @@ fn plan_or_apply_merge(
         .checked_add_signed(TimeDelta::seconds(1))
         .unwrap_or_else(Utc::now);
     let refreshed_state = run_pr_agent_state(
-        PrAgentArgs {
+        &PrAgentArgs {
             capsule: args.capsule.clone(),
             repo: args.repo.clone(),
             number: args.number,
@@ -5548,60 +5552,81 @@ fn merge_command(args: &PrReadinessArgs, pr: &PrEvidence) -> Result<Vec<String>>
 
 fn render_pr_readiness_markdown(report: &PrAgentReadinessReport) -> String {
     let mut markdown = String::new();
-    markdown.push_str(&format!(
+    write!(
+        markdown,
         "# PR Readiness: {}#{}\n\n",
         report.repository, report.number
-    ));
-    markdown.push_str(&format!("- Status: {:?}\n", report.final_status));
-    markdown.push_str(&format!("- Ready: {}\n", report.ready));
-    markdown.push_str(&format!("- Attempts: {}\n", report.attempts.len()));
-    markdown.push_str(&format!("- Apply requested: {}\n", report.apply_requested));
-    markdown.push_str(&format!(
-        "- Rerun failed requested: {}\n",
+    )
+    .expect("writing to a String is infallible");
+    writeln!(markdown, "- Status: {:?}", report.final_status)
+        .expect("writing to a String is infallible");
+    writeln!(markdown, "- Ready: {}", report.ready).expect("writing to a String is infallible");
+    writeln!(markdown, "- Attempts: {}", report.attempts.len())
+        .expect("writing to a String is infallible");
+    writeln!(markdown, "- Apply requested: {}", report.apply_requested)
+        .expect("writing to a String is infallible");
+    writeln!(
+        markdown,
+        "- Rerun failed requested: {}",
         report.rerun_failed_requested
-    ));
-    markdown.push_str(&format!(
+    )
+    .expect("writing to a String is infallible");
+    write!(
+        markdown,
         "- Merge requested: {}\n\n",
         report.merge_requested
-    ));
+    )
+    .expect("writing to a String is infallible");
     if let Some(final_attempt) = report.attempts.last() {
         markdown.push_str("## Final Attempt\n\n");
-        markdown.push_str(&format!("- Checked at: {}\n", final_attempt.checked_at));
-        markdown.push_str(&format!("- PR state: {}\n", final_attempt.pr.state));
-        markdown.push_str(&format!(
-            "- Mergeable: {}\n",
+        writeln!(markdown, "- Checked at: {}", final_attempt.checked_at)
+            .expect("writing to a String is infallible");
+        writeln!(markdown, "- PR state: {}", final_attempt.pr.state)
+            .expect("writing to a String is infallible");
+        writeln!(
+            markdown,
+            "- Mergeable: {}",
             final_attempt.pr.mergeable.as_deref().unwrap_or("unknown")
-        ));
-        markdown.push_str(&format!(
-            "- Merge state: {}\n",
+        )
+        .expect("writing to a String is infallible");
+        writeln!(
+            markdown,
+            "- Merge state: {}",
             final_attempt
                 .pr
                 .merge_state_status
                 .as_deref()
                 .unwrap_or("unknown")
-        ));
-        markdown.push_str(&format!(
-            "- Review threads: {} unresolved, authoritative={}\n",
+        )
+        .expect("writing to a String is infallible");
+        writeln!(
+            markdown,
+            "- Review threads: {} unresolved, authoritative={}",
             final_attempt.pr.review_threads.unresolved,
             final_attempt.pr.review_threads.authoritative
-        ));
-        markdown.push_str(&format!(
+        )
+        .expect("writing to a String is infallible");
+        write!(
+            markdown,
             "- Review comments: {} active, {} outdated\n\n",
             final_attempt.active_review_comments, final_attempt.outdated_review_comments
-        ));
+        )
+        .expect("writing to a String is infallible");
         markdown.push_str(&markdown_list("Blockers", &final_attempt.blockers));
         markdown.push_str(&markdown_list("Wait Reasons", &final_attempt.wait_reasons));
         markdown.push_str(&markdown_list("Warnings", &final_attempt.warnings));
         if !final_attempt.failing_checks.is_empty() {
             markdown.push_str("## Failing Checks\n\n");
             for check in &final_attempt.failing_checks {
-                markdown.push_str(&format!(
-                    "- {}: {} / {}; inspect with `{}`\n",
+                writeln!(
+                    markdown,
+                    "- {}: {} / {}; inspect with `{}`",
                     check.name,
                     check.status,
                     check.conclusion.as_deref().unwrap_or("none"),
                     check.diagnostic_command
-                ));
+                )
+                .expect("writing to a String is infallible");
             }
             markdown.push('\n');
         }
@@ -5609,12 +5634,14 @@ fn render_pr_readiness_markdown(report: &PrAgentReadinessReport) -> String {
     if !report.actions.is_empty() {
         markdown.push_str("## Actions\n\n");
         for action in &report.actions {
-            markdown.push_str(&format!(
-                "- {} ({:?}): `{}`\n",
+            writeln!(
+                markdown,
+                "- {} ({:?}): `{}`",
                 action.id,
                 action.status,
                 render_command(&action.command)
-            ));
+            )
+            .expect("writing to a String is infallible");
         }
         markdown.push('\n');
     }
@@ -5627,7 +5654,7 @@ fn markdown_list(title: &str, values: &[String]) -> String {
     }
     let mut markdown = format!("## {title}\n\n");
     for value in values {
-        markdown.push_str(&format!("- {value}\n"));
+        writeln!(markdown, "- {value}").expect("writing to a String is infallible");
     }
     markdown.push('\n');
     markdown
@@ -5702,7 +5729,7 @@ fn render_pr_readiness_command(args: &PrReadinessArgs) -> String {
 }
 
 pub fn run_pr_agent_hosted_action(
-    args: PrAgentActionArgs,
+    args: &PrAgentActionArgs,
     generated_at: DateTime<Utc>,
 ) -> Result<PrAgentHostedActionReport> {
     if args.apply && args.source_dir.is_some() {
@@ -5710,8 +5737,8 @@ pub fn run_pr_agent_hosted_action(
     }
     let (owner, name) = parse_github_repository(&args.repo)?;
     validate_plan_id(&args.plan_id)?;
-    validate_hosted_action_args(&args)?;
-    let body = read_hosted_action_body(&args)?;
+    validate_hosted_action_args(args)?;
+    let body = read_hosted_action_body(args)?;
     ensure_regular_contract_files(&args.capsule)?;
     let validation = validate_capsule(&args.capsule)?;
     if !validation.valid {
@@ -5724,7 +5751,7 @@ pub fn run_pr_agent_hosted_action(
 
     let action_dir = prepare_pr_agent_action_dir(&args.capsule, &args.plan_id)?;
     let before_state = run_pr_agent_state(
-        PrAgentArgs {
+        &PrAgentArgs {
             capsule: args.capsule.clone(),
             repo: args.repo.clone(),
             number: args.number,
@@ -5735,7 +5762,7 @@ pub fn run_pr_agent_hosted_action(
     )?;
     let before_state_path = action_dir.join("before-state.json");
     ensure_pr_agent_report_path_safe(&before_state_path)?;
-    write_json(before_state_path.clone(), &before_state)?;
+    write_json(&before_state_path, &before_state)?;
 
     let intent = PrAgentHostedActionIntent {
         repository: args.repo.clone(),
@@ -5750,9 +5777,9 @@ pub fn run_pr_agent_hosted_action(
     };
     let plan_hash = stable_json_hash(&intent)?;
     let idempotency_key = format!("codex-dev-pr-agent:{plan_hash}");
-    let action = build_hosted_action_spec(&args, owner, name, &idempotency_key, body)?;
+    let action = build_hosted_action_spec(args, owner, name, &idempotency_key, body.as_deref());
     let mut diagnostics = before_state.diagnostics.clone();
-    diagnostics.extend(permission_diagnostics(&args, generated_at));
+    diagnostics.extend(permission_diagnostics(args, generated_at));
     let mut report = PrAgentHostedActionReport {
         schema: PR_AGENT_HOSTED_ACTION_SCHEMA.to_string(),
         repository: args.repo.clone(),
@@ -5771,15 +5798,15 @@ pub fn run_pr_agent_hosted_action(
     };
     let report_path = action_dir.join("plan.json");
     ensure_pr_agent_report_path_safe(&report_path)?;
-    write_json(report_path.clone(), &report)?;
+    write_json(&report_path, &report)?;
 
     if !args.apply {
-        append_pr_agent_action_evidence(&args, &report, &report_path, None)?;
+        append_pr_agent_action_evidence(args, &report, &report_path, None)?;
         return Ok(report);
     }
 
     if let Some(preflight_execution) = preflight_hosted_action(
-        &args,
+        args,
         &report.action,
         &before_state,
         generated_at,
@@ -5787,8 +5814,8 @@ pub fn run_pr_agent_hosted_action(
     )? {
         report.diagnostics = diagnostics;
         report.execution = Some(preflight_execution);
-        write_json(report_path.clone(), &report)?;
-        append_pr_agent_action_evidence(&args, &report, &report_path, report.execution.as_ref())?;
+        write_json(&report_path, &report)?;
+        append_pr_agent_action_evidence(args, &report, &report_path, report.execution.as_ref())?;
         return Ok(report);
     }
 
@@ -5802,7 +5829,7 @@ pub fn run_pr_agent_hosted_action(
     ) {
         let after_checked_at = next_state_timestamp(generated_at);
         match run_pr_agent_state(
-            PrAgentArgs {
+            &PrAgentArgs {
                 capsule: args.capsule.clone(),
                 repo: args.repo.clone(),
                 number: args.number,
@@ -5814,7 +5841,7 @@ pub fn run_pr_agent_hosted_action(
             Ok(after_state) => {
                 let after_state_path = action_dir.join("after-state.json");
                 ensure_pr_agent_report_path_safe(&after_state_path)?;
-                write_json(after_state_path.clone(), &after_state)?;
+                write_json(&after_state_path, &after_state)?;
                 report.after_state_path = Some(after_state_path.display().to_string());
             }
             Err(error) => report.diagnostics.push(PrAgentDiagnostic {
@@ -5830,8 +5857,8 @@ pub fn run_pr_agent_hosted_action(
         }
     }
 
-    write_json(report_path.clone(), &report)?;
-    append_pr_agent_action_evidence(&args, &report, &report_path, report.execution.as_ref())?;
+    write_json(&report_path, &report)?;
+    append_pr_agent_action_evidence(args, &report, &report_path, report.execution.as_ref())?;
     Ok(report)
 }
 
@@ -5861,15 +5888,14 @@ fn build_hosted_action_spec(
     owner: &str,
     name: &str,
     idempotency_key: &str,
-    body: Option<String>,
-) -> Result<PrAgentHostedActionSpec> {
+    body: Option<&str>,
+) -> PrAgentHostedActionSpec {
     let mut duplicate_check_command = Vec::new();
     let mut state_check_command = Vec::new();
     let (target, command, summary, reason) = match args.action {
         PrAgentHostedActionKind::PostIssueComment => {
             let body = append_idempotency_marker(
-                body.as_deref()
-                    .expect("validated post issue comment body should exist"),
+                body.expect("validated post issue comment body should exist"),
                 idempotency_key,
             );
             duplicate_check_command = vec![
@@ -5902,8 +5928,7 @@ fn build_hosted_action_spec(
                 .review_comment_id
                 .expect("validated review comment id should exist");
             let body = append_idempotency_marker(
-                body.as_deref()
-                    .expect("validated review reply body should exist"),
+                body.expect("validated review reply body should exist"),
                 idempotency_key,
             );
             duplicate_check_command = vec![
@@ -5992,7 +6017,7 @@ fn build_hosted_action_spec(
         }
     };
 
-    Ok(PrAgentHostedActionSpec {
+    PrAgentHostedActionSpec {
         id: args.plan_id.clone(),
         kind: args.action.as_str().to_string(),
         summary,
@@ -6006,7 +6031,7 @@ fn build_hosted_action_spec(
         network: true,
         secrets: true,
         permission_notes: permission_notes_for_action(args.action),
-    })
+    }
 }
 
 fn preflight_hosted_action(
@@ -6220,8 +6245,7 @@ fn preflight_workflow_rerun(
     };
     if run_head_sha != Some(pr_head_sha) {
         let message = format!(
-            "refusing hosted write because workflow run head_sha {:?} does not match PR head_sha {pr_head_sha}",
-            run_head_sha
+            "refusing hosted write because workflow run head_sha {run_head_sha:?} does not match PR head_sha {pr_head_sha}"
         );
         diagnostics.push(PrAgentDiagnostic {
             source: "pr-agent-preflight".to_string(),
@@ -6299,8 +6323,7 @@ fn workflow_run_identity_error(
     let actual_run_id = value.get("id").and_then(Value::as_u64);
     if actual_run_id != Some(expected_run_id) {
         return Some(format!(
-            "refusing hosted write because workflow run id {:?} does not match requested run id {expected_run_id}",
-            actual_run_id
+            "refusing hosted write because workflow run id {actual_run_id:?} does not match requested run id {expected_run_id}"
         ));
     }
     let repository = json_pointer_string(value, "/repository/full_name");
@@ -6360,8 +6383,7 @@ fn workflow_run_identity_error(
     let actual_head_ref = value.get("head_branch").and_then(Value::as_str);
     if actual_head_ref != Some(expected_head_ref) {
         return Some(format!(
-            "refusing hosted write because workflow run head branch {:?} does not match PR head branch {expected_head_ref}",
-            actual_head_ref
+            "refusing hosted write because workflow run head branch {actual_head_ref:?} does not match PR head branch {expected_head_ref}"
         ));
     }
     let Some(pull_requests) = value.get("pull_requests").and_then(Value::as_array) else {
@@ -6808,9 +6830,10 @@ fn append_pr_agent_action_evidence(
     report_path: &Path,
     execution: Option<&PrAgentHostedActionExecution>,
 ) -> Result<()> {
-    let status = execution
-        .map(|execution| format!("{:?}", execution.status))
-        .unwrap_or_else(|| "planned".to_string());
+    let status = execution.map_or_else(
+        || "planned".to_string(),
+        |execution| format!("{:?}", execution.status),
+    );
     append_evidence(AppendEvidenceArgs {
         capsule: args.capsule.clone(),
         record: EvidenceRecord {
@@ -6820,9 +6843,7 @@ fn append_pr_agent_action_evidence(
             } else {
                 EvidenceKind::Decision
             },
-            at: execution
-                .map(|execution| execution.applied_at)
-                .unwrap_or(report.generated_at),
+            at: execution.map_or(report.generated_at, |execution| execution.applied_at),
             summary: format!(
                 "PR agent hosted action {} for {}#{}: {status}",
                 report.plan_id, report.repository, report.number
@@ -6968,6 +6989,10 @@ fn require_body(args: &PrAgentActionArgs, action: &str) -> Result<()> {
     }
 }
 
+#[allow(
+    clippy::fn_params_excessive_bools,
+    reason = "each action has distinct supported target fields"
+)]
 fn reject_targets(
     args: &PrAgentActionArgs,
     allow_body: bool,
@@ -7398,7 +7423,7 @@ fn capture_pr_agent_source(
         } else {
             value
         };
-        write_json(output_path.clone(), &value)?;
+        write_json(&output_path, &value)?;
     }
 
     Ok(CapturedPrAgentSource {
@@ -7424,7 +7449,7 @@ fn write_pr_agent_failure_artifact(
     exit_code: Option<i32>,
 ) -> Result<()> {
     write_json(
-        output_path.to_path_buf(),
+        output_path,
         &json!({
             "schema": "codex-dev.pr-agent-source-failure.v1",
             "source": spec.id,
@@ -7509,9 +7534,7 @@ fn rate_limit_diagnostics(
     } else {
         PrAgentSeverity::Info
     };
-    let limit_suffix = limit
-        .map(|limit| format!(" of {limit}"))
-        .unwrap_or_else(String::new);
+    let limit_suffix = limit.map_or_else(String::new, |limit| format!(" of {limit}"));
     Ok(vec![PrAgentDiagnostic {
         source: spec.id.clone(),
         severity,
@@ -7544,11 +7567,12 @@ fn render_pr_agent_command(args: &PrAgentArgs, checked_at: DateTime<Utc>) -> Str
 }
 
 fn diagnostic_excerpt(bytes: &[u8]) -> Option<String> {
+    const MAX_CHARS: usize = 2_000;
+
     let text = redact_sensitive_text(String::from_utf8_lossy(bytes).trim());
     if text.is_empty() {
         return None;
     }
-    const MAX_CHARS: usize = 2000;
     if text.chars().count() <= MAX_CHARS {
         return Some(text);
     }
@@ -9766,12 +9790,16 @@ fn skip_gate(gate: &PolicyGate, reason: &str) -> PolicyGateResult {
 fn kill_process_group(pid: u32) {
     // Negative pid targets the group. The child is made a group leader at spawn
     // time, so the group id equals its pid.
-    let group = -(pid as i32);
+    let group = -pid.cast_signed();
+    // SAFETY: libc::kill is required to signal the child-owned POSIX process group.
+    #[allow(unsafe_code)]
     unsafe {
         libc::kill(group, libc::SIGTERM);
     }
     // Give a well-behaved tree a moment to unwind before removing the choice.
     std::thread::sleep(std::time::Duration::from_millis(250));
+    // SAFETY: the same valid process-group identifier is reused for escalation.
+    #[allow(unsafe_code)]
     unsafe {
         libc::kill(group, libc::SIGKILL);
     }
@@ -9970,7 +9998,7 @@ fn record_policy_run(
     checked_at: DateTime<Utc>,
 ) -> Result<()> {
     ensure_regular_contract_files(capsule_path)?;
-    write_json(capsule_path.join("policy.json"), manifest)?;
+    write_json(&capsule_path.join("policy.json"), manifest)?;
 
     let mut verification: Verification = read_json(&capsule_path.join("verification.json"))?;
     verification.required = results
@@ -9992,11 +10020,11 @@ fn record_policy_run(
         })
         .collect();
     verification.last_checked_at = checked_at;
-    write_json(capsule_path.join("verification.json"), &verification)?;
+    write_json(&capsule_path.join("verification.json"), &verification)?;
 
     for gate in results {
         append_jsonl(
-            capsule_path.join("evidence.jsonl"),
+            &capsule_path.join("evidence.jsonl"),
             &EvidenceRecord {
                 schema: EVIDENCE_SCHEMA.to_string(),
                 kind: match gate.status {
@@ -10019,17 +10047,18 @@ fn record_policy_run(
 
     let mut capsule: Capsule = read_json(&capsule_path.join("capsule.json"))?;
     capsule.updated_at = std::cmp::max(capsule.updated_at, checked_at);
-    write_json(capsule_path.join("capsule.json"), &capsule)?;
+    write_json(&capsule_path.join("capsule.json"), &capsule)?;
     Ok(())
 }
 
 fn output_excerpt(bytes: &[u8]) -> Option<String> {
+    const MAX_CHARS: usize = 2_000;
+
     let text = String::from_utf8_lossy(bytes).trim().to_string();
     if text.is_empty() {
         return None;
     }
 
-    const MAX_CHARS: usize = 2000;
     if text.chars().count() <= MAX_CHARS {
         return Some(text);
     }
@@ -10682,7 +10711,7 @@ enabled = false
         let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
 
         let error = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::CodexDev,
                 repo_root: Some(root.clone()),
                 include_local_paths: false,
@@ -10699,7 +10728,7 @@ enabled = false
         assert!(!message.contains(&root.display().to_string()));
 
         let error_with_paths = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::CodexDev,
                 repo_root: Some(root.clone()),
                 include_local_paths: true,
@@ -10724,7 +10753,7 @@ enabled = false
         let checked_at = "2026-05-09T05:00:00Z".parse().unwrap();
 
         let report = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::CodexDev,
                 repo_root: Some(repo_root.clone()),
                 include_local_paths: false,
@@ -10769,7 +10798,7 @@ enabled = false
         assert_eq!(completion_gate.docs_mirror_status, "not_mirrored");
 
         let full_local_report = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::FullLocal,
                 repo_root: Some(repo_root.clone()),
                 include_local_paths: false,
@@ -10789,7 +10818,7 @@ enabled = false
                 .contains(&"isolated install root under target/codex-dev-install-smoke/codex-dev on filesystem".to_string())
         );
         let release_report = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::Release,
                 repo_root: Some(repo_root.clone()),
                 include_local_paths: false,
@@ -10831,7 +10860,7 @@ enabled = false
         );
 
         let report_with_paths = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::CodexDev,
                 repo_root: Some(repo_root.clone()),
                 include_local_paths: true,
@@ -10887,7 +10916,7 @@ enabled = false
         assert!(!docs_check.passed);
 
         let report = policy_explain(
-            PolicyExplainArgs {
+            &PolicyExplainArgs {
                 profile: PolicyProfile::CodexDevTui,
                 repo_root: Some(root.to_path_buf()),
                 include_local_paths: false,

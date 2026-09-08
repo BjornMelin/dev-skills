@@ -1,0 +1,6 @@
+interface:
+  display_name: "QA Router"
+  short_description: "Validation routing and failure triage"
+  default_prompt: "Use $qa-router to discover repository-owned gates, author deterministic tests, reproduce CI failures, and triage flakes with evidence."
+policy:
+  allow_implicit_invocation: true

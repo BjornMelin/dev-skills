@@ -1,4 +1,9 @@
-use crate::*;
+use crate::{
+    BTreeMap, BTreeSet, Context, DEFAULT_EVAL_SUITE, Deserialize, EVIDENCE_BUNDLE_SCHEMA, EvalArgs,
+    Path, ProviderBudgets, ResearchConfig, ResearchProfile, Result, Serialize, TopicKind, Value,
+    bail, build_plan, classify_body, classify_privacy, fs, github_token, http_client, json,
+    metadata_text, print_json, privacy_class_name, redact_url_query_secrets, route_name,
+};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct EvalSuite {
@@ -41,11 +46,7 @@ pub(crate) struct EvalTaskOutcome {
     pub(crate) details: BTreeMap<String, Value>,
 }
 
-pub(crate) async fn run_eval(
-    args: EvalArgs,
-    config: &ResearchConfig,
-    json_out: bool,
-) -> Result<()> {
+pub(crate) fn run_eval(args: &EvalArgs, config: &ResearchConfig, json_out: bool) -> Result<()> {
     let suite = load_eval_suite(args.suite.as_deref())?;
     let selected = select_eval_tasks(&suite, &args.task)?;
 
@@ -338,8 +339,7 @@ pub(crate) fn evaluate_budget_eval(
             .collect::<Vec<_>>();
         if actual != prefix {
             assertions.failures.push(format!(
-                "route_order_prefix expected {:?}, got {:?}",
-                prefix, actual
+                "route_order_prefix expected {prefix:?}, got {actual:?}"
             ));
         }
     }
@@ -591,10 +591,7 @@ pub(crate) fn evaluate_evidence_bundle_eval(
     for status in optional_str_array(&task.expected, "required_source_freshness_statuses")?
         .unwrap_or_default()
     {
-        if !freshness_statuses
-            .map(|statuses| statuses.contains_key(status))
-            .unwrap_or(false)
-        {
+        if !freshness_statuses.is_some_and(|statuses| statuses.contains_key(status)) {
             assertions.failures.push(format!(
                 "bundle source_freshness.by_status missing `{status}`"
             ));

@@ -109,10 +109,7 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     });
 
     for entry in walker {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
+        let Ok(entry) = entry else { continue };
         if !entry.file_type().is_file() {
             continue;
         }
@@ -129,10 +126,9 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
             break;
         }
 
-        let source = match std::fs::read_to_string(path) {
-            Ok(source) => source,
-            // Unreadable / non-UTF-8 files are skipped, not fatal.
-            Err(_) => continue,
+        // Unreadable / non-UTF-8 files are skipped, not fatal.
+        let Ok(source) = std::fs::read_to_string(path) else {
+            continue;
         };
         outcome.files_scanned += 1;
 
@@ -179,7 +175,7 @@ pub fn scan_file(root: &Path, path: &Path) -> Result<Option<Vec<Finding>>> {
 fn file_extension(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|extension| extension.to_str())
-        .map(|extension| extension.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
 }
 
 /// Render a path relative to root using forward slashes, falling back to the

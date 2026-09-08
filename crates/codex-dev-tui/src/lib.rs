@@ -116,8 +116,8 @@ pub fn run() -> Result<()> {
 
     run_interactive(capsule.as_deref(), &root, interactive_tick_rate(tick_ms)?).map_err(|error| {
         match capsule.as_deref() {
-            Some(capsule) => sanitized_cli_error(error, capsule),
-            None => sanitized_path_error(error, &root, "<tasks-root>"),
+            Some(capsule) => sanitized_cli_error(&error, capsule),
+            None => sanitized_path_error(&error, &root, "<tasks-root>"),
         }
     })
 }
@@ -435,18 +435,17 @@ impl DashboardCapsule {
         diagnostics.extend(pr.1);
 
         let capsule = task.capsule.clone();
-        let display_title = capsule
-            .as_ref()
-            .map(|capsule| capsule.title.clone())
-            .unwrap_or_else(|| fallback_dashboard_title(&path));
+        let display_title = capsule.as_ref().map_or_else(
+            || fallback_dashboard_title(&path),
+            |capsule| capsule.title.clone(),
+        );
         let status_label = capsule
             .as_ref()
-            .map(|capsule| capsule.status.to_string())
-            .unwrap_or_else(|| "valid".to_string());
-        let updated_label = capsule
-            .as_ref()
-            .map(|capsule| capsule.updated_at.to_rfc3339())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "valid".to_string(), |capsule| capsule.status.to_string());
+        let updated_label = capsule.as_ref().map_or_else(
+            || "unknown".to_string(),
+            |capsule| capsule.updated_at.to_rfc3339(),
+        );
 
         Self {
             path,
@@ -497,8 +496,7 @@ impl DashboardCapsule {
 fn fallback_dashboard_title(path: &Path) -> String {
     path.file_name()
         .and_then(|name| name.to_str())
-        .map(str::to_string)
-        .unwrap_or_else(|| "<unknown>".to_string())
+        .map_or_else(|| "<unknown>".to_string(), str::to_string)
 }
 
 #[derive(Debug)]
@@ -962,9 +960,10 @@ fn optional_regular_file(
 }
 
 fn required_regular_file(file_path: &Path, capsule_path: &Path, label: &str) -> Result<(), String> {
-    match optional_regular_file(file_path, capsule_path, label)? {
-        true => Ok(()),
-        false => Err(format!("{label}: missing file")),
+    if optional_regular_file(file_path, capsule_path, label)? {
+        Ok(())
+    } else {
+        Err(format!("{label}: missing file"))
     }
 }
 
@@ -1141,7 +1140,7 @@ fn dashboard_operator_report(root: &Path) -> TuiOperatorPanelsReport {
         }
     };
     let skill_inventory = match repo_root {
-        Some(repo_root) => match skills_inventory(SkillInventoryArgs {
+        Some(repo_root) => match skills_inventory(&SkillInventoryArgs {
             repo_root: Some(repo_root),
             skills_root: None,
             checked_at: Some(Utc::now()),
@@ -1611,14 +1610,14 @@ fn dashboard_items(state: &DashboardState, visible_rows: usize) -> Vec<ListItem<
             } else {
                 "  "
             };
-            let style = if !capsule.validation.valid {
-                Style::default().fg(Color::Red)
-            } else {
+            let style = if capsule.validation.valid {
                 capsule
                     .capsule
                     .as_ref()
                     .map(capsule_status_style)
                     .unwrap_or_default()
+            } else {
+                Style::default().fg(Color::Red)
             };
             ListItem::new(format!(
                 "{selected}{} [{}] ev:{} pr:{} sa:{}",
@@ -1770,8 +1769,7 @@ fn evidence_total(capsule: &DashboardCapsule) -> u64 {
     capsule
         .capsule
         .as_ref()
-        .map(|capsule| capsule.evidence.total)
-        .unwrap_or(0)
+        .map_or(0, |capsule| capsule.evidence.total)
 }
 
 fn subagent_summary(capsule: &DashboardCapsule) -> String {
@@ -1876,13 +1874,11 @@ fn render_header(frame: &mut Frame<'_>, area: Rect, state: &WorkbenchState) {
     let title = state
         .capsule
         .as_ref()
-        .map(|capsule| capsule.title.as_str())
-        .unwrap_or("Invalid capsule");
-    let status = state
-        .capsule
-        .as_ref()
-        .map(|capsule| capsule.status.to_string())
-        .unwrap_or_else(|| "invalid".to_string());
+        .map_or("Invalid capsule", |capsule| capsule.title.as_str());
+    let status = state.capsule.as_ref().map_or_else(
+        || "invalid".to_string(),
+        |capsule| capsule.status.to_string(),
+    );
     let line = Line::from(vec![
         Span::styled(
             title.to_string(),
@@ -1998,8 +1994,7 @@ fn overview_items(state: &WorkbenchState) -> Vec<ListItem<'static>> {
         state
             .subagents
             .as_ref()
-            .map(subagents_status_label)
-            .unwrap_or_else(|| "not loaded".to_string())
+            .map_or_else(|| "not loaded".to_string(), subagents_status_label)
     )));
     items.push(ListItem::new(format!(
         "pr agent: {}",
@@ -2028,9 +2023,7 @@ fn overview_text(state: &WorkbenchState) -> String {
                     "subagents: {}",
                     state
                         .subagents
-                        .as_ref()
-                        .map(subagents_status_label)
-                        .unwrap_or_else(|| "not loaded".to_string())
+                        .as_ref().map_or_else(|| "not loaded".to_string(), subagents_status_label)
                 ),
                 format!("pr agent: {}", pr_agent_status_label(state)),
                 format!("orchestration runs: {}", state.operator.orchestration.len()),
@@ -2832,11 +2825,11 @@ pub fn render_once_for_cli(
     ensure_render_dimensions(width, height)?;
     if let Some(capsule_path) = capsule_path {
         return render_once(capsule_path, width, height)
-            .map_err(|error| sanitized_cli_error(error, capsule_path));
+            .map_err(|error| sanitized_cli_error(&error, capsule_path));
     }
 
     let state = AppState::load(None, dashboard_root)
-        .map_err(|error| sanitized_path_error(error, dashboard_root, "<tasks-root>"))?;
+        .map_err(|error| sanitized_path_error(&error, dashboard_root, "<tasks-root>"))?;
     let output = redact_path_text_with_placeholder(
         &render_app_to_string(&state, width, height)?,
         dashboard_root,
@@ -2884,11 +2877,11 @@ fn redact_path_text_with_placeholder(text: &str, path: &Path, placeholder: &str)
     text.replace(&path, placeholder)
 }
 
-fn sanitized_cli_error(error: anyhow::Error, capsule_path: &Path) -> anyhow::Error {
+fn sanitized_cli_error(error: &anyhow::Error, capsule_path: &Path) -> anyhow::Error {
     sanitized_path_error(error, capsule_path, "<capsule>")
 }
 
-fn sanitized_path_error(error: anyhow::Error, path: &Path, placeholder: &str) -> anyhow::Error {
+fn sanitized_path_error(error: &anyhow::Error, path: &Path, placeholder: &str) -> anyhow::Error {
     anyhow::anyhow!(
         "{}",
         redact_path_text_with_placeholder(&format!("{error:#}"), path, placeholder)
@@ -3579,10 +3572,8 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let capsule = temp.path().join("private-task-name");
 
-        let error = sanitized_cli_error(
-            anyhow::anyhow!("failed to read {}", capsule.display()),
-            &capsule,
-        );
+        let source_error = anyhow::anyhow!("failed to read {}", capsule.display());
+        let error = sanitized_cli_error(&source_error, &capsule);
 
         let message = format!("{error:#}");
         assert!(message.contains("<capsule>"));

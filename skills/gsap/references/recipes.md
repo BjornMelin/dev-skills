@@ -1,5 +1,7 @@
 # GSAP Recipes for Next.js (App Router, TypeScript)
 
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
 Copy-paste, production-minded recipes. All assume a client component and a shared registration module:
 
 ```ts
@@ -178,7 +180,8 @@ useGSAP(() => {
 
 ## 6. Staggered grid reveal
 
-`ScrollTrigger.batch()` groups elements entering the viewport together so they stagger in batches instead of firing one ScrollTrigger each (cheaper, nicer).
+`ScrollTrigger.batch()` still creates one ScrollTrigger per target. It groups callbacks, and the
+animation work they start, for targets that enter together so they can stagger as a batch.
 
 ```tsx
 useGSAP(() => {

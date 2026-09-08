@@ -1,6 +1,8 @@
 # GSAP Performance
 
-Smooth 60fps animation is mostly about animating cheap properties, promoting layers sparingly, and never doing layout work on the hot path. GSAP is fast by default — the wins below come from feeding it the right properties and cleaning up after yourself, not from licensing tiers (GSAP is 100% free and open, v3.13+).
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
+Smooth 60fps animation is mostly about animating cheap properties, promoting layers sparingly, and never doing layout work on the hot path. GSAP is fast by default. The wins below come from feeding it the right properties and cleaning up after yourself, not from licensing tiers (GSAP is 100% free and open).
 
 ## Contents
 

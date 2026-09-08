@@ -1,0 +1,1 @@
+> **IMPORTANT:** Default shadcn runner: `bunx --bun shadcn@latest`. In pnpm repos, use `pnpm dlx shadcn@latest`; with npm, `npx shadcn@latest`; with Yarn, `yarn dlx shadcn@latest`. Detect via `packageManager`, then lockfile. Examples use Bun; substitute the project runner throughout, including the `info --json` step below.

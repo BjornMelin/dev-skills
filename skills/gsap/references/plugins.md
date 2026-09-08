@@ -1,5 +1,7 @@
 # GSAP Plugins
 
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
 GSAP ships a deep plugin library for scroll, layout, drag, input, text, SVG, easing, and physics work. This reference covers registration discipline plus the plugins you reach for most in Next.js + React + TypeScript apps, tiered by how often you'll use them.
 
 ## GSAP is 100% free (as of 2025)

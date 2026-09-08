@@ -14,13 +14,11 @@ use oxc_span::SourceType;
 #[must_use]
 pub fn source_type_for_extension(extension: &str) -> SourceType {
     match extension.to_ascii_lowercase().as_str() {
-        "tsx" => SourceType::tsx(),
         "ts" | "mts" | "cts" => SourceType::ts(),
-        "jsx" => SourceType::jsx(),
+        // Plain `.js` can contain JSX in many React projects, so parse as JSX.
+        "jsx" | "js" => SourceType::jsx(),
         "mjs" => SourceType::mjs(),
         "cjs" => SourceType::cjs(),
-        // Plain `.js` can contain JSX in many React projects, so parse as JSX.
-        "js" => SourceType::jsx(),
         _ => SourceType::tsx(),
     }
 }

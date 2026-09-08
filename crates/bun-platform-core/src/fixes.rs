@@ -168,13 +168,15 @@ fn normalize_scripts(
     rule_ids: &mut Vec<String>,
     descriptions: &mut Vec<String>,
 ) {
+    const NPX_RULE_ID: &str = "pm-bunx-vs-npx";
+    const VERCEL_RULE_ID: &str = "vercel-nextjs-bun-runtime-scripts";
+
     let vercel_bun_enabled = has_vercel_bun_runtime(root);
     let Some(scripts) = root_map.get_mut("scripts").and_then(Value::as_object_mut) else {
         return;
     };
     let mut rewrote_npx = false;
 
-    const NPX_RULE_ID: &str = "pm-bunx-vs-npx";
     if bun_first && policy.allows(NPX_RULE_ID) {
         for value in scripts.values_mut() {
             if let Some(command) = value.as_str()
@@ -189,14 +191,12 @@ fn normalize_scripts(
         rule_ids.push(NPX_RULE_ID.to_string());
         descriptions.push("rewrite npx invocations to bunx".to_string());
     }
-    const VERCEL_RULE_ID: &str = "vercel-nextjs-bun-runtime-scripts";
     if vercel_bun_enabled && policy.allows(VERCEL_RULE_ID) {
         let mut changed = false;
         if scripts
             .get("dev")
             .and_then(Value::as_str)
-            .map(|value| value.trim() == "next dev")
-            .unwrap_or(false)
+            .is_some_and(|value| value.trim() == "next dev")
         {
             scripts.insert(
                 "dev".to_string(),
@@ -207,8 +207,7 @@ fn normalize_scripts(
         if scripts
             .get("build")
             .and_then(Value::as_str)
-            .map(|value| value.trim() == "next build")
-            .unwrap_or(false)
+            .is_some_and(|value| value.trim() == "next build")
         {
             scripts.insert(
                 "build".to_string(),
@@ -229,25 +228,21 @@ fn is_bun_first_repo(root: &Path, root_map: &Map<String, Value>) -> bool {
         || root_map
             .get("packageManager")
             .and_then(Value::as_str)
-            .map(|value| value.starts_with("bun@"))
-            .unwrap_or(false)
+            .is_some_and(|value| value.starts_with("bun@"))
         || root_map
             .get("devDependencies")
             .and_then(Value::as_object)
-            .map(|deps| deps.contains_key("@types/bun") || deps.contains_key("bun-types"))
-            .unwrap_or(false)
+            .is_some_and(|deps| deps.contains_key("@types/bun") || deps.contains_key("bun-types"))
         || root_map
             .get("scripts")
             .and_then(Value::as_object)
-            .map(|scripts| {
+            .is_some_and(|scripts| {
                 scripts.values().any(|value| {
                     value
                         .as_str()
-                        .map(|command| BUN_COMMAND_RE.is_match(command))
-                        .unwrap_or(false)
+                        .is_some_and(|command| BUN_COMMAND_RE.is_match(command))
                 })
             })
-            .unwrap_or(false)
 }
 
 fn has_vercel_bun_runtime(root: &Path) -> bool {
@@ -257,9 +252,7 @@ fn has_vercel_bun_runtime(root: &Path) -> bool {
     {
         return true;
     }
-    fs::read_to_string(root.join("vercel.ts"))
-        .map(|text| vercel_ts_has_bun_runtime(&text))
-        .unwrap_or(false)
+    fs::read_to_string(root.join("vercel.ts")).is_ok_and(|text| vercel_ts_has_bun_runtime(&text))
 }
 
 pub(crate) fn strip_ts_comments(text: &str) -> String {
@@ -387,8 +380,7 @@ pub(crate) fn vercel_ts_has_bun_runtime(text: &str) -> bool {
     if let Some(captures) = bun_version_re.captures(&text)
         && captures
             .get(1)
-            .map(|value| !value.as_str().trim().is_empty())
-            .unwrap_or(false)
+            .is_some_and(|value| !value.as_str().trim().is_empty())
     {
         return true;
     }
@@ -401,13 +393,11 @@ pub(crate) fn contains_bun_runtime_config(value: &Value) -> bool {
         Value::Object(map) => {
             map.get("runtime")
                 .and_then(Value::as_str)
-                .map(|runtime| runtime == "bun" || runtime.starts_with("bun@"))
-                .unwrap_or(false)
+                .is_some_and(|runtime| runtime == "bun" || runtime.starts_with("bun@"))
                 || map
                     .get("bunVersion")
                     .and_then(Value::as_str)
-                    .map(|version| !version.trim().is_empty())
-                    .unwrap_or(false)
+                    .is_some_and(|version| !version.trim().is_empty())
                 || map.values().any(contains_bun_runtime_config)
         }
         _ => false,

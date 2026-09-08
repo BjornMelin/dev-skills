@@ -320,11 +320,13 @@ for local development and validation commands.
 | `dash-audit` | Audit Dash apps: callbacks, state, layout, accessibility, Dash-specific UX. | [skills/dash-audit/SKILL.md](skills/dash-audit/SKILL.md) |
 | `deep-researcher` | Deep cited research across Codex web, Context7 API, GitHub, source, rendered pages, Firecrawl, and evidence ledgers. | [skills/deep-researcher/SKILL.md](skills/deep-researcher/SKILL.md) |
 | `design-motion-audit` | Audit a repo, route, screen, or 3D scene for motion quality — token consistency, R3F/Reanimated polish, performance, reduced-motion, and accessibility — returning a prioritized punch list. | [skills/design-motion-audit/SKILL.md](skills/design-motion-audit/SKILL.md) |
+| `design-review` | Adversarial UI, frontend, and motion review with real browser/device proof, measurement, implementation, and an evidence-backed verdict. | [skills/design-review/SKILL.md](skills/design-review/SKILL.md) |
 | `dmc-best-practices` | DMC + Dash best practices: architecture, callbacks, styling, performance, theming. | [skills/dmc-best-practices/SKILL.md](skills/dmc-best-practices/SKILL.md) |
 | `dmc-py` | Dash Mantine Components v2.x: theming, callbacks (pattern-matching, clientside), pages, charts, components. | [skills/dmc-py/SKILL.md](skills/dmc-py/SKILL.md) |
 | `docker-architect` | Docker/Compose: Dockerfiles, Compose, CI, security hardening, audits. | [skills/docker-architect/SKILL.md](skills/docker-architect/SKILL.md) |
 | `docs-align` | Post-implement docs alignment: drift detection, ADRs, specs, README, `AGENTS.md`. | [skills/docs-align/SKILL.md](skills/docs-align/SKILL.md) |
 | `expo-motion` | Master Expo/React Native motion skill for iOS, Android, and web: Reanimated 4, worklets, gestures, layout animations, scroll, Expo Router/native-stack transitions, NativeWind boundaries, accessibility/performance, React Native Skia, and manifest-driven validation — with an Expo/RN recipe cookbook and the `expo-motion-audit` CLI. | [skills/expo-motion/SKILL.md](skills/expo-motion/SKILL.md) |
+| `finalize-branch` | Pre-merge branch and PR closeout for hard cuts, product completeness, dependency-native simplification, validation, docs, and merge readiness. | [skills/finalize-branch/SKILL.md](skills/finalize-branch/SKILL.md) |
 | `firecrawl` | Firecrawl CLI for cache-aware search, scrape, map, crawl, interact, monitor, research, download, diagnostics, feedback, and document parse tasks. | [skills/firecrawl/SKILL.md](skills/firecrawl/SKILL.md) |
 | `gh-pr-review-fix` | Resolve GitHub PR review threads end-to-end through `codex-dev pr review` with verified fixes, semantic commits, push, and hosted closeout (not local review files). | [skills/gh-pr-review-fix/SKILL.md](skills/gh-pr-review-fix/SKILL.md) |
 | `grill-me` | Stress-test a plan or design with exhaustive Q&A until the decision tree is clear. | [skills/grill-me/SKILL.md](skills/grill-me/SKILL.md) |
@@ -341,6 +343,7 @@ for local development and validation commands.
 | `platform-architect` | Full-stack/native across Next.js, Expo, Convex, monorepos: detection, planning, repo verification. | [skills/platform-architect/SKILL.md](skills/platform-architect/SKILL.md) |
 | `pre-mortem` | Adversarial pre-mortem that stress-tests a plan before reality does: surface assumptions, map vulnerabilities and irreversible bets, then harden them. | [skills/pre-mortem/SKILL.md](skills/pre-mortem/SKILL.md) |
 | `pytest-dev` | pytest: fixtures, flakes, coverage, speed, CI sharding and tuning. | [skills/pytest-dev/SKILL.md](skills/pytest-dev/SKILL.md) |
+| `qa-router` | Repository-native validation routing, deterministic test authoring, CI reproduction, and flake triage. | [skills/qa-router/SKILL.md](skills/qa-router/SKILL.md) |
 | `r3f-scene-polish` | Cinematic look-dev for an existing three.js / React Three Fiber scene: postprocessing, HDRI/PBR lighting, shadows, tone mapping, and camera choreography (scene setup & lifecycle route to `web-three-r3f`). | [skills/r3f-scene-polish/SKILL.md](skills/r3f-scene-polish/SKILL.md) |
 | `repo-docs-align` | Sync all repo docs to code and workflow across stacks (`AGENTS.md`, ADRs, runbooks, etc.). | [skills/repo-docs-align/SKILL.md](skills/repo-docs-align/SKILL.md) |
 | `repo-modernizer` | Repo and monorepo dependency modernization, vulnerability remediation, and framework-aware upgrade audits. | [skills/repo-modernizer/SKILL.md](skills/repo-modernizer/SKILL.md) |
@@ -353,6 +356,7 @@ for local development and validation commands.
 | `rust-web-services` | Production Rust HTTP services with Axum, Tokio, Tower, SQLx, tracing, and shutdown. | [skills/rust-web-services/SKILL.md](skills/rust-web-services/SKILL.md) |
 | `sentry-cli` | Safe Sentry command atoms: issues, traces, releases, projects, sourcemaps, and deliberate mutations. | [skills/sentry-cli/SKILL.md](skills/sentry-cli/SKILL.md) |
 | `sentry-cli-fix-issues` | Fix Sentry issues from CLI evidence: issues, events, traces, logs, replays, Seer, privacy, and verification. | [skills/sentry-cli-fix-issues/SKILL.md](skills/sentry-cli-fix-issues/SKILL.md) |
+| `shadcn` | Manage shadcn/ui components: add, search, fix, style, and compose, with registry and component docs. | [skills/shadcn/SKILL.md](skills/shadcn/SKILL.md) |
 | `ship-branch` | Semantic commits, push, and open a PR to `main` with conventional title and body. | [skills/ship-branch/SKILL.md](skills/ship-branch/SKILL.md) |
 | `streamdown` | Streamdown: streaming markdown for AI UIs, Shiki/KaTeX/Mermaid, remend, hardening. | [skills/streamdown/SKILL.md](skills/streamdown/SKILL.md) |
 | `streamlit-master-architect` | Streamlit: reruns/state, caching/fragments, AppTest, components v2, security, Playwright E2E. | [skills/streamlit-master-architect/SKILL.md](skills/streamlit-master-architect/SKILL.md) |

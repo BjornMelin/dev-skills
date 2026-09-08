@@ -30,7 +30,10 @@ target repo's installed package versions before editing.
 - Use GSAP for imperative timelines and plugin-heavy scenes.
 - Use CSS for simple static transitions.
 - Use WAAPI for low-level Animation object control outside React.
-
+- For general Motion/CSS API work, native motion, or cross-stack audits,
+  prefer `motion`, `expo-motion`, or `design-motion-audit` when installed;
+  otherwise proceed with the guidance here. Web R3F stays in-bundle via
+  [`web-three-r3f`](../web-three-r3f/SKILL.md).
 ## Workflow
 
 1. Confirm package import path and React/client boundary.

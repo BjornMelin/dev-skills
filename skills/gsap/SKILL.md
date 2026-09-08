@@ -119,6 +119,19 @@ useGSAP(() => {
 - In React, prefer `useGSAP()`; scope selectors to a ref; wrap event-handler/async animations in `contextSafe`.
 - Register plugins once at a client boundary. Run GSAP client-side only — never during SSR.
 - Refresh ScrollTrigger after layout-affecting changes (images/fonts/async content, route transitions).
+- Pair responsive values with functions and `invalidateOnRefresh: true` so refresh re-reads them:
+
+  ```ts
+  gsap.to(".panel", {
+    x: () => -window.innerWidth,
+    scrollTrigger: {
+      trigger: ".panel",
+      end: () => `+=${window.innerWidth}`,
+      invalidateOnRefresh: true,
+    },
+  });
+  ```
+
 - Animate `transform`/`opacity` over layout properties; use `quickTo` for high-frequency updates; use `gsap.matchMedia()` for breakpoints and `prefers-reduced-motion`.
 
 ## Do not
@@ -145,10 +158,34 @@ useGSAP(() => {
 
 ## Optional power tool: `gsap-audit` CLI
 
-This repo ships a Rust CLI, `gsap-audit`, that statically audits GSAP usage in JS/TS/JSX/TSX (missing cleanup/registration, unscoped selectors, `markers: true` in prod, layout-property animation, scrub+toggleActions, GSAP in SSR, hot-path tweens, and more). It is optional — if it's not installed, proceed with the guidance above.
+This repo ships a Rust CLI, `gsap-audit`, that statically audits GSAP usage in JS/TS/JSX/TSX.
+The rule catalog at `crates/gsap-audit-core/src/rules.rs` is authoritative; `doctor` shows the
+exact installed build. It is optional. If it is not installed, proceed with the guidance above.
+
+| Rule ID | Lead |
+| --- | --- |
+| `core.gsap-trial-import` | An obsolete `gsap-trial` import remains. |
+| `plugins.gsdevtools-in-source` | GSDevTools appears in non-test source. |
+| `scrolltrigger.markers-in-prod` | `markers: true` remains in a ScrollTrigger config. |
+| `scrolltrigger.scrub-with-toggleactions` | A ScrollTrigger mixes `scrub` and `toggleActions`. |
+| `core.gsap2-signature` | A GSAP 2 duration-as-second-argument call remains. |
+| `performance.lag-smoothing-disabled` | Ticker lag smoothing is disabled. |
+| `core.layout-prop-animation` | A layout property is animated instead of a transform. |
+| `plugins.plugin-used-without-register` | A used plugin was not registered. |
+| `react.usegsap-not-registered` | `useGSAP` was imported but not registered. |
+| `react.gsap-in-ssr` | GSAP is used in an SSR route without a client boundary. |
+| `react.unscoped-selector` | A React context uses string selectors without a scope. |
+| `react.context-missing-revert` | A `gsap.context()` result is not reverted. |
+| `react.state-in-continuous-motion` | React state is set from a continuous motion source, causing renders per frame. |
+| `scrolltrigger.nested-timeline-child` | A nested timeline child owns a ScrollTrigger. |
+| `react.tween-in-render` | A tween is created during React render. |
+| `performance.will-change-permanent` | An animation keeps `will-change` for its full lifetime. |
+| `core.missing-overwrite` | An event-handler tween omits overwrite protection. |
+| `react.matchmedia-missing-revert` | `gsap.matchMedia()` lacks revert cleanup outside `useGSAP`. |
 
 ```bash
 # Install once (from this repo): cargo install --path crates/gsap-audit --locked --force
+gsap-audit doctor --format json
 gsap-audit scan --root . --format json          # audit a project
 gsap-audit scan --root . --categories react,scrolltrigger
 ```

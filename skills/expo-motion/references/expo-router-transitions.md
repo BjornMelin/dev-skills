@@ -93,10 +93,11 @@ options and surfaced through events like `sheetDetentChange`.
 
 Native shared-element and zoom transitions are exposed through
 `react-native-screens` / native-stack options rather than a screen-level
-Reanimated layout. Prefer the native knob when it exists; reach for the
-[Layout animations](./layout-animations.md) `sharedTransitionTag` path only for
-content that is not a route-shell transition, and never layer it on top of the
-native stack transition for the same screen.
+Reanimated layout. Native-stack options are the production default. Reanimated
+[Layout animations](./layout-animations.md) `sharedTransitionTag` is experimental,
+feature-flagged, and not recommended for production; consider it only behind a
+feature flag for content that is not a route-shell transition. Never layer it on
+top of the native stack transition for the same screen.
 
 ## When navigation owns the lifecycle (don't fight it)
 

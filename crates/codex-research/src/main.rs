@@ -1,3 +1,8 @@
+#![allow(
+    clippy::wildcard_imports,
+    reason = "crate-private reexports deliberately provide a shared command prelude"
+)]
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::future::Future;
@@ -93,18 +98,20 @@ async fn main() -> Result<()> {
             unreachable!("handled before config load")
         }
         Commands::Doctor => doctor(cli.json),
-        Commands::Plan(args) => output_plan(args, &config, cli.json),
-        Commands::Search(args) => output_search_plan(args, &config, cli.json),
+        Commands::Plan(args) => output_plan(&args, &config, cli.json),
+        Commands::Search(args) => output_search_plan(&args, &config, cli.json),
         Commands::Fetch { command } => handle_fetch(command, &config, cli.json).await,
         Commands::Context7 { command } => handle_context7(command, &config, cli.json).await,
         Commands::Github { command } => handle_github(command, &config, cli.json).await,
         Commands::Ledger { command } => handle_ledger(command, cli.json),
         Commands::Report(args) => render_report(args, cli.json),
-        Commands::Bundle(args) => build_evidence_bundle_command(args, cli.json),
+        Commands::Bundle(args) => build_evidence_bundle_command(&args, cli.json),
         Commands::Cache { command } => handle_cache(command, cli.json),
-        Commands::Config { command } => handle_config(command, loaded_config.path, cli.json),
+        Commands::Config { command } => {
+            handle_config(command, loaded_config.path.as_deref(), cli.json)
+        }
         Commands::Run { command } => handle_run(command, &config, cli.json),
-        Commands::Eval(args) => run_eval(args, &config, cli.json).await,
+        Commands::Eval(args) => run_eval(&args, &config, cli.json),
     }
 }
 

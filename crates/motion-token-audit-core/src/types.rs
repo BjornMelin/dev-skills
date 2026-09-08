@@ -61,6 +61,8 @@ pub enum Category {
     TokensReanimated,
     TokensGsap,
     TokensReact,
+    TokensTailwind,
+    TokensMotion,
     TokensR3f,
 }
 
@@ -73,6 +75,8 @@ impl Category {
             Category::TokensReanimated => "tokens-reanimated",
             Category::TokensGsap => "tokens-gsap",
             Category::TokensReact => "tokens-react",
+            Category::TokensTailwind => "tokens-tailwind",
+            Category::TokensMotion => "tokens-motion",
             Category::TokensR3f => "tokens-r3f",
         }
     }
@@ -85,6 +89,8 @@ impl Category {
             Category::TokensReanimated,
             Category::TokensGsap,
             Category::TokensReact,
+            Category::TokensTailwind,
+            Category::TokensMotion,
             Category::TokensR3f,
         ]
     }
@@ -97,6 +103,8 @@ impl Category {
             "tokens-reanimated" => Some(Category::TokensReanimated),
             "tokens-gsap" => Some(Category::TokensGsap),
             "tokens-react" => Some(Category::TokensReact),
+            "tokens-tailwind" => Some(Category::TokensTailwind),
+            "tokens-motion" => Some(Category::TokensMotion),
             "tokens-r3f" => Some(Category::TokensR3f),
             _ => None,
         }

@@ -75,9 +75,8 @@ pub fn load_audit_config(
     config_path: Option<&Path>,
     overrides: &CliOverrides,
 ) -> Result<AuditConfig> {
-    let resolved_config_path = config_path
-        .map(PathBuf::from)
-        .unwrap_or_else(|| root.join("bun-platform.config.json"));
+    let resolved_config_path =
+        config_path.map_or_else(|| root.join("bun-platform.config.json"), PathBuf::from);
     let loaded = if resolved_config_path.exists() {
         let text = fs::read_to_string(&resolved_config_path)
             .with_context(|| format!("failed to read {}", resolved_config_path.display()))?;

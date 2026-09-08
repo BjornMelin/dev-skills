@@ -1,6 +1,7 @@
 //! motion-token-audit: static auditor CLI for cross-stack motion token drift.
 
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process;
@@ -20,9 +21,9 @@ use motion_token_audit_core::{
     name = "motion-token-audit",
     version,
     about = "Statically audit cross-stack motion token drift.",
-    long_about = "motion-token-audit discovers shared motion duration/easing/spring tokens, then checks CSS, Reanimated, GSAP, and Motion React code for hardcoded motion literals that drift from or bypass the token vocabulary.",
+    long_about = "motion-token-audit discovers shared motion duration/easing/spring tokens, then checks CSS, Tailwind/NativeWind, Reanimated, GSAP, Motion React, and R3F code for hardcoded motion literals that drift from or bypass the token vocabulary. Categories: ssot,tokens-css,tokens-reanimated,tokens-gsap,tokens-react,tokens-tailwind,tokens-motion,tokens-r3f.",
     propagate_version = true,
-    after_long_help = "Examples:\n  motion-token-audit scan --root . --format markdown\n  motion-token-audit scan --root ./src --format json --categories tokens-css,tokens-reanimated\n  motion-token-audit doctor --format json\n  motion-token-audit completions zsh"
+    after_long_help = "Examples:\n  motion-token-audit scan --root . --format markdown\n  motion-token-audit scan --root ./src --format json --categories tokens-css,tokens-tailwind,tokens-motion,tokens-reanimated\n  motion-token-audit doctor --format json\n  motion-token-audit completions zsh"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -34,7 +35,7 @@ enum Commands {
     #[command(
         about = "Scan a directory tree for motion token drift.",
         long_about = "Walk the given root, discover motion tokens, parse supported source files, and report drift/orphan findings. Exit code is 2 when any finding meets --min-severity (default medium), otherwise 0.",
-        after_long_help = "Example:\n  motion-token-audit scan --root . --format json --categories tokens-css,tokens-reanimated"
+        after_long_help = "Example:\n  motion-token-audit scan --root . --format json --categories tokens-css,tokens-tailwind,tokens-motion,tokens-reanimated"
     )]
     Scan {
         #[arg(
@@ -49,7 +50,7 @@ enum Commands {
         #[arg(
             long,
             value_name = "CSV",
-            help = "Comma-separated subset of: ssot,tokens-css,tokens-reanimated,tokens-gsap,tokens-react,tokens-r3f. Default = all."
+            help = "Comma-separated subset of: ssot,tokens-css,tokens-reanimated,tokens-gsap,tokens-react,tokens-tailwind,tokens-motion,tokens-r3f. Default = all."
         )]
         categories: Option<String>,
         #[arg(
@@ -280,10 +281,12 @@ fn run_scan(request: ScanRequest<'_>) -> Result<i32> {
                 &outcome.coverage,
             );
             if outcome.truncated {
-                text.push_str(&format!(
+                write!(
+                    text,
                     "\nLimitation: file walk truncated at {} files; some files were not analyzed.\n",
                     outcome.files_scanned
-                ));
+                )
+                .expect("writing to a String is infallible");
             }
             text
         }
@@ -417,6 +420,25 @@ mod tests {
     #[test]
     fn verify_cli() {
         Cli::command().debug_assert();
+    }
+
+    #[test]
+    fn category_help_lists_every_core_category() {
+        let mut command = Cli::command();
+        let scan = command
+            .find_subcommand_mut("scan")
+            .expect("scan subcommand must exist");
+        let mut output = Vec::new();
+        scan.write_long_help(&mut output)
+            .expect("writing help to a buffer must succeed");
+        let help = String::from_utf8(output).expect("Clap help must be UTF-8");
+
+        for category in Category::all() {
+            assert!(
+                help.contains(category.as_str()),
+                "scan help omits category `{category}`"
+            );
+        }
     }
 
     #[test]

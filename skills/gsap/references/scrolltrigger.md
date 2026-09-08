@@ -1,6 +1,8 @@
 # GSAP ScrollTrigger
 
-ScrollTrigger ties GSAP tweens and timelines to scroll position for pinning, scrubbing, parallax, reveals, and snapping. It is part of the public `gsap` package and is fully free (including ScrollSmoother) as of v3.13+ under Webflow's 2025 release, so no license gate, trial, or premium plugin install is required.
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
+ScrollTrigger ties GSAP tweens and timelines to scroll position for pinning, scrubbing, parallax, reveals, and snapping. It is part of the public `gsap` package and has been fully free (including ScrollSmoother) since GSAP 3.13 under Webflow's 2025 release, so no license gate, trial, or premium plugin install is required.
 
 ## Table of contents
 

@@ -19,7 +19,7 @@ pub(super) fn collect_global_skills(
     diagnostics: &mut Vec<KimiSyncDiagnostic>,
 ) {
     collect_skill_root(
-        SkillRootSpec {
+        &SkillRootSpec {
             root,
             source_kind: KimiSyncSourceKind::GlobalSkill,
             plugin: None,
@@ -40,7 +40,7 @@ pub(super) fn collect_project_skills(
     diagnostics: &mut Vec<KimiSyncDiagnostic>,
 ) {
     collect_skill_root(
-        SkillRootSpec {
+        &SkillRootSpec {
             root,
             source_kind: KimiSyncSourceKind::ProjectSkill,
             plugin: None,
@@ -54,7 +54,7 @@ pub(super) fn collect_project_skills(
 }
 
 fn collect_skill_root(
-    spec: SkillRootSpec<'_>,
+    spec: &SkillRootSpec<'_>,
     config: &CodexConfig,
     candidates: &mut Vec<SkillCandidate>,
     excluded: &mut Vec<KimiSyncExcludedSkill>,
@@ -193,7 +193,7 @@ fn discover_plugin_manifest(
     for path in candidates {
         match read_plugin_manifest(&path) {
             Ok(manifest) if manifest.name == plugin_name => return Some((path, manifest)),
-            Ok(_) => continue,
+            Ok(_) => {}
             Err(error) => diagnostics.push(KimiSyncDiagnostic {
                 severity: KimiSyncDiagnosticSeverity::Warning,
                 code: "plugin_manifest_read_error".to_string(),

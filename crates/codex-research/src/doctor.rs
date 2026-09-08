@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{BTreeMap, DoctorReport, Result, command_version, print_json, research_paths};
 
 pub(crate) fn doctor(json_out: bool) -> Result<()> {
     let paths = research_paths()?;

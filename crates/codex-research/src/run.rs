@@ -1,4 +1,8 @@
-use crate::*;
+use crate::{
+    ProviderBudgets, ResearchConfig, ResearchRunState, Result, RunCommand, RunStatus, Utc, bail,
+    close_run_state, debit_run_budget, ensure_parent, fs, json, print_budgets, print_json,
+    profile_budget, provider_name, read_run_state, remaining_budgets,
+};
 
 pub(crate) fn handle_run(
     command: RunCommand,
@@ -51,7 +55,7 @@ pub(crate) fn handle_run(
             } else {
                 println!("status: {:?}", state.status);
                 println!("profile: {}", state.profile);
-                println!("source_count: {}", source_count);
+                println!("source_count: {source_count}");
                 println!("remaining:");
                 print_budgets(&remaining);
                 Ok(())

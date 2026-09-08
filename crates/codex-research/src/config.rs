@@ -1,4 +1,7 @@
-use crate::*;
+use crate::{
+    ConfigCommand, Path, PathBuf, ResearchConfig, Result, Serialize, bail, default_config_toml,
+    ensure_parent, fs, json, load_config, print_json,
+};
 
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct ConfigReport {
@@ -8,7 +11,7 @@ pub(crate) struct ConfigReport {
 
 pub(crate) fn handle_config(
     command: ConfigCommand,
-    loaded_path: Option<PathBuf>,
+    loaded_path: Option<&Path>,
     json_out: bool,
 ) -> Result<()> {
     match command {
@@ -30,7 +33,7 @@ pub(crate) fn handle_config(
             }
         }
         ConfigCommand::Show => {
-            let loaded = load_config(loaded_path.as_deref())?;
+            let loaded = load_config(loaded_path)?;
             let report = ConfigReport {
                 path: loaded.path,
                 config: loaded.config,

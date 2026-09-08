@@ -28,8 +28,12 @@ target repo's installed package versions before editing.
 ## Decision Boundaries
 
 - Use web-lottie for Lottie/dotLottie assets.
-- Use native-rive for React Native.
+- For React Native, prefer `expo-motion` when installed; otherwise proceed
+  with the guidance here.
 - Use Motion/GSAP/CSS when no .riv asset or state machine is involved.
+- For general Motion/CSS API work or cross-stack audits, prefer `motion` or
+  `design-motion-audit` when installed; otherwise proceed with the guidance
+  here. Web R3F stays in-bundle via [`web-three-r3f`](../web-three-r3f/SKILL.md).
 
 ## Workflow
 

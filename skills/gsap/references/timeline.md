@@ -1,6 +1,8 @@
 # GSAP Timeline
 
-A timeline is GSAP's sequencer: a container that plays child tweens (and nested timelines) in order or in parallel, with a single playhead you can play, pause, reverse, seek, and scrub. GSAP is fully free and open source (v3.13+); all examples use the GSAP 3 signature `.to(target, vars)` — duration lives inside `vars`.
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
+A timeline is GSAP's sequencer: a container that plays child tweens (and nested timelines) in order or in parallel, with a single playhead you can play, pause, reverse, seek, and scrub. All plugins have been free since GSAP 3.13; examples use the GSAP 3 signature `.to(target, vars)`, with duration inside `vars`.
 
 ## Creating a Timeline + Method Chaining
 

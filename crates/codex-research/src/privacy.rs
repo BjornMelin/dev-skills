@@ -1,4 +1,6 @@
-use crate::*;
+use crate::{
+    IpAddr, Path, PrivacyClass, ProviderKind, ResearchConfig, Result, Url, Value, bail, fs,
+};
 
 pub(crate) fn ensure_parent(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
@@ -34,9 +36,13 @@ pub(crate) fn is_github_url(value: &str) -> bool {
 pub(crate) fn url_domain(value: &str) -> Option<String> {
     Url::parse(value)
         .ok()
-        .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+        .and_then(|url| url.host_str().map(str::to_ascii_lowercase))
 }
 
+#[allow(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "host is normalized to lowercase and these are DNS suffixes"
+)]
 pub(crate) fn classify_privacy(value: &str) -> PrivacyClass {
     let Ok(url) = Url::parse(value) else {
         return PrivacyClass::Ambiguous;
@@ -48,12 +54,12 @@ pub(crate) fn classify_privacy(value: &str) -> PrivacyClass {
         return PrivacyClass::PrivateOrAuthenticated;
     }
     if let Some(host) = url.host()
-        && let Some(ip) = host_ip_addr(host)
+        && let Some(ip) = host_ip_addr(&host)
         && private_or_local_ip(ip)
     {
         return PrivacyClass::PrivateOrAuthenticated;
     }
-    let Some(host) = url.host_str().map(|host| host.to_ascii_lowercase()) else {
+    let Some(host) = url.host_str().map(str::to_ascii_lowercase) else {
         return PrivacyClass::Ambiguous;
     };
     if matches!(host.as_str(), "localhost" | "127.0.0.1" | "::1")
@@ -113,10 +119,10 @@ pub(crate) fn enforce_external_privacy(
     }
 }
 
-pub(crate) fn host_ip_addr(host: url::Host<&str>) -> Option<IpAddr> {
+pub(crate) fn host_ip_addr(host: &url::Host<&str>) -> Option<IpAddr> {
     match host {
-        url::Host::Ipv4(ip) => Some(IpAddr::V4(ip)),
-        url::Host::Ipv6(ip) => Some(IpAddr::V6(ip)),
+        url::Host::Ipv4(ip) => Some(IpAddr::V4(*ip)),
+        url::Host::Ipv6(ip) => Some(IpAddr::V6(*ip)),
         url::Host::Domain(_) => None,
     }
 }

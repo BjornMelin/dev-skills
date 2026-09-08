@@ -26,6 +26,37 @@ for R3F setup and correctness, `r3f-scene-polish` for look-dev, or `gsap`). Toke
 2. Read the flagged files and judge against the dimensions below.
 3. Return the punch list, most-severe first.
 
+## Optional analyzers
+
+These Rust CLIs are optional static-lead generators. Install only the analyzers needed for the
+target stack, run `doctor` to capture the exact catalog/version, and verify every result in the
+source before reporting it.
+
+| Tool | Use for | Catalog |
+| --- | --- | --- |
+| `motion-token-audit` | Cross-stack token drift and orphans | [rules](https://github.com/BjornMelin/dev-skills/blob/main/crates/motion-token-audit-core/src/rules.rs) |
+| `expo-motion-audit` | Reanimated/Worklets source and Expo config | [rules](https://github.com/BjornMelin/dev-skills/blob/main/crates/expo-motion-audit-core/src/rules.rs) |
+| `gsap-audit` | GSAP/ScrollTrigger and React source | [rules](https://github.com/BjornMelin/dev-skills/blob/main/crates/gsap-audit-core/src/rules.rs) |
+
+```bash
+# From a dev-skills checkout only. Standalone skill installs lack the
+# crates tree, so these commands fail there: skip this section and work
+# from the audit dimensions below (static-only mode).
+cargo install --path crates/motion-token-audit --locked --force
+cargo install --path crates/expo-motion-audit --locked --force
+cargo install --path crates/gsap-audit --locked --force
+
+# Record the exact installed version and catalog before scanning.
+motion-token-audit doctor --format json
+expo-motion-audit doctor --format json
+gsap-audit doctor --format json
+
+# Omit --categories for a full scan; otherwise record the CSV used in the report.
+motion-token-audit scan --root <project-root> --format json
+expo-motion-audit scan --root <project-root> --format json
+gsap-audit scan --root <project-root> --format json
+```
+
 ## Audit dimensions
 
 1. **Design tokens & consistency** — hardcoded durations/easings/springs vs

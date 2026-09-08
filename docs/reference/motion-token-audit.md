@@ -57,7 +57,7 @@ Options:
   `markdown` or `json`.
 - `--categories <CSV>`: comma-separated subset of rule categories to run
   (`ssot`, `tokens-css`, `tokens-reanimated`, `tokens-gsap`, `tokens-react`,
-  `tokens-r3f`). Default runs every category.
+  `tokens-tailwind`, `tokens-motion`, `tokens-r3f`). Default runs every category.
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`.
@@ -90,6 +90,16 @@ motion-token-audit doctor --format json
 `doctor` is the authoritative source for rule ids, categories, and severities in
 the installed build.
 
+New rules in v0.1.0 (`severity` below is the catalog severity; emitted
+findings report `medium` for token drift and `low` for orphans):
+
+| id | catalog severity | summary |
+| --- | --- | --- |
+| `tokens-tailwind.duration-literal` | medium | Detects `duration-[Nms]` and `delay-[Nms]` in Tailwind/NativeWind string and template literals. |
+| `tokens-tailwind.easing-literal` | medium | Detects `ease-[cubic-bezier(...)]` arbitrary values. |
+| `tokens-motion.duration-literal` | medium | Detects seconds-based inline durations in Motion 12 JSX transition/animate/exit/initial props. |
+| `tokens-motion.easing-literal` | medium | Detects inline cubic-bezier arrays in Motion 12 JSX transition/animate/exit/initial props. |
+
 ## completions
 
 ```bash
@@ -108,6 +118,9 @@ Supported shells are `bash`, `elvish`, `fish`, `powershell`, and `zsh`.
   `Easing.bezier` literals.
 - `tokens-gsap`: GSAP tween `duration` and `ease` literals.
 - `tokens-react`: Motion React `transition` duration and ease literals.
+- `tokens-tailwind`: Tailwind/NativeWind arbitrary duration, delay, and easing
+  literals in classes.
+- `tokens-motion`: Motion 12 JSX prop duration and cubic-bezier array literals.
 - `tokens-r3f`: reserved R3F category for lower-confidence damp/lerp checks.
 
 Run `motion-token-audit doctor` for the current per-rule catalog.

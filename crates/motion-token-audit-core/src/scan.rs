@@ -86,9 +86,8 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     let (files, truncated) = collect_files(root, options.max_files, &options.exclude);
     let mut tokens = MotionTokens::default();
     for file in &files {
-        let source = match std::fs::read_to_string(&file.path) {
-            Ok(source) => source,
-            Err(_) => continue,
+        let Ok(source) = std::fs::read_to_string(&file.path) else {
+            continue;
         };
         if CSS_EXTENSIONS.contains(&file.extension.as_str()) {
             tokens.merge(discover_css_tokens(&source));
@@ -120,9 +119,8 @@ pub fn scan_root(options: &ScanOptions) -> Result<ScanOutcome> {
     }
 
     for file in files {
-        let source = match std::fs::read_to_string(&file.path) {
-            Ok(source) => source,
-            Err(_) => continue,
+        let Ok(source) = std::fs::read_to_string(&file.path) else {
+            continue;
         };
         let analysis = if CSS_EXTENSIONS.contains(&file.extension.as_str()) {
             analyze_css(&file.relative, &source, &tokens)
@@ -177,10 +175,7 @@ fn collect_files(root: &Path, max_files: usize, exclude: &[String]) -> (Vec<Sour
     });
 
     for entry in walker {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
+        let Ok(entry) = entry else { continue };
         if !entry.file_type().is_file() {
             continue;
         }
@@ -209,7 +204,7 @@ fn collect_files(root: &Path, max_files: usize, exclude: &[String]) -> (Vec<Sour
 fn file_extension(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|extension| extension.to_str())
-        .map(|extension| extension.to_ascii_lowercase())
+        .map(str::to_ascii_lowercase)
 }
 
 fn relative_path(root: &Path, path: &Path) -> String {

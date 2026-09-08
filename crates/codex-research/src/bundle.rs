@@ -1,4 +1,12 @@
-use crate::*;
+use std::fmt::Write as _;
+
+use crate::{
+    BTreeMap, BTreeSet, BundleArgs, ClaimRecord, Connection, DateTime, EVIDENCE_BUNDLE_SCHEMA,
+    LedgerRecord, OpenFlags, ProviderBudgets, ProviderError, ProviderKind, ResearchProfile, Result,
+    RunDebit, RunStatus, Serialize, SourceCacheRecord, SourceRecord, TopicKind, Utc, bail,
+    ensure_parent, fs, params, print_json, provider_name, read_ledger_records, read_run_state,
+    redact_url_query_secrets, remaining_budgets, research_paths, secret_query_key, source_from_row,
+};
 
 #[derive(Debug, Serialize)]
 pub(crate) struct EvidenceBundle {
@@ -92,9 +100,9 @@ pub(crate) struct EvidenceBundleReport {
     pub(crate) exists: bool,
 }
 
-pub(crate) fn build_evidence_bundle_command(args: BundleArgs, json_out: bool) -> Result<()> {
+pub(crate) fn build_evidence_bundle_command(args: &BundleArgs, json_out: bool) -> Result<()> {
     let generated_at = args.generated_at.unwrap_or_else(Utc::now);
-    let (bundle, markdown) = build_evidence_bundle(&args, generated_at)?;
+    let (bundle, markdown) = build_evidence_bundle(args, generated_at)?;
     if let Some(out) = &args.out {
         ensure_parent(out)?;
         fs::write(out, serde_json::to_vec_pretty(&bundle)?)?;
@@ -451,8 +459,7 @@ pub(crate) fn redact_embedded_urls(value: &str) -> String {
         let token_end = url_and_after
             .char_indices()
             .find(|(_, ch)| ch.is_whitespace())
-            .map(|(index, _)| index)
-            .unwrap_or(url_and_after.len());
+            .map_or(url_and_after.len(), |(index, _)| index);
         let (url_token, after_token) = url_and_after.split_at(token_end);
         let trailing_len = url_token
             .chars()
@@ -480,18 +487,17 @@ pub(crate) fn find_url_start(value: &str) -> Option<usize> {
 }
 
 pub(crate) fn redact_secret_assignments(value: &str) -> String {
-    value
-        .split_inclusive(char::is_whitespace)
-        .map(|part| {
-            let split_at = part
-                .char_indices()
-                .find(|(_, ch)| ch.is_whitespace())
-                .map(|(index, _)| index)
-                .unwrap_or(part.len());
-            let (token, suffix) = part.split_at(split_at);
-            format!("{}{}", redact_secret_assignment_token(token), suffix)
-        })
-        .collect()
+    let mut output = String::with_capacity(value.len());
+    for part in value.split_inclusive(char::is_whitespace) {
+        let split_at = part
+            .char_indices()
+            .find(|(_, ch)| ch.is_whitespace())
+            .map_or(part.len(), |(index, _)| index);
+        let (token, suffix) = part.split_at(split_at);
+        output.push_str(&redact_secret_assignment_token(token));
+        output.push_str(suffix);
+    }
+    output
 }
 
 pub(crate) fn redact_secret_assignment_token(token: &str) -> String {
@@ -528,8 +534,7 @@ pub(crate) fn redact_standalone_secret_tokens(value: &str) -> String {
         let split_at = part
             .char_indices()
             .find(|(_, ch)| ch.is_whitespace())
-            .map(|(index, _)| index)
-            .unwrap_or(part.len());
+            .map_or(part.len(), |(index, _)| index);
         let (token, suffix) = part.split_at(split_at);
         let (leading, core, trailing) = split_secret_token_parts(token);
         if matches!(redaction_state, BundleRedactionState::AwaitAssignmentValue) {
@@ -591,8 +596,7 @@ pub(crate) fn split_secret_token_parts(token: &str) -> (&str, &str, &str) {
     let leading_end = token
         .char_indices()
         .find(|(_, ch)| !secret_token_boundary_punctuation(*ch))
-        .map(|(index, _)| index)
-        .unwrap_or(token.len());
+        .map_or(token.len(), |(index, _)| index);
     let trailing_len = token[leading_end..]
         .chars()
         .rev()
@@ -683,45 +687,56 @@ pub(crate) fn secret_token_like(value: &str) -> bool {
 pub(crate) fn render_evidence_bundle_markdown(bundle: &EvidenceBundle) -> String {
     let mut markdown = String::new();
     markdown.push_str("# Research Evidence Bundle\n\n");
-    markdown.push_str(&format!("- Status: {}\n", bundle.status));
-    markdown.push_str(&format!("- Generated: {}\n", bundle.generated_at));
-    markdown.push_str(&format!("- Query: {}\n", bundle.run.query));
-    markdown.push_str(&format!("- Run status: {:?}\n", bundle.run.status));
-    markdown.push_str(&format!(
-        "- Claims: {} total, {} cited, {} uncited\n",
+    writeln!(markdown, "- Status: {}", bundle.status).expect("writing to a String is infallible");
+    writeln!(markdown, "- Generated: {}", bundle.generated_at)
+        .expect("writing to a String is infallible");
+    writeln!(markdown, "- Query: {}", bundle.run.query).expect("writing to a String is infallible");
+    writeln!(markdown, "- Run status: {:?}", bundle.run.status)
+        .expect("writing to a String is infallible");
+    writeln!(
+        markdown,
+        "- Claims: {} total, {} cited, {} uncited",
         bundle.ledger.claim_count,
         bundle.citation_coverage.cited_claims,
         bundle.citation_coverage.uncited_claims
-    ));
-    markdown.push_str(&format!("- Sources: {}\n", bundle.ledger.source_count));
-    markdown.push_str(&format!(
-        "- Provider errors: {}\n",
+    )
+    .expect("writing to a String is infallible");
+    writeln!(markdown, "- Sources: {}", bundle.ledger.source_count)
+        .expect("writing to a String is infallible");
+    writeln!(
+        markdown,
+        "- Provider errors: {}",
         bundle.provider_errors.len()
-    ));
-    markdown.push_str(&format!(
-        "- Report: {} ({})\n",
+    )
+    .expect("writing to a String is infallible");
+    writeln!(
+        markdown,
+        "- Report: {} ({})",
         bundle.report.path,
         if bundle.report.exists {
             "exists"
         } else {
             "missing"
         }
-    ));
+    )
+    .expect("writing to a String is infallible");
     markdown.push_str("\n## Provider Budget\n\n");
     markdown.push_str("| Provider | Budget | Spent | Remaining |\n");
     markdown.push_str("| --- | ---: | ---: | ---: |\n");
     for line in &bundle.budget.by_provider {
-        markdown.push_str(&format!(
-            "| {} | {} | {} | {} |\n",
+        writeln!(
+            markdown,
+            "| {} | {} | {} | {} |",
             line.provider, line.budget, line.spent, line.remaining
-        ));
+        )
+        .expect("writing to a String is infallible");
     }
     markdown.push_str("\n## Source Freshness\n\n");
     if bundle.source_freshness.by_status.is_empty() {
         markdown.push_str("- No sources recorded.\n");
     } else {
         for (status, count) in &bundle.source_freshness.by_status {
-            markdown.push_str(&format!("- {status}: {count}\n"));
+            writeln!(markdown, "- {status}: {count}").expect("writing to a String is infallible");
         }
     }
     markdown.push_str("\n## Failures\n\n");
@@ -729,7 +744,7 @@ pub(crate) fn render_evidence_bundle_markdown(bundle: &EvidenceBundle) -> String
         markdown.push_str("- None.\n");
     } else {
         for failure in &bundle.failures {
-            markdown.push_str(&format!("- {failure}\n"));
+            writeln!(markdown, "- {failure}").expect("writing to a String is infallible");
         }
     }
     markdown.push_str("\n## Warnings\n\n");
@@ -737,7 +752,7 @@ pub(crate) fn render_evidence_bundle_markdown(bundle: &EvidenceBundle) -> String
         markdown.push_str("- None.\n");
     } else {
         for warning in &bundle.warnings {
-            markdown.push_str(&format!("- {warning}\n"));
+            writeln!(markdown, "- {warning}").expect("writing to a String is infallible");
         }
     }
     markdown

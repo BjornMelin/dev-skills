@@ -1,5 +1,6 @@
 use std::{
     ffi::OsString,
+    fmt::Write as _,
     fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -257,18 +258,18 @@ pub(crate) fn tool_command_name(command: &ToolCommand) -> &'static str {
 
 pub(crate) fn handle_bun_command(command: BunCommand) -> Result<CommandOutput> {
     match command {
-        BunCommand::Audit(args) => bun_audit(args),
+        BunCommand::Audit(args) => bun_audit(&args),
         BunCommand::Rules { command } => match command {
             BunRulesCommand::List(args) => bun_rules_list(args),
             BunRulesCommand::Show(args) => bun_rules_show(args),
         },
         BunCommand::Fixes { command } => match command {
-            BunFixesCommand::Plan(args) => bun_fixes(args, false),
-            BunFixesCommand::Apply(args) => bun_fixes(args, true),
+            BunFixesCommand::Plan(args) => bun_fixes(&args, false),
+            BunFixesCommand::Apply(args) => bun_fixes(&args, true),
         },
         BunCommand::Validate { command } => match command {
-            BunValidateCommand::Plan(args) => bun_validate_plan(args),
-            BunValidateCommand::Run(args) => bun_validate_run(args),
+            BunValidateCommand::Plan(args) => bun_validate_plan(&args),
+            BunValidateCommand::Run(args) => bun_validate_run(&args),
         },
         BunCommand::References { command } => match command {
             BunReferencesCommand::Status(args) => bun_references_status(args),
@@ -276,7 +277,7 @@ pub(crate) fn handle_bun_command(command: BunCommand) -> Result<CommandOutput> {
             BunReferencesCommand::Sync(args) => bun_references_sync(args),
         },
         BunCommand::Doctor(args) => bun_doctor(args),
-        BunCommand::Benchmark(args) => bun_benchmark(args),
+        BunCommand::Benchmark(args) => bun_benchmark(&args),
     }
 }
 
@@ -286,15 +287,14 @@ pub(crate) fn handle_tool_command(command: ToolCommand) -> Result<CommandOutput>
     }
 }
 
-fn bun_audit(args: BunAuditArgs) -> Result<CommandOutput> {
+fn bun_audit(args: &BunAuditArgs) -> Result<CommandOutput> {
     let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let findings = run_audit(&root, &config, &paths)?;
     let failed = args
         .fail_on
         .map(map_bun_severity)
-        .map(|severity| bun_platform_core::should_fail(&findings, severity))
-        .unwrap_or(false);
+        .is_some_and(|severity| bun_platform_core::should_fail(&findings, severity));
     Ok(CommandOutput {
         ok: !failed,
         command: "bun audit",
@@ -340,7 +340,7 @@ fn bun_rules_show(args: BunRuleShowArgs) -> Result<CommandOutput> {
     })
 }
 
-fn bun_fixes(args: BunFixesArgs, apply: bool) -> Result<CommandOutput> {
+fn bun_fixes(args: &BunFixesArgs, apply: bool) -> Result<CommandOutput> {
     let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let fixes = if apply {
@@ -351,7 +351,7 @@ fn bun_fixes(args: BunFixesArgs, apply: bool) -> Result<CommandOutput> {
     let projected = fixes
         .iter()
         .map(|fix| ProjectedFix::from_fix(fix, args.full_content))
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Vec<_>>();
     let command = if apply {
         "bun fixes apply"
     } else {
@@ -372,7 +372,7 @@ fn bun_fixes(args: BunFixesArgs, apply: bool) -> Result<CommandOutput> {
     })
 }
 
-fn bun_validate_plan(scope: BunScopeArgs) -> Result<CommandOutput> {
+fn bun_validate_plan(scope: &BunScopeArgs) -> Result<CommandOutput> {
     let (root, config) = build_bun_config(&scope.scan, scope.write_cache)?;
     let commands = validation_commands(&root, &config)?;
     Ok(CommandOutput {
@@ -388,7 +388,7 @@ fn bun_validate_plan(scope: BunScopeArgs) -> Result<CommandOutput> {
     })
 }
 
-fn bun_validate_run(args: BunValidateRunArgs) -> Result<CommandOutput> {
+fn bun_validate_run(args: &BunValidateRunArgs) -> Result<CommandOutput> {
     let (root, config) = build_bun_config(&args.scope.scan, args.scope.write_cache)?;
     let paths = PlatformPaths::discover()?;
     let findings = run_audit(&root, &config, &paths)?;
@@ -532,7 +532,7 @@ fn bun_doctor(args: BunDoctorArgs) -> Result<CommandOutput> {
     })
 }
 
-fn bun_benchmark(args: BunBenchmarkArgs) -> Result<CommandOutput> {
+fn bun_benchmark(args: &BunBenchmarkArgs) -> Result<CommandOutput> {
     let (root, mut config) = build_bun_config(&args.scope, false)?;
     config.write_cache = false;
     let paths = PlatformPaths::discover()?;
@@ -783,10 +783,10 @@ struct ProjectedFix {
 }
 
 impl ProjectedFix {
-    fn from_fix(fix: &bun_platform_core::PlannedFix, full_content: bool) -> Result<Self> {
+    fn from_fix(fix: &bun_platform_core::PlannedFix, full_content: bool) -> Self {
         let before = fix.before.as_deref();
         let after = fix.after.as_deref();
-        Ok(Self {
+        Self {
             rule_id: fix.rule_id.clone(),
             rule_ids: fix.rule_ids.clone(),
             kind: format!("{:?}", fix.kind).to_ascii_lowercase(),
@@ -802,7 +802,7 @@ impl ProjectedFix {
             },
             before: full_content.then(|| fix.before.clone()).flatten(),
             after: full_content.then(|| fix.after.clone()).flatten(),
-        })
+        }
     }
 }
 
@@ -816,13 +816,19 @@ fn simple_unified_diff(path: &str, before: &str, after: &str) -> String {
     let max_len = before_lines.len().max(after_lines.len());
     for index in 0..max_len {
         match (before_lines.get(index), after_lines.get(index)) {
-            (Some(left), Some(right)) if left == right => out.push_str(&format!(" {left}\n")),
-            (Some(left), Some(right)) => {
-                out.push_str(&format!("-{left}\n"));
-                out.push_str(&format!("+{right}\n"));
+            (Some(left), Some(right)) if left == right => {
+                writeln!(out, " {left}").expect("writing to a String is infallible");
             }
-            (Some(left), None) => out.push_str(&format!("-{left}\n")),
-            (None, Some(right)) => out.push_str(&format!("+{right}\n")),
+            (Some(left), Some(right)) => {
+                writeln!(out, "-{left}").expect("writing to a String is infallible");
+                writeln!(out, "+{right}").expect("writing to a String is infallible");
+            }
+            (Some(left), None) => {
+                writeln!(out, "-{left}").expect("writing to a String is infallible");
+            }
+            (None, Some(right)) => {
+                writeln!(out, "+{right}").expect("writing to a String is infallible");
+            }
             (None, None) => {}
         }
     }
@@ -843,7 +849,7 @@ fn summarize_timings(values: &[f64]) -> Value {
     let sum = sorted.iter().sum::<f64>();
     let median = if sorted.len().is_multiple_of(2) {
         let upper = sorted.len() / 2;
-        (sorted[upper - 1] + sorted[upper]) / 2.0
+        f64::midpoint(sorted[upper - 1], sorted[upper])
     } else {
         sorted[sorted.len() / 2]
     };

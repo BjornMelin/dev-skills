@@ -35,7 +35,7 @@ impl Estate {
     }
 
     /// Write a skill into an arbitrary directory and return its path.
-    fn skill_at(&self, dir: &Path, name: &str, frontmatter: &str, body: &str) -> PathBuf {
+    fn skill_at(dir: &Path, name: &str, frontmatter: &str, body: &str) -> PathBuf {
         let d = dir.join(name);
         fs::create_dir_all(&d).unwrap();
         let p = d.join("SKILL.md");
@@ -44,7 +44,7 @@ impl Estate {
     }
 
     fn skill(&self, name: &str, frontmatter: &str, body: &str) -> PathBuf {
-        self.skill_at(&self.home().join("skills"), name, frontmatter, body)
+        Self::skill_at(&self.home().join("skills"), name, frontmatter, body)
     }
 
     fn settings(&self, json: &str) {
@@ -214,7 +214,7 @@ fn override_targeting_a_disabled_plugin_is_distinguished_from_stale() {
         .home()
         .join("plugins/marketplaces/mymarket/plugins/myplug/skills");
     fs::create_dir_all(&gated).unwrap();
-    e.skill_at(
+    Estate::skill_at(
         &gated,
         "ghost-skill",
         "name: ghost-skill\ndescription: Short.",
@@ -244,7 +244,7 @@ fn override_on_an_enabled_plugin_skill_is_clean() {
         .home()
         .join("plugins/marketplaces/mymarket/plugins/myplug/skills");
     fs::create_dir_all(&gated).unwrap();
-    e.skill_at(
+    Estate::skill_at(
         &gated,
         "real-skill",
         "name: real-skill\ndescription: Short.",
@@ -270,7 +270,7 @@ fn mirror_drift_reports_only_skills_that_actually_differ() {
         "name: same\ndescription: Short description.",
         "identical",
     );
-    e.skill_at(
+    Estate::skill_at(
         &mirror,
         "same",
         "name: same\ndescription: Short description.",
@@ -283,7 +283,7 @@ fn mirror_drift_reports_only_skills_that_actually_differ() {
         "name: drifted\ndescription: Short description.",
         "old body",
     );
-    e.skill_at(
+    Estate::skill_at(
         &mirror,
         "drifted",
         "name: drifted\ndescription: Short description.",
@@ -291,7 +291,7 @@ fn mirror_drift_reports_only_skills_that_actually_differ() {
     );
 
     // authored but deliberately not installed: not drift
-    e.skill_at(
+    Estate::skill_at(
         &mirror,
         "not-installed",
         "name: not-installed\ndescription: Short.",
@@ -365,7 +365,7 @@ fn mirror_drift_covers_the_whole_skill_directory() {
 
     let front = "name: deep\ndescription: Identical entrypoint.";
     e.skill("deep", front, "same body");
-    e.skill_at(&mirror, "deep", front, "same body");
+    Estate::skill_at(&mirror, "deep", front, "same body");
     fs::create_dir_all(e.home().join("skills/deep/references")).unwrap();
     fs::create_dir_all(mirror.join("deep/references")).unwrap();
     fs::write(

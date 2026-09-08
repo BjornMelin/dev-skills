@@ -1,6 +1,8 @@
 # GSAP Core API
 
-The GSAP core engine (`gsap.to/from/fromTo/set`, transforms, easing, stagger, defaults, and `matchMedia`) animates anything with a numeric property — DOM, SVG, CSS variables, JS objects. GSAP is **100% free and open** since the Webflow acquisition (v3.13+): every former "Club GreenSock" plugin now ships in the public `gsap` npm package, with no membership, trial package, or auth token required.
+> **Compatibility baseline:** `gsap@3.15`; where React is used, `@gsap/react@2.x`. Explicit earlier versions below are feature-introduction notes.
+
+The GSAP core engine (`gsap.to/from/fromTo/set`, transforms, easing, stagger, defaults, and `matchMedia`) animates anything with a numeric property: DOM, SVG, CSS variables, and JS objects. GSAP is **100% free and open** since the Webflow acquisition (GSAP 3.13): every former "Club GreenSock" plugin now ships in the public `gsap` npm package, with no membership, trial package, or auth token required.
 
 ## Contents
 

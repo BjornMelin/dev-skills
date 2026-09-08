@@ -55,6 +55,8 @@ const SKILL_INVENTORY_MAX_RESOURCE_ENTRIES: usize = 32;
 const SKILL_INVENTORY_MAX_RESOURCE_DEPTH: usize = 16;
 const SKILL_ARCHIVE_GROUPS: [&str; 3] = ["gsap", "native", "rust"];
 
+// Serde's `skip_serializing_if` predicate ABI requires a borrowed field value.
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -907,7 +909,7 @@ struct SkillArchiveManifest {
 }
 
 fn archive_manifest_is_snapshot(manifest: &SkillArchiveManifest) -> bool {
-    trimmed_optional(&manifest.kind) == Some("snapshot")
+    trimmed_optional(manifest.kind.as_ref()) == Some("snapshot")
 }
 
 #[derive(Clone, Copy)]
@@ -1005,6 +1007,8 @@ pub enum PrAgentHostedActionStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+// These booleans are independent serialized facts in the stable report schema.
+#[allow(clippy::struct_excessive_bools)]
 pub struct PrAgentReadinessReport {
     pub schema: String,
     pub repository: String,
@@ -1613,7 +1617,7 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
         let existing: PrEvidence = read_json(&args.capsule.join("pr.json"))?;
         pr = merge_provider_pr_evidence(existing, pr, args.source_kind)?;
     }
-    write_json(args.capsule.join("pr.json"), &pr)?;
+    write_json(&args.capsule.join("pr.json"), &pr)?;
 
     let mut capsule: Capsule = read_json(&args.capsule.join("capsule.json"))?;
     if let Some(number) = pr.number
@@ -1622,12 +1626,12 @@ pub fn record_pr_snapshot(args: PrRecordArgs, checked_at: DateTime<Utc>) -> Resu
         capsule.pull_requests.push(number);
     }
     capsule.updated_at = std::cmp::max(capsule.updated_at, checked_at);
-    write_json(args.capsule.join("capsule.json"), &capsule)?;
+    write_json(&args.capsule.join("capsule.json"), &capsule)?;
 
     let evidence_command = args.command;
     let evidence_exit_code = evidence_command.as_ref().map(|_| 0);
     append_jsonl(
-        args.capsule.join("evidence.jsonl"),
+        &args.capsule.join("evidence.jsonl"),
         &EvidenceRecord {
             schema: EVIDENCE_SCHEMA.to_string(),
             kind: EvidenceKind::Review,
@@ -1680,11 +1684,11 @@ pub fn append_evidence(args: AppendEvidenceArgs) -> Result<AppendEvidenceResult>
         bail!("invalid evidence record: {}", errors.join("; "));
     }
 
-    append_jsonl(args.capsule.join("evidence.jsonl"), &args.record)?;
+    append_jsonl(&args.capsule.join("evidence.jsonl"), &args.record)?;
 
     let mut capsule: Capsule = read_json(&args.capsule.join("capsule.json"))?;
     capsule.updated_at = std::cmp::max(capsule.updated_at, args.record.at);
-    write_json(args.capsule.join("capsule.json"), &capsule)?;
+    write_json(&args.capsule.join("capsule.json"), &capsule)?;
 
     let evidence = evidence_summary(&args.capsule)?;
 
@@ -1735,8 +1739,8 @@ pub fn record_subagent_plan(args: RecordSubagentPlanArgs) -> Result<RecordSubage
     validate_subagent_evidence_record(&evidence_record)?;
     subagents.batches.push(batch.clone());
     ensure_valid_subagents_value(&subagents)?;
-    write_json(args.capsule.join("subagents.json"), &subagents)?;
-    append_subagent_evidence(&args.capsule, evidence_record)?;
+    write_json(&args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, &evidence_record)?;
     touch_capsule(&args.capsule, args.recorded_at)?;
 
     let evidence = evidence_summary(&args.capsule)?;
@@ -1785,10 +1789,10 @@ pub fn record_subagent_outcome(
             )
         })?;
     if args.agent_id.is_some() {
-        agent.agent_id = args.agent_id.clone();
+        agent.agent_id.clone_from(&args.agent_id);
     }
     agent.status = args.status.to_string();
-    agent.summary = args.summary.clone();
+    agent.summary.clone_from(&args.summary);
     if let Some(wait_status) = args.wait_status {
         agent.wait_status = Some(wait_status.to_string());
     }
@@ -1797,8 +1801,8 @@ pub fn record_subagent_outcome(
     }
     agent.disposition = Some(args.disposition.to_string());
     agent.human_verified = args.human_verified;
-    agent.source_ids = args.source_ids.clone();
-    agent.artifacts = args.artifacts.clone();
+    agent.source_ids.clone_from(&args.source_ids);
+    agent.artifacts.clone_from(&args.artifacts);
     agent.updated_at = Some(monotonic_timestamp(agent.updated_at, args.recorded_at));
     let agent_result = agent.clone();
     batch.updated_at = Some(monotonic_timestamp(batch.updated_at, args.recorded_at));
@@ -1820,8 +1824,8 @@ pub fn record_subagent_outcome(
     };
     validate_subagent_evidence_record(&evidence_record)?;
     ensure_valid_subagents_value(&subagents)?;
-    write_json(args.capsule.join("subagents.json"), &subagents)?;
-    append_subagent_evidence(&args.capsule, evidence_record)?;
+    write_json(&args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, &evidence_record)?;
     touch_capsule(&args.capsule, args.recorded_at)?;
 
     let evidence = evidence_summary(&args.capsule)?;
@@ -1836,7 +1840,7 @@ pub fn record_subagent_outcome(
 }
 
 pub fn record_subagent_synthesis(
-    args: RecordSubagentSynthesisArgs,
+    args: &RecordSubagentSynthesisArgs,
 ) -> Result<RecordSubagentSynthesisResult> {
     validate_capsule_for_subagent_record(&args.capsule)?;
     validate_stable_id("batch_id", &args.batch_id)?;
@@ -1893,8 +1897,8 @@ pub fn record_subagent_synthesis(
     };
     validate_subagent_evidence_record(&evidence_record)?;
     ensure_valid_subagents_value(&subagents)?;
-    write_json(args.capsule.join("subagents.json"), &subagents)?;
-    append_subagent_evidence(&args.capsule, evidence_record)?;
+    write_json(&args.capsule.join("subagents.json"), &subagents)?;
+    append_subagent_evidence(&args.capsule, &evidence_record)?;
     touch_capsule(&args.capsule, args.recorded_at)?;
 
     let evidence = evidence_summary(&args.capsule)?;
@@ -1927,7 +1931,7 @@ pub fn orchestration_run(
         .collect::<Vec<_>>();
     let subagents_path = capsule_path.join("subagents.json");
     let subagents: Subagents = match ensure_regular_contract_file(capsule_path, "subagents.json")
-        .and_then(|_| read_json(&subagents_path))
+        .and_then(|()| read_json(&subagents_path))
     {
         Ok(subagents) => subagents,
         Err(error) => {
@@ -2206,14 +2210,13 @@ fn latest_batch_timestamp(batch: &SubagentBatch) -> Option<DateTime<Utc>> {
 }
 
 /// Build a read-only machine-readable inventory of tracked skill folders.
-pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryReport> {
+pub fn skills_inventory(args: &SkillInventoryArgs) -> Result<SkillsInventoryReport> {
     let checked_at = args.checked_at.unwrap_or_else(Utc::now);
     let (repo_root, skills_root) =
         resolve_skill_roots(args.repo_root.as_deref(), args.skills_root.as_deref())?;
     let mut diagnostics = Vec::new();
-    let readme = read_optional_catalog_text(&repo_root.join("README.md"), &mut diagnostics)?;
-    let docs_index =
-        read_optional_catalog_text(&repo_root.join("docs/index.md"), &mut diagnostics)?;
+    let readme = read_optional_catalog_text(&repo_root.join("README.md"), &mut diagnostics);
+    let docs_index = read_optional_catalog_text(&repo_root.join("docs/index.md"), &mut diagnostics);
     let mut skills = Vec::new();
     match fs::symlink_metadata(&skills_root) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -2285,7 +2288,7 @@ pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryRepor
                     });
                 }
             }
-            entries.sort_by_key(|entry| entry.file_name());
+            entries.sort_by_key(std::fs::DirEntry::file_name);
             for entry in entries {
                 let path = entry.path();
                 if entry.file_name() == "dist" {
@@ -2367,7 +2370,7 @@ pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryRepor
                     &readme,
                     &docs_index,
                     &mut diagnostics,
-                )?;
+                );
                 if !skill.validation.valid {
                     diagnostics.push(SkillInventoryDiagnostic {
                         severity: SkillInventoryDiagnosticSeverity::Error,
@@ -2407,7 +2410,7 @@ pub fn skills_inventory(args: SkillInventoryArgs) -> Result<SkillsInventoryRepor
 /// Build a read-only hygiene audit for skill folders.
 pub fn skills_audit(args: SkillAuditArgs) -> Result<SkillsAuditReport> {
     let checked_at = args.checked_at.unwrap_or_else(Utc::now);
-    let inventory = skills_inventory(SkillInventoryArgs {
+    let inventory = skills_inventory(&SkillInventoryArgs {
         repo_root: args.repo_root,
         skills_root: args.skills_root,
         checked_at: Some(checked_at),
@@ -2468,11 +2471,11 @@ pub fn skills_audit(args: SkillAuditArgs) -> Result<SkillsAuditReport> {
     let readme = read_optional_catalog_text(
         &inventory.repo_root.join("README.md"),
         &mut archive_catalog_diagnostics,
-    )?;
+    );
     let docs_index = read_optional_catalog_text(
         &inventory.repo_root.join("docs/index.md"),
         &mut archive_catalog_diagnostics,
-    )?;
+    );
     let active_skill_entrypoints =
         active_skill_entrypoints(&inventory.repo_root, &inventory.skills)?;
     let archive = audit_skill_archive(
@@ -2726,12 +2729,12 @@ fn audit_skill_archive(
         let mut is_snapshot = false;
         if let Some(manifest) = manifest {
             is_snapshot = archive_manifest_is_snapshot(&manifest);
-            entry_status = trimmed_optional(&manifest.status)
+            entry_status = trimmed_optional(manifest.status.as_ref())
                 .unwrap_or("invalid")
                 .to_string();
-            archived_at = trimmed_optional(&manifest.archived_at).map(str::to_string);
-            replacement = trimmed_optional(&manifest.replacement).map(str::to_string);
-            reason = trimmed_optional(&manifest.reason).map(str::to_string);
+            archived_at = trimmed_optional(manifest.archived_at.as_ref()).map(str::to_string);
+            replacement = trimmed_optional(manifest.replacement.as_ref()).map(str::to_string);
+            reason = trimmed_optional(manifest.reason.as_ref()).map(str::to_string);
             validate_skill_archive_manifest(
                 repo_root,
                 &directory,
@@ -2787,7 +2790,7 @@ fn discover_skill_archive_dirs(
         })?
         .collect::<std::result::Result<Vec<_>, _>>()
         .with_context(|| format!("failed to read entry in {}", archive_root.display()))?;
-    root_entries.sort_by_key(|entry| entry.file_name());
+    root_entries.sort_by_key(std::fs::DirEntry::file_name);
 
     let mut archive_dirs = Vec::new();
     for entry in root_entries {
@@ -2816,7 +2819,7 @@ fn discover_skill_archive_dirs(
             .with_context(|| format!("failed to read archive group {}", path.display()))?
             .collect::<std::result::Result<Vec<_>, _>>()
             .with_context(|| format!("failed to read entry in {}", path.display()))?;
-        group_entries.sort_by_key(|entry| entry.file_name());
+        group_entries.sort_by_key(std::fs::DirEntry::file_name);
         for entry in group_entries {
             let child_path = entry.path();
             let child_metadata = fs::symlink_metadata(&child_path).with_context(|| {
@@ -2887,7 +2890,7 @@ fn validate_skill_archive_manifest(
     issues: &mut Vec<SkillAuditIssue>,
 ) {
     let manifest_rel = repo_relative_string(repo_root, manifest_path);
-    match trimmed_optional(&manifest.schema) {
+    match trimmed_optional(manifest.schema.as_ref()) {
         Some(SKILL_ARCHIVE_SCHEMA) => {}
         Some(schema) => push_archive_issue(
             issues,
@@ -2906,7 +2909,7 @@ fn validate_skill_archive_manifest(
             format!("archive.json is missing schema {SKILL_ARCHIVE_SCHEMA}"),
         ),
     }
-    match trimmed_optional(&manifest.status) {
+    match trimmed_optional(manifest.status.as_ref()) {
         Some("archived") => {}
         Some(status) => push_archive_issue(
             issues,
@@ -2925,7 +2928,7 @@ fn validate_skill_archive_manifest(
             "archive.json is missing archived status",
         ),
     }
-    match trimmed_optional(&manifest.name) {
+    match trimmed_optional(manifest.name.as_ref()) {
         Some(name) if !is_valid_skill_name(name) => push_archive_issue(
             issues,
             SkillInventoryDiagnosticSeverity::Error,
@@ -2952,7 +2955,7 @@ fn validate_skill_archive_manifest(
             "archive.json is missing name",
         ),
     }
-    match trimmed_optional(&manifest.archived_at) {
+    match trimmed_optional(manifest.archived_at.as_ref()) {
         Some(archived_at) if DateTime::parse_from_rfc3339(archived_at).is_err() => {
             push_archive_issue(
                 issues,
@@ -2985,7 +2988,7 @@ fn validate_skill_archive_manifest(
             "archived skill name is also present in an active skill entrypoint",
         );
     }
-    if let Some(replacement) = trimmed_optional(&manifest.replacement)
+    if let Some(replacement) = trimmed_optional(manifest.replacement.as_ref())
         && !active_skill_entrypoints.contains_key(replacement)
     {
         push_archive_issue(
@@ -2998,7 +3001,7 @@ fn validate_skill_archive_manifest(
         );
     }
     validate_archive_source_path(
-        &manifest.source_path,
+        manifest.source_path.as_ref(),
         directory,
         repo_root,
         directory,
@@ -3007,7 +3010,7 @@ fn validate_skill_archive_manifest(
         issues,
     );
     validate_required_archive_manifest_field(
-        &manifest.archived_path,
+        manifest.archived_path.as_ref(),
         "archived_path",
         archived_path,
         repo_root,
@@ -3016,7 +3019,7 @@ fn validate_skill_archive_manifest(
         issues,
     );
     validate_nonempty_archive_manifest_field(
-        &manifest.reason,
+        manifest.reason.as_ref(),
         "reason",
         repo_root,
         directory,
@@ -3024,7 +3027,7 @@ fn validate_skill_archive_manifest(
         issues,
     );
     validate_nonempty_archive_manifest_field(
-        &manifest.restore,
+        manifest.restore.as_ref(),
         "restore",
         repo_root,
         directory,
@@ -3034,7 +3037,7 @@ fn validate_skill_archive_manifest(
 }
 
 fn validate_archive_source_path(
-    value: &Option<String>,
+    value: Option<&String>,
     directory: &str,
     repo_root: &Path,
     archive_name: &str,
@@ -3086,7 +3089,7 @@ fn archive_source_path_matches(actual: &str, directory: &str, allow_global_insta
 }
 
 fn validate_required_archive_manifest_field(
-    value: &Option<String>,
+    value: Option<&String>,
     field: &str,
     expected: &str,
     repo_root: &Path,
@@ -3116,7 +3119,7 @@ fn validate_required_archive_manifest_field(
 }
 
 fn validate_nonempty_archive_manifest_field(
-    value: &Option<String>,
+    value: Option<&String>,
     field: &str,
     repo_root: &Path,
     archive_name: &str,
@@ -3230,9 +3233,9 @@ fn audit_archived_skill_catalog_exposure(
     }
 }
 
-fn trimmed_optional(value: &Option<String>) -> Option<&str> {
+fn trimmed_optional(value: Option<&String>) -> Option<&str> {
     value
-        .as_deref()
+        .map(String::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
 }
@@ -3264,21 +3267,19 @@ fn resolve_skill_roots(
             Some(repo_root) => canonicalize_repo_root(repo_root)?,
             None => skills_root
                 .parent()
-                .map(Path::to_path_buf)
-                .unwrap_or_else(|| skills_root.clone()),
+                .map_or_else(|| skills_root.clone(), Path::to_path_buf),
         };
         return Ok((repo_root, skills_root));
     }
-    let repo_root = match explicit_repo_root {
-        Some(path) => canonicalize_repo_root(path)?,
-        None => {
-            let cwd = env::current_dir().context("failed to read current directory")?;
-            find_repo_root(&cwd).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "failed to discover repository root from current directory; run from the repo or pass --repo-root"
-                )
-            })?
-        }
+    let repo_root = if let Some(path) = explicit_repo_root {
+        canonicalize_repo_root(path)?
+    } else {
+        let cwd = env::current_dir().context("failed to read current directory")?;
+        find_repo_root(&cwd).ok_or_else(|| {
+            anyhow::anyhow!(
+                "failed to discover repository root from current directory; run from the repo or pass --repo-root"
+            )
+        })?
     };
     Ok((repo_root.clone(), repo_root.join("skills")))
 }
@@ -3493,7 +3494,7 @@ fn severity_sort_key(severity: SkillInventoryDiagnosticSeverity) -> u8 {
 /// Build the public Agent Skills Lab catalog from the tracked skill inventory.
 pub fn agent_skills_catalog(args: AgentSkillsCatalogArgs) -> Result<AgentSkillsCatalogReport> {
     let generated_at = args.generated_at.unwrap_or_else(Utc::now);
-    let inventory = skills_inventory(SkillInventoryArgs {
+    let inventory = skills_inventory(&SkillInventoryArgs {
         repo_root: args.repo_root,
         skills_root: None,
         checked_at: Some(generated_at),
@@ -3632,16 +3633,14 @@ fn agent_skills_catalog_skill(
     let slug = safe_inventory_skill_name(skill.name.as_deref(), &skill.directory).to_string();
     let resources = agent_skills_catalog_resources(&skill.resources);
     AgentSkillsCatalogSkill {
-        name: sanitize_agent_skills_catalog_text(
-            skill.name.clone().unwrap_or_else(|| slug.clone()),
-        ),
+        name: sanitize_agent_skills_catalog_text(skill.name.as_deref().unwrap_or(&slug)),
         slug: slug.clone(),
         description: sanitize_agent_skills_catalog_text(
-            skill.description.clone().unwrap_or_default(),
+            skill.description.as_deref().unwrap_or_default(),
         ),
         license: skill
             .license
-            .clone()
+            .as_deref()
             .map(sanitize_agent_skills_catalog_text),
         path: skill.path.clone(),
         skill_md_path: skill.skill_md.clone(),
@@ -3709,7 +3708,7 @@ fn agent_skills_catalog_skill_install_commands(
     }
 }
 
-fn sanitize_agent_skills_catalog_text(value: String) -> String {
+fn sanitize_agent_skills_catalog_text(value: &str) -> String {
     value.replace('\u{2014}', "--")
 }
 
@@ -3801,7 +3800,7 @@ fn skill_inventory_entry(
     readme: &CatalogInputText,
     docs_index: &CatalogInputText,
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
-) -> Result<SkillInventoryEntry> {
+) -> SkillInventoryEntry {
     let directory = skill_dir
         .file_name()
         .and_then(|name| name.to_str())
@@ -3820,7 +3819,7 @@ fn skill_inventory_entry(
                 skill: Some(directory.clone()),
                 message: message.clone(),
             });
-            return Ok(skill_inventory_unreadable_entry(
+            return skill_inventory_unreadable_entry(
                 repo_root,
                 skill_dir,
                 &directory,
@@ -3828,7 +3827,7 @@ fn skill_inventory_entry(
                 docs_index,
                 diagnostics,
                 message,
-            ));
+            );
         }
         Err(error) => {
             let message = format!(
@@ -3841,7 +3840,7 @@ fn skill_inventory_entry(
                 skill: Some(directory.clone()),
                 message: message.clone(),
             });
-            return Ok(skill_inventory_unreadable_entry(
+            return skill_inventory_unreadable_entry(
                 repo_root,
                 skill_dir,
                 &directory,
@@ -3849,7 +3848,7 @@ fn skill_inventory_entry(
                 docs_index,
                 diagnostics,
                 message,
-            ));
+            );
         }
     };
     let parsed_frontmatter = parse_skill_frontmatter(&skill_text.text);
@@ -3857,8 +3856,7 @@ fn skill_inventory_entry(
     let mut errors = Vec::new();
     if skill_text.truncated {
         errors.push(format!(
-            "SKILL.md exceeds the {} byte inventory read limit",
-            SKILL_INVENTORY_MAX_TEXT_BYTES
+            "SKILL.md exceeds the {SKILL_INVENTORY_MAX_TEXT_BYTES} byte inventory read limit"
         ));
     }
     errors.extend(
@@ -3902,7 +3900,7 @@ fn skill_inventory_entry(
         &companion_skills,
     );
 
-    Ok(SkillInventoryEntry {
+    SkillInventoryEntry {
         directory,
         name,
         description: frontmatter.and_then(|frontmatter| frontmatter.description.clone()),
@@ -3919,7 +3917,7 @@ fn skill_inventory_entry(
         package,
         validation,
         underbuilt_signals,
-    })
+    }
 }
 
 fn skill_inventory_unreadable_entry(
@@ -4228,8 +4226,7 @@ fn skill_package_status(
                         code: "package_git_query_error".to_string(),
                         skill: Some(directory.to_string()),
                         message: format!(
-                            "failed to inspect git tracking status for {}: {error:#}",
-                            package_path
+                            "failed to inspect git tracking status for {package_path}: {error:#}"
                         ),
                     });
                     return SkillPackageStatus {
@@ -4288,7 +4285,7 @@ fn count_regular_files_bounded(
         // entry budget so they never count toward the cap (a symlinked
         // `node_modules`/`target` would otherwise burn a budget slot on the way
         // to being skipped).
-        if file_type.is_symlink() || is_generated_resource_entry(&entry.path(), &file_type) {
+        if file_type.is_symlink() || is_generated_resource_entry(&entry.path(), file_type) {
             continue;
         }
         if *remaining == 0 {
@@ -4331,12 +4328,15 @@ const GENERATED_RESOURCE_DIRS: &[&str] = &[
     ".git",
 ];
 
-fn is_generated_resource_entry(path: &Path, file_type: &fs::FileType) -> bool {
+fn is_generated_resource_entry(path: &Path, file_type: fs::FileType) -> bool {
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
+    let generated_python_file = path.extension().is_some_and(|extension| {
+        extension.eq_ignore_ascii_case("pyc") || extension.eq_ignore_ascii_case("pyo")
+    });
     (file_type.is_dir() && GENERATED_RESOURCE_DIRS.contains(&name))
-        || (file_type.is_file() && (name.ends_with(".pyc") || name.ends_with(".pyo")))
+        || (file_type.is_file() && generated_python_file)
 }
 
 fn safe_inventory_skill_name<'a>(name: Option<&'a str>, directory: &'a str) -> &'a str {
@@ -4421,7 +4421,7 @@ fn parse_skill_frontmatter(content: &str) -> std::result::Result<SkillFrontmatte
             continue;
         }
         let Some((raw_key, raw_value)) = line.split_once(':') else {
-            return Err(format!("invalid frontmatter line '{}'", trimmed));
+            return Err(format!("invalid frontmatter line '{trimmed}'"));
         };
         let key = raw_key.trim().to_string();
         let value = raw_value.trim();
@@ -4720,7 +4720,7 @@ fn clean_frontmatter_scalar(value: &str) -> String {
 fn read_optional_catalog_text(
     path: &Path,
     diagnostics: &mut Vec<SkillInventoryDiagnostic>,
-) -> Result<CatalogInputText> {
+) -> CatalogInputText {
     match read_optional_regular_text(path, SKILL_INVENTORY_MAX_TEXT_BYTES) {
         Ok(Some(text)) => {
             if text.truncated {
@@ -4735,16 +4735,16 @@ fn read_optional_catalog_text(
                     ),
                 });
             }
-            Ok(CatalogInputText {
+            CatalogInputText {
                 text: text.text,
                 reliable_for_missing_signals: !text.truncated,
-            })
+            }
         }
         Ok(None) => match fs::symlink_metadata(path) {
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(CatalogInputText {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => CatalogInputText {
                 text: String::new(),
                 reliable_for_missing_signals: true,
-            }),
+            },
             Err(error) => {
                 diagnostics.push(SkillInventoryDiagnostic {
                     severity: SkillInventoryDiagnosticSeverity::Warning,
@@ -4755,10 +4755,10 @@ fn read_optional_catalog_text(
                         path.display()
                     ),
                 });
-                Ok(CatalogInputText {
+                CatalogInputText {
                     text: String::new(),
                     reliable_for_missing_signals: false,
-                })
+                }
             }
             Ok(metadata) if metadata.file_type().is_symlink() => {
                 diagnostics.push(SkillInventoryDiagnostic {
@@ -4770,10 +4770,10 @@ fn read_optional_catalog_text(
                         path.display()
                     ),
                 });
-                Ok(CatalogInputText {
+                CatalogInputText {
                     text: String::new(),
                     reliable_for_missing_signals: false,
-                })
+                }
             }
             Ok(_) => {
                 diagnostics.push(SkillInventoryDiagnostic {
@@ -4785,10 +4785,10 @@ fn read_optional_catalog_text(
                         path.display()
                     ),
                 });
-                Ok(CatalogInputText {
+                CatalogInputText {
                     text: String::new(),
                     reliable_for_missing_signals: false,
-                })
+                }
             }
         },
         Err(error) => {
@@ -4798,10 +4798,10 @@ fn read_optional_catalog_text(
                 skill: None,
                 message: format!("failed to read catalog input {}: {error:#}", path.display()),
             });
-            Ok(CatalogInputText {
+            CatalogInputText {
                 text: String::new(),
                 reliable_for_missing_signals: false,
-            })
+            }
         }
     }
 }
@@ -4890,11 +4890,11 @@ fn ensure_regular_contract_file(capsule_path: &Path, file: &str) -> Result<()> {
 }
 
 pub fn ensure_regular_contract_files(capsule_path: &Path) -> Result<()> {
-    for file in REQUIRED_FILES
-        .iter()
-        .copied()
-        .filter(|file| file.ends_with(".json") || file.ends_with(".jsonl"))
-    {
+    for file in REQUIRED_FILES.iter().copied().filter(|file| {
+        Path::new(file).extension().is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("json") || extension.eq_ignore_ascii_case("jsonl")
+        })
+    }) {
         ensure_regular_contract_file(capsule_path, file)?;
     }
     Ok(())
@@ -4978,7 +4978,7 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
         updated_at: created_at,
     };
 
-    write_json(path.join("capsule.json"), &capsule)?;
+    write_json(&path.join("capsule.json"), &capsule)?;
 
     let evidence = EvidenceRecord {
         schema: EVIDENCE_SCHEMA.to_string(),
@@ -4994,10 +4994,10 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
         residual_risk: None,
         artifacts: Vec::new(),
     };
-    append_jsonl(path.join("evidence.jsonl"), &evidence)?;
+    append_jsonl(&path.join("evidence.jsonl"), &evidence)?;
 
     write_json(
-        path.join("verification.json"),
+        &path.join("verification.json"),
         &Verification {
             schema: VERIFICATION_SCHEMA.to_string(),
             required: Vec::new(),
@@ -5006,14 +5006,14 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
         },
     )?;
     write_json(
-        path.join("subagents.json"),
+        &path.join("subagents.json"),
         &Subagents {
             schema: SUBAGENTS_SCHEMA.to_string(),
             batches: Vec::new(),
         },
     )?;
     write_json(
-        path.join("pr.json"),
+        &path.join("pr.json"),
         &PrEvidence {
             schema: PR_SCHEMA.to_string(),
             repository: None,
@@ -5040,15 +5040,15 @@ pub fn init_capsule(args: InitArgs) -> Result<InitResult> {
             sources: Vec::new(),
         },
     )?;
-    write_json(path.join("policy.json"), &args.policy_manifest)?;
+    write_json(&path.join("policy.json"), &args.policy_manifest)?;
 
     write_markdown(
-        path.join("plan.md"),
+        &path.join("plan.md"),
         &format!("# Plan\n\n{}\n", capsule.objective),
     )?;
-    write_markdown(path.join("decisions.md"), "# Decisions\n\n")?;
-    write_markdown(path.join("output.md"), "# Output\n\n")?;
-    write_markdown(path.join("retrospective.md"), "# Retrospective\n\n")?;
+    write_markdown(&path.join("decisions.md"), "# Decisions\n\n")?;
+    write_markdown(&path.join("output.md"), "# Output\n\n")?;
+    write_markdown(&path.join("retrospective.md"), "# Retrospective\n\n")?;
 
     let validation = validate_capsule(&path)?;
     if !validation.valid {
@@ -5082,21 +5082,21 @@ const REQUIRED_FILES: &[&str] = &[
 ];
 
 pub fn validate_capsule(path: &Path) -> Result<ValidationResult> {
-    validate_capsule_files(path)
+    Ok(validate_capsule_files(path))
 }
 
-fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
+fn validate_capsule_files(path: &Path) -> ValidationResult {
     let mut errors = Vec::new();
     if !path.is_dir() {
         errors.push(format!(
             "capsule path is not a directory: {}",
             path.display()
         ));
-        return Ok(ValidationResult {
+        return ValidationResult {
             path: path.to_path_buf(),
             valid: false,
             errors,
-        });
+        };
     }
 
     let missing_files = REQUIRED_FILES
@@ -5156,11 +5156,11 @@ fn validate_capsule_files(path: &Path) -> Result<ValidationResult> {
         }
     }
 
-    Ok(ValidationResult {
+    ValidationResult {
         path: path.to_path_buf(),
         valid: errors.is_empty(),
         errors,
-    })
+    }
 }
 
 fn can_validate_contract_file(
@@ -5630,7 +5630,7 @@ pub fn evidence_summary(capsule_path: &Path) -> Result<EvidenceSummary> {
                 summary.count += 1;
                 if record.at >= summary.latest_at {
                     summary.latest_at = record.at;
-                    summary.latest_summary = record.summary.clone();
+                    summary.latest_summary.clone_from(&record.summary);
                 }
             })
             .or_insert_with(|| EvidenceKindSummary {
@@ -5817,9 +5817,10 @@ fn review_author_key(review: &Value, index: usize) -> String {
             return format!("{pointer}:{value}");
         }
     }
-    json_scalar_key(review.get("id"))
-        .map(|id| format!("review:{id}"))
-        .unwrap_or_else(|| format!("review-index:{index}"))
+    json_scalar_key(review.get("id")).map_or_else(
+        || format!("review-index:{index}"),
+        |id| format!("review:{id}"),
+    )
 }
 
 fn review_state_is_decisive(state: &str) -> bool {
@@ -5836,7 +5837,6 @@ fn review_decision_from_reviewer_states<'a>(
             "changes_requested" => return Some("changes_requested".to_string()),
             "approved" => approved = true,
             "commented" => commented = true,
-            "dismissed" | "pending" => {}
             _ => {}
         }
     }
@@ -6018,8 +6018,10 @@ fn review_comment_thread_key(comment: &Value, index: usize) -> String {
     json_scalar_key(comment.get("in_reply_to_id"))
         .or_else(|| json_scalar_key(comment.get("inReplyToId")))
         .or_else(|| json_scalar_key(comment.get("id")))
-        .map(|id| format!("thread:{id}"))
-        .unwrap_or_else(|| format!("comment-index:{index}"))
+        .map_or_else(
+            || format!("comment-index:{index}"),
+            |id| format!("thread:{id}"),
+        )
 }
 
 fn review_comment_is_outdated(comment: &Value) -> bool {
@@ -6121,7 +6123,7 @@ fn merge_provider_pr_evidence(
             existing.review_threads = incoming.review_threads;
         }
         PrRecordSourceKind::GhReviewComments => {
-            merge_review_comment_summary(&mut existing.review_threads, incoming.review_threads);
+            merge_review_comment_summary(&mut existing.review_threads, &incoming.review_threads);
         }
         PrRecordSourceKind::Normalized => unreachable!("handled before merge"),
     }
@@ -6164,7 +6166,10 @@ fn merge_pr_number_field(
     Ok(())
 }
 
-fn merge_review_comment_summary(existing: &mut ReviewThreadSummary, incoming: ReviewThreadSummary) {
+fn merge_review_comment_summary(
+    existing: &mut ReviewThreadSummary,
+    incoming: &ReviewThreadSummary,
+) {
     if existing.authoritative {
         existing.total = existing
             .total
@@ -6438,8 +6443,8 @@ fn check_from_github_value(value: &Value, checked_at: DateTime<Utc>) -> Result<C
     let status = check_lifecycle_status(value)
         .with_context(|| format!("GitHub check {name} is missing status/state/bucket"))?;
     let conclusion = optional_string(value, "conclusion")
-        .or_else(|| optional_string(value, "state").and_then(state_to_conclusion))
-        .or_else(|| optional_string(value, "bucket").and_then(bucket_to_conclusion))
+        .or_else(|| optional_string(value, "state").and_then(|value| state_to_conclusion(&value)))
+        .or_else(|| optional_string(value, "bucket").and_then(|value| bucket_to_conclusion(&value)))
         .map(|conclusion| conclusion.to_ascii_lowercase());
     let url = optional_string(value, "detailsUrl")
         .or_else(|| optional_string(value, "targetUrl"))
@@ -6667,8 +6672,8 @@ fn parse_github_datetime(value: &str) -> Option<DateTime<Utc>> {
     value.parse().ok()
 }
 
-fn bucket_to_conclusion(value: String) -> Option<String> {
-    match value.as_str() {
+fn bucket_to_conclusion(value: &str) -> Option<String> {
+    match value {
         "pass" => Some("success".to_string()),
         "fail" => Some("failure".to_string()),
         "cancel" => Some("cancelled".to_string()),
@@ -6677,7 +6682,7 @@ fn bucket_to_conclusion(value: String) -> Option<String> {
     }
 }
 
-fn state_to_conclusion(value: String) -> Option<String> {
+fn state_to_conclusion(value: &str) -> Option<String> {
     match value.to_ascii_lowercase().as_str() {
         "success" | "failure" | "error" | "cancelled" | "canceled" | "skipped" => {
             Some(value.to_ascii_lowercase())
@@ -6990,9 +6995,9 @@ fn subagent_artifacts(extra: &[String]) -> Vec<String> {
     artifacts
 }
 
-fn append_subagent_evidence(capsule_path: &Path, record: EvidenceRecord) -> Result<()> {
-    validate_subagent_evidence_record(&record)?;
-    append_jsonl(capsule_path.join("evidence.jsonl"), &record)
+fn append_subagent_evidence(capsule_path: &Path, record: &EvidenceRecord) -> Result<()> {
+    validate_subagent_evidence_record(record)?;
+    append_jsonl(&capsule_path.join("evidence.jsonl"), record)
 }
 
 fn validate_subagent_evidence_record(record: &EvidenceRecord) -> Result<()> {
@@ -7006,7 +7011,7 @@ fn validate_subagent_evidence_record(record: &EvidenceRecord) -> Result<()> {
 fn touch_capsule(capsule_path: &Path, updated_at: DateTime<Utc>) -> Result<()> {
     let mut capsule: Capsule = read_json(&capsule_path.join("capsule.json"))?;
     capsule.updated_at = std::cmp::max(capsule.updated_at, updated_at);
-    write_json(capsule_path.join("capsule.json"), &capsule)
+    write_json(&capsule_path.join("capsule.json"), &capsule)
 }
 
 fn validate_capsule_for_subagent_record(capsule_path: &Path) -> Result<()> {
@@ -7505,24 +7510,24 @@ fn validate_non_empty_text(field: &str, value: &str, errors: &mut Vec<String>) {
     }
 }
 
-pub fn write_json<T: Serialize>(path: PathBuf, value: &T) -> Result<()> {
+pub fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     let mut options = OpenOptions::new();
     options.write(true).create(true).truncate(true);
     configure_no_follow(&mut options);
     let mut file = options
-        .open(&path)
+        .open(path)
         .with_context(|| format!("failed to create {}", path.display()))?;
     serde_json::to_writer_pretty(&mut file, value)?;
     writeln!(file)?;
     Ok(())
 }
 
-pub fn append_jsonl<T: Serialize>(path: PathBuf, value: &T) -> Result<()> {
+pub fn append_jsonl<T: Serialize>(path: &Path, value: &T) -> Result<()> {
     let mut options = OpenOptions::new();
     options.create(true).append(true);
     configure_no_follow(&mut options);
     let mut file = options
-        .open(&path)
+        .open(path)
         .with_context(|| format!("failed to open {}", path.display()))?;
     serde_json::to_writer(&mut file, value)?;
     writeln!(file)?;
@@ -7537,8 +7542,8 @@ fn configure_no_follow(options: &mut OpenOptions) {
 #[cfg(not(unix))]
 fn configure_no_follow(_options: &mut OpenOptions) {}
 
-fn write_markdown(path: PathBuf, content: &str) -> Result<()> {
-    fs::write(&path, content).with_context(|| format!("failed to write {}", path.display()))
+fn write_markdown(path: &Path, content: &str) -> Result<()> {
+    fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))
 }
 
 pub fn read_json<T>(path: &Path) -> Result<T>
@@ -7898,7 +7903,7 @@ mod tests {
         assert_eq!(actual, expected);
     }
 
-    fn merge_json_object(base: &mut Value, extra: Value) {
+    fn merge_json_object(base: &mut Value, extra: &Value) {
         let base = base.as_object_mut().expect("base json object");
         for (key, value) in extra.as_object().expect("extra json object") {
             base.insert(key.clone(), value.clone());
@@ -8056,24 +8061,24 @@ mod tests {
         fs::create_dir_all(repo.join("archive/skills/plugin-skill")).expect("archive skill dir");
         fs::write(
             repo.join("plugins/web-motion/skills/plugin-skill/SKILL.md"),
-            r#"---
+            r"---
 name: plugin-skill
 description: Active plugin skill.
 ---
 
 # Plugin Skill
-"#,
+",
         )
         .expect("plugin skill");
         fs::write(
             repo.join("archive/skills/plugin-skill/SKILL.md"),
-            r#"---
+            r"---
 name: plugin-skill
 description: Archived plugin skill.
 ---
 
 # Plugin Skill
-"#,
+",
         )
         .expect("archived skill");
         fs::write(
@@ -8219,13 +8224,13 @@ description: Archived plugin skill.
         fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
         fs::write(
             repo.join("skills/alpha-skill/SKILL.md"),
-            r#"---
+            r"---
 name: alpha-skill
 description: Alpha skill.
 ---
 
 # Alpha
-"#,
+",
         )
         .expect("alpha skill");
         std::process::Command::new("git")
@@ -8320,13 +8325,13 @@ description: Alpha skill.
         fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
         fs::write(
             repo.join("skills/alpha-skill/SKILL.md"),
-            r#"---
+            r"---
 name: alpha-skill
 description: Alpha skill.
 ---
 
 # Alpha
-"#,
+",
         )
         .expect("alpha skill");
         std::process::Command::new("git")
@@ -8375,13 +8380,13 @@ description: Alpha skill.
         fs::create_dir_all(repo.join("skills/beta-skill")).expect("beta skill dir");
         fs::write(
             repo.join("skills/beta-skill/SKILL.md"),
-            r#"---
+            r"---
 name: beta-skill
 description: Beta skill.
 ---
 
 # Beta
-"#,
+",
         )
         .expect("beta skill");
 
@@ -8413,13 +8418,13 @@ description: Beta skill.
         fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
         fs::write(
             repo.join("skills/alpha-skill/SKILL.md"),
-            r#"---
+            r"---
 name: alpha-skill
 description: Alpha skill.
 ---
 
 # Alpha
-"#,
+",
         )
         .expect("alpha skill");
         std::process::Command::new("git")
@@ -8501,13 +8506,13 @@ description: Alpha skill.
         fs::write(repo.join("README.md"), "# Fixture\n").expect("readme");
         fs::write(
             repo.join("skills/alpha-skill/SKILL.md"),
-            r#"---
+            r"---
 name: alpha-skill
 description: Alpha skill.
 ---
 
 # Alpha
-"#,
+",
         )
         .expect("alpha skill");
         std::process::Command::new("git")
@@ -10012,7 +10017,7 @@ description: Alpha skill.
             .path;
         let mut pr: Value = read_json(&capsule.join("pr.json")).expect("pr json");
         pr["schema"] = json!("codex-dev.pr-evidence.v1");
-        write_json(capsule.join("pr.json"), &pr).expect("write drifted pr schema");
+        write_json(&capsule.join("pr.json"), &pr).expect("write drifted pr schema");
 
         let validation = validate_capsule(&capsule).expect("validate");
 
@@ -10036,7 +10041,7 @@ description: Alpha skill.
         gate.remove("working_directory");
         gate.remove("required_tools");
         gate.remove("failure_interpretation");
-        write_json(capsule.join("policy.json"), &policy).expect("write legacy policy");
+        write_json(&capsule.join("policy.json"), &policy).expect("write legacy policy");
 
         let validation = validate_capsule(&capsule).expect("validate");
 
@@ -10227,7 +10232,7 @@ description: Alpha skill.
         assert!(outcome.agent.human_verified);
         assert_eq!(outcome.batch.status, "completed");
 
-        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        let synthesis = record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule: capsule.clone(),
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Completed,
@@ -10310,7 +10315,7 @@ description: Alpha skill.
             })
             .expect("record outcome");
         }
-        record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule: capsule.clone(),
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Completed,
@@ -10687,7 +10692,7 @@ description: Alpha skill.
             Some("2026-05-09T05:20:00Z".parse().unwrap())
         );
 
-        record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule: capsule.clone(),
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Completed,
@@ -10699,7 +10704,7 @@ description: Alpha skill.
         })
         .expect("record synthesis");
 
-        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        let synthesis = record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule,
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Completed,
@@ -10828,7 +10833,7 @@ description: Alpha skill.
                 "registry_issues": [],
                 "duplicate_roles_ignored": {}
             });
-            merge_json_object(&mut plan, extra);
+            merge_json_object(&mut plan, &extra);
             let source = temp.path().join(file_name);
             fs::write(
                 &source,
@@ -10873,7 +10878,7 @@ description: Alpha skill.
         })
         .expect("record plan");
 
-        let error = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        let error = record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule,
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Completed,
@@ -10978,7 +10983,7 @@ description: Alpha skill.
         assert_eq!(outcome.batch.status, "blocked");
         assert!(validate_capsule(&capsule).expect("validate").valid);
 
-        let synthesis = record_subagent_synthesis(RecordSubagentSynthesisArgs {
+        let synthesis = record_subagent_synthesis(&RecordSubagentSynthesisArgs {
             capsule,
             batch_id: "review".to_string(),
             status: SubagentSynthesisStatus::Partial,
@@ -11092,7 +11097,7 @@ description: Alpha skill.
         let link = temp.path().join("link.json");
         std::os::unix::fs::symlink(&target, &link).expect("symlink");
 
-        let error = write_json(link, &json!({"changed": true})).expect_err("symlink refused");
+        let error = write_json(&link, &json!({"changed": true})).expect_err("symlink refused");
 
         let message = format!("{error:#}");
         assert!(
@@ -11278,7 +11283,7 @@ description: Alpha skill.
                 summary: " ".to_string(),
                 command: None,
                 exit_code: Some(1),
-                source_ids: vec!["".to_string()],
+                source_ids: vec![String::new()],
                 actor: Some("codex".to_string()),
                 tool: Some("codex-dev".to_string()),
                 confidence: Some(90),

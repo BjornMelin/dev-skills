@@ -25,7 +25,7 @@ pub fn run_release_sync(
 ) -> Result<ReleaseSyncReport> {
     paths.ensure()?;
 
-    let staged_root = temp_stage_root()?;
+    let staged_root = temp_stage_root();
     copy_dir_all(&context.skill_root, &staged_root)?;
     let staged_context = SkillContext {
         skill_root: staged_root.clone(),
@@ -110,12 +110,12 @@ fn commit_release_sync_updates(
     Ok(())
 }
 
-fn temp_stage_root() -> Result<PathBuf> {
+fn temp_stage_root() -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    Ok(std::env::temp_dir().join(format!("bun-platform-release-sync-{nanos}")))
+    std::env::temp_dir().join(format!("bun-platform-release-sync-{nanos}"))
 }
 
 fn copy_dir_all(source: &Path, target: &Path) -> Result<()> {
@@ -309,10 +309,10 @@ fn build_rules_index_content(context: &SkillContext) -> Result<String> {
     let mut remaining = names.clone();
     let mut out = vec![
         "# Rules Index".to_string(),
-        "".to_string(),
+        String::new(),
         "Open `SKILL.md` first to route by priority. Prefer opening specific rules over references."
             .to_string(),
-        "".to_string(),
+        String::new(),
     ];
 
     for (title, prefix) in groups {
@@ -348,36 +348,36 @@ fn build_rules_index_content(context: &SkillContext) -> Result<String> {
 fn build_references_index_content() -> String {
     let lines = vec![
         "# References Index".to_string(),
-        "".to_string(),
+        String::new(),
         "Prefer rules for decisions, references for exact commands and API detail.".to_string(),
-        "".to_string(),
+        String::new(),
         "Verified version pin:".to_string(),
-        "".to_string(),
+        String::new(),
         format!("- Bun CLI `{VERIFIED_BUN_VERSION}`"),
         format!("- Bun release `v{VERIFIED_BUN_VERSION}`"),
-        "".to_string(),
+        String::new(),
         "Refresh vendor-backed refs:".to_string(),
-        "".to_string(),
+        String::new(),
         "```bash".to_string(),
         "codex-dev --json bun references status".to_string(),
         "codex-dev --json bun references plan".to_string(),
         "codex-dev --json bun references sync".to_string(),
         "```".to_string(),
-        "".to_string(),
+        String::new(),
         "## Bun".to_string(),
-        "".to_string(),
+        String::new(),
         format!("- Bun release notes snapshot:\n  - `{REF_BUN_RELEASE_NOTES}`"),
         format!("- Bun capability map:\n  - `{REF_BUN_CAPABILITIES}`"),
         format!("- Bun CLI reference:\n  - `{REF_BUN_CLI}`"),
         format!("- Bun runtime APIs reference:\n  - `{REF_BUN_BUILTINS}`"),
         format!("- Package-manager fallback lanes:\n  - `{REF_BUN_PM_FALLBACKS}`"),
-        "".to_string(),
+        String::new(),
         "## Vercel".to_string(),
-        "".to_string(),
+        String::new(),
         format!("- Bun runtime docs:\n  - `{REF_VERCEL_BUN_RUNTIME}`"),
-        "".to_string(),
+        String::new(),
         "## Fast Lookup".to_string(),
-        "".to_string(),
+        String::new(),
         "```bash".to_string(),
         format!(
             "rg -n \"Bun.WebView|markdown\\\\.ansi|Bun\\\\.cron|availableParallelism|stripANSI\" ~/.agents/skills/bun-dev/references/{REF_BUN_CAPABILITIES}"
@@ -438,8 +438,7 @@ fn fetch_vercel_runtime_snapshot() -> Result<String> {
                 .ok()
                 .and_then(|response| response.error_for_status().ok())
                 .and_then(|response| response.text().ok())
-                .map(|body| tidy_markdown(&body))
-                .unwrap_or_else(|| html_to_markdown(&html));
+                .map_or_else(|| html_to_markdown(&html), |body| tidy_markdown(&body));
             Ok(markdown)
         }
         Err(_) => Ok(html_to_markdown(&html)),
@@ -447,7 +446,15 @@ fn fetch_vercel_runtime_snapshot() -> Result<String> {
 }
 
 fn resolve_markdown_url(client: &reqwest::blocking::Client, url: &str) -> Result<String> {
-    if url.ends_with(".md") {
+    if reqwest::Url::parse(url)?
+        .path_segments()
+        .and_then(Iterator::last)
+        .is_some_and(|segment| {
+            Path::new(segment)
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+        })
+    {
         return Ok(url.to_string());
     }
     let html = client
@@ -591,9 +598,7 @@ fn read_or_empty(path: PathBuf) -> String {
 }
 
 fn regex_match(content: &str, pattern: &str) -> bool {
-    Regex::new(pattern)
-        .map(|re| re.is_match(content))
-        .unwrap_or(false)
+    Regex::new(pattern).is_ok_and(|re| re.is_match(content))
 }
 
 fn iso_now() -> Result<String> {

@@ -28,8 +28,10 @@ target repo's installed package versions before editing.
 ## Decision Boundaries
 
 - Do not trigger for raw WebGPU without TypeGPU imports.
-- Use web-three-r3f for Three/R3F scenes.
-- Use native-three-r3f or native-skia for React Native GPU surfaces.
+- Use [`web-three-r3f`](../web-three-r3f/SKILL.md) for Three/R3F scenes.
+- For React Native GPU surfaces, general Motion/CSS API work, or cross-stack
+  motion audits, prefer `expo-motion`, `motion`, or `design-motion-audit` when
+  installed; otherwise proceed with the guidance here.
 
 ## Workflow
 

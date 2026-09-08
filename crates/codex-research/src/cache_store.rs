@@ -1,4 +1,8 @@
-use crate::*;
+use crate::{
+    BTreeSet, Connection, Digest, Path, ResearchPaths, Result, Route, RouteMemoryHit, Serialize,
+    Sha256, Utc, Value, fs, json, params, redact_metadata_urls, redact_url_query_secrets,
+    route_name, short_hash, url_domain,
+};
 
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct SourceCacheRecord {
@@ -164,7 +168,7 @@ pub(crate) fn record_source_cache(
             source.title,
             source.freshness_status,
             source.privacy_classification,
-            if source.raw_body_stored { 1_i64 } else { 0_i64 }
+            i64::from(source.raw_body_stored)
         ],
     )?;
     Ok(id)
@@ -290,8 +294,8 @@ pub(crate) fn record_route_memory(
         params![
             domain,
             route,
-            if success { 1_i64 } else { 0_i64 },
-            if success { 0_i64 } else { 1_i64 },
+            i64::from(success),
+            i64::from(!success),
             Utc::now().to_rfc3339(),
             reason,
             status,

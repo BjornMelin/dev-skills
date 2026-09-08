@@ -3,9 +3,10 @@
 Use this before loading the large scraped docs when the task needs current API
 shape or implementation heuristics.
 
-## Package Snapshot
+## Pinned Motion 12 compatibility baseline (checked 2026-08)
 
-- Current pinned source/registry snapshot: `motion@12.40.0`.
+- Intentional compatibility pin: `motion@12.40.0`.
+- The registry latest is `motion@13.x`; this guide intentionally targets the Motion 12.x pin.
 - Official installation docs say Motion is compatible with React `18.2` and
   higher. The package peer range is `react` / `react-dom`
   `^18.0.0 || ^19.0.0`; report this distinction for version-sensitive work.

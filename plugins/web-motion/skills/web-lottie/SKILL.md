@@ -27,9 +27,13 @@ target repo's installed package versions before editing.
 
 ## Decision Boundaries
 
-- Use native-lottie for React Native.
+- For React Native, prefer `expo-motion` when installed; otherwise proceed
+  with the guidance here.
 - Use Rive for interactive state machines.
 - Use CSS/WAAPI for simple UI motion that does not need designer-authored assets.
+- For general Motion/CSS API work or cross-stack audits, prefer `motion` or
+  `design-motion-audit` when installed; otherwise proceed with the guidance
+  here. Web R3F stays in-bundle via [`web-three-r3f`](../web-three-r3f/SKILL.md).
 
 ## Workflow
 

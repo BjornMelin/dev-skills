@@ -153,26 +153,62 @@ Reduced motion: keep the header static (skip the interpolation) — content stil
 
 ## 6. FlatList item enter/exit + reorder
 
-Layout animations handle mount/unmount/reorder declaratively. Honor reduced motion via `.reduceMotion`.
+Layout animations handle mount/unmount/reorder declaratively. Use this only for small lists or
+after measuring representative devices. `performance.layout-animation-in-list` reports per-cell
+entering, exiting, or layout animation as a low-severity performance lead. Large virtualized
+lists and reduced-motion users need static cells.
 
 ```tsx
-import Animated, { FadeInDown, FadeOut, LinearTransition, ReduceMotion } from "react-native-reanimated";
+import { FlatList, View } from "react-native";
+import Animated, {
+  FadeInDown,
+  FadeOut,
+  LinearTransition,
+  ReduceMotion,
+  useReducedMotion,
+} from "react-native-reanimated";
 
-<Animated.FlatList
-  data={items}
-  itemLayoutAnimation={LinearTransition}            // animates reorder/add/remove
-  keyExtractor={(it) => it.id}
-  renderItem={({ item }) => (
-    <Animated.View
-      entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)}
-      exiting={FadeOut.reduceMotion(ReduceMotion.System)}>
-      {/* row */}
-    </Animated.View>
-  )}
-/>;
+type Item = { id: string };
+
+function ItemList({
+  items,
+  measuredSmallList,
+}: {
+  items: Item[];
+  measuredSmallList: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  // Set only after representative-device measurement, not from a guessed item count.
+  const shouldAnimateCells = measuredSmallList && !reduceMotion;
+
+  return shouldAnimateCells ? (
+    <Animated.FlatList
+      data={items}
+      itemLayoutAnimation={LinearTransition} // animates reorder/add/remove
+      keyExtractor={(it) => it.id}
+      renderItem={() => (
+        <Animated.View
+          entering={FadeInDown.duration(220).reduceMotion(ReduceMotion.System)}
+          exiting={FadeOut.reduceMotion(ReduceMotion.System)}
+        >
+          {/* row */}
+        </Animated.View>
+      )}
+    />
+  ) : (
+    <FlatList
+      data={items}
+      keyExtractor={(it) => it.id}
+      renderItem={() => (
+        <View>{/* static row */}</View>
+      )}
+    />
+  );
+}
 ```
 
-Stable `keyExtractor` is required for correct enter/exit/reorder. Layout animations need the New Architecture.
+Stable `keyExtractor` is required for correct enter/exit/reorder. Layout animations need the New
+Architecture. Treat the audit finding as a measurement prompt, not a blanket prohibition.
 
 ---
 

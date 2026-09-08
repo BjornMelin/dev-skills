@@ -72,7 +72,8 @@ Options:
   `markdown` or `json`.
 - `--categories <CSV>`: comma-separated subset of rule categories to run
   (`reanimated-core`, `worklets-threading`, `gestures`, `layout`,
-  `accessibility`, `lifecycle`, `config`). Default runs every category.
+  `accessibility`, `lifecycle`, `performance`, `config`). Default runs every
+  category.
 - `--output <PATH>`: write the report to this file instead of stdout.
 - `--max-files <N>`: maximum number of files to analyze before truncating.
   Default `5000`. When the cap is hit, the report sets `truncated: true`.
@@ -112,6 +113,16 @@ followed by an `id | category | severity` table. JSON output is an object with
 `tool`, `version`, and `rules`; each rule carries `id`, `category`, `severity`,
 `confidence`, and `summary`.
 
+New or strengthened rules (existing stable ids are retained where the catalog
+already covered the same invariant):
+
+| id | severity | summary |
+| --- | --- | --- |
+| `worklets-threading.value-access-on-js` | high | Flags `.value` access on a `useSharedValue` binding directly during component render. |
+| `accessibility.missing-reduced-motion` | medium | Flags animation files without `ReducedMotionConfig`, `useReducedMotion`, `AccessibilityInfo`, or per-animation `reduceMotion`. |
+| `worklets-threading.bridge-in-hot-path` | medium | Flags `runOnJS`/`scheduleOnRN` inside `useAnimatedReaction` and gesture `onUpdate`/`onChange` callbacks. |
+| `performance.layout-animation-in-list` | low | Flags per-cell `entering`, `exiting`, or `layout` animation in FlatList/SectionList render paths. |
+
 ## completions
 
 Generate a shell completion script from the canonical Clap command definition:
@@ -147,6 +158,8 @@ Rules are grouped into stable categories so `--categories` can scope a scan:
   never referencing a reduced-motion API.
 - `lifecycle`: animation lifecycle issues such as animating a shared value
   without ever calling `cancelAnimation` for teardown.
+- `performance`: virtualized-list motion hazards such as applying layout
+  animation independently to every rendered cell.
 - `config`: project configuration issues — a missing or misordered
   `react-native-worklets/plugin` in `babel.config.js`, the deprecated
   `react-native-reanimated/plugin`, and an explicit

@@ -1,0 +1,1 @@
+> **IMPORTANT:** Always run commands using the project's package runner: `bunx --bun shadcn@latest` (bun), `pnpm dlx shadcn@latest` (pnpm), `npx shadcn@latest` (npm), or `yarn dlx shadcn@latest` (yarn). Check `packageManager` from project context to choose the right one. Examples below use `bunx --bun shadcn@latest` but substitute the correct runner for the project.
