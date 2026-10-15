@@ -1,47 +1,48 @@
 ---
 name: codex-utils
-description: Use built-in Codex coordination, retrieval, and utility tools effectively during live sessions. Trigger when work benefits from maintaining a step plan, asking the user 1-3 short multiple-choice questions before risky edits, inspecting a local image from disk, searching or browsing the web for current or source-backed information, discovering additional MCP tools or plugins, or running independent developer-tool calls in parallel.
+description: Discover available tools, coordinate safe parallel reads, clarify decisions, inspect images, and verify current sources.
 ---
 
 # Codex Utils
 
-Use these built-ins when they materially improve accuracy, safety, or speed.
-Prefer the lightest tool that resolves the need.
+Use the lightest available tool that resolves the need. The current session's
+tool catalog, schemas, and restrictions are authoritative; never assume a tool
+name from another host or session exists.
 
-## Coordination Utilities
+## Coordination
 
-- Use `functions.update_plan` for non-trivial multi-step work. Keep one step
-  `in_progress` and mark completed steps as you advance.
-- Use `functions.request_user_input` before risky edits or when a decision
-  cannot be inferred safely. Ask 1-3 short multiple-choice questions, put the
-  recommended option first, and keep options mutually exclusive.
-- Use `functions.view_image` to inspect a local image from disk when visual
-  details matter. Pass an absolute path. Use `detail: original` only when
-  high-fidelity inspection is necessary.
+- Use a planning tool when available and useful for non-trivial work; otherwise
+  keep a short checklist. Do not create a persistent goal unless requested.
+- Use the available user-input tool for optional clarification, following its
+  current mode restrictions. Ask directly when explicit approval is required;
+  a recommended or preselected option is not approval.
+- Inspect local images with the available image-viewing tool before editing or
+  judging them. Use original detail only when necessary.
 
-## Web + Internet
+## Discovery and execution
 
-- Use `web.search_query` for current facts, source-backed answers, official
-  documentation, or external verification. Search narrowly and prefer primary
-  sources.
-- Use `web.open` to read a result directly or jump to relevant lines.
-- Use `web.click` to follow numbered links inside an opened page.
-- Use `web.find` to locate exact text in a long page before opening more
-  context.
-- Use `web.screenshot` only for PDFs when a page image is needed.
-- Use `web.image_query` when reference imagery or visual comparison helps.
-- Use `web.time` when you need the current time for a specific UTC offset.
+- Search the exposed tool catalog before declaring a capability missing.
+  In Code Mode, filter `ALL_TOOLS` by name/description and call the matching
+  `tools` method. Use tool search only when the session exposes it.
+- Match the actual schema before calling. Never print credentials, raw auth
+  configuration, or secret-bearing subprocess arguments while inspecting tools.
+- Batch independent read-only calls with `Promise.allSettled` when Code Mode is
+  available; inspect every result. Keep dependent calls, mutations, approvals,
+  waits, and tools marked non-parallel sequential.
+- Request plugin installation only for a plugin or connector explicitly requested
+  by the user, after the available discovery/install tools confirm an exact match.
+  Installed, enabled, exposed, and healthy are different states; verify the one
+  the task needs.
 
-## Tooling + MCP Discovery
+## Sources
 
-- Use `tool_search.tool_search_tool` to discover extra MCP tools or plugins
-  before assuming a capability is unavailable.
-- Use `multi_tool_use.parallel` only for independent developer-tool calls that
-  are safe to run concurrently, such as parallel reads or separate inspections.
-  Do not parallelize dependent steps or tools marked as non-parallel.
+Use the available browsing tool's search/open/find operations for current facts
+and source verification. Prefer primary sources; inspect the actual page before
+relying on search snippets. For OpenAI product questions, inspect local code/help
+first and use official OpenAI documentation as the fallback. Keep private source
+and credentials out of external research services.
 
 ## Defaults
 
-- Verify unstable or high-stakes claims with tools instead of memory.
-- Keep tool use proportional to the task; do not browse, ask, or plan when the
-  answer is already clear and stable.
+Verify unstable or high-stakes claims with tools instead of memory. Keep tool use
+proportional: do not browse, ask, plan, install, or delegate when unnecessary.

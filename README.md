@@ -310,7 +310,7 @@ for local development and validation commands.
 | `codex-delegate` | Delegate implementation, investigation, or bulk work to the gpt-5.6 codex family via direct pinned `codex exec` (Model Routing v4 lanes: gpt-5.6-luna max implementation default, delegation gate, no Claude shims). | [skills/codex-delegate/SKILL.md](skills/codex-delegate/SKILL.md) |
 | `codex-review` | Independent gpt-5.6-sol code review via the Codex CLI: normal diff review or steerable adversarial review with structured JSON findings. | [skills/codex-review/SKILL.md](skills/codex-review/SKILL.md) |
 | `codex-sdk` | Codex SDK/CLI: JSONL threads, MCP, multi-agent orchestration, SQLite memory, sandbox patterns. | [skills/codex-sdk/SKILL.md](skills/codex-sdk/SKILL.md) |
-| `codex-utils` | Codex session utilities: plans, short MCQs before risky edits, images, web/MCP discovery, parallel tool use. | [skills/codex-utils/SKILL.md](skills/codex-utils/SKILL.md) |
+| `codex-utils` | Session-aware tool discovery, safe parallel reads, clarification, image inspection, and source verification. | [skills/codex-utils/SKILL.md](skills/codex-utils/SKILL.md) |
 | `commit` | Stage and commit in semantic, reviewable groups. | [skills/commit/SKILL.md](skills/commit/SKILL.md) |
 | `context7-research` | Library/API documentation research via Context7 MCP (version-specific, migrations, primary sources). | [skills/context7-research/SKILL.md](skills/context7-research/SKILL.md) |
 | `convex-audit` | Audit Convex backends: schema, security, runtime edges, migrations, function-surface risk. | [skills/convex-audit/SKILL.md](skills/convex-audit/SKILL.md) |

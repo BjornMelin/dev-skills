@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """Model Routing drift gate (v4, calibrated 2026-07-24, CursorBench 3.2).
 
-The routing doctrine lives in ~/.claude/MODELS.md but is mirrored across the
+The routing doctrine lived in ~/.claude/MODELS.md but is mirrored across the
 estate: this repo's routing skills, the installed skill copies, and the live
 doctrine anchors. Mirrors drift silently when the doctrine recalibrates; this
 gate makes drift loud.
+
+2026-09-25 (v5): the live doctrine files (~/.claude/MODELS.md and
+~/.codex/MODELS.md) are archived and the routing skills repinned to the gpt-6
+family. Check 3 below skips absent doctrine files, so archival is converged
+by construction; checks 1-2 (no retired patterns, installed copies match repo)
+remain enforced.
 
 Scope (founder ruling 2026-07-24): CLAUDE-INITIATED lanes only. The codex
 multi_agent_v2 custom-agent TOMLs (subagents/codex/) are governed by the

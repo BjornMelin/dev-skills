@@ -1,8 +1,8 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-08-05T02:04:56.917791793Z",
+  "generatedAt": "2026-10-15T18:54:15.932211196Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "9c8fa4fd49d32942be1b6e9a4fbe7f6020fa817b",
+  "sourceCommit": "0294f84334336b539ff139f77e352d972ef5479a",
   "sourceRef": "main",
   "skillsCount": 82,
   "totalSkillDirectories": 82,
@@ -794,7 +794,7 @@
     {
       "name": "codex-delegate",
       "slug": "codex-delegate",
-      "description": "Delegate implementation, investigation, or bulk work to gpt-5.6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task MODELS.md routes to codex.",
+      "description": "Delegate implementation, investigation, or bulk work to gpt-6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task the routing table below sends to codex.",
       "path": "skills/codex-delegate",
       "skillMdPath": "skills/codex-delegate/SKILL.md",
       "sourceUrls": {
@@ -841,7 +841,7 @@
     {
       "name": "codex-review",
       "slug": "codex-review",
-      "description": "Independent gpt-5.6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.",
+      "description": "Independent gpt-6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.",
       "path": "skills/codex-review",
       "skillMdPath": "skills/codex-review/SKILL.md",
       "sourceUrls": {
@@ -940,7 +940,7 @@
     {
       "name": "codex-utils",
       "slug": "codex-utils",
-      "description": "Use built-in Codex coordination, retrieval, and utility tools effectively during live sessions. Trigger when work benefits from maintaining a step plan, asking the user 1-3 short multiple-choice questions before risky edits, inspecting a local image from disk, searching or browsing the web for current or source-backed information, discovering additional MCP tools or plugins, or running independent developer-tool calls in parallel.",
+      "description": "Discover available tools, coordinate safe parallel reads, clarify decisions, inspect images, and verify current sources.",
       "path": "skills/codex-utils",
       "skillMdPath": "skills/codex-utils/SKILL.md",
       "sourceUrls": {
@@ -954,14 +954,15 @@
       },
       "readinessLabels": [
         "Valid",
+        "Documented",
         "Emerging"
       ],
       "qualitySignals": [
         "readme_catalogued",
+        "docs_indexed",
         "has_agents"
       ],
       "improvementSignals": [
-        "missing_docs_index_exposure",
         "missing_dist_package",
         "missing_references",
         "missing_scripts"
@@ -976,7 +977,7 @@
       },
       "exposure": {
         "readme_catalog": true,
-        "docs_index": false
+        "docs_index": true
       },
       "package": {
         "path": "skills/dist/codex-utils.skill",

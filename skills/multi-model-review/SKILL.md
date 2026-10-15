@@ -7,7 +7,7 @@ description: Pre-PR multi-model review, parallel opus and codex exec adversarial
 
 Two independent review lanes run in parallel, then every merged finding is
 adversarially verified against the actual code. Replaces the retired
-`multi-model-review` workflow: per MODELS.md there is **no Claude shim** - the
+`multi-model-review` workflow: there is **no Claude shim** - the
 main loop (Root) runs the codex lane itself via direct background Bash.
 
 Inputs: `repo` (absolute path, required), `base` (default `main`), `focus`
@@ -50,17 +50,17 @@ skill is invoked) - substitute the real absolute path in every prompt/command.
 2. Run ONE bare background Bash command (600000ms timeout):
 
 ```bash
-codex exec -m gpt-5.6-terra -c model_reasoning_effort="max" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
+codex exec -m gpt-6-astra -c model_reasoning_effort="max" -s read-only --cd <repo> --output-schema <skill-dir>/references/findings-schema.json --output-last-message <scratchpad>/mmr-codex-findings.json - < <scratchpad>/mmr-prompt.md
 ```
 
-Model routing per MODELS.md: this lane exists to be an *independent* second
-opinion, so it pins `gpt-5.6-terra` at `"max"` - the maximum-intelligence tier,
-reserved for exactly this adversarial-check shape. Use `gpt-5.6-luna` at `"max"`
-instead when Terra is unavailable or the diff is routine; never a Sol worker
-tier, which is retired.
+This lane exists to be an *independent* second
+opinion, so it pins `gpt-6-astra` at `"max"` - the maximum-intelligence tier,
+reserved for exactly this adversarial-check shape. Use `gpt-6-sol` at `"max"`
+instead when `gpt-6-astra` is unavailable or the diff is routine; never a lite
+worker tier, which is retired.
 
 1. On completion, read `mmr-codex-findings.json`; set reviewer to
-   "gpt-5.6-terra" if absent.
+   "gpt-6-astra" if absent.
 
 ## Phase 2 - lane failure semantics (never skip)
 
