@@ -1,16 +1,16 @@
 ---
 name: codex-delegate
-description: Delegate implementation, investigation, or bulk work to gpt-5.6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task MODELS.md routes to codex.
+description: Delegate implementation, investigation, or bulk work to gpt-6 codex via pinned codex exec. Use for clear-spec builds, migrations, debugging, or any task the routing table below sends to codex.
 ---
 
 # Codex Delegate
 
-Hand a task to the gpt-5.6 family through the Codex CLI. This is the delegation
-path per MODELS.md: the main loop (Root) invokes Codex **directly through Bash  - 
+Hand a task to the gpt-6 family through the Codex CLI. This is the delegation
+path: the main loop (Root) invokes Codex **directly through Bash -
 no Claude shim, and never a Claude worker whose only job is to launch, wait for,
 or relay a Codex call**.
 
-## Delegation gate (from MODELS.md - check before delegating at all)
+## Delegation gate (check before delegating at all)
 
 Delegate only when at least one shape applies: `independence` (fresh-eyes or
 adversarial value), `context` (repo/research mass stays out of the root
@@ -25,29 +25,12 @@ decisions to codex.
 
 | lane | pin | use |
 |---|---|---|
-| **default** | **`gpt-5.6-luna` + `"max"`** | almost everything: implementation, debugging, code review, retrieval, repo mapping, inventories, dependency tracing, bounded analysis and synthesis |
-| fast | `gpt-5.6-luna` + `"high"` | latency-sensitive work: exploration, file and symbol location, shallow inventories, a quick second read - anywhere a fast good answer beats a slow better one |
-| maximum intelligence | `gpt-5.6-terra` + `"max"` | one independent adversarial check or alternate solution, and the rare task Luna max cannot carry |
-| last resort | `gpt-5.6-sol` + `"max"` | rare and root-gated; burns quota disproportionately |
+| **default** | **`gpt-6-sol` + `"max"`** | almost everything: implementation, debugging, code review, retrieval, repo mapping, inventories, dependency tracing, bounded analysis and synthesis |
+| fast | `gpt-6-luna` + `"high"` | latency-sensitive work: exploration, file and symbol location, shallow inventories, a quick second read - anywhere a fast good answer beats a slow better one |
+| maximum intelligence | `gpt-6-astra` + `"max"` | one independent adversarial check or alternate solution, and the rare task the default lane cannot carry |
+| last resort | `gpt-6-astra` + `"max"` | rare and root-gated |
 
-Rationale, per the MODELS.md recalibration dated 2026-08-01: Luna is
-substantially cheaper than when the old Sol ladder was written and its weekly
-limits are effectively unlimited, so it is the default at max effort; Terra
-earns its premium over Luna max only when the last few points of capability are
-load-bearing. The Sol medium/high worker tiers are retired.
-
-These are commercial terms, not stable facts — they were true at that
-recalibration and will drift. Re-check them against current provider pricing
-before treating cost as the reason for a routing decision, and prefer the
-measured latency figures below, which do not depend on pricing.
-
-**Quota is no longer the binding constraint on Luna; wall-clock is.** Measured on
-one read-only analysis lane over a single component and its imports:
-
-| effort | wall clock | tokens | findings |
-|---|---|---|---|
-| `high` | ~4 min | ~75k | 2 of 6 |
-| `max` | ~14 min | ~153k | 6 of 6 |
+Re-check current provider pricing before treating cost as a routing reason; never inherit model/effort silently, always pin -m and effort explicitly per call.
 
 The gap is **traversal depth, not polish**: the fast lane never entered
 `node_modules`, so it missed everything that depended on what an installed
@@ -62,17 +45,17 @@ reasoning tier establishes that the scope was covered or the claims verified -
 only explicit scope, coverage, and verification evidence does that. Do not
 report a `max` lane as complete merely because it ran at `max`.
 
-Escalation ladder: **Luna high → Luna max → Terra max → Root finishes the hard
-part inline** (or an Opus high worker when a delegation shape holds). Sol max
+Escalation ladder: **gpt-6-luna high → gpt-6-sol max → gpt-6-astra max → Root finishes the hard
+part inline** (or an Opus high worker when a delegation shape holds). Astra max
 requires one of: critical blast radius with no cheap deterministic oracle;
-unresolved disagreement after Luna max and Terra max; two failed strong
-attempts. Only one active Sol max call.
+unresolved disagreement after gpt-6-sol max and gpt-6-astra max; two failed strong
+attempts. Only one active Astra max call.
 
-Bans: **no Sol xhigh or ultra; no Terra effort other than max; never
+Bans: **no gpt-6-astra xhigh or ultra; no gpt-6-astra effort other than max; never
 mini/spark-class models.**
 
 Consequential or cross-cutting implementation still routes to Opus high workers
-or Root inline per MODELS.md; Codex is the independent second opinion there, or
+or Root inline; Codex is the independent second opinion there, or
 the primary when Claude quota is the binding constraint.
 
 ## Composing the prompt
@@ -87,14 +70,14 @@ returns, pass `--output-schema <schema.json>`.
 
 ```bash
 # Investigation / retrieval (read-only, default lane)
-codex exec -C "<repo>" -m gpt-5.6-luna -c model_reasoning_effort="max" --sandbox read-only --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
+codex exec -C "<repo>" -m gpt-6-sol -c model_reasoning_effort="max" --sandbox read-only --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
 
 # Fast exploration (read-only) - trade depth for latency
-codex exec -C "<repo>" -m gpt-5.6-luna -c model_reasoning_effort="high" --sandbox read-only --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
+codex exec -C "<repo>" -m gpt-6-luna -c model_reasoning_effort="high" --sandbox read-only --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
 
 # Implementation (write-capable) - ALWAYS pass the sandbox
 # explicitly; never inherit the config default (danger-full-access)
-codex exec -C "<repo>" -m gpt-5.6-luna -c model_reasoning_effort="max" --sandbox workspace-write --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
+codex exec -C "<repo>" -m gpt-6-sol -c model_reasoning_effort="max" --sandbox workspace-write --output-last-message "<scratchpad>/codex-out-<ts>.md" "<self-contained prompt>"
 ```
 
 Rules:

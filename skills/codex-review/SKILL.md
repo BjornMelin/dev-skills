@@ -1,19 +1,19 @@
 ---
 name: codex-review
-description: Independent gpt-5.6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.
+description: Independent gpt-6 diff review via the Codex CLI, normal or steerable adversarial with JSON findings. Use before shipping nontrivial changes.
 ---
 
 # Codex Review
 
-Independent gpt-5.6 review of local changes through the Codex CLI. Read-only - never
+Independent gpt-6 review of local changes through the Codex CLI. Read-only - never
 lets Codex modify the repo. Works identically from the main loop, subagents, and
 workflow stages (no plugin runtime required).
 
-Reviews run on `gpt-5.6-luna` at `"max"` (MODELS.md: Luna max is the Codex
-default for almost everything, review included). Escalate to `gpt-5.6-terra` at
+Reviews run on `gpt-6-sol` at `"max"` (the Codex
+default for almost everything, review included). Escalate to `gpt-6-astra` at
 `"max"` when the review is the load-bearing check - a one-way door, a
 security or money path, or an adversarial pass whose verdict you will act on
-directly. Drop to `gpt-5.6-luna` at `"high"` only for a fast look at a small
+directly. Drop to `gpt-6-luna` at `"high"` only for a fast look at a small
 diff where latency matters more than depth.
 
 Pin BOTH the model and the effort on every command below rather than inheriting
@@ -31,9 +31,9 @@ subcommand. Paths written as `<skill-dir>` mean this skill's base directory
 ## Normal review
 
 ```bash
-codex -m gpt-5.6-luna -c model_reasoning_effort="max" review --uncommitted   # staged + unstaged + untracked
-codex -m gpt-5.6-luna -c model_reasoning_effort="max" review --base main     # branch vs base
-codex -m gpt-5.6-luna -c model_reasoning_effort="max" review --commit <sha>  # a single commit
+codex -m gpt-6-sol -c model_reasoning_effort="max" review --uncommitted   # staged + unstaged + untracked
+codex -m gpt-6-sol -c model_reasoning_effort="max" review --base main     # branch vs base
+codex -m gpt-6-sol -c model_reasoning_effort="max" review --commit <sha>  # a single commit
 ```
 
 - Multi-file/large diffs take minutes: run via Bash `run_in_background: true`; the
@@ -51,7 +51,7 @@ codex -m gpt-5.6-luna -c model_reasoning_effort="max" review --commit <sha>  # a
    prompt from stdin; a plain `< file` redirect keeps the command pipe-free):
 
 ```bash
-codex exec -m gpt-5.6-luna -c model_reasoning_effort="max" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
+codex exec -m gpt-6-sol -c model_reasoning_effort="max" -s read-only --cd <repo> --output-schema <skill-dir>/references/review-output.schema.json --output-last-message <scratchpad>/codex-adversarial-<ts>.json - < <scratchpad>/prompt.md
 ```
 
 3. Read the output JSON: `verdict` (`approve` | `needs-attention`), `findings[]`
@@ -70,11 +70,11 @@ codex exec -m gpt-5.6-luna -c model_reasoning_effort="max" -s read-only --cd <re
 
 ## Effort
 
-Always pin effort explicitly - never inherit a vendor default. Per MODELS.md,
-`gpt-5.6-luna` at `"max"` is the review tier; `"high"` only for a fast look at a
-small diff where latency matters more than depth. The Sol worker tiers are
-retired. If a Luna max review still leaves material doubt, escalate per
-MODELS.md: one independent `gpt-5.6-terra` `"max"` adversarial pass, then Root
+Always pin effort explicitly - never inherit a vendor default.
+`gpt-6-sol` at `"max"` is the review tier; `"high"` only for a fast look at a
+small diff where latency matters more than depth. The retired worker tiers stay
+retired. If a gpt-6-sol max review still leaves material doubt, escalate:
+one independent `gpt-6-astra` `"max"` adversarial pass, then Root
 resolves the hard part inline.
 
 References adapted from openai/codex-plugin-cc (Apache-2.0; see references/NOTICE

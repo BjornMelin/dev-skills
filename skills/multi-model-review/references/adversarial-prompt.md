@@ -47,7 +47,7 @@ A finding should answer:
 
 <structured_output_contract>
 Return only valid JSON matching the provided schema.
-Set `reviewer` to "gpt-5.6-sol".
+Set `reviewer` to "gpt-6-astra".
 Set `verdict` to "blocker" for any material risk worth blocking on,
 "changes-recommended" when findings exist but none block, and "ship" only if
 you cannot support any substantive adversarial finding from the provided context.
