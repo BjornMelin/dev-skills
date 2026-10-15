@@ -3,8 +3,12 @@
 This directory documents the research, subagent, operating-layer, and
 skill-authoring systems added to this repository:
 
+- [Code Quality](../skills/code-quality/SKILL.md): scoped implementation and
+  review with reuse, precise contracts, proportional verification, and simplification.
 - [Codex Utils](../skills/codex-utils/SKILL.md): session-aware tool discovery,
   safe parallel reads, clarification, and source verification.
+- [Docs Cleaner](../skills/docs-cleaner/SKILL.md): post-change documentation
+  governance and evidence-preserving consolidation.
 - `codex-research`: Rust CLI for evidence-first research helpers.
 - `codex-dev`: current CLI for local task capsule lifecycle, structured
   evidence, subspawn plan/outcome/synthesis capture, repo-native policy gates,

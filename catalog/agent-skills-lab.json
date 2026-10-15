@@ -1,11 +1,11 @@
 {
   "schemaVersion": "agent_skills_lab_catalog.v1",
-  "generatedAt": "2026-10-15T18:54:15.932211196Z",
+  "generatedAt": "2026-10-15T18:55:04.858009339Z",
   "sourceRepository": "https://github.com/BjornMelin/dev-skills",
-  "sourceCommit": "0294f84334336b539ff139f77e352d972ef5479a",
+  "sourceCommit": "5e078082bcc4db1af8964c5337b1fe441a1b554f",
   "sourceRef": "main",
-  "skillsCount": 82,
-  "totalSkillDirectories": 82,
+  "skillsCount": 84,
+  "totalSkillDirectories": 84,
   "installCommands": {
     "list": "npx skills add BjornMelin/dev-skills --list",
     "installAllCodex": "npx skills add BjornMelin/dev-skills --skill '*' -a codex",
@@ -787,6 +787,54 @@
       },
       "package": {
         "path": "skills/dist/caveman-compress.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "code-quality",
+      "slug": "code-quality",
+      "description": "Implement, fix, simplify, refactor, or review code with evidence-based reuse, clear ownership, precise types, focused tests, and removal of accidental complexity. Use for substantive code changes and code-quality reviews. Skip prose-only, generated-only, dependency-only, or purely mechanical edits.",
+      "path": "skills/code-quality",
+      "skillMdPath": "skills/code-quality/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/code-quality",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/code-quality/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill code-quality -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill code-quality -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill code-quality"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Documented",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "docs_indexed"
+      ],
+      "improvementSignals": [
+        "missing_dist_package",
+        "missing_references",
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 0,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 0
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": true
+      },
+      "package": {
+        "path": "skills/dist/code-quality.skill",
         "present": false,
         "rejected": false
       }
@@ -1666,6 +1714,54 @@
       },
       "package": {
         "path": "skills/dist/docs-align.skill",
+        "present": false,
+        "rejected": false
+      }
+    },
+    {
+      "name": "docs-cleaner",
+      "slug": "docs-cleaner",
+      "description": "Consolidates redundant docs while preserving valuable content; keeps docs truthful after changes. Two modes. (1) POST-CHANGE GOVERNANCE -- when code, scripts, config, env vars, ports, paths, deployment, auth, tests, or a documented procedure changed; also \"which docs are now wrong\", \"check docs for inconsistencies\", \"过时的命令/路径\", \"文档同步\". Use it even when the user mentions only the change and never the docs -- updating them is part of the change, not optional cleanup. (2) CONSOLIDATION -- \"clean up docs\", \"documentation bloat\", \"reduce documentation sprawl\", \"consolidate documentation\", \"too many doc files\", \"merge redundant docs\", \"merge these docs\", \"文档太多/太乱\", multiple files covering the same topic, or docs exceeding 500 lines across files on similar topics. Finds stale copies of a fact changed in only one place, values that should never have been persisted (counts, totals, \"N items\", restated summaries), rival definitions that drift apart, and orphaned cross-references.",
+      "path": "skills/docs-cleaner",
+      "skillMdPath": "skills/docs-cleaner/SKILL.md",
+      "sourceUrls": {
+        "directory": "https://github.com/BjornMelin/dev-skills/tree/main/skills/docs-cleaner",
+        "skillMd": "https://github.com/BjornMelin/dev-skills/blob/main/skills/docs-cleaner/SKILL.md"
+      },
+      "installCommands": {
+        "codexGlobal": "npx skills add BjornMelin/dev-skills --skill docs-cleaner -g -a codex -y",
+        "codexProject": "npx skills add BjornMelin/dev-skills --skill docs-cleaner -a codex",
+        "allAgents": "npx skills add BjornMelin/dev-skills --agent '*' --skill docs-cleaner"
+      },
+      "readinessLabels": [
+        "Valid",
+        "Documented",
+        "Emerging"
+      ],
+      "qualitySignals": [
+        "readme_catalogued",
+        "docs_indexed",
+        "has_references"
+      ],
+      "improvementSignals": [
+        "missing_dist_package",
+        "missing_scripts",
+        "no_assets_templates_or_agents"
+      ],
+      "resources": {
+        "references": 1,
+        "scripts": 0,
+        "assets": 0,
+        "templates": 0,
+        "agents": 0,
+        "total": 1
+      },
+      "exposure": {
+        "readme_catalog": true,
+        "docs_index": true
+      },
+      "package": {
+        "path": "skills/dist/docs-cleaner.skill",
         "present": false,
         "rejected": false
       }
