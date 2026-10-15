@@ -286,7 +286,7 @@ for local development and validation commands.
 
 | Plugin | Skills | Description | Sources |
 | --- | --- | --- | --- |
-| `web-motion` | `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
+| `web-motion` | `gsap-core`, `gsap-react`, `gsap-timeline`, `gsap-utils`, `typegpu`, `web-css-animations`, `web-lottie`, `web-motion-react`, `web-rive`, `web-tailwind-motion`, `web-three-r3f`, `web-waapi` | Self-contained web motion skills with GSAP, TypeGPU, Motion React, CSS, WAAPI, Tailwind, Lottie, Three.js/R3F, and Rive references. | [Codex](plugins/web-motion/.codex-plugin/plugin.json), [Claude Code](plugins/web-motion/.claude-plugin/plugin.json) |
 | `design-motion` | `design-motion-audit`, `r3f-scene-polish` | Cross-stack motion & design-system direction: a motion-quality audit with token scaffolding, cinematic R3F look-dev, seven specialist motion subagents (including a runtime-proof verifier), and a director output style. Routes single-stack work to `expo-motion`, `web-three-r3f`, and `gsap`. | [Codex](plugins/design-motion/.codex-plugin/plugin.json), [Claude Code](plugins/design-motion/.claude-plugin/plugin.json), [Kimi](plugins/design-motion/kimi.plugin.json) |
 
 | Skill | Description | Source |
