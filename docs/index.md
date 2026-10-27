@@ -116,6 +116,8 @@ out of version control.
 
 ## Skill References
 
+- [Vitest Engineering](reference/vitest-dev.md): compact Vitest v5+ testing, measured optimization, source authority, and validation boundaries.
+
 - [Deep Researcher Skill](reference/deep-researcher-skill.md)
 - [Firecrawl Skill](../skills/firecrawl/SKILL.md)
 - [Expo Motion Skill](../skills/expo-motion/SKILL.md): manifest-driven Expo and
