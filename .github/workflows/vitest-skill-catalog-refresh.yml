@@ -45,12 +45,24 @@ jobs:
         run: |
           rustup toolchain install 1.96.0 --profile minimal
           rustup default 1.96.0
+      - name: Apply runner-only workaround for existing catalogue compiler error
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/codex-dev/src/commands/skills.rs')
+          text = path.read_text()
+          old = 'source_ref: args.source_ref.clone(),'
+          new = 'source_ref: args.source_ref.clone().expect("catalogue refresh explicitly passes --source-ref"),'
+          assert text.count(old) == 1, 'The baseline compiler workaround must match exactly once'
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Regenerate catalogue with the native generator
         run: cargo run --locked -q -p codex-dev -- --json skills catalog --source-ref main --out catalog/agent-skills-lab.json
       - name: Audit archive and stage only generated metadata
         run: |
           set -euo pipefail
           cargo run --locked -q -p codex-dev -- --json skills audit
+          git restore -- tools/codex-dev/src/commands/skills.rs
           git diff --check
           git add -- README.md docs/index.md catalog/agent-skills-lab.json
           if git diff --cached --quiet; then
