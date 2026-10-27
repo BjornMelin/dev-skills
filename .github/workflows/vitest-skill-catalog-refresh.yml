@@ -1,4 +1,4 @@
-name: Vitest skill catalogue refresh (temporary)
+name: Vitest skill portal refresh (temporary)
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ jobs:
   refresh:
     if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/vitest-dev-v5-20261027'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     env:
       PR_HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
     steps:
@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 2
-      - name: Align the existing documentation portals
+      - name: Align existing portals and record catalogue validation limitation
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -40,38 +40,21 @@ jobs:
           assert len(matches) == 1
           lines[matches[0]] = '| `vitest-dev` | Vitest v5+: behavioral tests, migrations, Browser Mode, and measured local/CI optimization. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |\n'
           readme.write_text(''.join(lines))
+          report = Path('docs/reference/vitest-dev.md')
+          text = report.read_text()
+          heading = '\n## Repository catalogue limitation\n'
+          if heading not in text:
+              report.write_text(text + heading + '\nCatalogue regeneration did not complete. The native tool returned incompatible command interfaces across the attempted invocations, including rejecting the documented `skills catalog check --write` command. A prior attempt also exposed a source-ref type mismatch. The generated catalogue was not hand-edited or represented as refreshed. No compiler workaround or permanent workflow change is included in the final diff. Repository-wide CI is not claimed green; inspect PR #183 checks before merging.\n')
           PY
-      - name: Install repository-pinned Rust
-        run: |
-          rustup toolchain install 1.96.0 --profile minimal
-          rustup default 1.96.0
-      - name: Apply runner-only workaround for the existing optional source-ref compiler error
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          old = 'source_ref: args.source_ref.clone(),'
-          matches = [(p, p.read_text()) for root in ('crates', 'tools') for p in Path(root).rglob('*.rs') if old in p.read_text()]
-          assert len(matches) <= 1, 'Ambiguous workaround target; refusing to change source'
-          for path, text in matches:
-              assert text.count(old) == 1
-              path.write_text(text.replace(old, 'source_ref: args.source_ref.clone().unwrap_or_else(|| "main".to_owned()),', 1))
-          print(f'Applied {len(matches)} runner-only workaround(s)')
-          PY
-      - name: Regenerate catalogue with the repository documented command
-        run: |
-          cargo run --locked -q -p codex-dev -- --json skills catalog check --write
-          cargo run --locked -q -p codex-dev -- --json skills catalog check
-      - name: Audit archive and stage only generated metadata
+      - name: Commit only scoped documentation updates
         run: |
           set -euo pipefail
-          cargo run --locked -q -p codex-dev -- --json skills audit
-          git restore -- crates tools
           git diff --check
-          git add -- README.md docs/index.md catalog/agent-skills-lab.json
+          git add -- README.md docs/index.md docs/reference/vitest-dev.md
           if git diff --cached --quiet; then
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore(vitest-dev): refresh skill portals and generated catalogue'
+          git commit -m 'docs(vitest-dev): update portals and record catalogue blocker'
           git push origin "HEAD:refs/heads/$PR_HEAD_BRANCH"
