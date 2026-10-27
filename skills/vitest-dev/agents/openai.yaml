@@ -1,6 +1,6 @@
 interface:
-  display_name: "Vitest Dev"
-  short_description: "Vitest + TS + Next tests"
-  default_prompt: "Use $vitest-dev to write, debug, optimize, or harden Vitest tests for TypeScript and Next.js projects."
+  display_name: "Vitest Engineering"
+  short_description: "Reliable Vitest v5+ tests and measured speedups"
+  default_prompt: "Use $vitest-dev to complete the scoped Vitest work, preserve behavioral confidence, and measure any proposed speedup."
 policy:
   allow_implicit_invocation: true

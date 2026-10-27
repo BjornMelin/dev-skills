@@ -1,196 +1,42 @@
 ---
 name: vitest-dev
+description: "Write, debug, migrate, and speed up Vitest v5+ tests, Browser Mode, coverage, and Bun/Turborepo CI without weakening behavior checks."
+license: MIT
 metadata:
-  version: 0.1.0
-description: "Generic Vitest/TypeScript testing: write or repair tests, triage flakes, tune monorepo config, and reduce local/CI test time."
+  version: "1.0.0"
+  verified: "2026-10-27"
+  vitest: "5.0.5"
 ---
 
-# vitest-dev
+# Vitest engineering
 
-A Claude Code skill for producing **high-signal, low-flake, fast** Vitest suites (TypeScript + Next.js 16) and for shaping Vitest configuration for optimal **local DX** and **CI throughput**.
+Improve confidence per test and feedback time, not test count or feature adoption. Work in the existing repository; do not scaffold a testing framework around Vitest.
 
-## Core outcomes
+## Execute the task
 
-1. **Correctness first**: tests encode business behavior (not implementation details).
-2. **Deterministic**: no network, no clocks, no global leakage, no order dependencies.
-3. **Fast**:
-   - fast feedback locally (watch mode + smart filtering)
-   - scalable CI (parallel workers + sharding + cache + machine-readable reports)
-4. **Actionable failures**: failures localize root cause quickly.
+1. Inspect the affected implementation, nearest tests, package scripts, and applicable configuration. Read installed versions from the lockfile/manifests. Preserve the runner, runtime, and package manager unless changing them is the task. For upgrades, check matching addon peers and migration notes; do not install `latest` during an ordinary test repair.
+2. Identify the observable contract and realistic regression. Exercise owned code directly; mock external boundaries only when needed. Add the smallest meaningful test or repair the existing one. Delete redundant coverage only when the retained test protects the same behavior.
+3. Run the repository's scoped command, using `vitest run` semantics for noninteractive execution. Confirm selected files/tests, failures, skips, and exit status. A static `vitest list`, a cached task, or a test with every dependency mocked is not fresh behavioral verification.
+4. Widen verification for shared configuration, dependency, runtime, or cross-package changes. For a local test edit, stop after the relevant checks pass. Report executed checks, unresolved failures, and measured performance changes; do not claim unexecuted browser/provider/CI checks passed.
 
-## Default operating procedure
+## Read only what the task needs
 
-When asked to add or improve tests:
+An ordinary test edit can finish with this entry point. Read the indicated reference before changing that surface, not all references on activation. They are independent, with no nested local-reference chain.
 
-1. **Map the unit under test**
-   - Identify public API / observable behavior
-   - Identify boundaries: I/O, time, randomness, network, database, filesystem, env, global state
-2. **Choose the lightest test that gives confidence**
-   - Pure unit test (no framework/runtime) → preferred
-   - Component test in `jsdom` (React) when DOM behavior is essential
-   - Integration test in Node when multiple modules must cooperate
-   - Browser Mode (real browser) only when DOM fidelity matters (layout/visuals, real events)
-3. **Design a minimal test matrix**
-   - happy path(s)
-   - boundary conditions
-   - error paths
-   - key invariants (idempotency, caching semantics, auth gates, etc.)
-4. **Implement tests**
-   - arrange/act/assert clarity
-   - isolate side effects and restore mocks
-   - prefer stable assertions (`toHaveTextContent`, role-based queries, etc.)
-5. **Run locally and fix**
-   - run smallest scope first (single file / name filtering)
-6. **Harden**
-   - remove flakiness vectors (timers, concurrency, random, hidden network)
-   - ensure tests pass in “run mode” (CI-like)
-7. **Optimize**
-   - reduce expensive setup per test file
-   - tune Vitest config: pool, isolate, workers, cache, deps optimization, sharding
-8. **Deliver**
-   - include config + scripts changes needed for local + CI
-   - include README notes if non-obvious
+| Task or uncertainty | Reference |
+| --- | --- |
+| Upgrade, removed API, projects, config inheritance, version mismatch | [Configuration and migration](references/configuration.md) |
+| Slow tests, workers, isolation, transform caches, `doctor`, experimental execution | [Performance](references/performance.md) |
+| Mocking, timers, async failures, fixtures, types, lint enforcement | [Test patterns](references/testing.md) |
+| Real-browser components, locators, screenshots, traces, framework boundaries | [Browser testing](references/browser.md) |
+| Bun/Turbo, affected tests, sharding, reports, coverage, type tests, benchmarks | [CI and execution](references/ci.md) |
 
-## Naming and structure conventions
+Use the installed public types and CLI help for exact signatures. Consult the matching official release docs for unresolved details. Context7 and community skills are discovery aids, not authority over a newer installed patch. Never fetch the entire documentation corpus into a routine task.
 
-- Place tests next to code for discoverability:
-  - `src/foo.ts` → `src/foo.test.ts`
-  - `src/components/Button.tsx` → `src/components/Button.test.tsx`
-- Use `__tests__` for framework-driven routes when colocation is awkward (Next example uses this convention).
-- Prefer `describe('<unit>')` with focused `it('does X when Y')`.
+## Keep tests honest
 
-## Vitest execution modes and what to target
-
-- Local development: `vitest` (watch mode by default when TTY is detected).
-- CI: `vitest run` (forces a single run and is non-interactive).
-
-From the Vitest CLI guide, Vitest defaults to watch mode when `process.stdout.isTTY` is true and falls back to run mode otherwise, while `vitest run` always runs once. (See: https://vitest.dev/guide/cli)
-
-## Configuration baseline
-
-### Recommended “default” config goals
-
-- Use TypeScript path aliases (monorepos and Next apps frequently need this).
-- Choose an environment per project:
-  - `node` for backend/unit tests
-  - `jsdom` (or `happy-dom`) for React component tests
-- Keep setup lightweight.
-
-### Pool choice (speed vs compatibility)
-
-Vitest runs test files using a **pool** (`forks`, `threads`, `vmThreads`, `vmForks`). By default (Vitest v4 docs) it uses **`forks`**. `threads` can be faster but may break libraries that use native bindings; `forks` uses `child_process` and supports process APIs like `process.chdir()`. (See: https://vitest.dev/config/pool)
-
-**Rule of thumb**:
-- Prefer `threads` for “pure JS/TS” unit tests.
-- Use `forks` if you use:
-  - native addons (e.g. Prisma, bcrypt, canvas)
-  - `process.*` APIs that are not available in threads
-- Avoid VM pools unless you have measured wins and understand the tradeoffs.
-
-### Isolation (speed vs global leakage)
-
-`test.isolate` defaults to `true`. Disabling can improve performance when tests don’t rely on side effects (often true for Node-only units). (See: https://vitest.dev/config/isolate)
-
-**Rule of thumb**:
-- Keep `isolate: true` for frontend/component tests (`jsdom`) and any suite that touches global state.
-- Consider `isolate: false` for Node-only pure units *after* you have strong isolation discipline.
-
-### File-level and test-level parallelism
-
-- `test.fileParallelism` default is `true`. Setting it to `false` forces single-worker execution by overriding `maxWorkers` to 1. (See: https://vitest.dev/config/fileparallelism)
-- `test.maxWorkers` defaults to:
-  - all available parallelism when watch is disabled
-  - half when watch is enabled
-  It also accepts a percentage string like `"50%"`. (See: https://vitest.dev/config/maxworkers)
-- `test.maxConcurrency` controls how many `test.concurrent` tests can run simultaneously, default `5`. (See: https://vitest.dev/config/maxconcurrency)
-
-### Cache (CI win)
-
-Vitest caching is enabled by default and uses `node_modules/.vite/vitest`. (See: https://vitest.dev/config/cache)
-
-For CI, persist this directory between runs (per branch key) for significant speedups.
-
-## Next.js 16 integration defaults
-
-Use Next’s recommended baseline:
-- Install (TypeScript): `vitest`, `@vitejs/plugin-react`, `jsdom`, `@testing-library/react`, `@testing-library/dom`, `vite-tsconfig-paths`.
-- Configure `test.environment = 'jsdom'` with the React + tsconfigPaths plugins.
-
-(See: https://nextjs.org/docs/app/guides/testing/vitest)
-
-**Important limitation noted by Next.js**: Vitest currently does not support `async` Server Components; for `async` components, use E2E tests instead. (See the same Next.js guide above.)
-
-## Mocking & test doubles discipline
-
-### Preferred hierarchy (from most realistic to most isolated)
-
-1. **Real pure functions** (no mocking)
-2. **In-memory fakes** (e.g., fake repo with a Map)
-3. **Contract-driven stubs** (minimal, stable)
-4. **Spies** (`vi.spyOn`) for verifying interactions
-5. **Module mocks** (`vi.mock`) only when necessary
-
-### Mock reset policy
-
-- Default: clean up per test file:
-  - `afterEach(() => vi.restoreAllMocks())`
-- If you use global stubs (env/globals), clean them up in `afterEach` too.
-
-### Timers
-
-Use fake timers to avoid slow sleeps. Vitest’s docs show using `vi.useFakeTimers()` with `vi.runAllTimers()` / `vi.advanceTimersByTime()` to speed time-based code. (See: https://vitest.dev/guide/mocking/timers)
-
-Advanced note: if you configure `fakeTimers.toFake` to include `nextTick`, it is **not supported** with `--pool=forks` because Node’s `child_process` uses `process.nextTick` internally and can hang; it is supported with `--pool=threads`. (See: https://vitest.dev/config/faketimers)
-
-## CI reporting and sharding
-
-### Reporters
-
-- Use `junit` to export JUnit XML (for most CI systems). (See: https://vitest.dev/guide/reporters)
-- In GitHub Actions, Vitest automatically adds `github-actions` reporter when `GITHUB_ACTIONS === 'true'` if default reporters are used; if you override reporters, add it explicitly. (See: https://vitest.dev/guide/reporters)
-
-### Sharding (multi-machine parallel CI)
-
-Use `--shard` with the `blob` reporter and merge at the end. Vitest recommends the blob reporter for sharded runs and provides `--merge-reports`. (See: https://vitest.dev/guide/reporters)
-
-## Using test projects for multi-environment suites
-
-Use `test.projects` to run multiple configurations in one process (monorepos or mixed environments). Vitest notes the older “workspace” name is deprecated in favor of `projects`. (See: https://vitest.dev/guide/projects)
-
-Patterns:
-- project A: `environment: 'node'`, `pool: 'threads'`, `isolate: false`
-- project B: `environment: 'jsdom'`, `isolate: true`
-
-## Deliverables this skill produces
-
-When invoked, this skill can generate or update:
-
-- Vitest config(s): `vitest.config.ts`, multi-project configs, CI overrides
-- Test setup: `setupTests.ts`, test utils, mocks
-- Tests: unit, integration, React component tests, type tests
-- CI scripts: sharding + merging reports, coverage, flake detection
-- Performance tuning recommendations with measurable steps
-
-## Output quality gates
-
-Before finalizing, ensure:
-
-- No test uses real timers (`setTimeout` waits), real network, or real clock time without explicit control.
-- All mocks/stubs are restored.
-- Tests pass with:
-  - `vitest`
-  - `vitest run`
-- On CI, tests emit machine-readable artifacts (JUnit, JSON, blob merge) if requested.
-- Coverage settings match team goals and don’t create “coverage theater”.
-
-## Where to look for authoritative details (official docs)
-
-- Config reference: https://vitest.dev/config
-- CLI: https://vitest.dev/guide/cli
-- Improving performance: https://vitest.dev/guide/improving-performance
-- Profiling performance: https://vitest.dev/guide/profiling-test-performance
-- Parallelism: https://vitest.dev/guide/parallelism
-- Mocking: https://vitest.dev/guide/mocking
-- Reporters: https://vitest.dev/guide/reporters
-- Coverage: https://vitest.dev/guide/coverage
-- Next.js 16 + Vitest: https://nextjs.org/docs/app/guides/testing/vitest
+- Preserve type evidence: use inferred/native contracts, `satisfies`, typed mocks, and `expect.assert` for narrowing. No `any`, double assertions, fake generated IDs, or production interfaces added solely to appease tests.
+- Assert the business result, including relevant failure and permission paths. Avoid tautologies, implementation snapshots, assertions on mocks alone, swallowed errors, and conditional assertions that can never run. Keep exact boolean assertions exact.
+- Await asynchronous assertions and browser actions. Prefer observable completion or bounded polling over sleeps. Keep clocks, globals, network, and resources test-owned; concurrent tests must not mutate shared mocks or fake clocks.
+- In v5, `clearMocks` clears history by default, not implementations. Hoisted `vi.mock`/`vi.hoisted` calls belong at module scope. Replace removed `.sequential` with `{ concurrent: false }`, which does not serialize other files.
+- Preserve useful native defaults. Do not blanket-disable isolation, enable retries, raise timeouts, update snapshots, exclude coverage, or accept zero tests to manufacture green results. Use a feature only when it removes a demonstrated problem.

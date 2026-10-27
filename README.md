@@ -371,7 +371,7 @@ for local development and validation commands.
 | `tanstack-start` | TanStack Start: server functions, middleware, server routes, auth boundaries, SSR, deployment. | [skills/tanstack-start/SKILL.md](skills/tanstack-start/SKILL.md) |
 | `technical-writing` | Internal engineering docs: PRDs, specs, architecture, runbooks, migrations, and maintainer guides. | [skills/technical-writing/SKILL.md](skills/technical-writing/SKILL.md) |
 | `upgrade-pack-generator` | Repo-local upgrade packs under `.agents/plans/upgrade/` (playbook, prompts, manifest). | [skills/upgrade-pack-generator/SKILL.md](skills/upgrade-pack-generator/SKILL.md) |
-| `vitest-dev` | Vitest for TypeScript + Next.js: stable suites, fast local + CI, sharding. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
+| `vitest-dev` | Vitest v5+: behavioral tests, migrations, Browser Mode, and measured local/CI optimization. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |
 | `wcag-audit-patterns` | WCAG 2.2 conformance audit: SC-numbered checklist, axe-core and Playwright harness, pa11y and Lighthouse CLI, and remediation guidance. | [skills/wcag-audit-patterns/SKILL.md](skills/wcag-audit-patterns/SKILL.md) |
 | `web-interface-guidelines` | Terse pre-commit sweep of UI code against the Vercel Web Interface Guidelines, across interaction, forms, layout, content, performance, and accessibility. | [skills/web-interface-guidelines/SKILL.md](skills/web-interface-guidelines/SKILL.md) |
 | `zod-v4` | Zod v4: schemas, v3 migration, errors, JSON Schema/OpenAPI, framework hooks. | [skills/zod-v4/SKILL.md](skills/zod-v4/SKILL.md) |
