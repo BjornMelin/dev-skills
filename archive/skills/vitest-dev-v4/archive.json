@@ -1,0 +1,11 @@
+{
+  "schema": "skill_archive.v1",
+  "name": "vitest-dev-v4",
+  "status": "archived",
+  "archived_at": "2026-10-27T14:47:29.371062Z",
+  "source_path": "skills/vitest-dev",
+  "archived_path": "archive/skills/vitest-dev-v4",
+  "reason": "Replaced by the compact, version-aware Vitest v5+ skill. Historical v4 guidance is retained, not active.",
+  "restore": "Copy this directory to skills/vitest-dev-v4 and remove archive.json. Review the historical package metadata and v4 compatibility before use.",
+  "replacement": "vitest-dev"
+}

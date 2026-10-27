@@ -1,0 +1,62 @@
+name: Vitest skill catalogue refresh (temporary)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: vitest-skill-catalog-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/vitest-dev-v5-20261027'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PR_HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+      - name: Align the existing documentation portals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          index = Path('docs/index.md')
+          text = index.read_text()
+          marker = '## Skill References\n'
+          assert text.count(marker) == 1
+          entry = '\n- [Vitest Engineering](reference/vitest-dev.md): compact Vitest v5+ testing, measured optimization, source authority, and validation boundaries.\n'
+          if '(reference/vitest-dev.md)' not in text:
+              index.write_text(text.replace(marker, marker + entry, 1))
+          readme = Path('README.md')
+          lines = readme.read_text().splitlines(keepends=True)
+          matches = [i for i, line in enumerate(lines) if line.startswith('| `vitest-dev` |')]
+          assert len(matches) == 1
+          lines[matches[0]] = '| `vitest-dev` | Vitest v5+: behavioral tests, migrations, Browser Mode, and measured local/CI optimization. | [skills/vitest-dev/SKILL.md](skills/vitest-dev/SKILL.md) |\n'
+          readme.write_text(''.join(lines))
+          PY
+      - name: Install repository-pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+      - name: Regenerate catalogue with the native generator
+        run: cargo run --locked -q -p codex-dev -- --json skills catalog --source-ref main --out catalog/agent-skills-lab.json
+      - name: Audit archive and stage only generated metadata
+        run: |
+          set -euo pipefail
+          cargo run --locked -q -p codex-dev -- --json skills audit
+          git diff --check
+          git add -- README.md docs/index.md catalog/agent-skills-lab.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(vitest-dev): refresh skill portals and generated catalogue'
+          git push origin "HEAD:refs/heads/$PR_HEAD_BRANCH"
