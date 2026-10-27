@@ -45,7 +45,7 @@ jobs:
         run: |
           rustup toolchain install 1.96.0 --profile minimal
           rustup default 1.96.0
-      - name: Apply a runner-only workaround only when the exact affected expression exists
+      - name: Apply runner-only workaround for the existing optional source-ref compiler error
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -54,11 +54,13 @@ jobs:
           assert len(matches) <= 1, 'Ambiguous workaround target; refusing to change source'
           for path, text in matches:
               assert text.count(old) == 1
-              path.write_text(text.replace(old, 'source_ref: args.source_ref.clone().expect("refresh explicitly passes --source-ref"),', 1))
+              path.write_text(text.replace(old, 'source_ref: args.source_ref.clone().unwrap_or_else(|| "main".to_owned()),', 1))
           print(f'Applied {len(matches)} runner-only workaround(s)')
           PY
-      - name: Regenerate catalogue with the native generator
-        run: cargo run --locked -q -p codex-dev -- --json skills catalog --source-ref main --out catalog/agent-skills-lab.json
+      - name: Regenerate catalogue with the repository documented command
+        run: |
+          cargo run --locked -q -p codex-dev -- --json skills catalog check --write
+          cargo run --locked -q -p codex-dev -- --json skills catalog check
       - name: Audit archive and stage only generated metadata
         run: |
           set -euo pipefail
